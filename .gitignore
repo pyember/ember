@@ -1,0 +1,14 @@
+**/.DS_Store
+**/*.pyc
+**/__pycache__/
+*.egg-info/
+*.eggs/
+
+.vscode
+
+# Custom configuration file for API keys.
+config.ini
+config.ini.*
+
+.env
+*.secret

@@ -1,0 +1,10 @@
+debug: true
+logging:
+  level: "DEBUG"
+registry:
+  auto_register: true
+  included_configs:
+  - "./src/avior/registry/model/provider_registry/openai/openai_config.yaml"
+  - "./src/avior/registry/model/provider_registry/anthropic/anthropic_config.yaml"
+  - "./src/avior/registry/model/provider_registry/deepmind/gemini_config.yaml"
+  # To add more providers here as we grow
