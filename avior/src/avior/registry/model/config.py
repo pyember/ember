@@ -19,6 +19,7 @@ GLOBAL_USAGE_SERVICE = UsageService()
 
 _INITIALIZED = False
 
+
 def deep_merge(base: Any, override: Any) -> Any:
     """
     Recursively merges `override` into `base`, returning `base`.
@@ -35,6 +36,7 @@ def deep_merge(base: Any, override: Any) -> Any:
         return base
     else:
         return override
+
 
 ###############################################################################
 # NEW FUNCTION: Expand any string of the form "${ENV_VAR}" from your environment.
@@ -54,7 +56,7 @@ def resolve_env_vars(data: Any) -> Any:
         return data
     elif isinstance(data, str):
         # Only replace if the entire string is a single environment placeholder.
-        match = re.match(r'^\${([^}]+)}$', data)
+        match = re.match(r"^\${([^}]+)}$", data)
         if match:
             env_name = match.group(1)
             return os.environ.get(env_name, "")
@@ -62,6 +64,7 @@ def resolve_env_vars(data: Any) -> Any:
             return data
     else:
         return data
+
 
 class RegistryConfig(BaseModel):
     auto_register: bool = False
@@ -77,7 +80,7 @@ class OtherSettings(BaseModel):
 
 class AviorSettings(BaseSettings):
     """
-    Example Pydantic-based settings. 
+    Example Pydantic-based settings.
     Reads environment variables + your 'config.yaml' by default.
     """
 
@@ -102,7 +105,7 @@ class AviorSettings(BaseSettings):
         protected_namespaces=("settings_",),
     )
 
-    def load_model_config(self)-> Dict[str, Any]:
+    def load_model_config(self) -> Dict[str, Any]:
         """
         Loads the main config.yaml specified by model_config_path.
         Returns a Python dict of all config data.
@@ -129,7 +132,9 @@ def initialize_global_registry() -> None:
 
     # 1) Load environment settings
     env_settings = AviorSettings()
-    logger.debug("Environment-based settings (before YAML merge): %s", env_settings.model_dump())
+    logger.debug(
+        "Environment-based settings (before YAML merge): %s", env_settings.model_dump()
+    )
 
     # 2) Load the base config.yaml into a dict
     yaml_data = env_settings.load_model_config()
@@ -171,7 +176,9 @@ def initialize_global_registry() -> None:
     if main_config.registry.auto_register and main_config.registry.models:
         logger.info("Auto-registering models from the final config:")
         for m in main_config.registry.models:
-            logger.info(f"  -> Registering model_id='{m.model_id}', provider='{m.provider.name}'")
+            logger.info(
+                f"  -> Registering model_id='{m.model_id}', provider='{m.provider.name}'"
+            )
             GLOBAL_MODEL_REGISTRY.register_model(m)
     else:
         logger.warning("No models found to auto-register or 'auto_register' is false.")

@@ -13,16 +13,18 @@ from src.avior.registry.model.schemas.usage import UsageStats
 from src.avior.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
-    BaseChatParameters
+    BaseChatParameters,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class GeminiChatParameters(BaseChatParameters):
     """
     For Google Gemini, we place 'max_tokens' into the 'max_output_tokens'
     field within a GenerationConfig object.
     """
+
     max_tokens: int | None = Field(default=None)
 
     @field_validator("max_tokens", mode="before")
@@ -46,6 +48,7 @@ class GeminiChatParameters(BaseChatParameters):
 
         return {"generation_config": generation_cfg}
 
+
 class GeminiModel(BaseProviderModel):
     """
     Google Gemini provider implementation.
@@ -66,10 +69,13 @@ class GeminiModel(BaseProviderModel):
         logger.info("Listing available Gemini models from Google Generative AI:")
         try:
             for m in genai.list_models():
-                logger.info("  name=%s | supported=%s", m.name, m.supported_generation_methods)
+                logger.info(
+                    "  name=%s | supported=%s", m.name, m.supported_generation_methods
+                )
         except Exception as ex:
             logger.warning(
-                "Failed to list Gemini models. Possibly limited or missing permissions: %s", ex
+                "Failed to list Gemini models. Possibly limited or missing permissions: %s",
+                ex,
             )
         return genai
 
@@ -86,19 +92,21 @@ class GeminiModel(BaseProviderModel):
             if raw_name not in available:
                 logger.warning(
                     "Gemini model '%s' not recognized by the API. Using 'models/gemini-1.5-flash'.",
-                    raw_name
+                    raw_name,
                 )
                 return "models/gemini-1.5-flash"
         except Exception as ex:
             logger.warning(
                 "Unable to confirm Gemini model availability. Defaulting to 'models/gemini-1.5-flash'. Error: %s",
-                ex
+                ex,
             )
             return "models/gemini-1.5-flash"
 
         return raw_name
 
-    @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True)
+    @retry(
+        wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True
+    )
     def forward(self, request: ChatRequest) -> ChatResponse:
         """
         Sends a content-generation request to the specified Gemini model.
@@ -120,7 +128,9 @@ class GeminiModel(BaseProviderModel):
         final_model_ref = self._normalize_gemini_model_name(self.model_info.model_name)
 
         # 1) Convert universal ChatRequest -> GeminiChatParameters
-        gemini_params = GeminiChatParameters(**request.dict(exclude={"provider_params"}))
+        gemini_params = GeminiChatParameters(
+            **request.dict(exclude={"provider_params"})
+        )
         gemini_kwargs = gemini_params.to_gemini_kwargs()
 
         # 2) Merge additional provider_params
@@ -135,19 +145,19 @@ class GeminiModel(BaseProviderModel):
                 request.prompt,
                 generation_config=gen_config,
                 # provider_params might also contain other recognized fields
-                **{k: v for k, v in gemini_kwargs.items() if k != "generation_config"}
+                **{k: v for k, v in gemini_kwargs.items() if k != "generation_config"},
             )
 
-            logger.debug("Gemini usage_metadata from response=%r", response.usage_metadata)
+            logger.debug(
+                "Gemini usage_metadata from response=%r", response.usage_metadata
+            )
 
             text = response.text
             if not text:
                 raise ProviderAPIError("Gemini returned no text.")
 
             return ChatResponse(
-                data=text,
-                raw_output=response,
-                usage=self.calculate_usage(response)
+                data=text, raw_output=response, usage=self.calculate_usage(response)
             )
 
         except NotFound as nf:
@@ -168,10 +178,16 @@ class GeminiModel(BaseProviderModel):
 
         prompt_count = getattr(usage_data, "prompt_token_count", 0)
         completion_count = getattr(usage_data, "candidates_token_count", 0)
-        total_count = getattr(usage_data, "total_token_count", 0) or (prompt_count + completion_count)
+        total_count = getattr(usage_data, "total_token_count", 0) or (
+            prompt_count + completion_count
+        )
 
-        cost_input = (prompt_count / 1000.0) * self.model_info.cost.input_cost_per_thousand
-        cost_output = (completion_count / 1000.0) * self.model_info.cost.output_cost_per_thousand
+        cost_input = (
+            prompt_count / 1000.0
+        ) * self.model_info.cost.input_cost_per_thousand
+        cost_output = (
+            completion_count / 1000.0
+        ) * self.model_info.cost.output_cost_per_thousand
         total_cost = round(cost_input + cost_output, 6)
 
         return UsageStats(

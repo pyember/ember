@@ -1,5 +1,5 @@
-
 from avior.core.graph_executor import NoNGraphBuilder, NoNGraphData
+
 
 def multi_model_graph() -> NoNGraphData:
     """Builds a multi-model NoN graph with multiple model ensembles and a final judge.
@@ -36,12 +36,14 @@ def multi_model_graph() -> NoNGraphData:
             ],
         },
     }
-    return NoNGraphBuilder().parse_graph(graph_config,)
+    return NoNGraphBuilder().parse_graph(
+        graph_config,
+    )
 
 
 from typing import Dict, Any
 from avior.registry.operator.operator_base import Operator
-from avior.registry import non 
+from avior.registry import non
 
 
 class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
@@ -57,7 +59,9 @@ class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
 
     def forward(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         ens_out = self.ensemble(inputs)  # calls EnsembleInputs(...) under the hood
-        ref_out = self.refine({"query": inputs.get("query", ""), "responses": [ens_out]})
+        ref_out = self.refine(
+            {"query": inputs.get("query", ""), "responses": [ens_out]}
+        )
         return ref_out
 
 
@@ -76,7 +80,7 @@ class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
             "responses": [
                 s1_out.get("final_answer", ""),
                 s2_out.get("final_answer", ""),
-            ]
+            ],
         }
         judged = self.judge(judge_in)
         return judged

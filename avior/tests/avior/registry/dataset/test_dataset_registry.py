@@ -13,7 +13,7 @@ from src.avior.registry.dataset.base.models import DatasetInfo, DatasetEntry
 from src.avior.registry.dataset.base.preppers import IDatasetPrepper
 from src.avior.registry.dataset.base.transformers import IDatasetTransformer
 
-from src.avior.registry.dataset.datasets.truthful_qa import TruthfulQAPrepper 
+from src.avior.registry.dataset.datasets.truthful_qa import TruthfulQAPrepper
 from src.avior.registry.dataset.datasets.mmlu import MMLUPrepper
 from src.avior.registry.dataset.datasets.commonsense_qa import CommonsenseQAPrepper
 from src.avior.registry.dataset.datasets.halueval import HaluEvalPrepper
@@ -44,19 +44,21 @@ def sample_dataset_info():
         name="test",
         description="Test Dataset",
         source="test_source",
-        task_type="multiple_choice"
+        task_type="multiple_choice",
     )
 
 
 @pytest.fixture
 def sample_prepper(sample_dataset_info):
     """Fixture to create a sample Prepper object."""
+
     class SamplePrepper(IDatasetPrepper):
         def __init__(self, dataset_info=None):
             # Store dataset_info if we want to test directory creation.
             self.dataset_info = dataset_info
             if dataset_info:
                 import os
+
                 os.makedirs("/tmp/sampleprepper_cache", exist_ok=True)
 
         def get_required_keys(self):
@@ -74,7 +76,7 @@ def sample_prepper(sample_dataset_info):
         # Minimal stubs so the existing tests don’t fail:
         def _sample_dataset(self, dataset, n):
             return dataset.select(range(n))
-        
+
         def _validate_dataset(self, data):
             if not data:
                 raise ValueError("No data to validate.")
@@ -241,7 +243,10 @@ def test_cache_directory_creation(mock_makedirs, sample_prepper):
         (TruthfulQAPrepper, ["question", "mc1_targets"]),
         (MMLUPrepper, ["question", "choices", "answer"]),
         (CommonsenseQAPrepper, ["question", "choices", "answerKey"]),
-        (HaluEvalPrepper, ["knowledge", "question", "right_answer", "hallucinated_answer"]),
+        (
+            HaluEvalPrepper,
+            ["knowledge", "question", "right_answer", "hallucinated_answer"],
+        ),
     ],
 )
 def test_get_required_keys(prepper_class, required_keys):
@@ -255,14 +260,22 @@ def test_get_required_keys(prepper_class, required_keys):
     [
         (
             TruthfulQAPrepper,
-            {"question": "Q?", "mc1_targets": {"choices": ["A", "B"], "labels": [1, 0]}},
+            {
+                "question": "Q?",
+                "mc1_targets": {"choices": ["A", "B"], "labels": [1, 0]},
+            },
             "Q?",
             {"A": "A", "B": "B"},
             "A",
         ),
         (
             MMLUPrepper,
-            {"question": "Q?", "choices": ["A", "B", "C", "D"], "answer": 2, "subject": "math"},
+            {
+                "question": "Q?",
+                "choices": ["A", "B", "C", "D"],
+                "answer": 2,
+                "subject": "math",
+            },
             "Q?",
             {"A": "A", "B": "B", "C": "C", "D": "D"},
             "C",
@@ -295,7 +308,9 @@ def test_get_required_keys(prepper_class, required_keys):
         ),
     ],
 )
-def test_create_dataset_entries(prepper_class, mock_data, expected_query, expected_choices, expected_correct):
+def test_create_dataset_entries(
+    prepper_class, mock_data, expected_query, expected_choices, expected_correct
+):
     prepper = prepper_class()
     entries = prepper.create_dataset_entries(mock_data)
 
@@ -357,7 +372,9 @@ def test_logging(mock_log):
         ),
     ],
 )
-@pytest.mark.skip(reason="MMLUPrepper doesn't implement load_and_prepare or take constructor arguments.")
+@pytest.mark.skip(
+    reason="MMLUPrepper doesn't implement load_and_prepare or take constructor arguments."
+)
 def test_large_dataset_preparation(use_real_data):
     """Test preparation of a large dataset."""
     pass
@@ -436,56 +453,74 @@ def test_load_and_prepare(prepper_class, mock_data, expected_split):
     for item in data_subset:
         entries.extend(loader.create_dataset_entries(item))
 
-    assert (
-        len(entries) == len(data_subset)
-        or (
-            prepper_class == HaluEvalPrepper
-            and len(entries) == len(data_subset) * 2
-        )
+    assert len(entries) == len(data_subset) or (
+        prepper_class == HaluEvalPrepper and len(entries) == len(data_subset) * 2
     ), "Prepper transforms each item correctly."
     # Validate further as needed
 
 
 @pytest.mark.skip(reason="MMLUPrepper lacks load_and_prepare and constructor args.")
-@pytest.mark.skip(reason="MMLUPrepper has no constructor args or load_and_prepare; skipping.")
+@pytest.mark.skip(
+    reason="MMLUPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_mmlu_with_real_data():
     """Testing MMLU loader with real data."""
     pass
 
 
 # Tests for HaluEvalLoaderPrepper
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_required_keys():
     """Test getting required keys for HaluEvalLoaderPrepper."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_create_operator_input(real_halueval_dataset):
     """Test creating OperatorContext for HaluEval using real data."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 @pytest.mark.parametrize("num_questions", [1, 5, 10])
 def test_halueval_load_and_prepare(real_halueval_dataset, num_questions):
     """Test load_and_prepare method for HaluEvalLoaderPrepper using real data."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_with_real_data():
     """Test HaluEvalLoaderPrepper with real data from Hugging Face."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_registration():
     """Test registration of HaluEval dataset."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_end_to_end():
     """End-to-end test for HaluEval dataset registration and preparation."""
     pass
 
-@pytest.mark.skip(reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping.")
+
+@pytest.mark.skip(
+    reason="HaluEvalPrepper has no constructor args or load_and_prepare; skipping."
+)
 def test_halueval_large_dataset_preparation():
     """Test preparation of a large HaluEval dataset."""
     pass
@@ -494,10 +529,7 @@ def test_halueval_large_dataset_preparation():
 def test_dataset_registry_manager(registry_manager_fixture):
     manager = registry_manager_fixture
     info = DatasetInfo(
-        name="demo",
-        description="",
-        source="demo_source",
-        task_type="multiple_choice"
+        name="demo", description="", source="demo_source", task_type="multiple_choice"
     )
 
     # A mock prepper
@@ -571,10 +603,7 @@ def test_create_dataset_entries_truthful_qa():
     prepper = TruthfulQAPrepper()
     mock_item = {
         "question": "Is the sky green?",
-        "mc1_targets": {
-            "choices": ["Yes", "No"],
-            "labels": [0, 1]
-        }
+        "mc1_targets": {"choices": ["Yes", "No"], "labels": [0, 1]},
     }
     entries = prepper.create_dataset_entries(mock_item)
     assert len(entries) == 1

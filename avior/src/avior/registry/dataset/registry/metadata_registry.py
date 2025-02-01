@@ -2,6 +2,7 @@ from typing import Dict, Tuple, Optional, List
 from src.avior.registry.dataset.base.models import DatasetInfo
 from src.avior.registry.dataset.base.preppers import IDatasetPrepper
 
+
 class DatasetRegistry:
     _registry: Dict[str, Tuple[DatasetInfo, IDatasetPrepper]] = {}
 
@@ -21,6 +22,7 @@ class DatasetRegistry:
     def list_datasets(cls):
         return list(cls._registry.keys())
 
+
 def register_dataset(
     name: str,
     description: str,
@@ -29,18 +31,18 @@ def register_dataset(
     prepper_class: type[IDatasetPrepper],
 ) -> None:
     dataset_info = DatasetInfo(
-        name=name,
-        description=description,
-        source=source,
-        task_type=task_type
+        name=name, description=description, source=source, task_type=task_type
     )
     DatasetRegistry.register(dataset_info, prepper_class())
+
 
 class DatasetRegistryManager:
     def __init__(self) -> None:
         self._registry = {}
 
-    def register_dataset(self, info: DatasetInfo, prepper_class: type[IDatasetPrepper]) -> None:
+    def register_dataset(
+        self, info: DatasetInfo, prepper_class: type[IDatasetPrepper]
+    ) -> None:
         self._registry[info.name] = (info, prepper_class())
 
     def get_dataset_info(self, name: str) -> Optional[DatasetInfo]:
@@ -54,11 +56,13 @@ class DatasetRegistryManager:
     def clear_all(self) -> None:
         self._registry = {}
 
+
 class DatasetMetadataRegistry:
     """
     A lightweight registry for just DatasetInfo, used by initialization.py.
-    This does not handle Preppers at all. 
+    This does not handle Preppers at all.
     """
+
     def __init__(self) -> None:
         self._registry: Dict[str, DatasetInfo] = {}
 

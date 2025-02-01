@@ -11,6 +11,7 @@ from src.avior.registry.operator.operator_base import (
 from src.avior.registry.prompt_signature.signatures import Signature
 from src.avior.core.scheduler import ExecutionPlan, ExecutionTask
 
+
 class OperatorRegistry:
     """
     A global registry that maps string 'op_code' to a particular Operator class.
@@ -18,6 +19,7 @@ class OperatorRegistry:
       OperatorRegistry.register("ENSEMBLE", EnsembleOperator)
       ...
     """
+
     def __init__(self):
         self._registry = {}
 
@@ -27,6 +29,7 @@ class OperatorRegistry:
     def get(self, code: str) -> Optional[Any]:
         return self._registry.get(code)
 
+
 # For typed usage
 T_in = TypeVar("T_in", bound=BaseModel)
 T_out = TypeVar("T_out")
@@ -35,14 +38,17 @@ T_out = TypeVar("T_out")
 # 1) EnsembleOperator
 #####################################################
 
+
 class EnsembleOperatorInputs(BaseModel):
     query: str
+
 
 class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
     """
     Parallel calls to multiple LMModules. Each LMModule processes
     the same prompt, producing an array of responses.
     """
+
     metadata = OperatorMetadata(
         code="ENSEMBLE",
         description="Runs an ensemble of models to generate responses",
@@ -73,12 +79,14 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
         plan = ExecutionPlan()
         for i, lm in enumerate(self.lm_modules):
             task_id = f"ensemble_task_{i}"
-            plan.add_task(ExecutionTask(
-                task_id=task_id,
-                function=self._lm_call_wrapper,
-                inputs={"prompt": prompt, "lm": lm},
-                dependencies=[],
-            ))
+            plan.add_task(
+                ExecutionTask(
+                    task_id=task_id,
+                    function=self._lm_call_wrapper,
+                    inputs={"prompt": prompt, "lm": lm},
+                    dependencies=[],
+                )
+            )
         return plan
 
     def _lm_call_wrapper(self, prompt: str, lm: LMModule) -> str:
@@ -91,13 +99,16 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
         sorted_responses = [results[tid] for tid in sorted(results.keys())]
         return {"responses": sorted_responses}
 
+
 #####################################################
 # 2) MostCommonOperator
 #####################################################
 
+
 class MostCommonOperatorInputs(BaseModel):
     query: str
     responses: List[str]
+
 
 class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
     metadata = OperatorMetadata(
@@ -134,20 +145,24 @@ class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
         # 1) Create a counting task per response
         for i, r in enumerate(inputs.responses):
             task_id = f"count_task_{i}"
-            plan.add_task(ExecutionTask(
-                task_id=task_id,
-                function=self._count_single_response,
-                inputs={"response": r},
-                dependencies=[]
-            ))
+            plan.add_task(
+                ExecutionTask(
+                    task_id=task_id,
+                    function=self._count_single_response,
+                    inputs={"response": r},
+                    dependencies=[],
+                )
+            )
         # 2) Create aggregator task
         agg_id = "aggregate_most_common"
-        plan.add_task(ExecutionTask(
-            task_id=agg_id,
-            function=self._aggregate_counts,
-            inputs={},
-            dependencies=[f"count_task_{i}" for i in range(len(inputs.responses))]
-        ))
+        plan.add_task(
+            ExecutionTask(
+                task_id=agg_id,
+                function=self._aggregate_counts,
+                inputs={},
+                dependencies=[f"count_task_{i}" for i in range(len(inputs.responses))],
+            )
+        )
         return plan
 
     def _count_single_response(self, response: str) -> Dict[str, int]:
@@ -164,17 +179,22 @@ class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
         [(final_answer, _)] = big_count.most_common(1)
         return {"final_answer": final_answer}
 
-    def combine_plan_results(self, results: Dict[str, Any], inputs: Dict[str, Any]) -> Any:
+    def combine_plan_results(
+        self, results: Dict[str, Any], inputs: Dict[str, Any]
+    ) -> Any:
         # We look for the final aggregator task's result
         return results.get("aggregate_most_common", {"final_answer": None})
+
 
 #####################################################
 # 3) GetAnswerOperator
 #####################################################
 
+
 class GetAnswerOperatorInputs(BaseModel):
     query: str
     responses: List[str]
+
 
 class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
     metadata = OperatorMetadata(
@@ -214,12 +234,14 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
         plan = ExecutionPlan()
         for i, resp in enumerate(inputs.responses):
             task_id = f"get_answer_task_{i}"
-            plan.add_task(ExecutionTask(
-                task_id=task_id,
-                function=self._process_single_response,
-                inputs={"query": inputs.query, "response": resp},
-                dependencies=[]
-            ))
+            plan.add_task(
+                ExecutionTask(
+                    task_id=task_id,
+                    function=self._process_single_response,
+                    inputs={"query": inputs.query, "response": resp},
+                    dependencies=[],
+                )
+            )
         return plan
 
     def _process_single_response(self, query: str, response: str) -> str:
@@ -228,23 +250,31 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
         answer = self.call_lm(prompt, self.lm_modules[0]).strip()
         return answer
 
-    def combine_plan_results(self, results: Dict[str, Any], inputs: Dict[str, Any]) -> Any:
+    def combine_plan_results(
+        self, results: Dict[str, Any], inputs: Dict[str, Any]
+    ) -> Any:
         for task_id in sorted(results.keys()):
             ans = results[task_id]
             if ans:
                 return {"final_answer": ans}
         return {"final_answer": ""}
 
+
 #####################################################
 # 4) JudgeSynthesisOperator
 #####################################################
 
+
 class JudgeSynthesisInputs(BaseModel):
     query: str
-    responses: List[str] = Field(..., description="Aggregated list of all ensemble responses.")
+    responses: List[str] = Field(
+        ..., description="Aggregated list of all ensemble responses."
+    )
+
 
 class JudgeSynthesisOutputs(BaseModel):
     final_answer: str
+
 
 class JudgeSynthesisSignature(Signature):
     required_inputs: List[str] = ["query", "responses"]
@@ -260,6 +290,7 @@ class JudgeSynthesisSignature(Signature):
     )
     structured_output: Optional[Type[BaseModel]] = JudgeSynthesisOutputs
     input_model: Type[JudgeSynthesisInputs] = JudgeSynthesisInputs
+
 
 class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
     metadata = OperatorMetadata(
@@ -303,19 +334,25 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
         # 1) tasks for each response
         for i, resp in enumerate(inputs.responses):
             task_id = f"judge_single_{i}"
-            plan.add_task(ExecutionTask(
-                task_id=task_id,
-                function=self._judge_single_response,
-                inputs={"query": inputs.query, "response": resp},
-                dependencies=[]
-            ))
+            plan.add_task(
+                ExecutionTask(
+                    task_id=task_id,
+                    function=self._judge_single_response,
+                    inputs={"query": inputs.query, "response": resp},
+                    dependencies=[],
+                )
+            )
         # 2) final aggregator
-        plan.add_task(ExecutionTask(
-            task_id="judge_synthesis_agg",
-            function=self._synthesis_responses,
-            inputs={},
-            dependencies=[f"judge_single_{i}" for i in range(len(inputs.responses))]
-        ))
+        plan.add_task(
+            ExecutionTask(
+                task_id="judge_synthesis_agg",
+                function=self._synthesis_responses,
+                inputs={},
+                dependencies=[
+                    f"judge_single_{i}" for i in range(len(inputs.responses))
+                ],
+            )
+        )
         return plan
 
     def _judge_single_response(self, query: str, response: str) -> Dict[str, Any]:
@@ -329,26 +366,36 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
         if not partial_data:
             return {"final_answer": "No responses", "reasoning": ""}
 
-        combined_judgments = "\n".join(f"{d['response']}: {d['partial_judgment']}" for d in partial_data if isinstance(d, dict))
+        combined_judgments = "\n".join(
+            f"{d['response']}: {d['partial_judgment']}"
+            for d in partial_data
+            if isinstance(d, dict)
+        )
         final_answer = "Synthesized answer from partial_judgments"
         reasoning = combined_judgments
         return {"final_answer": final_answer, "reasoning": reasoning}
 
-    def combine_plan_results(self, results: Dict[str, Any], inputs: Dict[str, Any]) -> Any:
+    def combine_plan_results(
+        self, results: Dict[str, Any], inputs: Dict[str, Any]
+    ) -> Any:
         return results.get("judge_synthesis_agg", {"final_answer": "Unknown"})
+
 
 #####################################################
 # 5) VerifierOperator
 #####################################################
 
+
 class VerifierOperatorInputs(BaseModel):
     query: str
     candidate_answer: str
+
 
 class VerifierOperatorOutputs(BaseModel):
     verdict: str
     explanation: str
     revised_answer: Optional[str] = None
+
 
 class VerifierSignature(Signature):
     required_inputs: List[str] = ["query", "candidate_answer"]
@@ -363,6 +410,7 @@ class VerifierSignature(Signature):
     )
     structured_output: Optional[Type[BaseModel]] = VerifierOperatorOutputs
     input_model: Type[VerifierOperatorInputs] = VerifierOperatorInputs
+
 
 class VerifierOperator(Operator[VerifierOperatorInputs, Dict[str, Any]]):
     metadata = OperatorMetadata(
@@ -401,6 +449,7 @@ class VerifierOperator(Operator[VerifierOperatorInputs, Dict[str, Any]]):
         Typically, we have only one candidate_answer, so concurrency is not needed.
         """
         return None
+
 
 #####################################################
 # Register everything

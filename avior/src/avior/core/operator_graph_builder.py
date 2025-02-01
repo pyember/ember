@@ -8,11 +8,11 @@ from .operator_graph import OperatorGraph
 
 class ConfigGraphBuilder:
     """
-    Builds an OperatorGraph from a dictionary specification, 
+    Builds an OperatorGraph from a dictionary specification,
     similar to the old NoNGraphBuilder. The config format is:
         {
             "node_name": {
-                "op": "ENSEMBLE", 
+                "op": "ENSEMBLE",
                 "params": {"model_name": "gpt-4o", "count": 3},
                 "inputs": ["other_node", ...]
             },
@@ -22,9 +22,9 @@ class ConfigGraphBuilder:
 
     def __init__(self):
         self._graph = OperatorGraph()
-        # We keep a mapping from user-friendly names (e.g. "node_name") 
-        # to internal node IDs (if you want them distinct). 
-        # Or we can simply reuse "node_name" as the node_id. 
+        # We keep a mapping from user-friendly names (e.g. "node_name")
+        # to internal node IDs (if you want them distinct).
+        # Or we can simply reuse "node_name" as the node_id.
         self._name_to_id: Dict[str, str] = {}
 
     def parse_graph(self, graph_dict: Dict[str, Dict[str, Any]]) -> OperatorGraph:
@@ -60,7 +60,7 @@ class ConfigGraphBuilder:
 
     def _create_lm_modules_from_params(self, params: Dict[str, Any]) -> List[LMModule]:
         """
-        Creates LMModule(s) from the config 'params' block, 
+        Creates LMModule(s) from the config 'params' block,
         handling optional 'count' for multiple modules.
         """
         if "model_name" not in params:
@@ -68,7 +68,8 @@ class ConfigGraphBuilder:
         config_copy = dict(params)
         count = config_copy.pop("count", 1)
         config_for_lm = {
-            k: v for k, v in config_copy.items()
+            k: v
+            for k, v in config_copy.items()
             if k in ["model_name", "temperature", "max_tokens", "persona"]
         }
         modules = []

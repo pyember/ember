@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from avior.registry.model.provider_registry.anthropic.anthropic_provider import AnthropicModel
+from avior.registry.model.provider_registry.anthropic.anthropic_provider import (
+    AnthropicModel,
+)
 from src.avior.registry.model.schemas.model_info import ModelInfo
 from src.avior.registry.model.schemas.provider_info import ProviderInfo
 from src.avior.registry.model.schemas.cost import ModelCost, RateLimit

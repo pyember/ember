@@ -11,6 +11,7 @@ from src.avior.registry.model.services.model_service import ModelService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def main():
     """
     Demonstrates usage of multiple models (OpenAI, Anthropic, DeepMind, etc.)
@@ -20,7 +21,9 @@ def main():
     initialize_global_registry()
 
     # 2) Create a ModelService that uses GLOBAL_MODEL_REGISTRY + GLOBAL_USAGE_SERVICE by default
-    service = ModelService(registry=GLOBAL_MODEL_REGISTRY, usage_service=GLOBAL_USAGE_SERVICE)
+    service = ModelService(
+        registry=GLOBAL_MODEL_REGISTRY, usage_service=GLOBAL_USAGE_SERVICE
+    )
 
     # 3) Define some model IDs we expect to be registered (based on your YAML configs)
     model_ids = [
@@ -57,6 +60,7 @@ def main():
             logger.error(f"Error invoking '{m_id}': {e}")
 
     print("\nDone invoking all example models.")
+
 
 if __name__ == "__main__":
     main()

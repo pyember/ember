@@ -11,16 +11,18 @@ from src.avior.registry.model.schemas.usage import UsageStats
 from src.avior.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
-    BaseChatParameters
+    BaseChatParameters,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class AnthropicChatParameters(BaseChatParameters):
     """
     For Anthropic, the param is 'max_tokens_to_sample'.
     Must be an integer. Default 768 if missing.
     """
+
     max_tokens: int | None = Field(default=None)
 
     @field_validator("max_tokens", mode="before")
@@ -48,6 +50,7 @@ class AnthropicChatParameters(BaseChatParameters):
 
         return kwargs
 
+
 class AnthropicModel(BaseProviderModel):
     """
     Concrete implementation for Anthropic models (Claude, etc.).
@@ -66,7 +69,7 @@ class AnthropicModel(BaseProviderModel):
         if raw_name not in known_anthropic_models:
             logger.warning(
                 "Anthropic model '%s' not recognized by the API. Using 'claude-2'.",
-                raw_name
+                raw_name,
             )
             return "claude-2"
         return raw_name
@@ -77,12 +80,16 @@ class AnthropicModel(BaseProviderModel):
             raise ProviderAPIError("Anthropic API key is missing or invalid.")
         return anthropic.Client(api_key=api_key)
 
-    @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True)
+    @retry(
+        wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True
+    )
     def forward(self, request: ChatRequest) -> ChatResponse:
         if not request.prompt:
             raise InvalidPromptError("Anthropic prompt cannot be empty.")
 
-        correlation_id = request.provider_params.get("correlation_id") or str(uuid.uuid4())
+        correlation_id = request.provider_params.get("correlation_id") or str(
+            uuid.uuid4()
+        )
         logger.info(
             "Anthropic forward() invoked",
             extra={
@@ -94,10 +101,14 @@ class AnthropicModel(BaseProviderModel):
         )
 
         # 0) Possibly fix the model name if it’s invalid
-        final_model_name = self._normalize_anthropic_model_name(self.model_info.model_name)
+        final_model_name = self._normalize_anthropic_model_name(
+            self.model_info.model_name
+        )
 
         # 1) Convert universal ChatRequest -> AnthropicChatParameters
-        anthropic_params = AnthropicChatParameters(**request.dict(exclude={"provider_params"}))
+        anthropic_params = AnthropicChatParameters(
+            **request.dict(exclude={"provider_params"})
+        )
         anthro_kwargs = anthropic_params.to_anthropic_kwargs()
 
         # 2) Merge additional provider_params

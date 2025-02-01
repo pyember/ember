@@ -8,6 +8,7 @@ from src.avior.registry.model.provider_registry.base import BaseProviderModel
 
 GLOBAL_MODEL_REGISTRY = None  # Will be initialized at import time
 
+
 class ModelRegistry:
     """
     Thread-safe registry for managing multiple model instances.

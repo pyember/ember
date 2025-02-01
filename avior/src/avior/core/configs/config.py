@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+
 # -------------------------------------------------------------------
 # 1) Configuration Manager
 # -------------------------------------------------------------------
@@ -74,6 +75,7 @@ class ConfigManager:
 # Global, shared config object
 CONFIG = ConfigManager()
 
+
 # -------------------------------------------------------------------
 # 2) API Key Initialization
 # -------------------------------------------------------------------
@@ -87,21 +89,27 @@ def initialize_api_keys() -> None:
     if openai_api_key:
         CONFIG.set("models", "openai_api_key", openai_api_key)
     elif not CONFIG.get("models", "openai_api_key"):
-        print("WARNING: OpenAI API key not found in environment variables or config file")
+        print(
+            "WARNING: OpenAI API key not found in environment variables or config file"
+        )
 
     # 2) Anthropic
     anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY")
     if anthropic_api_key:
         CONFIG.set("models", "anthropic_api_key", anthropic_api_key)
     elif not CONFIG.get("models", "anthropic_api_key"):
-        print("WARNING: Anthropic API key not found in environment variables or config file")
+        print(
+            "WARNING: Anthropic API key not found in environment variables or config file"
+        )
 
     # 3) Google
     google_api_key = os.environ.get("GOOGLE_API_KEY")
     if google_api_key:
         CONFIG.set("models", "google_api_key", google_api_key)
     elif not CONFIG.get("models", "google_api_key"):
-        print("WARNING: Google API key not found in environment variables or config file")
+        print(
+            "WARNING: Google API key not found in environment variables or config file"
+        )
 
 
 # -------------------------------------------------------------------
@@ -127,6 +135,7 @@ def auto_register_known_models(registry):
     known_model_id = "openai:gpt-4o"
     if registry.get_model(known_model_id) is None:
         import logging
+
         logging.info(f"Auto-registering known model: {known_model_id}")
         # Basic cost/rate-limit placeholders
         cost = ModelCost(input_cost_per_thousand=0.03, output_cost_per_thousand=0.06)

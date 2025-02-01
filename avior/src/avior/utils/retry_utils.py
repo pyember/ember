@@ -17,9 +17,10 @@ T = TypeVar("T")
 # 1) Retry Strategy Interface (SOLID: Interface Segregation)
 ##############################################################
 
+
 class IRetryStrategy(ABC, Generic[T]):
     """
-    Abstract base for a retry strategy. 
+    Abstract base for a retry strategy.
     Implementers define how to run a function with retries/backoff.
     """
 
@@ -36,10 +37,11 @@ class IRetryStrategy(ABC, Generic[T]):
 # 2) Tenacity-Based Exponential Backoff Strategy
 ##############################################################
 
+
 class ExponentialBackoffStrategy(IRetryStrategy[T]):
     """
-    A concrete strategy using tenacity's exponential backoff. 
-    By default: 
+    A concrete strategy using tenacity's exponential backoff.
+    By default:
       - random exponential wait from 1..60 sec
       - up to 3 attempts
     Adjust as needed or create a new subclass for your scenario.
@@ -59,10 +61,11 @@ class ExponentialBackoffStrategy(IRetryStrategy[T]):
         """
         Uses tenacity's retry logic with random exponential backoff.
         """
+
         @retry(
             wait=wait_random_exponential(min=self.min_wait, max=self.max_wait),
             stop=stop_after_attempt(self.max_attempts),
-            reraise=True
+            reraise=True,
         )
         def wrapped() -> T:
             return func(*args, **kwargs)
@@ -76,11 +79,12 @@ class ExponentialBackoffStrategy(IRetryStrategy[T]):
 
 _default_strategy = ExponentialBackoffStrategy[Any]()
 
+
 def run_with_backoff(func: Callable[..., T], *args: Any, **kwargs: Any) -> T:
     """
     A convenience wrapper that uses a default ExponentialBackoffStrategy
     to retry 'func(*args, **kwargs)' upon failure.
-    
+
     Example usage:
         result = run_with_backoff(some_network_call, "hello", param=123)
     """
@@ -94,10 +98,11 @@ if __name__ == "__main__":
 
     def flaky_function(x: int) -> int:
         """
-        Example function that fails randomly, e.g. 
+        Example function that fails randomly, e.g.
         simulating a network or embedding-service call.
         """
         import random
+
         if random.random() < 0.5:
             raise RuntimeError("Simulated failure!")
         return x * 2

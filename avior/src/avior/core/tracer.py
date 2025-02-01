@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Tuple, Optional
 from src.avior.registry.operator.operator_base import Operator
 from src.avior.core.scheduler import ExecutionPlan, ExecutionTask
 
+
 class TracedNode:
     """
     Represents a single sub-operator call in the traced graph.
@@ -13,19 +14,22 @@ class TracedNode:
       - inputs (or references to upstream node IDs)
       - outputs
     """
+
     def __init__(self, node_id: str, operator: Operator):
         self.node_id = node_id
         self.operator = operator
-        self.inbound_edges: List[str] = []   # node_ids of parents
+        self.inbound_edges: List[str] = []  # node_ids of parents
         self.outbound_edges: List[str] = []  # node_ids of children
-        self.inputs: Dict[str, Any] = {}     # captured inputs
-        self.outputs: Any = None            # captured outputs
+        self.inputs: Dict[str, Any] = {}  # captured inputs
+        self.outputs: Any = None  # captured outputs
+
 
 class TracedGraph:
     """
     Holds a collection of TracedNode objects plus adjacency.
     This is a pure data structure representing the call DAG discovered by the tracer.
     """
+
     def __init__(self):
         self.nodes: Dict[str, TracedNode] = {}
         self.entry_node: Optional[str] = None
@@ -43,6 +47,7 @@ class TracedGraph:
         self.nodes[from_id].outbound_edges.append(to_id)
         self.nodes[to_id].inbound_edges.append(from_id)
 
+
 class TraceCallInterceptor:
     """
     Intercepts calls to sub-operators, capturing input->output edges.
@@ -56,7 +61,7 @@ class TraceCallInterceptor:
 
     def instrument(self):
         """
-        Recursively instrument the top_operator and its sub_operators 
+        Recursively instrument the top_operator and its sub_operators
         so that each call is captured.
         """
         self._walk_and_instrument(self.top_operator)
@@ -125,6 +130,7 @@ class TraceCallInterceptor:
         self.original_calls[operator] = original_call
         operator.__call__ = wrapped_call
 
+
 class TracerContext:
     """
     The top-level context manager or decorator that:
@@ -155,20 +161,24 @@ class TracerContext:
         # The tracer_graph is now populated
         return self.tracer_graph
 
+
 def convert_traced_graph_to_plan(traced_graph: TracedGraph) -> ExecutionPlan:
     plan = ExecutionPlan()
     # We can do a topological sort over traced_graph.nodes by inbound_edges
     # Then each node => ExecutionTask
     # For example:
     for node_id, node in traced_graph.nodes.items():
-        # A single task calls the operator in eager style with the inputs 
+        # A single task calls the operator in eager style with the inputs
         # (Though in real HPC usage, we might do partial plan-based concurrency).
         def task_fn(operator=node.operator, inps=node.inputs):
             return operator.forward(inps)
-        plan.add_task(ExecutionTask(
-            task_id=node_id,
-            function=task_fn,
-            inputs={},  # if needed
-            dependencies=node.inbound_edges
-        ))
+
+        plan.add_task(
+            ExecutionTask(
+                task_id=node_id,
+                function=task_fn,
+                inputs={},  # if needed
+                dependencies=node.inbound_edges,
+            )
+        )
     return plan

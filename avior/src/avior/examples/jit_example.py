@@ -51,9 +51,10 @@ class ParallelEnsemble(Ensemble):
     Inherits directly from `non.Ensemble`.
     That class already uses 'EnsembleOperator' under the hood,
     which returns a concurrency plan in to_plan(...).
-    
+
     No overrides => concurrency is enabled if the runner's max_workers > 1.
     """
+
     pass
 
 
@@ -67,6 +68,7 @@ class JITEnsemble(ParallelEnsemble):
     After the first call (or on __init__ if sample_input is specified),
     a concurrency plan is traced & cached, so subsequent calls skip overhead.
     """
+
     pass
 
 
@@ -134,7 +136,9 @@ def main():
         t2 = time.perf_counter()
 
         baseline_times.append(t2 - t1)
-        logging.info(f"[BASELINE] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s")
+        logging.info(
+            f"[BASELINE] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s"
+        )
 
     end_baseline_total = time.perf_counter()
     total_baseline_time = end_baseline_total - start_baseline_total
@@ -152,7 +156,9 @@ def main():
         t2 = time.perf_counter()
 
         parallel_times.append(t2 - t1)
-        logging.info(f"[PARALLEL] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s")
+        logging.info(
+            f"[PARALLEL] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s"
+        )
 
     end_parallel_total = time.perf_counter()
     total_parallel_time = end_parallel_total - start_parallel_total
@@ -170,7 +176,9 @@ def main():
         t2 = time.perf_counter()
 
         jit_times.append(t2 - t1)
-        logging.info(f"[JIT] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s")
+        logging.info(
+            f"[JIT] Query='{q}' => #responses={len(out.get('responses', []))} | time={t2 - t1:.4f}s"
+        )
 
     end_jit_total = time.perf_counter()
     total_jit_time = end_jit_total - start_jit_total
@@ -179,17 +187,22 @@ def main():
     # 4) Print timing summary
     ########################################################################
     from prettytable import PrettyTable
+
     table = PrettyTable()
     table.field_names = ["Query #", "Baseline (s)", "Parallel (s)", "JIT (s)"]
     for i, q in enumerate(queries):
-        table.add_row([
-            i+1,
-            f"{baseline_times[i]:.4f}",
-            f"{parallel_times[i]:.4f}",
-            f"{jit_times[i]:.4f}"
-        ])
+        table.add_row(
+            [
+                i + 1,
+                f"{baseline_times[i]:.4f}",
+                f"{parallel_times[i]:.4f}",
+                f"{jit_times[i]:.4f}",
+            ]
+        )
 
-    print("\nTiming Results for Baseline vs. Parallel vs. JIT (100 LM calls each, max_workers=32):")
+    print(
+        "\nTiming Results for Baseline vs. Parallel vs. JIT (100 LM calls each, max_workers=32):"
+    )
     print(table)
 
     print(f"\nTotal Baseline time: {total_baseline_time:.4f}s")

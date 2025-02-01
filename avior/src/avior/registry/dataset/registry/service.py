@@ -58,7 +58,9 @@ class DatasetService:
             logger.debug(f"Could not log dataset columns: {exc}")
         return dataset
 
-    def select_split(self, dataset: Any, config_obj: Optional[BaseDatasetConfig]) -> Any:
+    def select_split(
+        self, dataset: Any, config_obj: Optional[BaseDatasetConfig]
+    ) -> Any:
         """
         If config_obj has a 'split' attribute (like MMLUConfig does),
         then try dataset[split]. Otherwise, return dataset unchanged.
@@ -101,10 +103,7 @@ class DatasetService:
         return self._sampler.sample(data, num_samples)
 
     def _prep_data(
-        self,
-        dataset_info: DatasetInfo,
-        sampled_data: Any,
-        prepper: IDatasetPrepper
+        self, dataset_info: DatasetInfo, sampled_data: Any, prepper: IDatasetPrepper
     ) -> List[DatasetEntry]:
         """
         Step 6: Final prep, validating each item and creating DatasetEntry objects.
@@ -134,7 +133,9 @@ class DatasetService:
             f"with source='{dataset_info.source}', config='{config}', num_samples='{num_samples}'."
         )
 
-        logging.info("[load_and_prepare] Converting config -> a string (or None) that _load_data expects.")
+        logging.info(
+            "[load_and_prepare] Converting config -> a string (or None) that _load_data expects."
+        )
         resolved_config = self._resolve_loader_config(config)
         logging.info(f"[load_and_prepare] Resolved config is: '{resolved_config}'.")
 
@@ -149,9 +150,13 @@ class DatasetService:
                 f"[load_and_prepare] Loaded dataset details: type={type(dataset)}, size={len(dataset)}"
             )
             if len(dataset) > 0:
-                logging.info(f"[load_and_prepare] Example record from loaded dataset: {dataset}")
+                logging.info(
+                    f"[load_and_prepare] Example record from loaded dataset: {dataset}"
+                )
         else:
-            logging.info(f"[load_and_prepare] Loaded dataset is of type={type(dataset)}, size=Unknown")
+            logging.info(
+                f"[load_and_prepare] Loaded dataset is of type={type(dataset)}, size=Unknown"
+            )
 
         config_obj = config if isinstance(config, BaseDatasetConfig) else None
         logging.info(
@@ -171,11 +176,17 @@ class DatasetService:
                 f"[load_and_prepare] Validated data details: type={type(validated_data)}, size={len(validated_data)}"
             )
             if len(validated_data) > 0:
-                logging.info(f"[load_and_prepare] Example record from validated data: {validated_data[0]}")
+                logging.info(
+                    f"[load_and_prepare] Example record from validated data: {validated_data[0]}"
+                )
         else:
-            logging.info(f"[load_and_prepare] Validated data is of type={type(validated_data)}, size=Unknown")
+            logging.info(
+                f"[load_and_prepare] Validated data is of type={type(validated_data)}, size=Unknown"
+            )
 
-        logging.info("[load_and_prepare] Applying transformations to the validated data.")
+        logging.info(
+            "[load_and_prepare] Applying transformations to the validated data."
+        )
         transformed_data = self._transform_data(validated_data)
         logging.info("[load_and_prepare] Data transformations applied.")
         if hasattr(transformed_data, "__len__"):
@@ -183,11 +194,17 @@ class DatasetService:
                 f"[load_and_prepare] Transformed data details: type={type(transformed_data)}, size={len(transformed_data)}"
             )
             if len(transformed_data) > 0:
-                logging.info(f"[load_and_prepare] Example record from transformed data: {transformed_data[0]}")
+                logging.info(
+                    f"[load_and_prepare] Example record from transformed data: {transformed_data[0]}"
+                )
         else:
-            logging.info(f"[load_and_prepare] Transformed data is of type={type(transformed_data)}, size=Unknown")
+            logging.info(
+                f"[load_and_prepare] Transformed data is of type={type(transformed_data)}, size=Unknown"
+            )
 
-        logging.info("[load_and_prepare] Validating required keys in the transformed data.")
+        logging.info(
+            "[load_and_prepare] Validating required keys in the transformed data."
+        )
         self._validate_keys(transformed_data, prepper)
         logging.info("[load_and_prepare] Required keys validation completed.")
 
@@ -201,11 +218,14 @@ class DatasetService:
             f"{len(sampled_data) if hasattr(sampled_data, '__len__') else 'Unknown'}."
         )
         if hasattr(sampled_data, "__len__") and len(sampled_data) > 0:
-            logging.info(f"[load_and_prepare] Example record from sampled data: {sampled_data}")
+            logging.info(
+                f"[load_and_prepare] Example record from sampled data: {sampled_data}"
+            )
 
         logging.info("[load_and_prepare] Preparing final DatasetEntry objects.")
         entries = self._prep_data(dataset_info, sampled_data, prepper)
-        logging.info(f"[load_and_prepare] Final preparation complete. Generated {len(entries)} DatasetEntry objects.")
+        logging.info(
+            f"[load_and_prepare] Final preparation complete. Generated {len(entries)} DatasetEntry objects."
+        )
 
         return entries
-

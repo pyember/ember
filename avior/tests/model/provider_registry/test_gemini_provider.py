@@ -61,7 +61,9 @@ def test_forward_success_new_model(mock_gen_model, mock_configure, mock_list):
     usage_mock.total_token_count = 30
 
     generated_mock = MagicMock()
-    generated_mock.candidates = [MagicMock(content="Hello from Gemini 1.5 Flash (mocked)")]
+    generated_mock.candidates = [
+        MagicMock(content="Hello from Gemini 1.5 Flash (mocked)")
+    ]
     generated_mock.usage_metadata = usage_mock
 
     mock_model_instance.generate_content.return_value = generated_mock
@@ -69,7 +71,6 @@ def test_forward_success_new_model(mock_gen_model, mock_configure, mock_list):
 
     resp = gemini_model("Updated test prompt", context="System context")
     assert resp.data != None
-
 
 
 def test_forward_empty_prompt():

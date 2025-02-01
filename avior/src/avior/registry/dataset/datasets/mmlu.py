@@ -3,12 +3,15 @@ from src.avior.registry.dataset.base.preppers import IDatasetPrepper
 from src.avior.registry.dataset.base.models import DatasetEntry
 from src.avior.registry.dataset.base.config import BaseDatasetConfig
 
+
 class MMLUConfig(BaseDatasetConfig):
     """
     Represents MMLU-specific config fields, e.g. a sub-dataset name on HF.
     """
+
     config_name: Optional[str] = None
     split: Optional[str] = None
+
 
 class MMLUPrepper(IDatasetPrepper):
     def __init__(self, config: MMLUConfig = MMLUConfig()):

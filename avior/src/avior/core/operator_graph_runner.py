@@ -12,16 +12,16 @@ class OperatorGraphRunner:
     """
     Executes an OperatorGraph by:
       1. If there's only one node, run it immediately with the user-provided input_data.
-      2. Otherwise, topologically sort the graph, 
+      2. Otherwise, topologically sort the graph,
          collect inputs from upstream nodes, and run each node in order.
       3. Return the outputs from the final (exit) node of the graph.
-      
+
     This merges the old 'GraphExecutor' approach.
     """
 
     def __init__(self, max_workers: Optional[int] = None):
         """
-        max_workers can be used if we later implement concurrency or 
+        max_workers can be used if we later implement concurrency or
         partial parallelism. Currently, we run sequentially in this example.
         """
         self.max_workers = max_workers
@@ -62,7 +62,7 @@ class OperatorGraphRunner:
         graph: OperatorGraph,
         node_id: str,
         results: Dict[str, Any],
-        input_data: Dict[str, Any]
+        input_data: Dict[str, Any],
     ) -> Any:
         """
         Runs a single node in the graph with the given input_data.
@@ -74,7 +74,9 @@ class OperatorGraphRunner:
         node.captured_inputs = dict(input_data)
 
         operator = node.operator
-        output = operator(input_data)  # calls Operator.__call__, which includes forward()
+        output = operator(
+            input_data
+        )  # calls Operator.__call__, which includes forward()
         node.captured_outputs = output
 
         # If there's a TraceContext, record
@@ -95,14 +97,14 @@ class OperatorGraphRunner:
         graph: OperatorGraph,
         node_id: str,
         results: Dict[str, Any],
-        global_input: Dict[str, Any]
+        global_input: Dict[str, Any],
     ) -> Dict[str, Any]:
         """
         Aggregates all required inputs for this node from:
           - global_input
-          - outputs of upstream nodes 
+          - outputs of upstream nodes
             (based on inbound_edges)
-        If the Operator requires certain fields, we gather them. 
+        If the Operator requires certain fields, we gather them.
         Otherwise, we pass everything from global_input by default.
         """
         node = graph.get_node(node_id)
@@ -110,8 +112,7 @@ class OperatorGraphRunner:
 
         # If no inbound edges => might use global_input only
         required_inputs = (
-            op.get_signature().required_inputs
-            if op.get_signature() else []
+            op.get_signature().required_inputs if op.get_signature() else []
         )
 
         # Start with global_input as a base
@@ -167,7 +168,8 @@ class OperatorGraphRunner:
         if len(sorted_list) != len(graph.nodes):
             raise ValueError("OperatorGraph has a cycle or is not a valid DAG.")
         return sorted_list
-    
+
+
 class OperatorGraphRunnerService:
     def __init__(self, max_workers: Optional[int] = None):
         self._runner = OperatorGraphRunner(max_workers=max_workers)

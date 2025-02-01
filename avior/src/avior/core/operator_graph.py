@@ -6,7 +6,7 @@ from src.avior.registry.operator.operator_base import Operator
 
 class OperatorGraphNode:
     """
-    Represents a single node in the OperatorGraph. 
+    Represents a single node in the OperatorGraph.
     It contains:
       - a unique node_id (string)
       - the operator reference (an instance of Operator)
@@ -16,9 +16,7 @@ class OperatorGraphNode:
       - captured_outputs: optionally store the output from the operator
     """
 
-    def __init__(self, 
-                 node_id: str,
-                 operator: Operator):
+    def __init__(self, node_id: str, operator: Operator):
         self.node_id: str = node_id
         self.operator: Operator = operator
         self.inbound_edges: List[str] = []
@@ -37,8 +35,8 @@ class OperatorGraphNode:
 
 class OperatorGraph:
     """
-    A unified internal representation of a DAG of Operators. 
-    This replaces prior NoNGraphData, GraphNode, TracedGraph, etc. 
+    A unified internal representation of a DAG of Operators.
+    This replaces prior NoNGraphData, GraphNode, TracedGraph, etc.
     """
 
     def __init__(self):
@@ -48,9 +46,9 @@ class OperatorGraph:
 
     def add_node(self, operator: Operator, node_id: Optional[str] = None) -> str:
         """
-        Creates a new node in the graph with the provided operator, 
+        Creates a new node in the graph with the provided operator,
         auto-generating a unique ID if node_id is not given.
-        
+
         Returns:
             The node_id of the newly added node.
         """
@@ -65,7 +63,7 @@ class OperatorGraph:
 
         if self.entry_node is None:
             self.entry_node = node_id
-        # By default, each newly added node can become the 'exit' 
+        # By default, each newly added node can become the 'exit'
         # (the last inserted node is the 'exit' unless changed).
         self.exit_node = node_id
 
@@ -73,7 +71,7 @@ class OperatorGraph:
 
     def add_edge(self, from_id: str, to_id: str) -> None:
         """
-        Connects two nodes in the graph. 
+        Connects two nodes in the graph.
         from_id => to_id
         """
         if from_id not in self.nodes:

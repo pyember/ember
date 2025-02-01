@@ -6,6 +6,7 @@ import pkg_resources  # or import importlib.metadata for py3.10+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
 def discover_preppers(entry_point_group: str = "avior.dataset_preppers"):
     """
     Discovers dataset preppers registered via Python entry points
@@ -22,6 +23,7 @@ def discover_preppers(entry_point_group: str = "avior.dataset_preppers"):
                 f"Failed to load dataset prepper plugin for {entry_point.name}: {e}"
             )
     return discovered
+
 
 class DatasetLoaderFactory:
     def __init__(self) -> None:

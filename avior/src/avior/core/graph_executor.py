@@ -403,7 +403,6 @@ class NoNGraphBuilder:
         return [LMModule(LMModuleConfig(**config_for_lm)) for _ in range(count)]
 
 
-
 ##############################################
 # DSL for Graph Building (Alternative Approach)
 ##############################################

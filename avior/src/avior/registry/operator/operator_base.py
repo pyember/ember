@@ -10,14 +10,15 @@ from src.avior.core.scheduler import Scheduler, ExecutionPlan
 
 class OperatorType(Enum):
     """Enumeration representing operator topologies or roles."""
+
     RECURRENT = auto()
     FAN_OUT = auto()
     FAN_IN = auto()
 
 
-
 class OperatorMetadata(BaseModel):
     """Metadata for an operator (useful for introspection and registry)."""
+
     code: str
     description: str
     operator_type: OperatorType
@@ -36,6 +37,7 @@ def run_in_parallel(
         for future in futures:
             results.append(future.result())
     return results
+
 
 T_in = TypeVar("T_in", bound=BaseModel)
 T_out = TypeVar("T_out", bound=BaseModel)
@@ -156,6 +158,7 @@ class Operator(ABC, Generic[T_in, T_out]):
             raw_output = self.forward(validated_inputs)
 
         from avior.core.trace_context import get_current_trace_context, TraceRecord
+
         ctx = get_current_trace_context()
         if ctx:
             record = TraceRecord(

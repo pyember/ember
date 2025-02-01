@@ -20,6 +20,7 @@ from src.avior.registry.operator.operator_base import (
     OperatorType,
 )
 from src.avior.registry.prompt_signature.signatures import Signature
+
 # Import the "raw" operators from the registry
 from src.avior.registry.operator.operator_registry import (
     EnsembleOperator,
@@ -36,24 +37,28 @@ from src.avior.modules.lm_modules import LMModuleConfig, LMModule
 # 1) Ensemble
 # ------------------------------------------------------------------------------
 
+
 class EnsembleInputs(BaseModel):
     """Typed inputs for our Ensemble wrapper."""
+
     query: str
+
 
 class EnsembleSignature(Signature):
     required_inputs: List[str] = ["query"]
     input_model: Type[BaseModel] = EnsembleInputs
+
 
 class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
     """
     A wrapper that internally uses EnsembleOperator from the registry to
     do multiple parallel LM calls. We add 'model_service=None' to LMModule
     to address the updated constructor that requires model_service.
-    
+
     Example usage:
         ensemble = Ensemble(num_units=2, model_name="gpt-4-turbo")
         output = ensemble({"query": "What is the capital of France?"})
-        # output => {"responses": ["Paris", "Paris", ...]} 
+        # output => {"responses": ["Paris", "Paris", ...]}
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
@@ -70,7 +75,7 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param num_units: Number of LMModules in the ensemble.
@@ -91,7 +96,7 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
                     temperature=temperature,
                     max_tokens=max_tokens,
                 ),
-                model_service=model_service
+                model_service=model_service,
             )
             for _ in range(num_units)
         ]
@@ -107,20 +112,24 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
 # 2) MostCommon
 # ------------------------------------------------------------------------------
 
+
 class MostCommonInputs(BaseModel):
     """Typed inputs for our MostCommon wrapper."""
+
     query: str
     responses: List[str]
+
 
 class MostCommonSignature(Signature):
     required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = MostCommonInputs
 
+
 class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     """
     A wrapper around MostCommonOperator from the registry, which picks the
     single most frequent answer from a list of responses.
-    
+
     Example usage:
         aggregator = MostCommon()
         output = aggregator({"query": "...", "responses": ["A", "B", "A"]})
@@ -153,21 +162,27 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 # 3) GetAnswer
 # ------------------------------------------------------------------------------
 
+
 class GetAnswerInputs(BaseModel):
     """Typed inputs for GetAnswer wrapper."""
+
     query: str
-    responses: List[str] = Field(..., description="List of response strings to parse into a single final answer.")
+    responses: List[str] = Field(
+        ..., description="List of response strings to parse into a single final answer."
+    )
+
 
 class GetAnswerSignature(Signature):
     required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = GetAnswerInputs
+
 
 class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
     """
     A wrapper around GetAnswerOperator, which typically takes a list of responses,
     possibly uses an LM to parse or extract a final single answer, returning
     {"final_answer": "..."}.
-    
+
     Example usage:
         getter = GetAnswer(model_name="gpt-4o")
         output = getter({"query": "Which label is correct?", "responses": ["A", "B"]})
@@ -186,7 +201,7 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param model_name: Model name for each LM module.
@@ -205,7 +220,7 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
                 temperature=temperature,
                 max_tokens=max_tokens,
             ),
-            model_service=model_service
+            model_service=model_service,
         )
         self._get_answer_op = GetAnswerOperator(lm_modules=[lm_module], **kwargs)
         self.get_answer_op = self._get_answer_op
@@ -218,18 +233,24 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
 # 4) JudgeSynthesis
 # ------------------------------------------------------------------------------
 
+
 class JudgeSynthesisInputs(BaseModel):
     """Typed inputs for the JudgeSynthesis wrapper."""
+
     query: str
-    responses: List[str] = Field(..., description="List of responses to synthesize a single best final answer.")
+    responses: List[str] = Field(
+        ..., description="List of responses to synthesize a single best final answer."
+    )
+
 
 class JudgeSynthesisSignature(Signature):
     required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = JudgeSynthesisInputs
 
+
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
     """
-    A wrapper for the JudgeSynthesisOperator, which merges multiple advisor 
+    A wrapper for the JudgeSynthesisOperator, which merges multiple advisor
     responses into one final, reasoned answer, with optional concurrency.
 
     Example usage:
@@ -251,7 +272,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param model_name: Model name for each LM module.
@@ -270,7 +291,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
                 temperature=temperature,
                 max_tokens=max_tokens,
             ),
-            model_service=model_service
+            model_service=model_service,
         )
         self._judge_synth_op = JudgeSynthesisOperator(lm_modules=[lm_module])
         self.judge_synth_op = self._judge_synth_op
@@ -283,14 +304,20 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
 # 5) Verifier
 # ------------------------------------------------------------------------------
 
+
 class VerifierInputs(BaseModel):
     """Typed inputs for the Verifier wrapper."""
+
     query: str
-    candidate_answer: str = Field(..., description="The answer to verify correctness for.")
+    candidate_answer: str = Field(
+        ..., description="The answer to verify correctness for."
+    )
+
 
 class VerifierSignature(Signature):
     required_inputs: List[str] = ["query", "candidate_answer"]
     input_model: Type[BaseModel] = VerifierInputs
+
 
 class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
     """
@@ -316,7 +343,7 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         :param model_name: Model name for each LM module.
@@ -335,7 +362,7 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
                 temperature=temperature,
                 max_tokens=max_tokens,
             ),
-            model_service=model_service
+            model_service=model_service,
         )
         self._verifier_op = VerifierOperator(lm_modules=[lm_module], **kwargs)
         self.verifier_op = self._verifier_op
@@ -343,18 +370,24 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
     def forward(self, inputs: VerifierInputs) -> Dict[str, Any]:
         return self._verifier_op(inputs.model_dump())
 
+
 class VariedEnsembleInputs(BaseModel):
     """Inputs for the VariedEnsemble operator."""
+
     query: str
+
 
 class VariedEnsembleOutputs(BaseModel):
     """Outputs for the VariedEnsemble operator."""
+
     responses: List[str]
+
 
 class VariedEnsembleSignature(Signature):
     required_inputs: List[str] = ["query"]
     input_model: Type[BaseModel] = VariedEnsembleInputs
     # Optionally, you could also specify an output_model if desired
+
 
 class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
     """
@@ -398,11 +431,11 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 # ------------------------------------------------------------------------------
 # 6) Bringing it All Together
 # ------------------------------------------------------------------------------
-# 
+#
 # This file defines typed wrappers around Avior's built-in operators, each
 # subclassing the base Operator and passing typed inputs to the underlying
-# registry operator. You can create complex pipelines by composing these 
-# wrappers as sub-operators of your custom operator classes (similar to 
+# registry operator. You can create complex pipelines by composing these
+# wrappers as sub-operators of your custom operator classes (similar to
 # the "NestedNetwork" pattern).
 #
 # For example, if you want to create an operator that does:

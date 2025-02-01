@@ -13,6 +13,7 @@ from src.avior.registry.model.registry.model_enum import parse_model_str
 
 logger = logging.getLogger(__name__)
 
+
 def discover_providers(package: str) -> Dict[str, Type[BaseProviderModel]]:
     """
     Recursively walks through 'package' and all subpackages,
@@ -38,8 +39,10 @@ def discover_providers(package: str) -> Dict[str, Type[BaseProviderModel]]:
 
     return provider_map
 
+
 class ModelFactory:
     """Factory that instantiates provider model classes from ModelInfo."""
+
     @staticmethod
     def create_model_from_info(model_info: ModelInfo) -> BaseProviderModel:
         try:
@@ -48,7 +51,9 @@ class ModelFactory:
             raise ProviderConfigError(f"Unrecognized model ID '{model_info.model_id}'.")
 
         provider_name = model_info.provider.name
-        discovered_map = discover_providers("src.avior.registry.model.provider_registry")  # now recursive
+        discovered_map = discover_providers(
+            "src.avior.registry.model.provider_registry"
+        )  # now recursive
         model_class = discovered_map.get(provider_name)
         if not model_class:
             raise ProviderConfigError(f"Unsupported provider '{provider_name}'.")

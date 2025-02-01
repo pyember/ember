@@ -167,7 +167,7 @@ def test_integration_gemini_end_to_end():
         gemini_model_info.model_id, "Explain quantum entanglement in simple terms."
     )
     assert svc_response.data, "Gemini model returned empty data (service call)."
-    print('GEMINI SVC RESPONSE: ', svc_response)
+    print("GEMINI SVC RESPONSE: ", svc_response)
     usage_summary = usage_service.get_usage_summary(gemini_model_info.model_id)
     logger.info("Gemini usage summary: %s", usage_summary.model_dump())
     assert (

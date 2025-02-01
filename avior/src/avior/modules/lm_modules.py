@@ -8,31 +8,32 @@ from src.avior.registry.model.registry.model_registry import GLOBAL_MODEL_REGIST
 
 logger = logging.getLogger(__name__)
 
+
 class LMModuleConfig(BaseModel):
     """
     Configuration settings for the Language Model module.
     """
+
     model_id: str = Field(
         "openai:gpt-4o",
-        description="String or enum-based identifier for picking the underlying model provider."
+        description="String or enum-based identifier for picking the underlying model provider.",
     )
     temperature: float = Field(
-        1.0, ge=0.0, le=5.0, 
-        description="Sampling temperature for model generation."
+        1.0, ge=0.0, le=5.0, description="Sampling temperature for model generation."
     )
     max_tokens: Optional[int] = Field(
-        None, 
-        description="Maximum tokens to generate in a single forward call."
+        None, description="Maximum tokens to generate in a single forward call."
     )
     cot_prompt: Optional[str] = Field(
-        None, 
-        description="Optional chain-of-thought prompt or format appended to the user's prompt."
+        None,
+        description="Optional chain-of-thought prompt or format appended to the user's prompt.",
     )
     persona: Optional[str] = Field(
-        None, 
-        description="Optional persona or role context to be prepended to user query."
+        None,
+        description="Optional persona or role context to be prepended to user query.",
     )
     # You can add more fields as needed (top_k, top_p, etc.).
+
 
 def get_default_model_service() -> ModelService:
     """
@@ -45,6 +46,7 @@ def get_default_model_service() -> ModelService:
     # Optionally, register default models here:
     # e.g. registry.register_model(<some ModelInfo>)
     return ModelService(registry, usage_service)
+
 
 class LMModule:
     """
@@ -95,7 +97,7 @@ class LMModule:
             temperature=kwargs.get("temperature", self.config.temperature),
             max_tokens=kwargs.get("max_tokens", self.config.max_tokens),
             # We no longer pass context here
-            **kwargs
+            **kwargs,
         )
 
         # 3) Return final text
@@ -116,6 +118,8 @@ class LMModule:
 
         # Append chain-of-thought prompt if present
         if self.config.cot_prompt:
-            segments.append(f"\n\n# Chain of Thought:\n{self.config.cot_prompt.strip()}")
+            segments.append(
+                f"\n\n# Chain of Thought:\n{self.config.cot_prompt.strip()}"
+            )
 
         return "\n".join(segments).strip()

@@ -6,6 +6,7 @@ from src.avior.registry.model.provider_registry.base import BaseProviderModel
 from src.avior.registry.model.services.usage_service import UsageService
 from src.avior.registry.model.registry.model_enum import ModelEnum
 
+
 class ModelService:
     """
     High-level façade for retrieving and invoking models by a string ID or enum-based ID.
@@ -48,9 +49,7 @@ class ModelService:
         """
         if not model_id:
             if not self._default_model_id:
-                raise ValueError(
-                    "No model_id provided and no default_model_id set."
-                )
+                raise ValueError("No model_id provided and no default_model_id set.")
             model_id = self._default_model_id
 
         raw_id = getattr(model_id, "value", model_id)
@@ -72,7 +71,7 @@ class ModelService:
     ):
         """
         Invokes the model using its __call__ interface.
-        If response contains usage, record it. 
+        If response contains usage, record it.
         """
         model = self.get_model(model_id)
         response = model(prompt=prompt, **kwargs)

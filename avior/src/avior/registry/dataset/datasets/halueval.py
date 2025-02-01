@@ -9,6 +9,7 @@ class HaluEvalConfig(BaseDatasetConfig):
     """
     Represents HaluEval-specific config fields, e.g. a sub-dataset name on HF.
     """
+
     config_name: Optional[str] = "qa"
     split: Optional[str] = "data"
 

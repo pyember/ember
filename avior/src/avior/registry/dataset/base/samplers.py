@@ -17,7 +17,7 @@ class DatasetSampler(IDatasetSampler):
     ) -> Union[Dataset, List[Dict[str, Any]]]:
         if not num_samples:
             return data
-        
+
         # If it’s a Hugging Face Dataset, use .select(...) to keep it as a
         # Dataset of row-wise dicts, instead of a dict of columns.
         if isinstance(data, Dataset):

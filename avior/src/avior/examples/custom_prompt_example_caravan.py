@@ -69,6 +69,7 @@ sample_flow_stream = (
     "0.0005740000051446259,0.00014400000509340316,6.0,6.0,5.0 "
 )
 
+
 # ------------------------------------------------------------------------------------
 # Environment Validation
 # ------------------------------------------------------------------------------------
@@ -79,6 +80,7 @@ def check_env() -> None:
         logger.error(f"Missing env vars: {missing}")
         sys.exit(1)
 
+
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
@@ -88,6 +90,7 @@ from src.avior.registry.model.schemas.model_info import ModelInfo
 from src.avior.registry.model.schemas.provider_info import ProviderInfo
 from src.avior.registry.model.schemas.cost import ModelCost, RateLimit
 from avior.registry.model.provider_registry.openai.openai_provider import OpenAIModel
+
 
 def register_custom_model() -> None:
     """
@@ -105,9 +108,7 @@ def register_custom_model() -> None:
         cost=ModelCost(input_cost_per_thousand=0.0, output_cost_per_thousand=0.0),
         rate_limit=RateLimit(tokens_per_minute=0, requests_per_minute=0),
         provider=ProviderInfo(
-            name="foundry",
-            default_api_key=api_key, 
-            base_url=base_url
+            name="foundry", default_api_key=api_key, base_url=base_url
         ),
         api_key=api_key,
     )
@@ -116,6 +117,7 @@ def register_custom_model() -> None:
         f"Registered custom model '{custom_model}' with base_url='{base_url}'. "
         f"Models now in registry: {registry.list_models()}"
     )
+
 
 # ------------------------------------------------------------------------------------
 # Prompt Pieces (Old Context, Broken Down)
@@ -150,6 +152,7 @@ CARAVAN_PROMPT_FULL = (
     "{question}\n"
 )
 
+
 # ------------------------------------------------------------------------------------
 # Minimal 'Signature' & 'Inputs' for Our Caravan Prompt
 # ------------------------------------------------------------------------------------
@@ -157,12 +160,15 @@ class CaravanLabelingInputs(BaseModel):
     """
     The request object containing the unlabeled flows in 'question'.
     """
+
     question: str
+
 
 class CaravanLabelingSignature(BaseModel):
     """
     Minimal local signature container with prompt string, required fields, etc.
     """
+
     required_inputs: List[str] = ["question"]
     prompt_template: str = CARAVAN_PROMPT_FULL
 
@@ -173,6 +179,7 @@ class CaravanLabelingSignature(BaseModel):
         # For production usage, you'd ensure all required fields are present.
         return self.prompt_template.format(**inputs)
 
+
 # ------------------------------------------------------------------------------------
 # A Simple 'Signature' & 'Inputs' for the "simple" pipeline
 # ------------------------------------------------------------------------------------
@@ -180,7 +187,9 @@ class SimplePromptInputs(BaseModel):
     """
     The request for a simple question like "What is the capital of India?"
     """
+
     question: str
+
 
 class SimplePromptSignature(BaseModel):
     required_inputs: List[str] = ["question"]
@@ -191,11 +200,19 @@ class SimplePromptSignature(BaseModel):
 
     def render_prompt(self, inputs: Dict[str, Any]) -> str:
         return self.prompt_template.format(**inputs)
+
+
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
-from src.avior.registry.operator.operator_base import Operator, OperatorContext, LMModule, LMModuleConfig
+from src.avior.registry.operator.operator_base import (
+    Operator,
+    OperatorContext,
+    LMModule,
+    LMModuleConfig,
+)
 from src.avior.registry import non
+
 
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
     """
@@ -205,7 +222,9 @@ class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
     def __init__(self, model_name: str):
         super().__init__()
         self.signature = SimplePromptSignature()
-        self.ensemble = non.Ensemble(num_units=1, model_name=model_name, temperature=0.2, max_tokens=64)
+        self.ensemble = non.Ensemble(
+            num_units=1, model_name=model_name, temperature=0.2, max_tokens=64
+        )
 
     def forward(self, inputs: SimplePromptInputs) -> Dict[str, Any]:
         # Validate input (in more advanced usage, you'd do thorough checks).
@@ -215,6 +234,7 @@ class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
         raw_answer = self.ensemble(ensemble_inputs).get("final_answer", "").strip()
         return {"final_answer": raw_answer}
 
+
 class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
     """
     Operator that uses a big, multi-part 'Caravan' prompt to label flows 0 or 1.
@@ -223,7 +243,9 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
     def __init__(self, model_name: str):
         super().__init__()
         self.signature = CaravanLabelingSignature()
-        self.ensemble = non.Ensemble(num_units=3, model_name=model_name, temperature=0.0, max_tokens=256)
+        self.ensemble = non.Ensemble(
+            num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
+        )
         self.judge = non.Judge(model_name=model_name, temperature=0.0, max_tokens=256)
 
     def forward(self, inputs: CaravanLabelingInputs) -> Dict[str, Any]:
@@ -232,11 +254,11 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
         ensemble_output = self.ensemble(ensemble_inputs)
 
         judge_inputs = non.JudgeInputs(
-            query=prompt,
-            responses=ensemble_output.get("responses", [])
+            query=prompt, responses=ensemble_output.get("responses", [])
         )
         judge_output = self.judge(judge_inputs)
         return {"final_answer": judge_output.get("final_answer", "").strip()}
+
 
 # ------------------------------------------------------------------------------------
 # Graph/Pipeline Constructors
@@ -245,15 +267,19 @@ def create_simple_pipeline(model_name: str) -> Operator:
     """Returns a single-step operator for 'simple' usage."""
     return SimplePromptOperator(model_name)
 
+
 def create_caravan_pipeline(model_name: str) -> Operator:
     """Returns a single-step operator for 'caravan' labeling usage."""
     return CaravanLabelingOperator(model_name)
+
 
 # ------------------------------------------------------------------------------------
 # Main + Arg Parsing
 # ------------------------------------------------------------------------------------
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Refactored custom prompt example (caravan).")
+    parser = argparse.ArgumentParser(
+        description="Refactored custom prompt example (caravan)."
+    )
     parser.add_argument(
         "--non",
         type=str,
@@ -261,6 +287,7 @@ def parse_arguments() -> argparse.Namespace:
         help="Which pipeline to run: 'simple' or 'caravan'.",
     )
     return parser.parse_args()
+
 
 def main():
     logger.info("Starting refactored custom prompt with old context ...")
@@ -288,7 +315,9 @@ def main():
         print(f"[CARAVAN] Final Labeled Output:\n{response['final_answer']}\n")
 
     else:
-        logger.error(f"Invalid --non={chosen_non}. Must be '{SIMPLE_NON}' or '{CARAVAN_NON}'.")
+        logger.error(
+            f"Invalid --non={chosen_non}. Must be '{SIMPLE_NON}' or '{CARAVAN_NON}'."
+        )
         sys.exit(1)
 
 

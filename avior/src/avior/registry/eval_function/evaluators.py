@@ -11,8 +11,8 @@ import re
 # 1) Core Data Structures & Interfaces
 ##########################################################
 
-T_out = TypeVar("T_out")     # The type of the system's output
-T_truth = TypeVar("T_truth") # The type of the correct answer
+T_out = TypeVar("T_out")  # The type of the system's output
+T_truth = TypeVar("T_truth")  # The type of the correct answer
 
 
 @dataclass
@@ -20,6 +20,7 @@ class EvaluationResult:
     """
     Encapsulates the result of evaluating a system output against a reference.
     """
+
     is_correct: bool
     score: float
     metadata: Dict[str, Any] = None
@@ -27,20 +28,17 @@ class EvaluationResult:
 
 class IEvaluator(ABC, Generic[T_out]):
     """
-    A generic interface for evaluating a system output (T_out) 
+    A generic interface for evaluating a system output (T_out)
     against a 'correct_answer', returning an EvaluationResult.
 
     By design:
-      - T_out is typically a str or dict, but can be anything 
+      - T_out is typically a str or dict, but can be anything
       - 'correct_answer' can also be arbitrary, typed or untyped
     """
 
     @abstractmethod
     def evaluate(
-        self,
-        system_output: T_out,
-        correct_answer: Any,
-        **kwargs
+        self, system_output: T_out, correct_answer: Any, **kwargs
     ) -> EvaluationResult:
         """
         Evaluate 'system_output' vs. 'correct_answer'.
@@ -52,9 +50,10 @@ class IEvaluator(ABC, Generic[T_out]):
 @dataclass
 class ExtractionResult:
     """
-    For advanced usage: if you do extraction steps, you might store 
+    For advanced usage: if you do extraction steps, you might store
     intermediate parse results or relevant info here.
     """
+
     extracted_value: Any
     metadata: Dict[str, Any] = None
 
@@ -77,8 +76,9 @@ class IOutputExtractor(ABC, Generic[T_out, T_truth]):
 # 2) Composed Evaluator (Extractor + Evaluator)
 ##########################################################
 
-OutType = TypeVar("OutType") 
+OutType = TypeVar("OutType")
 ExtractedType = TypeVar("ExtractedType")
+
 
 class ComposedEvaluator(Generic[OutType, ExtractedType], IEvaluator[OutType]):
     """
@@ -92,16 +92,13 @@ class ComposedEvaluator(Generic[OutType, ExtractedType], IEvaluator[OutType]):
     def __init__(
         self,
         extractor: IOutputExtractor[OutType, ExtractedType],
-        base_evaluator: IEvaluator[ExtractedType]
+        base_evaluator: IEvaluator[ExtractedType],
     ):
         self.extractor = extractor
         self.base_evaluator = base_evaluator
 
     def evaluate(
-        self,
-        system_output: OutType,
-        correct_answer: Any,
-        **kwargs
+        self, system_output: OutType, correct_answer: Any, **kwargs
     ) -> EvaluationResult:
         extracted_value = self.extractor.extract(system_output, **kwargs)
         return self.base_evaluator.evaluate(extracted_value, correct_answer, **kwargs)
@@ -111,20 +108,19 @@ class ComposedEvaluator(Generic[OutType, ExtractedType], IEvaluator[OutType]):
 # 3) Sample Concrete Evaluators
 ##########################################################
 
+
 class ExactMatchEvaluator(IEvaluator[str]):
     """
     Evaluates correctness by checking if system_output (string)
     matches correct_answer (string), ignoring case + whitespace.
     """
+
     def evaluate(
-        self,
-        system_output: str,
-        correct_answer: str,
-        **kwargs
+        self, system_output: str, correct_answer: str, **kwargs
     ) -> EvaluationResult:
         out_clean = system_output.strip().lower()
         ans_clean = correct_answer.strip().lower()
-        is_correct = (out_clean == ans_clean)
+        is_correct = out_clean == ans_clean
         return EvaluationResult(is_correct=is_correct, score=1.0 if is_correct else 0.0)
 
 
@@ -132,25 +128,25 @@ class NumericToleranceEvaluator(IEvaluator[float]):
     """
     Checks if system_output (float) is within tolerance of correct_answer (float).
     """
+
     def __init__(self, tolerance: float = 0.01):
         self.tolerance = tolerance
 
     def evaluate(
-        self,
-        system_output: float,
-        correct_answer: float,
-        **kwargs
+        self, system_output: float, correct_answer: float, **kwargs
     ) -> EvaluationResult:
         diff = abs(system_output - correct_answer)
         is_correct = diff <= self.tolerance
         # Score decreases as diff grows, but is never negative
         score = max(0, 1 - diff / (abs(correct_answer) if correct_answer != 0 else 1.0))
-        return EvaluationResult(is_correct=is_correct, score=score, metadata={"diff": diff})
+        return EvaluationResult(
+            is_correct=is_correct, score=score, metadata={"diff": diff}
+        )
 
 
 class CodeExecutionEvaluator(IEvaluator[str]):
     """
-    Example evaluator that tries to run system_output as Python code 
+    Example evaluator that tries to run system_output as Python code
     and compare stdout to a 'correct_answer' string.
     """
 
@@ -158,41 +154,37 @@ class CodeExecutionEvaluator(IEvaluator[str]):
         self.timeout = timeout
 
     def evaluate(
-        self,
-        system_output: str,
-        correct_answer: str,
-        **kwargs
+        self, system_output: str, correct_answer: str, **kwargs
     ) -> EvaluationResult:
         try:
             proc = subprocess.run(
                 ["python", "-c", system_output],
                 capture_output=True,
                 text=True,
-                timeout=self.timeout
+                timeout=self.timeout,
             )
             stdout_str = proc.stdout.strip()
             expected_str = correct_answer.strip()
-            is_correct = (stdout_str == expected_str)
+            is_correct = stdout_str == expected_str
             return EvaluationResult(
                 is_correct=is_correct,
                 score=1.0 if is_correct else 0.0,
                 metadata={
                     "stdout": proc.stdout,
                     "stderr": proc.stderr,
-                    "exit_code": proc.returncode
-                }
+                    "exit_code": proc.returncode,
+                },
             )
         except Exception as e:
             return EvaluationResult(
-                is_correct=False,
-                score=0.0,
-                metadata={"error": str(e)}
+                is_correct=False, score=0.0, metadata={"error": str(e)}
             )
 
 
 ##########################################################
 # 4) Sample Extractor(s)
 ##########################################################
+
 
 class RegexExtractor(IOutputExtractor[str, str]):
     """
@@ -214,6 +206,7 @@ class RegexExtractor(IOutputExtractor[str, str]):
 # 5) Example: Combining Extraction + Evaluation
 ##########################################################
 
+
 class PartialRegexEvaluator(ComposedEvaluator[str, str]):
     """
     Demonstrates combining a RegexExtractor with an ExactMatchEvaluator.
@@ -230,10 +223,12 @@ class PartialRegexEvaluator(ComposedEvaluator[str, str]):
 # 6) (Optional) Evaluator Registry or Batch Execution
 ##########################################################
 
+
 class EvaluatorRegistry:
     """
     Optional: store named evaluators for easy reuse.
     """
+
     def __init__(self):
         self._evaluators: Dict[str, IEvaluator[Any]] = {}
 
@@ -250,7 +245,7 @@ def evaluate_batch(
     evaluator: IEvaluator[Any],
     system_outputs: list[Any],
     correct_answers: list[Any],
-    **kwargs
+    **kwargs,
 ) -> list[EvaluationResult]:
     """
     Helper to run the same evaluator over a list of (system_output, correct_answer) pairs.
@@ -277,7 +272,7 @@ if __name__ == "__main__":
     print("NumericTolerance result:", res2)
 
     # Example 3: Combine a regex extraction + exact match
-    # e.g. parse 'The answer is XXX' 
+    # e.g. parse 'The answer is XXX'
     pattern = r"answer\s+is\s+(\w+)"
     eval_regex = PartialRegexEvaluator(pattern=pattern)
     res3 = eval_regex.evaluate("The answer is PARIS", "PARIS")

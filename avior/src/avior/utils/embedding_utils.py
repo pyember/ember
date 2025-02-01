@@ -8,6 +8,7 @@ import math
 # 1) Embedding Model Interfaces & Implementations
 ###########################################################
 
+
 class EmbeddingModel(Protocol):
     """
     A minimal interface for an embedding model that takes text and returns
@@ -32,6 +33,7 @@ class MockEmbeddingModel:
 
     Adheres to the EmbeddingModel interface.
     """
+
     def embed_text(self, text: str) -> List[float]:
         """
         Convert each character to an ASCII code normalized by some constant.
@@ -45,6 +47,7 @@ class MockEmbeddingModel:
 ###########################################################
 # 2) Similarity Metric Interface & Implementations
 ###########################################################
+
 
 class SimilarityMetric(ABC):
     """
@@ -63,7 +66,7 @@ class SimilarityMetric(ABC):
 
 class CosineSimilarity(SimilarityMetric):
     """
-    Standard cosine similarity: 
+    Standard cosine similarity:
        sim(a,b) = (a · b) / (||a|| * ||b||)
     """
 
@@ -85,11 +88,9 @@ class CosineSimilarity(SimilarityMetric):
 # 3) High-Level Utility Function
 ###########################################################
 
+
 def calculate_text_similarity(
-    text1: str,
-    text2: str,
-    model: EmbeddingModel,
-    metric: SimilarityMetric
+    text1: str, text2: str, model: EmbeddingModel, metric: SimilarityMetric
 ) -> float:
     """
     Given two pieces of text, an EmbeddingModel, and a SimilarityMetric,

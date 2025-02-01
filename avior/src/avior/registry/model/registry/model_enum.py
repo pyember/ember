@@ -1,21 +1,28 @@
 from enum import Enum
 import logging
 
+
 class OpenAIModelEnum(str, Enum):
     """Models under the OpenAI provider."""
+
     GPT_4O = "openai:gpt-4o"
     GPT_4O_MINI = "openai:gpt-4o-mini"
     O1 = "openai:o1"
 
+
 class AnthropicModelEnum(str, Enum):
     """Models under the Anthropic provider."""
+
     CLAUDE_3_5_SONNET = "anthropic:claude-3.5-sonnet"
+
 
 class GoogleModelEnum(str, Enum):
     """Models under the Google/Gemini provider."""
+
     GEMINI_1_5_PRO = "google:gemini-1.5-pro"
     GEMINI_2_0_FLASH = "google:gemini-2.0-flash"
     GEMINI_EXP_1206 = "google:gemini-exp-1206"
+
 
 # Optional aggregator for easy iteration
 ALL_PROVIDER_ENUMS = [
@@ -23,6 +30,7 @@ ALL_PROVIDER_ENUMS = [
     AnthropicModelEnum,
     GoogleModelEnum,
 ]
+
 
 def create_model_enum():
     """
@@ -37,7 +45,9 @@ def create_model_enum():
             members[model.name] = model.value
     return Enum("ModelEnum", members, type=str)
 
+
 ModelEnum = create_model_enum()
+
 
 def parse_model_str(model_str: str) -> str:
     """

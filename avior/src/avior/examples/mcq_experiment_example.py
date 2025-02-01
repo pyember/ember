@@ -39,14 +39,23 @@ from src.avior.core.configs.config import CONFIG, initialize_system
 from src.avior.registry.dataset.base.models import DatasetEntry
 from src.avior.registry.dataset.datasets.mmlu import MMLUConfig
 from src.avior.registry.dataset.registry.service import DatasetService
-from src.avior.registry.dataset.registry.metadata_registry import DatasetMetadataRegistry
+from src.avior.registry.dataset.registry.metadata_registry import (
+    DatasetMetadataRegistry,
+)
 from src.avior.registry.dataset.registry.loader_factory import DatasetLoaderFactory
 from src.avior.registry.dataset.base.loaders import HuggingFaceDatasetLoader
 from src.avior.registry.dataset.base.samplers import DatasetSampler
 from src.avior.registry.dataset.base.validators import DatasetValidator
-from src.avior.registry.dataset.registry.initialization import initialize_dataset_registry
+from src.avior.registry.dataset.registry.initialization import (
+    initialize_dataset_registry,
+)
 from src.avior.core.scheduler import ExecutionPlan
-from src.avior.registry.operator.operator_base import Operator, OperatorMetadata, OperatorType, LMModule
+from src.avior.registry.operator.operator_base import (
+    Operator,
+    OperatorMetadata,
+    OperatorType,
+    LMModule,
+)
 from src.avior.registry.prompt_signature.signatures import Signature
 from src.avior.modules.lm_modules import LMModuleConfig
 
@@ -58,6 +67,7 @@ class EnsureValidChoiceInputs(BaseModel):
     query: str
     partial_answer: str
     choices: Dict[str, str]
+
 
 class EnsureValidChoiceSignature(Signature):
     required_inputs: List[str] = ["query", "partial_answer", "choices"]
@@ -73,6 +83,7 @@ class EnsureValidChoiceSignature(Signature):
         "or 'Invalid' if no mapping is possible.\n"
         "No additional explanation, just the letter or 'Invalid'."
     )
+
 
 class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]]):
     """
@@ -92,9 +103,11 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
         temperature: float = 0.0,
         max_tokens: Optional[int] = 16,
         max_retries: int = 1,
-        **kwargs
+        **kwargs,
     ):
-        super().__init__(name="EnsureValidChoiceOperator", signature=self.metadata.signature)
+        super().__init__(
+            name="EnsureValidChoiceOperator", signature=self.metadata.signature
+        )
         lm_config = LMModuleConfig(
             model_name=model_name,
             temperature=temperature,
@@ -121,8 +134,12 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
             }
             prompt_str = self.build_prompt(prompt_context)
 
-            fallback_output = self.call_lm(prompt_str, self.lm_modules[0]).strip().upper()
-            logging.info(f"Attempt {attempt_i+1}/{self._max_retries}, LM suggested: '{fallback_output}'")
+            fallback_output = (
+                self.call_lm(prompt_str, self.lm_modules[0]).strip().upper()
+            )
+            logging.info(
+                f"Attempt {attempt_i+1}/{self._max_retries}, LM suggested: '{fallback_output}'"
+            )
 
             if fallback_output in inputs.choices:
                 return {"final_answer": fallback_output}
@@ -144,16 +161,21 @@ class SingleModelBaselineInputs(BaseModel):
     query: str
     choices: Dict[str, str]
 
+
 class SingleModelBaselineOutputs(BaseModel):
     final_answer: str
+
 
 # 1) Define a signature referencing SingleModelBaselineInputs
 class SingleModelBaselineSignature(Signature):
     required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = SingleModelBaselineInputs
 
+
 # 2) Attach that signature to the operator’s metadata
-class SingleModelBaseline(non.Operator[SingleModelBaselineInputs, SingleModelBaselineOutputs]):
+class SingleModelBaseline(
+    non.Operator[SingleModelBaselineInputs, SingleModelBaselineOutputs]
+):
     metadata: OperatorMetadata = OperatorMetadata(
         code="SINGLE_MODEL_BASELINE",
         description="One-LM baseline with ValidateChoice or EnsureValidChoice.",
@@ -164,7 +186,9 @@ class SingleModelBaseline(non.Operator[SingleModelBaselineInputs, SingleModelBas
     def __init__(self, model_name: str = "gpt-4o", temperature: float = 0.0):
         super().__init__(name="SingleModelBaseline", signature=self.metadata.signature)
         # 1) Ensemble
-        self.ensemble = non.Ensemble(num_units=1, model_name=model_name, temperature=temperature)
+        self.ensemble = non.Ensemble(
+            num_units=1, model_name=model_name, temperature=temperature
+        )
         # 2) GetAnswer
         self.get_answer = non.GetAnswer(model_name=model_name, temperature=temperature)
         # 3) EnsureValidChoice (or ValidateChoice)
@@ -185,11 +209,13 @@ class SingleModelBaseline(non.Operator[SingleModelBaselineInputs, SingleModelBas
         final_answer = ga_out["final_answer"]
 
         # 3) ensure_valid_choice => ensures final_answer is in `choices`
-        evc_out = self.ensure_valid_choice({
-            "query": inputs.query,
-            "partial_answer": final_answer,
-            "choices": inputs.choices
-        })
+        evc_out = self.ensure_valid_choice(
+            {
+                "query": inputs.query,
+                "partial_answer": final_answer,
+                "choices": inputs.choices,
+            }
+        )
 
         return SingleModelBaselineOutputs(final_answer=evc_out["final_answer"])
 
@@ -201,15 +227,20 @@ class MultiModelEnsembleInputs(BaseModel):
     query: str
     choices: Dict[str, str]
 
+
 class MultiModelEnsembleOutputs(BaseModel):
     final_answer: str
+
 
 # Step A: Define a signature referencing MultiModelEnsembleInputs
 class MultiModelEnsembleSignature(Signature):
     required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = MultiModelEnsembleInputs
 
-class MultiModelEnsemble(non.Operator[MultiModelEnsembleInputs, MultiModelEnsembleOutputs]):
+
+class MultiModelEnsemble(
+    non.Operator[MultiModelEnsembleInputs, MultiModelEnsembleOutputs]
+):
     """
     Pipeline:
       1) non.Ensemble(num_units=3) => {'responses': [...]}
@@ -226,22 +257,23 @@ class MultiModelEnsemble(non.Operator[MultiModelEnsembleInputs, MultiModelEnsemb
         signature=MultiModelEnsembleSignature(),
     )
 
-    def __init__(self, model_name: str = "claude-3.5-sonnet-latest", temperature: float = 0.7):
+    def __init__(
+        self, model_name: str = "claude-3.5-sonnet-latest", temperature: float = 0.7
+    ):
         # Step C: Pass the signature to super().__init__ so it can coerce inputs
         super().__init__(name="MultiModelEnsemble", signature=self.metadata.signature)
 
         # Step 1) Ensembling multiple LM calls
-        self.ensemble = non.Ensemble(num_units=3, model_name=model_name, temperature=temperature)
+        self.ensemble = non.Ensemble(
+            num_units=3, model_name=model_name, temperature=temperature
+        )
         # Step 2) Judge-synthesis aggregator
         self.judge = non.JudgeSynthesis(model_name=model_name, temperature=temperature)
         # Step 3) (Optional) refine or parse answer again
         self.get_answer = non.GetAnswer(model_name=model_name, temperature=0.1)
         # Step 4) Validate final_answer is in choices
         self.ensure_valid_choice = EnsureValidChoiceOperator(
-            model_name=model_name,
-            temperature=0.1,
-            max_tokens=16,
-            max_retries=1
+            model_name=model_name, temperature=0.1, max_tokens=16, max_retries=1
         )
 
     def forward(self, inputs: MultiModelEnsembleInputs) -> MultiModelEnsembleOutputs:
@@ -257,11 +289,13 @@ class MultiModelEnsemble(non.Operator[MultiModelEnsembleInputs, MultiModelEnsemb
         final_answer = ga_out["final_answer"]
 
         # Step 4) validate final_answer
-        evc_out = self.ensure_valid_choice({
-            "query": inputs.query,
-            "partial_answer": final_answer,
-            "choices": inputs.choices
-        })
+        evc_out = self.ensure_valid_choice(
+            {
+                "query": inputs.query,
+                "partial_answer": final_answer,
+                "choices": inputs.choices,
+            }
+        )
 
         return MultiModelEnsembleOutputs(final_answer=evc_out["final_answer"])
 
@@ -273,14 +307,19 @@ class VariedModelEnsembleInputs(BaseModel):
     query: str
     choices: Dict[str, str]
 
+
 class VariedModelEnsembleOutputs(BaseModel):
     final_answer: str
+
 
 class VariedModelEnsembleSignature(Signature):
     required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = VariedModelEnsembleInputs
 
-class VariedModelEnsemble(non.Operator[VariedModelEnsembleInputs, VariedModelEnsembleOutputs]):
+
+class VariedModelEnsemble(
+    non.Operator[VariedModelEnsembleInputs, VariedModelEnsembleOutputs]
+):
     """
     Pipeline:
       1) non.VariedEnsemble => {'responses': [...]}
@@ -303,13 +342,21 @@ class VariedModelEnsemble(non.Operator[VariedModelEnsembleInputs, VariedModelEns
         self.ensemble = non.VariedEnsemble(model_configs=model_configs)
 
         # Updated: read aggregator model details from 'model_id' instead of 'model_name'
-        aggregator_model_name = 'openai:o1'
+        aggregator_model_name = "openai:o1"
         aggregator_temp = 0.7
 
-        self.judge = non.JudgeSynthesis(model_name=aggregator_model_name, temperature=aggregator_temp)
-        self.get_answer = non.GetAnswer(model_name=aggregator_model_name, temperature=max(0.0, aggregator_temp - 0.6))
+        self.judge = non.JudgeSynthesis(
+            model_name=aggregator_model_name, temperature=aggregator_temp
+        )
+        self.get_answer = non.GetAnswer(
+            model_name=aggregator_model_name,
+            temperature=max(0.0, aggregator_temp - 0.6),
+        )
         self.ensure_valid_choice = EnsureValidChoiceOperator(
-            model_name=aggregator_model_name, temperature=aggregator_temp, max_tokens=16, max_retries=1
+            model_name=aggregator_model_name,
+            temperature=aggregator_temp,
+            max_tokens=16,
+            max_retries=1,
         )
 
     def forward(self, inputs: VariedModelEnsembleInputs) -> VariedModelEnsembleOutputs:
@@ -322,11 +369,13 @@ class VariedModelEnsemble(non.Operator[VariedModelEnsembleInputs, VariedModelEns
         ga_out = self.get_answer({"query": inputs.query, "responses": [judge_answer]})
         final_answer = ga_out["final_answer"]
 
-        evc_out = self.ensure_valid_choice({
-            "query": inputs.query,
-            "partial_answer": final_answer,
-            "choices": inputs.choices
-        })
+        evc_out = self.ensure_valid_choice(
+            {
+                "query": inputs.query,
+                "partial_answer": final_answer,
+                "choices": inputs.choices,
+            }
+        )
 
         return VariedModelEnsembleOutputs(final_answer=evc_out["final_answer"])
 
@@ -348,13 +397,24 @@ def build_pipeline_graph(pipeline_op: non.Operator) -> OperatorGraph:
 # 4) Main experiment code
 ###############################################################################
 def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="MCQ Experiment with Baseline vs. Multi-Model Ensemble.")
-    parser.add_argument("--config_name", type=str, default="abstract_algebra",
-                        help="MMLU sub-config (e.g. 'abstract_algebra').")
-    parser.add_argument("--num_samples", type=int, default=5,
-                        help="How many MMLU samples to test on.")
-    parser.add_argument("--max_workers", type=int, default=None,
-                        help="Number of threads for parallel scoring. Defaults to Python's choice.")
+    parser = argparse.ArgumentParser(
+        description="MCQ Experiment with Baseline vs. Multi-Model Ensemble."
+    )
+    parser.add_argument(
+        "--config_name",
+        type=str,
+        default="abstract_algebra",
+        help="MMLU sub-config (e.g. 'abstract_algebra').",
+    )
+    parser.add_argument(
+        "--num_samples", type=int, default=5, help="How many MMLU samples to test on."
+    )
+    parser.add_argument(
+        "--max_workers",
+        type=int,
+        default=None,
+        help="Number of threads for parallel scoring. Defaults to Python's choice.",
+    )
     return parser.parse_args()
 
 
@@ -406,19 +466,25 @@ def main() -> None:
         dataset_info=mmlu_info,
         prepper=prepper,
         config=mmlu_config,
-        num_samples=args.num_samples
+        num_samples=args.num_samples,
     )
-    logging.info(f"Loaded {len(dataset_entries)} MMLU items (config={args.config_name}).")
+    logging.info(
+        f"Loaded {len(dataset_entries)} MMLU items (config={args.config_name})."
+    )
 
     # Build the pipeline operators as typed wrappers only (no direct registry usage).
     baseline_op = SingleModelBaseline(model_name="gpt-4o", temperature=0.0)
     ensemble_op = MultiModelEnsemble(model_name="gpt-4o", temperature=0.7)
-    varied_op = VariedModelEnsemble([
-        LMModuleConfig(model_name="openai:gpt-4o", temperature=0.6),
-        LMModuleConfig(model_name="anthropic:claude-3.5-sonnet-latest", temperature=0.8),
-        LMModuleConfig(model_name="openai:o1", temperature=0.4),
-        LMModuleConfig(model_name="google:gemini-1.5-pro", temperature=0.5),
-    ])
+    varied_op = VariedModelEnsemble(
+        [
+            LMModuleConfig(model_name="openai:gpt-4o", temperature=0.6),
+            LMModuleConfig(
+                model_name="anthropic:claude-3.5-sonnet-latest", temperature=0.8
+            ),
+            LMModuleConfig(model_name="openai:o1", temperature=0.4),
+            LMModuleConfig(model_name="google:gemini-1.5-pro", temperature=0.5),
+        ]
+    )
 
     baseline_graph = build_pipeline_graph(baseline_op)
     ensemble_graph = build_pipeline_graph(ensemble_op)
@@ -441,7 +507,10 @@ def main() -> None:
         # Baseline pipeline
         baseline_out = runner.run(
             baseline_graph,
-            {"query": query, "choices": choices}  # typed inputs for SingleModelBaseline
+            {
+                "query": query,
+                "choices": choices,
+            },  # typed inputs for SingleModelBaseline
         )
         base_pred = baseline_out.final_answer.upper()
         baseline_correct = 1 if (base_pred == correct_answer) else 0
@@ -449,7 +518,7 @@ def main() -> None:
         # Ensemble pipeline
         ensemble_out = runner.run(
             ensemble_graph,
-            {"query": query, "choices": choices}  # typed inputs for MultiModelEnsemble
+            {"query": query, "choices": choices},  # typed inputs for MultiModelEnsemble
         )
         ens_pred = ensemble_out.final_answer.upper()
         ensemble_correct = 1 if (ens_pred == correct_answer) else 0
@@ -457,7 +526,10 @@ def main() -> None:
         # Varied pipeline
         varied_out = runner.run(
             varied_graph,
-            {"query": query, "choices": choices}  # typed inputs for VariedModelEnsemble
+            {
+                "query": query,
+                "choices": choices,
+            },  # typed inputs for VariedModelEnsemble
         )
         varied_pred = varied_out.final_answer.upper()
         varied_correct = 1 if (varied_pred == correct_answer) else 0
@@ -470,7 +542,9 @@ def main() -> None:
     varied_total = 0
     total_count = len(dataset_entries) or 1
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=args.max_workers
+    ) as executor:
         future_map = {
             executor.submit(score_single_entry, index, e): index
             for index, e in enumerate(dataset_entries)
@@ -489,7 +563,9 @@ def main() -> None:
     table = PrettyTable()
     table.field_names = ["Pipeline", "Accuracy (%)", "Num Samples"]
     table.add_row(["SingleModelBaseline", f"{baseline_acc:.2f}", total_count])
-    table.add_row(["MultiModelEnsemble (Judge aggregator)", f"{ensemble_acc:.2f}", total_count])
+    table.add_row(
+        ["MultiModelEnsemble (Judge aggregator)", f"{ensemble_acc:.2f}", total_count]
+    )
     table.add_row(["VariedModelEnsemble", f"{varied_acc:.2f}", total_count])
 
     print("\nFinal Results:")

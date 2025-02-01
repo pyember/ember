@@ -12,17 +12,19 @@ from src.avior.registry.model.schemas.model_info import ModelInfo
 from src.avior.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
-    BaseChatParameters
+    BaseChatParameters,
 )
 
 logger = logging.getLogger(__name__)
 
+
 class OpenAIChatParameters(BaseChatParameters):
     """
-    Provider-specific param class for OpenAI. 
+    Provider-specific param class for OpenAI.
     Ensures max_tokens is never None (default=512).
     Builds the OpenAI-style 'messages' list.
     """
+
     max_tokens: int | None = Field(default=None)
 
     @field_validator("max_tokens", mode="before")
@@ -53,11 +55,13 @@ class OpenAIChatParameters(BaseChatParameters):
         # (Adjust this logic to match your actual requirement.)
         return kwargs
 
+
 class OpenAIExtraParams(BaseModel):
     # Only include parameters that users can override safely
     stream: bool | None = None
     stop: list[str] | None = None
     # etc...
+
 
 class OpenAIModel(BaseProviderModel):
     """
@@ -93,7 +97,9 @@ class OpenAIModel(BaseProviderModel):
                 kwargs.pop("temperature")
         return kwargs
 
-    @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True)
+    @retry(
+        wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True
+    )
     def forward(self, request: ChatRequest) -> ChatResponse:
         if not request.prompt:
             raise InvalidPromptError("OpenAI prompt cannot be empty.")
@@ -108,7 +114,9 @@ class OpenAIModel(BaseProviderModel):
         )
 
         # 1) Convert universal ChatRequest
-        openai_params = OpenAIChatParameters(**request.dict(exclude={"provider_params"}))
+        openai_params = OpenAIChatParameters(
+            **request.dict(exclude={"provider_params"})
+        )
 
         # 2) Base OpenAI kwargs from param class (includes "messages")
         openai_kwargs = openai_params.to_openai_kwargs()
@@ -122,7 +130,10 @@ class OpenAIModel(BaseProviderModel):
                 openai_kwargs[k] = v
 
         # 4) Adjust naming, prune unsupported
-        if "max_tokens" in openai_kwargs and "max_completion_tokens" not in openai_kwargs:
+        if (
+            "max_tokens" in openai_kwargs
+            and "max_completion_tokens" not in openai_kwargs
+        ):
             openai_kwargs["max_completion_tokens"] = openai_kwargs.pop("max_tokens")
         openai_kwargs = self._prune_unsupported_params(
             model_name=self.model_info.model_name, kwargs=openai_kwargs
@@ -130,8 +141,7 @@ class OpenAIModel(BaseProviderModel):
 
         try:
             response = self.client.chat.completions.create(
-                model=self.model_info.model_name,
-                **openai_kwargs
+                model=self.model_info.model_name, **openai_kwargs
             )
             text = response.choices[0].message.content.strip()
             usage = self.calculate_usage(response)

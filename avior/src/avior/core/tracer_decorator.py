@@ -7,12 +7,14 @@ from src.avior.core.scheduler import Scheduler
 from src.avior.core.tracer import convert_traced_graph_to_plan
 from src.avior.registry.operator.operator_base import Operator
 
+
 def jit(sample_input: Optional[Dict[str, Any]] = None):
     """
     A decorator that JIT-traces an Operator:
       - If sample_input is provided, we immediately build the plan in __init__
       - Otherwise, we do a lazy trace on the first call
     """
+
     def decorator(cls):
         if not issubclass(cls, Operator):
             raise TypeError("@jit can only be applied to an Operator subclass.")
@@ -59,18 +61,23 @@ def jit(sample_input: Optional[Dict[str, Any]] = None):
             """
             if self._jit_traced:
                 return
-            
+
             # Guard to prevent re-entrancy
             if getattr(self, "_in_tracing", False):
                 return
-            
+
             setattr(self, "_in_tracing", True)
             try:
                 from src.avior.core.trace_context import get_current_trace_context
+
                 if get_current_trace_context():
                     return
 
-                from avior.core.tracer import TracerContext, convert_traced_graph_to_plan
+                from avior.core.tracer import (
+                    TracerContext,
+                    convert_traced_graph_to_plan,
+                )
+
                 with TracerContext(self, sample_in) as tgraph:
                     tracer_graph = tgraph.run_trace()
                 plan = convert_traced_graph_to_plan(tracer_graph)
@@ -85,4 +92,5 @@ def jit(sample_input: Optional[Dict[str, Any]] = None):
         setattr(cls, "_trace_and_compile", trace_and_compile)
 
         return cls
+
     return decorator

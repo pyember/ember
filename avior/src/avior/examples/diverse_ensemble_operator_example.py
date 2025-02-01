@@ -2,15 +2,20 @@ from pydantic import BaseModel
 from typing import Dict, Any, List
 from random import sample
 
-from src.avior.registry.operator.operator_base import Operator, OperatorType, OperatorMetadata
+from src.avior.registry.operator.operator_base import (
+    Operator,
+    OperatorType,
+    OperatorMetadata,
+)
 from src.avior.registry.prompt_signature.signatures import Signature
+
 
 def usage_example():
     """
     Demonstrates how to use MultiPrefixEnsembleOperator with different prefixes per LM.
     """
     # Example prefixes and LM modules
-    example_prefixes = ["PrefixA", "PrefixB", "PrefixC"] 
+    example_prefixes = ["PrefixA", "PrefixB", "PrefixC"]
     mock_lm_modules = [
         lambda prompt: f"[MockResponse] with prompt: {prompt}",
         lambda prompt: f"[MockResponse] with prompt: {prompt}",
@@ -21,7 +26,7 @@ def usage_example():
     operator = MultiPrefixEnsembleOperator(
         lm_modules=mock_lm_modules,
         prefixes=example_prefixes,
-        name="MultiPrefixEnsembleExample"
+        name="MultiPrefixEnsembleExample",
     )
 
     # Create inputs
@@ -60,8 +65,10 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, 
             responses.append(resp)
         return {"responses": responses}
 
+
 def main():
     usage_example()
+
 
 if __name__ == "__main__":
     main()
