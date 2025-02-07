@@ -1,4 +1,4 @@
-**/.DS_Store
+**/_.DS_Store
 **/*.pyc
 **/__pycache__/
 *.egg-info/
@@ -12,3 +12,4 @@ config.ini.*
 
 .env
 *.secret
+
