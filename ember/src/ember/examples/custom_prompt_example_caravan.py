@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
 """
-Refactored Custom Prompt Example with Old Context
 
 Usage:
-    export ember_API_KEY=ember_api_key
-    export ember_BASE_URL=http://ember_base_url
-    export ember_CUSTOM_MODEL=custom_model
+    export AVIOR_API_KEY=avior_api_key
+    export AVIOR_BASE_URL=http://avior_base_url
+    export AVIOR_CUSTOM_MODEL=custom_model
     python custom_prompt_example_caravan.py --non simple
 
 Example:
@@ -42,7 +40,6 @@ req_env_vars = ["ember_CUSTOM_MODEL", "ember_API_KEY", "ember_BASE_URL"]
 SIMPLE_NON = "simple"
 CARAVAN_NON = "caravan"
 
-# A larger sample flow stream from your prior code references:
 sample_flow_stream = (
     " (1) 0.001104000024497509,120.0,146.0,178.0,31.0,29.0,528985.5,644927.5,2.0,2.0,73.0,89.0,"
     "0.010999999940395355,0.009999999776482582,0.0,0.0,0.0,2.0,1.0,1.0 "
@@ -84,11 +81,10 @@ def check_env() -> None:
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
-# Example model registry references
-from src.ember.registry.model.registry.model_registry import ModelRegistry
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.schemas.provider_info import ProviderInfo
-from src.ember.registry.model.schemas.cost import ModelCost, RateLimit
+from ember.registry.model.core.model_registry import ModelRegistry
+from ember.registry.model.schemas.model_info import ModelInfo
+from ember.registry.model.schemas.provider_info import ProviderInfo
+from ember.registry.model.schemas.cost import ModelCost, RateLimit
 from ember.registry.model.provider_registry.openai.openai_provider import OpenAIModel
 
 
@@ -205,13 +201,8 @@ class SimplePromptSignature(BaseModel):
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
-from src.ember.registry.operator.operator_base import (
-    Operator,
-    OperatorContext,
-    LMModule,
-    LMModuleConfig,
-)
-from src.ember.registry import non
+from ember.registry.operator.operator_base import Operator
+from ember.core import non
 
 
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
@@ -302,7 +293,6 @@ def main():
         operator = create_simple_pipeline(model_name)
         # Example question:
         question_data = "What is the capital of India?"
-        context = OperatorContext(query=question_data)
         response = operator.forward(SimplePromptInputs(question=question_data))
         print(f"[SIMPLE] Final Answer:\n{response['final_answer']}\n")
 
@@ -310,7 +300,6 @@ def main():
         operator = create_caravan_pipeline(model_name)
         # We'll pass the flows into the 'question' field:
         flows = sample_flow_stream
-        context = OperatorContext(query=flows)
         response = operator.forward(CaravanLabelingInputs(question=flows))
         print(f"[CARAVAN] Final Labeled Output:\n{response['final_answer']}\n")
 

@@ -7,10 +7,8 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.ember.registry.model.registry.model_registry import ModelRegistry
-from src.ember.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.registry.model.core.model_registry import ModelRegistry
 from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.schemas.provider_info import ProviderInfo
 from src.ember.registry.model.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
