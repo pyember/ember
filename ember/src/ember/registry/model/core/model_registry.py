@@ -1,9 +1,9 @@
 import threading
 from typing import Dict, Optional, List
 
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.registry.factory import ModelFactory
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
+from ..schemas.model_info import ModelInfo
+from .factory import ModelFactory
+from ..provider_registry.base import BaseProviderModel
 
 # Global ModelRegistry instance instantiated at import time.
 GLOBAL_MODEL_REGISTRY: "ModelRegistry"  # Type hint for a global instance.

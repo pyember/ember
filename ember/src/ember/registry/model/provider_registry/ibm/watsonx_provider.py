@@ -6,13 +6,10 @@ try:
 except ImportError:
     ibm_models = None  # Gracefully handle the absence of the ibm_watsonx_ai package.
 
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
-from src.ember.registry.model.model_registry_exceptions import (
-    InvalidPromptError,
-    ProviderAPIError,
-)
-from src.ember.registry.model.schemas.chat_schemas import ChatRequest, ChatResponse
-from src.ember.registry.model.schemas.usage import UsageStats
+from ..base import BaseProviderModel
+from ...model_registry_exceptions import InvalidPromptError, ProviderAPIError
+from ...schemas.chat_schemas import ChatRequest, ChatResponse
+from ...schemas.usage import UsageStats
 from tenacity import retry, wait_exponential, stop_after_attempt
 
 logger: logging.Logger = logging.getLogger(__name__)

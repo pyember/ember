@@ -4,10 +4,10 @@ import logging
 import pkgutil
 from typing import Dict, List, Type
 
-from ember.src.ember.registry.model.model_registry_exceptions import ProviderConfigError
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.core.model_enum import parse_model_str
+from ember.registry.model.model_registry_exceptions import ProviderConfigError
+from ember.registry.model.provider_registry.base import BaseProviderModel
+from ember.registry.model.schemas.model_info import ModelInfo
+from ember.registry.model.core.model_enum import parse_model_str
 
 logger: logging.Logger = logging.getLogger(__name__)
 

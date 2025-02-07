@@ -1,8 +1,8 @@
 import abc
 from typing import Any
 
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.schemas.chat_schemas import ChatRequest, ChatResponse
+from ..schemas.model_info import ModelInfo
+from ..schemas.chat_schemas import ChatRequest, ChatResponse
 
 
 class BaseProviderModel(abc.ABC):

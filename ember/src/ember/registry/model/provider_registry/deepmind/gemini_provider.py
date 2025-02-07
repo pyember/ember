@@ -7,17 +7,9 @@ from google.generativeai import GenerativeModel, types
 from pydantic import Field, field_validator
 from tenacity import retry, wait_exponential, stop_after_attempt
 
-from ember.src.ember.registry.model.model_registry_exceptions import (
-    InvalidPromptError,
-    ProviderAPIError,
-)
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
-from src.ember.registry.model.schemas.chat_schemas import (
-    BaseChatParameters,
-    ChatRequest,
-    ChatResponse,
-)
-from src.ember.registry.model.schemas.usage import UsageStats
+from ..base import BaseProviderModel
+from ...schemas.chat_schemas import BaseChatParameters, ChatRequest, ChatResponse
+from ...schemas.usage import UsageStats
 
 logger: logging.Logger = logging.getLogger(__name__)
 
