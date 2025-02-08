@@ -2,12 +2,12 @@ import importlib
 import inspect
 import logging
 import pkgutil
-from typing import Dict, List, Type
+from typing import Dict, List, Optional, Type
 
-from ember.src.ember.registry.model.utils.model_registry_exceptions import ProviderConfigError
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.registry.model_enum import parse_model_str
+from ember.core.registry.model.utils.model_registry_exceptions import ProviderConfigError
+from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.config.model_enum import parse_model_str
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -31,11 +31,11 @@ def discover_providers(package: str) -> Dict[str, Type[BaseProviderModel]]:
     package_path: List[str] = [package.replace(".", "/")]
     package_prefix: str = f"{package}."
 
-    for module_finder, module_name, is_pkg in pkgutil.walk_packages(
+    for _, module_name, _ in pkgutil.walk_packages(
         path=package_path, prefix=package_prefix
     ):
         module = importlib.import_module(module_name)
-        for member_name, member_class in inspect.getmembers(module, inspect.isclass):
+        for _, member_class in inspect.getmembers(module, inspect.isclass):
             if (
                 issubclass(member_class, BaseProviderModel)
                 and member_class is not BaseProviderModel
@@ -78,7 +78,7 @@ class ModelFactory:
         providers_map: Dict[str, Type[BaseProviderModel]] = discover_providers(
             package="src.ember.registry.model.provider_registry"
         )
-        model_class: Type[BaseProviderModel] = providers_map.get(provider_name)
+        model_class: Optional[Type[BaseProviderModel]] = providers_map.get(provider_name)
         if model_class is None:
             raise ProviderConfigError(f"Unsupported provider '{provider_name}'.")
 

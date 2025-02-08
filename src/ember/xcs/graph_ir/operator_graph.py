@@ -2,7 +2,7 @@
 import uuid
 from typing import Any, Dict, List, Optional
 
-from ember.src.ember.registry.operator.core.operator_base import Operator
+from ember.core.registry.operator.core.operator_base import Operator
 
 
 class OperatorGraphNode:

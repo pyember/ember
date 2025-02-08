@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 import re
 from typing import Any, Dict, List, Optional
 
@@ -7,9 +7,9 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ember.registry.model.core.model_registry import ModelRegistry
-from ember.registry.model.schemas.model_info import ModelInfo
-from ember.registry.model.services.usage_service import UsageService
+from ember.core.registry.model.config.model_registry import ModelRegistry
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.core.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -211,9 +211,7 @@ def initialize_global_registry() -> None:
 
     # 5) Auto-discover or auto-register models.
     if final_settings.registry.auto_discover:
-        from ember.registry.model.services.discovery.discovery_service import (
-            ModelDiscoveryService,
-        )
+        from ember.core.registry.model.config.discovery_service import ModelDiscoveryService
 
         discovery_service: ModelDiscoveryService = ModelDiscoveryService(ttl=3600)
         discovered_models: Dict[str, Dict[str, Any]] = (

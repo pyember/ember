@@ -11,9 +11,9 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
-from ember.src.ember.registry.operator.core.operator_base import Operator
-from src.ember.registry.operator.operator_registry import OperatorRegistry
-from src.ember.registry.operator.modules.lm_modules import LMModule, LMModuleConfig
+from ember.core.registry.operator.core.operator_base import Operator
+from ember.core.registry.operator.operator_registry import OperatorRegistry
+from ember.core.registry.operator.modules.lm_modules import LMModule, LMModuleConfig
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 

@@ -1,9 +1,9 @@
 from typing import Any, Optional, Union
 
-from src.ember.registry.model.registry.model_enum import ModelEnum, parse_model_str
-from src.ember.registry.model.registry.model_registry import ModelRegistry
-from src.ember.registry.model.provider_registry.base import BaseProviderModel
-from src.ember.registry.model.services.usage_service import UsageService
+from ember.core.registry.model.config.model_enum import ModelEnum, parse_model_str
+from ember.core.registry.model.config.model_registry import ModelRegistry
+from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.core.services.usage_service import UsageService
 
 
 class ModelService:

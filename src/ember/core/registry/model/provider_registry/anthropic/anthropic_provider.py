@@ -8,10 +8,10 @@ import yaml
 from pydantic import Field, field_validator
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from ...utils.model_registry_exceptions import InvalidPromptError, ProviderAPIError
-from ..base import BaseProviderModel
-from ...schemas.chat_schemas import BaseChatParameters, ChatRequest, ChatResponse
-from ...schemas.usage import UsageStats
+from ember.core.registry.model.utils.model_registry_exceptions import InvalidPromptError, ProviderAPIError
+from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.core.schemas.chat_schemas import BaseChatParameters, ChatRequest, ChatResponse
+from ember.core.registry.model.core.schemas.usage import UsageStats
 
 logger: logging.Logger = logging.getLogger(__name__)
 

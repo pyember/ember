@@ -1,13 +1,12 @@
 import logging
 from typing import Any, List
 
-# Import the global config, registry, and the ModelService.
-from ember.src.ember.registry.model.config.model_registry_config import (
+from ember.core.registry.model.config.model_registry_config import (
     initialize_global_registry,
     GLOBAL_MODEL_REGISTRY,
     GLOBAL_USAGE_SERVICE,
 )
-from ember.registry.model.services.model_service import ModelService
+from ember.core.registry.model.core.services.model_service import ModelService
 
 logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)

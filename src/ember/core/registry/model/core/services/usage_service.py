@@ -1,7 +1,7 @@
 import threading
 from typing import Dict, Union
 
-from src.ember.registry.model.schemas.usage import UsageRecord, UsageSummary, UsageStats
+from ember.core.registry.model.core.schemas.usage import UsageRecord, UsageSummary, UsageStats
 
 
 class UsageService:

@@ -1,8 +1,8 @@
 import uuid
 from typing import Any, Callable, Dict, List, Optional, Set, Type
 
-from ember.src.ember.registry.operator.core.operator_base import Operator
-from src.ember.xcs.scheduler import ExecutionPlan, ExecutionTask
+from ember.core.registry.operator.core.operator_base import Operator
+from ember.xcs.scheduler import ExecutionPlan, ExecutionTask
 
 
 class TracedNode:

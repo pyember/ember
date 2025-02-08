@@ -1,9 +1,9 @@
 import functools
 from typing import Any, Callable, Dict, Optional, Type, TypeVar
 
-from src.ember.xcs.scheduler import Scheduler
-from src.ember.xcs.tracer import convert_traced_graph_to_plan
-from ember.src.ember.registry.operator.core.operator_base import Operator
+from ember.xcs.scheduler import Scheduler
+from ember.xcs.tracer import convert_traced_graph_to_plan
+from ember.core.registry.operator.core.operator_base import Operator
 
 T = TypeVar("T", bound=Operator)
 

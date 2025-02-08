@@ -2,15 +2,11 @@ import time
 import logging
 from typing import Any, Dict, List
 
-from src.ember.registry.model.schemas.model_info import ModelInfo
-from src.ember.registry.model.services.discovery.base_discovery import (
-    BaseDiscoveryProvider,
-)
-from src.ember.registry.model.services.discovery.openai_discovery import OpenAIDiscovery
-from src.ember.registry.model.services.discovery.anthropic_discovery import (
-    AnthropicDiscovery,
-)
-from src.ember.registry.model.services.discovery.google_discovery import GeminiDiscovery
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.config.discovery.base_discovery import BaseDiscoveryProvider
+from ember.core.registry.model.config.discovery.openai_discovery import OpenAIDiscovery
+from ember.core.registry.model.config.discovery.anthropic_discovery import AnthropicDiscovery
+from ember.core.registry.model.config.discovery.google_discovery import GeminiDiscovery
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -71,8 +67,7 @@ class ModelDiscoveryService:
         Returns:
             Dict[str, ModelInfo]: Mapping from model ID to merged ModelInfo objects.
         """
-        from ember.src.ember.registry.model.config.model_registry_config import emberSettings
-
+        from ember.core.registry.model.config.model_registry_config import emberSettings
         settings = emberSettings()
         local_models: Dict[str, Dict[str, Any]] = {
             model.model_id: model.dict() for model in settings.registry.models

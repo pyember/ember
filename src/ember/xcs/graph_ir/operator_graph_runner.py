@@ -2,7 +2,7 @@ import logging
 from collections import deque
 from typing import Any, Dict, List, Optional
 
-from ember.src.ember.xcs.tracer.trace_context import (
+from ember.xcs.tracer.trace_context import (
     get_current_trace_context,
     TraceRecord,
 )

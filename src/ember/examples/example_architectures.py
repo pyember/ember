@@ -1,4 +1,4 @@
-from ember.src.ember.xcs.graph_ir.graph_executor import NoNGraphBuilder, NoNGraphData
+from ember.xcs.graph_ir.graph_executor import NoNGraphBuilder, NoNGraphData
 
 
 def multi_model_graph() -> NoNGraphData:

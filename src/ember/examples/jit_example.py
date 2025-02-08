@@ -19,11 +19,11 @@ from typing import Any, Dict, List, Tuple
 from prettytable import PrettyTable
 
 # ember imports
-from src.ember.xcs.configs.config import initialize_system
-from ember.registry.model.core.model_registry import GLOBAL_MODEL_REGISTRY
-from ember.src.ember.xcs.graph_ir.operator_graph import OperatorGraph
-from ember.src.ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
-from ember.src.ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.configs.config import initialize_system
+from ember.core.registry.model.config.model_registry import GLOBAL_MODEL_REGISTRY
+from ember.xcs.graph_ir.operator_graph import OperatorGraph
+from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
+from ember.xcs.tracer.tracer_decorator import jit
 
 # Existing 'Ensemble' and its input type from non.py.
 from ember.xcs.non import Ensemble, EnsembleInputs

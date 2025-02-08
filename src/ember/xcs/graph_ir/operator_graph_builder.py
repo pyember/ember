@@ -1,8 +1,8 @@
 # operator_graph_builder.py
 import uuid
 from typing import Any, Dict, List, Optional
-from src.ember.registry.operator.operator_registry import OperatorRegistry
-from ember.src.ember.registry.operator.core.operator_base import LMModule, LMModuleConfig, Operator
+from ember.core.registry.operator.operator_registry import OperatorRegistry
+from ember.core.registry.operator.core.operator_base import LMModule, LMModuleConfig, Operator
 from .operator_graph import OperatorGraph
 
 

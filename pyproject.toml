@@ -125,3 +125,7 @@ short_answer = "ember.registry.dataset.datasets.short_answer:ShortAnswerPrepper"
 commonsense_qa = "ember.registry.dataset.datasets.commonsense_qa:CommonsenseQAPrepper"
 halueval = "ember.registry.dataset.datasets.halueval:HaluEvalPrepper"
 mmlu = "ember.registry.dataset.datasets.mmlu:MMLUPrepper"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ember"]

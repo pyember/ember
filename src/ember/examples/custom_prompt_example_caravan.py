@@ -81,11 +81,11 @@ def check_env() -> None:
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
-from ember.registry.model.core.model_registry import ModelRegistry
-from ember.registry.model.schemas.model_info import ModelInfo
-from ember.registry.model.schemas.provider_info import ProviderInfo
-from ember.registry.model.schemas.cost import ModelCost, RateLimit
-from ember.registry.model.provider_registry.openai.openai_provider import OpenAIModel
+from ember.core.registry.model.config.model_registry import ModelRegistry
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.provider_registry.openai.openai_provider import OpenAIModel
 
 
 def register_custom_model() -> None:

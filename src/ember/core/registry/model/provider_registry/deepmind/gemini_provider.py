@@ -7,9 +7,13 @@ from google.generativeai import GenerativeModel, types
 from pydantic import Field, field_validator
 from tenacity import retry, wait_exponential, stop_after_attempt
 
-from ..base import BaseProviderModel
-from ...schemas.chat_schemas import BaseChatParameters, ChatRequest, ChatResponse
-from ...schemas.usage import UsageStats
+from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.core.schemas.chat_schemas import (
+    BaseChatParameters,
+    ChatRequest,
+    ChatResponse,
+)
+from ember.core.registry.model.core.schemas.usage import UsageStats
 
 logger: logging.Logger = logging.getLogger(__name__)
 

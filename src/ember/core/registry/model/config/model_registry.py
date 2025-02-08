@@ -1,9 +1,9 @@
 import threading
 from typing import Dict, Optional, List
 
-from ..schemas.model_info import ModelInfo
-from .factory import ModelFactory
-from ..provider_registry.base import BaseProviderModel
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.config.factory import ModelFactory
+from ember.core.registry.model.provider_registry.base import BaseProviderModel
 
 # Global ModelRegistry instance instantiated at import time.
 GLOBAL_MODEL_REGISTRY: "ModelRegistry"  # Type hint for a global instance.
