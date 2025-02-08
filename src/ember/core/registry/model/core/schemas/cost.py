@@ -1,4 +1,4 @@
-from pydantic import BaseModel, FieldValidationInfo, field_validator
+from pydantic import BaseModel, field_validator, ValidationInfo, ConfigDict
 
 
 class ModelCost(BaseModel):
@@ -12,17 +12,15 @@ class ModelCost(BaseModel):
     input_cost_per_thousand: float = 0.0
     output_cost_per_thousand: float = 0.0
 
-    @field_validator(
-        fields=("input_cost_per_thousand", "output_cost_per_thousand"), mode="after"
-    )
+    @field_validator("input_cost_per_thousand", "output_cost_per_thousand", mode="after")
     def validate_non_negative_cost(
-        cls, value: float, info: FieldValidationInfo
+        cls, value: float, info: ValidationInfo
     ) -> float:
         """Validates that a cost value is not negative.
 
         Args:
             value (float): The cost value to validate.
-            info (FieldValidationInfo): Additional context for the field being validated.
+            info (ValidationInfo): Additional context for the field being validated.
 
         Raises:
             ValueError: If the cost value is negative.
@@ -48,13 +46,13 @@ class RateLimit(BaseModel):
     tokens_per_minute: int = 0
     requests_per_minute: int = 0
 
-    @field_validator(fields=("tokens_per_minute", "requests_per_minute"), mode="after")
-    def validate_non_negative_rate(cls, value: int, info: FieldValidationInfo) -> int:
+    @field_validator("tokens_per_minute", "requests_per_minute", mode="after")
+    def validate_non_negative_rate(cls, value: int, info: ValidationInfo) -> int:
         """Validates that a rate limit value is not negative.
 
         Args:
             value (int): The rate limit value to validate.
-            info (FieldValidationInfo): Additional context for the field being validated.
+            info (ValidationInfo): Additional context for the field being validated.
 
         Raises:
             ValueError: If the rate limit value is negative.

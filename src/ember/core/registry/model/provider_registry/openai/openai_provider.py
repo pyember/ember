@@ -14,6 +14,7 @@ from ember.core.registry.model.core.schemas.chat_schemas import (
     ChatResponse,
 )
 from ember.core.registry.model.core.schemas.usage import UsageStats
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
 
 logger: logging.Logger = logging.getLogger(__name__)
 

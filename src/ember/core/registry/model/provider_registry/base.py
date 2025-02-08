@@ -1,8 +1,8 @@
 import abc
 from typing import Any
 
-from ..schemas.model_info import ModelInfo
-from ..schemas.chat_schemas import ChatRequest, ChatResponse
+from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.core.registry.model.core.schemas.chat_schemas import ChatRequest, ChatResponse
 
 
 class BaseProviderModel(abc.ABC):
