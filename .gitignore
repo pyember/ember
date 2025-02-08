@@ -13,3 +13,5 @@ config.ini.*
 .env
 *.secret
 
+# Ignoring tests for now. 
+tests/
