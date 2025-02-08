@@ -8,13 +8,11 @@ class Signature(BaseModel):
     """Base class for operator signatures.
 
     Attributes:
-        required_inputs (List[str]): List of field names required by the operator.
-        prompt_template (Optional[str]): Template string, potentially referencing required input names.
-        structured_output (Optional[Type[BaseModel]]): Pydantic model class used to validate and structure output.
-        input_model (Optional[Type[BaseModel]]): Pydantic model class defining the required input fields.
+        prompt_template (Optional[str]): Template string, potentially referencing input names.
+        structured_output (Optional[Type[BaseModel]]): Pydantic model class used to validate output.
+        input_model (Optional[Type[BaseModel]]): Pydantic model class defining the expected input fields.
     """
 
-    required_inputs: List[str]
     prompt_template: Optional[str] = None
     structured_output: Optional[Type[BaseModel]] = None
     input_model: Optional[Type[BaseModel]] = None
@@ -22,7 +20,8 @@ class Signature(BaseModel):
     @model_validator(mode="after")
     @classmethod
     def check_template(cls: Type[Signature], values: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate that the prompt_template includes all required input placeholders.
+        """Validate that the prompt_template includes placeholders for all required input fields
+        as defined by the input_model.
 
         Args:
             values (Dict[str, Any]): Dictionary of model field values.
@@ -31,17 +30,19 @@ class Signature(BaseModel):
             Dict[str, Any]: The validated field values.
 
         Raises:
-            ValueError: If a required input placeholder is missing in the prompt_template.
+            ValueError: If a required input placeholder is missing in prompt_template.
         """
         template: Optional[str] = values.get("prompt_template")
-        required_inputs: List[str] = values.get("required_inputs", [])
-        if template is not None:
-            for input_name in required_inputs:
-                placeholder: str = f"{{{input_name}}}"
-                if placeholder not in template:
-                    raise ValueError(
-                        f"Required input '{input_name}' not found in prompt_template."
-                    )
+        input_model: Optional[Type[BaseModel]] = values.get("input_model")
+        if template is not None and input_model is not None:
+            # Reflect on the input_model to determine required fields.
+            for field_name, field in input_model.model_fields.items():
+                if field.required:
+                    placeholder: str = f"{{{field_name}}}"
+                    if placeholder not in template:
+                        raise ValueError(
+                            f"Required input '{field_name}' not found in prompt_template."
+                        )
         return values
 
     def model_json_schema(self) -> Dict[str, Any]:

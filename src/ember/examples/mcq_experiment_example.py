@@ -27,9 +27,9 @@ from pydantic import BaseModel
 from prettytable import PrettyTable
 
 # ember imports: use only the typed pipeline definitions (avoid direct registry references).
-from ember.xcs.non import Ensemble, JudgeSynthesis
+from ember.core.non import Ensemble, JudgeSynthesis
 from ember.core.registry.model.config.model_registry import get_model_registry
-from ember.xcs import non
+from ember.core import non
 from ember.xcs.graph_ir.operator_graph import OperatorGraph
 from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
 from ember.core.registry.model.config.model_registry import GLOBAL_MODEL_REGISTRY
@@ -50,10 +50,9 @@ from ember.core.registry.operator.core.operator_base import (
     LMModule,
     Operator,
     OperatorMetadata,
-    OperatorType,
 )
 from ember.core.registry.prompt_signature.signatures import Signature
-from ember.core.registry.operator.modules.lm_modules import LMModuleConfig
+from ember.core.registry.model.core.modules.lm_modules import LMModuleConfig
 
 
 ###############################################################################
@@ -70,7 +69,6 @@ class EnsureValidChoiceInputs(BaseModel):
 class EnsureValidChoiceSignature(Signature):
     """Signature for the EnsureValidChoiceOperator."""
 
-    required_inputs: List[str] = ["query", "partial_answer", "choices"]
     input_model: Type[BaseModel] = EnsureValidChoiceInputs
     prompt_template: str = (
         "We have a query:\n"
@@ -94,11 +92,7 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
 
     metadata: OperatorMetadata = OperatorMetadata(
         code="ENSURE_VALID_CHOICE",
-        description=(
-            "Refines or validates that final_answer is one of the valid choices, "
-            "or tries to fix it via LM."
-        ),
-        operator_type=OperatorType.RECURRENT,
+        description="Refines or validates that final_answer is one of the valid choices, or tries to fix it via LM.",
         signature=EnsureValidChoiceSignature(),
     )
 
@@ -206,7 +200,6 @@ class SingleModelBaselineOutputs(BaseModel):
 class SingleModelBaselineSignature(Signature):
     """Signature for the SingleModelBaseline pipeline."""
 
-    required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = SingleModelBaselineInputs
 
 
@@ -224,7 +217,6 @@ class SingleModelBaseline(
     metadata: OperatorMetadata = OperatorMetadata(
         code="SINGLE_MODEL_BASELINE",
         description="One-LM baseline with EnsureValidChoice.",
-        operator_type=OperatorType.RECURRENT,
         signature=SingleModelBaselineSignature(),
     )
 
@@ -301,7 +293,6 @@ class MultiModelEnsembleOutputs(BaseModel):
 class MultiModelEnsembleSignature(Signature):
     """Signature for the MultiModelEnsemble pipeline."""
 
-    required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = MultiModelEnsembleInputs
 
 
@@ -320,7 +311,6 @@ class MultiModelEnsemble(
     metadata: OperatorMetadata = OperatorMetadata(
         code="MULTI_MODEL_ENSEMBLE",
         description="Multi-model ensemble aggregator with judge step.",
-        operator_type=OperatorType.RECURRENT,
         signature=MultiModelEnsembleSignature(),
     )
 
@@ -342,10 +332,13 @@ class MultiModelEnsemble(
         )
         # Step 2: Judge synthesis aggregator.
         self.judge = non.JudgeSynthesis(model_name=model_name, temperature=temperature)
+        
         # Step 3: Optional get_answer operator.
-        self.get_answer = non.GetAnswer(model_name=model_name, temperature=0.1)
+        self.get_concise_answer_without_explanation = non.GetAnswer(
+            model_name=model_name, temperature=0.1
+        )
         # Step 4: Ensure the final answer is valid.
-        self.ensure_valid_choice = EnsureValidChoiceOperator(
+        self.ensure_answer_format_validity = EnsureValidChoiceOperator(
             model_name=model_name, temperature=0.1, max_tokens=16, max_retries=1
         )
 
@@ -366,12 +359,12 @@ class MultiModelEnsemble(
         )
         judge_answer: str = getattr(judge_output, "final_answer", "")
 
-        get_answer_output: Dict[str, Any] = self.get_answer(
+        get_answer_output: Dict[str, Any] = self.get_concise_answer_without_explanation(
             inputs={"query": inputs.query, "responses": [judge_answer]}
         )
         intermediate_answer: str = get_answer_output.get("final_answer", "")
 
-        valid_choice_output: Dict[str, Any] = self.ensure_valid_choice(
+        valid_choice_output: Dict[str, Any] = self.ensure_answer_format_validity(
             inputs={
                 "query": inputs.query,
                 "partial_answer": intermediate_answer,
@@ -401,7 +394,6 @@ class VariedModelEnsembleOutputs(BaseModel):
 class VariedModelEnsembleSignature(Signature):
     """Signature for the VariedModelEnsemble pipeline."""
 
-    required_inputs: List[str] = ["query", "choices"]
     input_model: Type[BaseModel] = VariedModelEnsembleInputs
 
 
@@ -422,7 +414,6 @@ class VariedModelEnsemble(
         description=(
             "Multi-model pipeline aggregator with judge step, using VariedEnsemble for step #1."
         ),
-        operator_type=OperatorType.RECURRENT,
         signature=VariedModelEnsembleSignature(),
     )
 
@@ -443,11 +434,11 @@ class VariedModelEnsemble(
         self.judge = non.JudgeSynthesis(
             model_name=aggregator_model_name, temperature=aggregator_temp
         )
-        self.get_answer = non.GetAnswer(
+        self.get_concise_answer_without_explanation = non.GetAnswer(
             model_name=aggregator_model_name,
             temperature=max(0.0, aggregator_temp - 0.6),
         )
-        self.ensure_valid_choice = EnsureValidChoiceOperator(
+        self.ensure_answer_format_validity = EnsureValidChoiceOperator(
             model_name=aggregator_model_name,
             temperature=aggregator_temp,
             max_tokens=16,
@@ -471,12 +462,12 @@ class VariedModelEnsemble(
         )
         judge_answer: str = getattr(judge_output, "final_answer", "")
 
-        get_answer_output: Dict[str, Any] = self.get_answer(
+        get_answer_output: Dict[str, Any] = self.get_concise_answer_without_explanation(
             inputs={"query": inputs.query, "responses": [judge_answer]}
         )
         intermediate_answer: str = get_answer_output.get("final_answer", "")
 
-        valid_choice_output: Dict[str, Any] = self.ensure_valid_choice(
+        valid_choice_output: Dict[str, Any] = self.ensure_answer_format_validity(
             inputs={
                 "query": inputs.query,
                 "partial_answer": intermediate_answer,

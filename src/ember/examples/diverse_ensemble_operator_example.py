@@ -5,12 +5,6 @@ from pydantic import BaseModel
 
 from ember.core.registry.operator.core.operator_base import (
     Operator,
-    OperatorType,
-    OperatorMetadata,
-)
-from ember.core.registry.operator.core.operator_base import (
-    Operator,
-    OperatorType,
     OperatorMetadata,
 )
 from ember.core.registry.prompt_signature.signatures import Signature
@@ -67,7 +61,7 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, 
     and aggregates the responses.
 
     Attributes:
-        metadata: Operator metadata describing the operator's code, description, type, and input signature.
+        metadata: Operator metadata describing the operator's code, description, and input signature.
         prefixes: List of prefix strings used to modify the query for each language model.
         lm_modules: List of callables representing language model modules. Each callable takes a prompt string
             and returns a response string.
@@ -76,7 +70,6 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, 
     metadata: OperatorMetadata = OperatorMetadata(
         code="MP_ENSEMBLE",
         description="Ensemble with distinct prefix per LM invocation.",
-        operator_type=OperatorType.FAN_OUT,
         signature=Signature(
             required_inputs=["query"],
             input_model=MultiPrefixOperatorInputs,

@@ -14,23 +14,22 @@ from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel, Field
 
 # ember imports (update paths if needed):
-from ember.src.ember.registry.operator.core.operator_base import (
+from ember.core.registry.operator.core.operator_base import (
     Operator,
     OperatorMetadata,
-    OperatorType,
 )
-from src.ember.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_signature.signatures import Signature
 
 # Import the "raw" operators from the registry
-from src.ember.registry.operator.operator_registry import (
+from ember.core.registry.operator.operator_registry import (
     EnsembleOperator,
     MostCommonOperator,
     GetAnswerOperator,
     JudgeSynthesisOperator,
     VerifierOperator,
 )
-from src.ember.registry.model.services.model_service import ModelService
-from src.ember.modules.lm_modules import LMModuleConfig, LMModule
+from ember.core.registry.model.core.services.model_service import ModelService
+from ember.core.registry.model.core.modules.lm_modules import LMModuleConfig, LMModule
 
 
 # ------------------------------------------------------------------------------
@@ -64,7 +63,6 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="ENSEMBLE_WRAPPER",
         description="Wrapper around EnsembleOperator for parallel model calls",
-        operator_type=OperatorType.FAN_OUT,
         signature=EnsembleSignature(),
     )
 
@@ -139,7 +137,6 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="MOST_COMMON_WRAPPER",
         description="Wrapper around MostCommonOperator to pick the best consensus answer",
-        operator_type=OperatorType.FAN_IN,
         signature=MostCommonSignature(),
     )
 
@@ -191,7 +188,6 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="GET_ANSWER_WRAPPER",
         description="Wrapper around GetAnswerOperator, extracting a single answer from multiple responses.",
-        operator_type=OperatorType.RECURRENT,
         signature=GetAnswerSignature(),
     )
 
@@ -262,7 +258,6 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="JUDGE_SYNTHESIS_WRAPPER",
         description="Wrapper around JudgeSynthesisOperator for multi-response reasoning.",
-        operator_type=OperatorType.FAN_IN,
         signature=JudgeSynthesisSignature(),
     )
 
@@ -333,7 +328,6 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="VERIFIER_WRAPPER",
         description="Wrapper around VerifierOperator to check correctness of a final answer.",
-        operator_type=OperatorType.RECURRENT,
         signature=VerifierSignature(),
     )
 
@@ -398,7 +392,6 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="VARIED_ENSEMBLE",
         description="Runs multiple different models in parallel, returning all responses.",
-        operator_type=OperatorType.FAN_OUT,
         signature=VariedEnsembleSignature(),
     )
 

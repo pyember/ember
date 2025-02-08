@@ -26,7 +26,7 @@ from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
 from ember.xcs.tracer.tracer_decorator import jit
 
 # Existing 'Ensemble' and its input type from non.py.
-from ember.xcs.non import Ensemble, EnsembleInputs
+from ember.core.non import Ensemble, EnsembleInputs
 
 
 ###############################################################################

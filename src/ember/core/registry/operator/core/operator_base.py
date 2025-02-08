@@ -2,12 +2,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
-from enum import Enum, auto
 from typing import Any, Callable, cast, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel
 from ember.xcs.scheduler import ExecutionPlan, Scheduler
-from ember.core.registry.operator.modules.lm_modules import LMModule
+from ember.core.registry.model.core.modules.lm_modules import LMModule
 from ember.core.registry.prompt_signature.signatures import Signature
 from ember.xcs.tracer.trace_context import (
     TraceRecord,
@@ -19,33 +18,17 @@ T_in = TypeVar("T_in", bound=BaseModel)
 T_out = TypeVar("T_out", bound=BaseModel)
 
 
-class OperatorType(Enum):
-    """Enumeration for operator topologies or roles.
-
-    Attributes:
-        RECURRENT: Indicates a recurrent operator, shape preserving.
-        FAN_OUT: Indicates a fan-out operator, shape expanding.
-        FAN_IN: Indicates a fan-in operator, shape contracting.
-    """
-
-    RECURRENT = auto()
-    FAN_OUT = auto()
-    FAN_IN = auto()
-
-
 class OperatorMetadata(BaseModel):
     """Metadata associated with an operator for introspection and registry.
 
     Attributes:
         code (str): A unique identifier for the operator.
         description (str): A brief explanation of the operator's purpose.
-        operator_type (OperatorType): The topology or role of the operator.
         signature (Optional[Signature]): An optional Signature instance for input/output validation.
     """
 
     code: str
     description: str
-    operator_type: OperatorType
     signature: Optional[Signature] = None
 
 
@@ -57,7 +40,7 @@ class Operator(ABC, Generic[T_in, T_out]):
 
     Attributes:
         metadata (OperatorMetadata): Contains introspection details such as code, description,
-            operator type, and the input/output signature.
+            and the input/output signature.
         name (str): A human-friendly name for the operator.
         lm_modules (List[LMModule]): A list of LMModule instances for performing language model calls.
     """
@@ -66,7 +49,6 @@ class Operator(ABC, Generic[T_in, T_out]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="BASE",
         description="Base operator with sub-operator auto-registration.",
-        operator_type=OperatorType.RECURRENT,
         signature=Signature(required_inputs=[]),
     )
 
@@ -130,7 +112,7 @@ class Operator(ABC, Generic[T_in, T_out]):
         """Build a prompt from the provided inputs using the operator's signature.
 
         If a prompt template is defined in the signature, it is formatted with the inputs.
-        Otherwise, the required fields are concatenated line by line.
+        Otherwise, the required fields (derived from the input_model) are concatenated line by line.
 
         Args:
             inputs: A dictionary containing input values.
@@ -142,12 +124,15 @@ class Operator(ABC, Generic[T_in, T_out]):
         if signature_obj is not None and signature_obj.prompt_template:
             return signature_obj.prompt_template.format(**inputs)
 
-        required_fields: List[str] = (
-            signature_obj.required_inputs if signature_obj else []
-        )
-        prompt_parts: List[str] = [
-            str(inputs.get(field, "")) for field in required_fields
-        ]
+        # Derive required fields from the input_model, if available.
+        required_fields: List[str] = []
+        if signature_obj is not None and signature_obj.input_model is not None:
+            required_fields = [
+                name
+                for name, field in signature_obj.input_model.model_fields.items()
+                if field.required
+            ]
+        prompt_parts: List[str] = [str(inputs.get(field, "")) for field in required_fields]
         return "\n".join(prompt_parts)
 
     def call_lm(self, *, prompt: str, lm: LMModule) -> str:

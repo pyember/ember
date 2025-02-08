@@ -2,9 +2,9 @@ import logging
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
-from ember.registry.model.services.model_service import ModelService
-from ember.registry.model.services.usage_service import UsageService
-from ember.registry.model.core.model_registry import GLOBAL_MODEL_REGISTRY
+from ember.core.registry.model.core.services.model_service import ModelService
+from ember.core.registry.model.core.services.usage_service import UsageService
+from ember.core.registry.model.config.model_registry_config import GLOBAL_MODEL_REGISTRY
 
 logger: logging.Logger = logging.getLogger(__name__)
 

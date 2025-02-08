@@ -1,19 +1,18 @@
 from __future__ import annotations
-from typing import List, Optional, Type
+from typing import Literal, Optional, Type
 
 from pydantic import BaseModel
 
-from ember.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class CaravanLabelsOutput(BaseModel):
     """Pydantic model for Caravan labeling output.
 
     Attributes:
-        label (str): The label assigned to the input.
+        label (Literal["0", "1"]): The label assigned to the input. It must be "0" (benign) or "1" (malicious).
     """
-
-    label: str
+    label: Literal["0", "1"]
 
 
 class CaravanLabelingInputs(BaseModel):
@@ -22,7 +21,6 @@ class CaravanLabelingInputs(BaseModel):
     Attributes:
         question (str): The question text used for labeling.
     """
-
     question: str
 
 
@@ -30,13 +28,10 @@ class CaravanLabelingSignature(Signature):
     """Signature for labeling network flows as benign or malicious.
 
     Attributes:
-        required_inputs (List[str]): List containing required input field names.
         prompt_template (str): The prompt template for processing the input.
         structured_output (Optional[Type[BaseModel]]): Output model class used to validate results.
         input_model (Optional[Type[BaseModel]]): Input model class used to validate inputs.
     """
-
-    required_inputs: List[str] = ["question"]
     prompt_template: str = (
         "You are a network security expert.\n"
         "Given these unlabeled flows:\n{question}\n"

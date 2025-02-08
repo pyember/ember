@@ -2,14 +2,13 @@ from typing import Any, Dict, List, Optional, Type, TypeVar
 from collections import Counter
 from pydantic import BaseModel, Field
 
-from ember.src.ember.registry.operator.core.operator_base import (
+from ember.core.registry.operator.core.operator_base import (
     Operator,
     OperatorMetadata,
-    OperatorType,
     LMModule,
 )
-from src.ember.registry.prompt_signature.signatures import Signature
-from src.ember.xcs.scheduler import ExecutionPlan, ExecutionTask
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.xcs.scheduler import ExecutionPlan, ExecutionTask
 
 # Type variables for strong typing.
 T_in = TypeVar("T_in", bound=BaseModel)
@@ -73,9 +72,7 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="ENSEMBLE",
         description="Runs an ensemble of models to generate responses",
-        operator_type=OperatorType.FAN_OUT,
         signature=Signature(
-            required_inputs=["query"],
             input_model=EnsembleOperatorInputs,
         ),
     )
@@ -182,9 +179,7 @@ class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="MOST_COMMON",
         description="Determines the most common answer from responses",
-        operator_type=OperatorType.FAN_IN,
         signature=Signature(
-            required_inputs=["query", "responses"],
             input_model=MostCommonOperatorInputs,
         ),
     )
@@ -306,7 +301,7 @@ class GetAnswerOperatorInputs(BaseModel):
 
     Attributes:
         query (str): The query string.
-        responses (List[str]): A list of responses.
+        potential_long_answer (str): A potential long answer.
     """
 
     query: str
@@ -322,9 +317,7 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="GET_ANSWER",
         description="Processes responses to generate a single character answer",
-        operator_type=OperatorType.RECURRENT,
         signature=Signature(
-            required_inputs=["query", "responses"],
             input_model=GetAnswerOperatorInputs,
         ),
     )
@@ -353,9 +346,7 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
         Raises:
             ValueError: If no LMModule is attached.
         """
-        response: str = inputs.responses[0] if inputs.responses else ""
         prompt_inputs: Dict[str, Any] = inputs.model_dump()
-        prompt_inputs["response"] = response
         prompt: str = self.build_prompt(prompt_inputs)
         if not self.lm_modules:
             raise ValueError("No LM module is attached to GetAnswerOperator.")
@@ -456,13 +447,11 @@ class JudgeSynthesisSignature(Signature):
     """Signature for JudgeSynthesisOperator.
 
     Attributes:
-        required_inputs (List[str]): List of required input field names.
         prompt_template (str): Template for the LM prompt.
         structured_output (Optional[Type[BaseModel]]): Output model.
         input_model (Type[BaseModel]): Input model.
     """
 
-    required_inputs: List[str] = ["query", "responses"]
     prompt_template: str = (
         "We have multiple advisors who proposed different answers:\n"
         "{responses}\n"
@@ -483,7 +472,6 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="JUDGE_SYNTHESIS",
         description="Takes multiple responses and produces one final answer with reasoning.",
-        operator_type=OperatorType.FAN_IN,
         signature=JudgeSynthesisSignature(),
     )
 
@@ -637,13 +625,11 @@ class VerifierSignature(Signature):
     """Signature for VerifierOperator.
 
     Attributes:
-        required_inputs (List[str]): The list of required inputs.
         prompt_template (str): Template for the verification prompt.
         structured_output (Optional[Type[BaseModel]]): Output model for the verification.
         input_model (Type[BaseModel]): The input model.
     """
 
-    required_inputs: List[str] = ["query", "candidate_answer"]
     prompt_template: str = (
         "You are a verifier of correctness.\n"
         "Question: {query}\n"
@@ -663,7 +649,6 @@ class VerifierOperator(Operator[VerifierOperatorInputs, Dict[str, Any]]):
     metadata: OperatorMetadata = OperatorMetadata(
         code="VERIFIER",
         description="Verifies correctness of a final answer and possibly revises it.",
-        operator_type=OperatorType.RECURRENT,
         signature=VerifierSignature(),
     )
 

@@ -40,8 +40,8 @@ def multi_model_graph() -> NoNGraphData:
 
 
 from typing import Dict, Any
-from ember.src.ember.registry.operator.core.operator_base import Operator
-from ember.src.ember.xcs import non
+from ember.core.registry.operator.core.operator_base import Operator
+from ember.core import non
 
 
 class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):

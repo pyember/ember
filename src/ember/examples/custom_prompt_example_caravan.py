@@ -85,9 +85,6 @@ from ember.core.registry.model.config.model_registry import ModelRegistry
 from ember.core.registry.model.core.schemas.model_info import ModelInfo
 from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.model.provider_registry.openai.openai_provider import (
-    OpenAIModel,
-)
 
 
 def register_custom_model() -> None:
@@ -164,17 +161,10 @@ class CaravanLabelingInputs(BaseModel):
 
 class CaravanLabelingSignature(BaseModel):
     """
-    Minimal local signature container with prompt string, required fields, etc.
+    Minimal local signature container with prompt string.
     """
-
-    required_inputs: List[str] = ["question"]
     prompt_template: str = CARAVAN_PROMPT_FULL
-
     def render_prompt(self, inputs: Dict[str, Any]) -> str:
-        """
-        Replace placeholders in the prompt template with actual values.
-        """
-        # For production usage, you'd ensure all required fields are present.
         return self.prompt_template.format(**inputs)
 
 
@@ -190,12 +180,10 @@ class SimplePromptInputs(BaseModel):
 
 
 class SimplePromptSignature(BaseModel):
-    required_inputs: List[str] = ["question"]
     prompt_template: str = (
         "Provide a concise single-sentence answer to the following question:\n"
         "QUESTION: {question}\n"
     )
-
     def render_prompt(self, inputs: Dict[str, Any]) -> str:
         return self.prompt_template.format(**inputs)
 
@@ -203,8 +191,8 @@ class SimplePromptSignature(BaseModel):
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
-from ember.src.ember.registry.operator.core.operator_base import Operator
-from ember.xcs import non
+from ember.core.registry.operator.core.operator_base import Operator
+from ember.core import non
 
 
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
