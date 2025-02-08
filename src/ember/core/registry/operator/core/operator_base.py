@@ -6,10 +6,10 @@ from enum import Enum, auto
 from typing import Any, Callable, cast, Dict, Generic, List, Optional, TypeVar, Union
 
 from pydantic import BaseModel
-from src.ember.xcs.scheduler import ExecutionPlan, Scheduler
-from src.ember.modules.lm_modules import LMModule
-from src.ember.registry.prompt_signature.signatures import Signature
-from ember.src.ember.xcs.tracer.trace_context import (
+from ember.xcs.scheduler import ExecutionPlan, Scheduler
+from ember.core.registry.operator.modules.lm_modules import LMModule
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.xcs.tracer.trace_context import (
     TraceRecord,
     get_current_trace_context,
 )
@@ -47,31 +47,6 @@ class OperatorMetadata(BaseModel):
     description: str
     operator_type: OperatorType
     signature: Optional[Signature] = None
-
-
-def run_in_parallel(
-    function: Callable[..., Any],
-    args_list: List[Dict[str, Any]],
-    max_workers: Optional[int] = None,
-) -> List[Any]:
-    """Run a function in parallel using a thread pool.
-
-    This utility submits concurrent invocations of the provided function and aggregates
-    the resulting outputs.
-
-    Args:
-        function: A callable that accepts keyword arguments.
-        args_list: A list of dictionaries, each representing the keyword arguments for a
-            single function call.
-        max_workers: The maximum number of threads to use. If None, a default value is used.
-
-    Returns:
-        List[Any]: A list containing the outputs from each function call.
-    """
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(function, **args) for args in args_list]
-        results: List[Any] = [future.result() for future in futures]
-    return results
 
 
 class Operator(ABC, Generic[T_in, T_out]):
@@ -117,7 +92,7 @@ class Operator(ABC, Generic[T_in, T_out]):
         object.__setattr__(
             self, "_sub_operators", {}
         )  # type: Dict[str, Operator[Any, Any]]
-        self.metadata = self.__class__.metadata.copy(deep=True)
+        self.metadata = self.__class__.metadata.model_copy(deep=True)
         self.name = name
         self.lm_modules = lm_modules if lm_modules is not None else []
 
