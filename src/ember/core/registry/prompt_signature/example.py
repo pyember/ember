@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from ember.registry.prompt_signature.signatures import Signature
 
+
 class CaravanLabelsOutput(BaseModel):
     """Pydantic model for Caravan labeling output.
 

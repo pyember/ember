@@ -12,10 +12,10 @@ class ModelCost(BaseModel):
     input_cost_per_thousand: float = 0.0
     output_cost_per_thousand: float = 0.0
 
-    @field_validator("input_cost_per_thousand", "output_cost_per_thousand", mode="after")
-    def validate_non_negative_cost(
-        cls, value: float, info: ValidationInfo
-    ) -> float:
+    @field_validator(
+        "input_cost_per_thousand", "output_cost_per_thousand", mode="after"
+    )
+    def validate_non_negative_cost(cls, value: float, info: ValidationInfo) -> float:
         """Validates that a cost value is not negative.
 
         Args:

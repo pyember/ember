@@ -7,8 +7,14 @@ except ImportError:
     ibm_models = None  # Gracefully handle the absence of the ibm_watsonx_ai package.
 
 from ember.core.registry.model.provider_registry.base import BaseProviderModel
-from ember.core.registry.model.utils.model_registry_exceptions import InvalidPromptError, ProviderAPIError
-from ember.core.registry.model.core.schemas.chat_schemas import ChatRequest, ChatResponse
+from ember.core.registry.model.utils.model_registry_exceptions import (
+    InvalidPromptError,
+    ProviderAPIError,
+)
+from ember.core.registry.model.core.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
 from ember.core.registry.model.core.schemas.usage import UsageStats
 from tenacity import retry, wait_exponential, stop_after_attempt
 

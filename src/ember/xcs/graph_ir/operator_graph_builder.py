@@ -2,7 +2,11 @@
 import uuid
 from typing import Any, Dict, List, Optional
 from ember.core.registry.operator.operator_registry import OperatorRegistry
-from ember.core.registry.operator.core.operator_base import LMModule, LMModuleConfig, Operator
+from ember.core.registry.operator.core.operator_base import (
+    LMModule,
+    LMModuleConfig,
+    Operator,
+)
 from .operator_graph import OperatorGraph
 
 

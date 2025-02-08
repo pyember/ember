@@ -4,7 +4,9 @@ import logging
 import pkgutil
 from typing import Dict, List, Optional, Type
 
-from ember.core.registry.model.utils.model_registry_exceptions import ProviderConfigError
+from ember.core.registry.model.utils.model_registry_exceptions import (
+    ProviderConfigError,
+)
 from ember.core.registry.model.provider_registry.base import BaseProviderModel
 from ember.core.registry.model.core.schemas.model_info import ModelInfo
 from ember.core.registry.model.config.model_enum import parse_model_str
@@ -78,7 +80,9 @@ class ModelFactory:
         providers_map: Dict[str, Type[BaseProviderModel]] = discover_providers(
             package="src.ember.registry.model.provider_registry"
         )
-        model_class: Optional[Type[BaseProviderModel]] = providers_map.get(provider_name)
+        model_class: Optional[Type[BaseProviderModel]] = providers_map.get(
+            provider_name
+        )
         if model_class is None:
             raise ProviderConfigError(f"Unsupported provider '{provider_name}'.")
 

@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 from requests.exceptions import HTTPError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from ember.core.registry.model.utils.model_registry_exceptions import InvalidPromptError, ProviderAPIError
+from ember.core.registry.model.utils.model_registry_exceptions import (
+    InvalidPromptError,
+    ProviderAPIError,
+)
 from ember.core.registry.model.provider_registry.base import BaseProviderModel
 from ember.core.registry.model.core.schemas.chat_schemas import (
     BaseChatParameters,

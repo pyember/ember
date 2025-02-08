@@ -211,7 +211,9 @@ def initialize_global_registry() -> None:
 
     # 5) Auto-discover or auto-register models.
     if final_settings.registry.auto_discover:
-        from ember.core.registry.model.config.discovery_service import ModelDiscoveryService
+        from ember.core.registry.model.config.discovery_service import (
+            ModelDiscoveryService,
+        )
 
         discovery_service: ModelDiscoveryService = ModelDiscoveryService(ttl=3600)
         discovered_models: Dict[str, Dict[str, Any]] = (

@@ -71,7 +71,9 @@ class ModelDiscoveryService:
         Returns:
             Dict[str, ModelInfo]: Mapping from model ID to merged ModelInfo objects.
         """
-        from ember.src.ember.registry.model.config.model_registry_config import emberSettings
+        from ember.src.ember.registry.model.config.model_registry_config import (
+            emberSettings,
+        )
 
         settings = emberSettings()
         local_models: Dict[str, Dict[str, Any]] = {
