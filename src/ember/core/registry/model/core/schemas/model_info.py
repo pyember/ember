@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, field_validator, ValidationInfo
 
-from ember.registry.model.schemas.cost import ModelCost, RateLimit
-from ember.registry.model.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
 
 
 class ModelInfo(BaseModel):
