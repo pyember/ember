@@ -32,12 +32,14 @@ from ember.core.registry.model.core.modules.lm_modules import LMModuleConfig, LM
 # 1) Ensemble
 # ------------------------------------------------------------------------------
 
+
 class EnsembleInputs(BaseModel):
     """Typed input for the Ensemble operator.
 
     Attributes:
         query (str): The query string to be processed.
     """
+
     query: str
 
 
@@ -96,8 +98,12 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
             )
             for _ in range(num_units)
         ]
-        self._ensemble_op: EnsembleOperator = EnsembleOperator(lm_modules=lm_modules, **kwargs)
-        self.ensemble_op: EnsembleOperator = self._ensemble_op  # For sub-operator auto-discovery.
+        self._ensemble_op: EnsembleOperator = EnsembleOperator(
+            lm_modules=lm_modules, **kwargs
+        )
+        self.ensemble_op: EnsembleOperator = (
+            self._ensemble_op
+        )  # For sub-operator auto-discovery.
 
     def forward(self, inputs: EnsembleInputs) -> Dict[str, Any]:
         """Executes the ensemble operation with the provided inputs.
@@ -116,6 +122,7 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
 # 2) MostCommon
 # ------------------------------------------------------------------------------
 
+
 class MostCommonInputs(BaseModel):
     """Typed input for the MostCommon operator.
 
@@ -123,6 +130,7 @@ class MostCommonInputs(BaseModel):
         query (str): The initial query.
         responses (List[str]): Candidate responses from which the most common answer is determined.
     """
+
     query: str
     responses: List[str]
 
@@ -174,6 +182,7 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 # 3) GetAnswer
 # ------------------------------------------------------------------------------
 
+
 class GetAnswerInputs(BaseModel):
     """Typed input for the GetAnswer operator.
 
@@ -181,10 +190,10 @@ class GetAnswerInputs(BaseModel):
         query (str): The query for which an answer is being sought.
         responses (List[str]): A list of candidate response strings.
     """
+
     query: str
     responses: List[str] = Field(
-        ...,
-        description="List of response strings to parse into a single final answer."
+        ..., description="List of response strings to parse into a single final answer."
     )
 
 
@@ -233,7 +242,9 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._get_answer_op: GetAnswerOperator = GetAnswerOperator(lm_modules=[lm_module], **kwargs)
+        self._get_answer_op: GetAnswerOperator = GetAnswerOperator(
+            lm_modules=[lm_module], **kwargs
+        )
         self.get_answer_op: GetAnswerOperator = self._get_answer_op
 
     def forward(self, inputs: GetAnswerInputs) -> Dict[str, Any]:
@@ -253,6 +264,7 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
 # 4) JudgeSynthesis
 # ------------------------------------------------------------------------------
 
+
 class JudgeSynthesisInputs(BaseModel):
     """Typed input for the JudgeSynthesis operator.
 
@@ -260,10 +272,10 @@ class JudgeSynthesisInputs(BaseModel):
         query (str): The query for synthesis.
         responses (List[str]): Responses to combine into a final answer.
     """
+
     query: str
     responses: List[str] = Field(
-        ...,
-        description="List of responses to synthesize a single best final answer."
+        ..., description="List of responses to synthesize a single best final answer."
     )
 
 
@@ -316,7 +328,9 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._judge_synth_op: JudgeSynthesisOperator = JudgeSynthesisOperator(lm_modules=[lm_module])
+        self._judge_synth_op: JudgeSynthesisOperator = JudgeSynthesisOperator(
+            lm_modules=[lm_module]
+        )
         self.judge_synth_op: JudgeSynthesisOperator = self._judge_synth_op
 
     def forward(self, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
@@ -336,6 +350,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
 # 5) Verifier
 # ------------------------------------------------------------------------------
 
+
 class VerifierInputs(BaseModel):
     """Typed input for the Verifier operator.
 
@@ -343,10 +358,10 @@ class VerifierInputs(BaseModel):
         query (str): The query string.
         candidate_answer (str): The answer for which correctness is to be verified.
     """
+
     query: str
     candidate_answer: str = Field(
-        ...,
-        description="The answer to verify correctness for."
+        ..., description="The answer to verify correctness for."
     )
 
 
@@ -396,7 +411,9 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._verifier_op: VerifierOperator = VerifierOperator(lm_modules=[lm_module], **kwargs)
+        self._verifier_op: VerifierOperator = VerifierOperator(
+            lm_modules=[lm_module], **kwargs
+        )
         self.verifier_op: VerifierOperator = self._verifier_op
 
     def forward(self, inputs: VerifierInputs) -> Dict[str, Any]:
@@ -419,6 +436,7 @@ class VariedEnsembleInputs(BaseModel):
     Attributes:
         query (str): The query to be processed across various model configurations.
     """
+
     query: str
 
 
@@ -428,6 +446,7 @@ class VariedEnsembleOutputs(BaseModel):
     Attributes:
         responses (List[str]): A list of responses from the different LM configurations.
     """
+
     responses: List[str]
 
 

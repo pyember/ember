@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any
-from .base_discovery import BaseDiscoveryProvider
+from ..base_discovery import BaseDiscoveryProvider
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 

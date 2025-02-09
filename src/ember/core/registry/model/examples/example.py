@@ -1,7 +1,7 @@
 import logging
 from typing import Any, List
 
-from ember.core.registry.model.config.model_registry_config import (
+from ember.core.registry.model.settings import (
     initialize_global_registry,
     GLOBAL_MODEL_REGISTRY,
     GLOBAL_USAGE_SERVICE,
@@ -19,13 +19,13 @@ def main() -> None:
     and iterates over a list of model IDs to execute and display responses using both
     service-based and direct model invocations.
     """
-    # Step 1: Initialize the global registry (auto-registers models from config.yaml and included configs).
-    initialize_global_registry()
+    # Step 1: Initialize the global registry with auto_discover=False for minimal usage
+    initialize_global_registry(auto_discover=False)
 
-    # Step 2: Create a ModelService instance using the global registry and usage service.
+    # Step 2: Create a ModelService, but skip usage_service if you don't need usage logs
     service: ModelService = ModelService(
         registry=GLOBAL_MODEL_REGISTRY,
-        usage_service=GLOBAL_USAGE_SERVICE,
+        usage_service=None,  # <--- For simpler usage, we can omit usage logging
     )
 
     # Step 3: Define a list of model IDs expected to be registered (based on YAML configurations).
@@ -45,7 +45,7 @@ def main() -> None:
             # (A) Service-based usage: Invoke the service with named parameters.
             prompt_text: str = f"Hello from {model_id}, can you introduce yourself?"
             response: Any = service(prompt=prompt_text, model_id=model_id)
-            print("Service-based response from '%s': %s" % (model_id, response.data))
+            print(f"Service-based response from '{model_id}': {response.data}")
 
             # (B) Direct usage from the registry: Retrieve the model instance for direct invocation.
             model_instance: Any = GLOBAL_MODEL_REGISTRY.get_model(model_id)

@@ -15,7 +15,7 @@ The `models` module is responsible for:
 4. **Usage Tracking**
     *   A `UsageService` that aggregates token counts, cost calculations, or any usage stats returned by each provider.
 
-Overall, this module provides a “network-of-networks” building block for large-scale model usage in a “PyTorch / JAX-inspired” framework.
+Overall, this module provides a "network-of-networks" building block for large-scale model usage in a "PyTorch / JAX-inspired" framework.
 
 ## Package Layout
 
@@ -135,7 +135,7 @@ registry/
    if __name__ == "__main__":
        main()
    ```
-   That’s it! The `ModelService` will look up `"openai:gpt-4o"` in the `GLOBAL_MODEL_REGISTRY`, which was populated by `initialize_global_registry()`.
+   That's it! The `ModelService` will look up `"openai:gpt-4o"` in the `GLOBAL_MODEL_REGISTRY`, which was populated by `initialize_global_registry()`.
 
 ## Usage Example
 
@@ -206,7 +206,7 @@ Then reference it in `config.yaml` under `registry.included_configs`, and it wil
 ## Adding a New Provider or Model
 
 1. Create a subclass of `BaseProviderModel` in `provider_registry/your_provider.py`.
-2. Add the provider name as an enum if desired, or just rely on the config’s `provider.name`.
+2. Add the provider name as an enum if desired, or just rely on the config's `provider.name`.
 3. Add a new entry in `config.yaml`:
 
     ```yaml
@@ -230,10 +230,42 @@ Then reference it in `config.yaml` under `registry.included_configs`, and it wil
           api_key: null
     ```
 
-4. Run `example.py`. If the provider class is discovered via your scanning logic (or manually mapped in `factory.py`), it’ll be accessible.
+4. Run `example.py`. If the provider class is discovered via your scanning logic (or manually mapped in `factory.py`), it'll be accessible.
 
 ## Further Notes
 
 *   **Thread Safety:** `ModelRegistry` uses a lock around model registration and retrieval to handle concurrent usage in multi-threaded scenarios.
 *   **Usage Logging:** The `UsageService` is optional but recommended. If your provider returns token usage or cost data, you can store it in memory or persist it.
 *   **Error Handling:** Custom exceptions (`ProviderConfigError`, etc.) provide explicit error messaging for misconfigurations.
+
+## Simple "Happy Path" Usage
+
+If you don't need advanced discovery or usage tracking, here's a minimal workflow:
+
+1. **Create or update your config YAML** so it has your model's info (API key, cost, rate limits, etc.).  
+2. **Initialize the global registry** in your application start-up code:
+
+```python
+from ember.core.registry.model.settings import initialize_global_registry
+
+initialize_global_registry()  # Reads and merges config, registers models
+```
+
+3. **Use the ModelService or LMModule** to run inference:
+```python
+from ember.core.registry.model.core.modules.lm_modules import LMModule, LMModuleConfig
+
+# Minimal usage with an LMModule:
+config = LMModuleConfig(model_id="openai:gpt-4o", temperature=0.7)
+lm = LMModule(config=config)
+response_text = lm("Hello world!")
+print("Got:", response_text)
+
+# Or via ModelService:
+from ember.core.registry.model.core.services.model_service import ModelService
+service = ModelService(registry=GLOBAL_MODEL_REGISTRY, usage_service=None)
+resp = service.invoke_model(model_id="openai:gpt-4o", prompt="Hello world!")
+print("Got:", resp.data)
+```
+
+That's it! Optionally set `auto_discover=False` if you don't want to fetch remote model lists, and skip usage tracking if you don't need usage logs.

@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, List
 import google.generativeai as genai
-from .base_discovery import BaseDiscoveryProvider
+from ..base_discovery import BaseDiscoveryProvider
 
 logger = logging.getLogger(__name__)
 

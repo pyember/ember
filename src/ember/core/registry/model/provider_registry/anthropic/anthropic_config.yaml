@@ -3,8 +3,8 @@ registry:
     - model_id: "anthropic:claude-3.5-sonnet"
       model_name: "claude-3.5-sonnet-latest"
       cost:
-        input_cost_per_million: 3000
-        output_cost_per_million: 15000
+        input_cost_per_thousand: 3
+        output_cost_per_thousand: 15
       rate_limit:
         tokens_per_minute: 300000
         requests_per_minute: 2000

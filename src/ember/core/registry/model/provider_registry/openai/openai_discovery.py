@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any, List
 import openai
-from .base_discovery import BaseDiscoveryProvider
+from ..base_discovery import BaseDiscoveryProvider
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
         """
         try:
             response: Dict[str, Any] = openai.Model.list()
+            logger.debug("Fetched OpenAI model list: %s", response)
             models: Dict[str, Dict[str, Any]] = {}
             model_list: List[Dict[str, Any]] = response.get("data", [])
             for model in model_list:
@@ -31,8 +32,10 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
                     model_id=standardized_model_id, model_data=model
                 )
             return models
-        except Exception as error:
-            logger.exception("Failed to fetch models from OpenAI: %s", error)
+        except openai.error.OpenAIError as err:
+            logger.exception(
+                "Failed to fetch models from OpenAI due to an API error: %s", err
+            )
             return {}
 
     def _generate_model_id(self, raw_model_id: str) -> str:

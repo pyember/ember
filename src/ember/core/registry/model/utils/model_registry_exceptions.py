@@ -1,14 +1,22 @@
 class ProviderError(Exception):
-    """Generic parent exception for errors raised by LLM providers."""
+    """Base exception class for provider-related errors."""
+
+    pass
 
 
 class ProviderAPIError(ProviderError):
-    """Raised when the provider's API call fails (network, invalid request, etc.)."""
+    """Exception raised when a provider API call fails."""
+
+    pass
 
 
 class ProviderConfigError(ProviderError):
-    """Raised when the provider configuration (API key, settings) is invalid."""
+    """Exception raised for errors in provider configuration."""
+
+    pass
 
 
 class InvalidPromptError(ProviderError):
-    """Raised when the user prompt is empty or otherwise invalid."""
+    """Exception raised when the provided prompt is invalid."""
+
+    pass
