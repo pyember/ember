@@ -26,7 +26,7 @@ def main() -> None:
     # Step 2: Create a ModelService, but skip usage_service if you don't need usage logs
     service: ModelService = ModelService(
         registry=GLOBAL_MODEL_REGISTRY,
-        usage_service=None,  # <--- For simplicity, we can omit usage tracking and logging
+        usage_service=None,  # <--- For simplicity, we can omit usage tracking and usage logging
     )
 
     # Step 3: Define a list of model IDs expected to be used for this demonstration.

@@ -5,6 +5,7 @@ from ember.core.registry.model.model_enum import ModelEnum, parse_model_str
 from ember.core.registry.model.model_registry import ModelRegistry
 from ember.core.registry.model.provider_registry.base_provider import BaseProviderModel
 from ember.core.registry.model.core.services.usage_service import UsageService
+from ember.core.registry.model.core.schemas.chat_schemas import ChatResponse
 
 
 class ModelService:
@@ -37,7 +38,7 @@ class ModelService:
         self._default_model_id: Optional[Union[str, Enum]] = default_model_id
 
     def get_model(
-        self, model_id: Optional[Union[str, ModelEnum]] = None
+        self, model_id: Optional[Union[str, Enum]] = None
     ) -> BaseProviderModel:
         """Retrieves a model instance from the registry using the provided identifier.
 
@@ -75,10 +76,10 @@ class ModelService:
 
     def invoke_model(
         self,
-        model_id: Optional[Union[str, ModelEnum]] = None,
+        model_id: Optional[Union[str, Enum]] = None,
         prompt: str = "",
         **kwargs: Any,
-    ) -> Any:
+    ) -> ChatResponse:
         """Invokes the specified model with the given prompt and additional arguments, logging usage if available.
 
         This method retrieves the model instance via get_model, invokes it using named arguments,
@@ -90,10 +91,10 @@ class ModelService:
             **kwargs (Any): Additional keyword arguments to pass to the model invocation.
 
         Returns:
-            Any: The response from the model invocation.
+            ChatResponse: The response from the model invocation.
         """
         model: BaseProviderModel = self.get_model(model_id=model_id)
-        response: Any = model.__call__(
+        response: ChatResponse = model.__call__(
             prompt=prompt, **kwargs
         )  # Explicit named method invocation.
 
@@ -118,6 +119,6 @@ class ModelService:
             **kwargs (Any): Additional keyword arguments for the model invocation.
 
         Returns:
-            Any: The result of the model invocation.
+            ChatResponse: The result of the model invocation.
         """
         return self.invoke_model(model_id=model_id, prompt=prompt, **kwargs)

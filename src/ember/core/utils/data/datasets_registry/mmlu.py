@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional
 
-from src.ember.registry.dataset.base.config import BaseDatasetConfig
-from src.ember.registry.dataset.base.models import DatasetEntry
-from src.ember.registry.dataset.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.config import BaseDatasetConfig
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 class MMLUConfig(BaseDatasetConfig):

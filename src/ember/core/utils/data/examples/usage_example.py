@@ -1,27 +1,17 @@
 import logging
 from typing import List, Optional
 
-from src.ember.registry.dataset.registry.metadata_registry import (
-    DatasetMetadataRegistry,
-)
-from src.ember.registry.dataset.registry.loader_factory import DatasetLoaderFactory
-from src.ember.registry.dataset.registry.initialization import (
-    initialize_dataset_registry,
-)
-from src.ember.registry.dataset.base.loaders import (
-    HuggingFaceDatasetLoader,
-    IDatasetLoader,
-)
-from src.ember.registry.dataset.base.validators import (
-    IDatasetValidator,
-    DatasetValidator,
-)
-from src.ember.registry.dataset.base.samplers import IDatasetSampler, DatasetSampler
-from src.ember.registry.dataset.base.models import DatasetInfo, DatasetEntry, TaskType
-from src.ember.registry.dataset.base.preppers import IDatasetPrepper
-from src.ember.registry.dataset.datasets.mmlu import MMLUConfig
-from src.ember.registry.dataset.datasets.halueval import HaluEvalConfig
-from src.ember.registry.dataset.registry.service import DatasetService
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from ember.core.utils.data.initialization import initialize_dataset_registry
+from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader, IDatasetLoader
+from ember.core.utils.data.base.validators import IDatasetValidator, DatasetValidator
+from ember.core.utils.data.base.samplers import IDatasetSampler, DatasetSampler
+from ember.core.utils.data.base.models import DatasetInfo, DatasetEntry, TaskType
+from ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
+from ember.core.utils.data.service import DatasetService
 
 
 def main() -> None:

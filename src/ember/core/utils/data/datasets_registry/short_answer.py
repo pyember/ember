@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 
-from src.ember.registry.dataset.base.preppers import IDatasetPrepper
-from src.ember.registry.dataset.base.models import DatasetEntry
+from ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.models import DatasetEntry
 
 
 class ShortAnswerPrepper(IDatasetPrepper):

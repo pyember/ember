@@ -1,7 +1,7 @@
 from typing import Dict, Tuple, Optional, List, Type
 
-from src.ember.registry.dataset.base.models import DatasetInfo
-from src.ember.registry.dataset.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.models import DatasetInfo
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 class DatasetRegistry:
