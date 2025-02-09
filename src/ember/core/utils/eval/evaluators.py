@@ -6,9 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, Generic, TypeVar, Optional, List
 
-# Type variables for generic interfaces.
-T_out = TypeVar("T_out")  # The type of the system's output.
-T_truth = TypeVar("T_truth")  # The type of the correct/expected answer.
+T_out = TypeVar("T_out")
+T_truth = TypeVar("T_truth")
 
 
 @dataclass
@@ -79,8 +78,6 @@ class IOutputExtractor(ABC, Generic[T_out, T_truth]):
         """
         raise NotImplementedError
 
-
-# Composed Evaluator pairs an output extractor with a base evaluator.
 OutType = TypeVar("OutType")
 ExtractedType = TypeVar("ExtractedType")
 
@@ -230,10 +227,6 @@ class CodeExecutionEvaluator(IEvaluator[str]):
                 score=0.0,
                 metadata={"error": str(error)},
             )
-
-
-# Output Extractor Implementation
-
 
 class RegexExtractor(IOutputExtractor[str, str]):
     """Extractor that uses a regular expression to select a substring.
