@@ -6,7 +6,7 @@ from .core.schemas.model_info import ModelInfo
 from .provider_registry.base_discovery import BaseDiscoveryProvider
 from .provider_registry.openai.openai_discovery import OpenAIDiscovery
 from .provider_registry.anthropic.anthropic_discovery import AnthropicDiscovery
-from .provider_registry.deepmind.deepmind_discovery import GeminiDiscovery
+from .provider_registry.deepmind.deepmind_discovery import DeepmindDiscovery
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class ModelDiscoveryService:
         self.providers: List[BaseDiscoveryProvider] = [
             OpenAIDiscovery(),
             AnthropicDiscovery(),
-            GeminiDiscovery(),
+            DeepmindDiscovery(),
         ]
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: float = 0.0

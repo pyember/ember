@@ -1,4 +1,5 @@
 from typing import Any, Optional, Union
+from enum import Enum
 
 from ember.core.registry.model.model_enum import ModelEnum, parse_model_str
 from ember.core.registry.model.model_registry import ModelRegistry
@@ -15,25 +16,25 @@ class ModelService:
     Attributes:
         _registry (ModelRegistry): Registry that stores and provides model objects.
         _usage_service (UsageService): Service responsible for recording and managing usage records.
-        _default_model_id (Optional[Union[str, ModelEnum]]): Optional default model identifier used when no model_id is provided.
+        _default_model_id (Optional[Union[str, Enum]]): Optional default model identifier used when no model_id is provided.
     """
 
     def __init__(
         self,
         registry: ModelRegistry,
         usage_service: UsageService,
-        default_model_id: Optional[Union[str, ModelEnum]] = None,
+        default_model_id: Optional[Union[str, Enum]] = None,
     ) -> None:
         """Initializes ModelService with a registry, usage service, and an optional default model identifier.
 
         Args:
             registry (ModelRegistry): An instance of ModelRegistry for retrieving model objects.
             usage_service (UsageService): An instance of UsageService for logging model usage statistics.
-            default_model_id (Optional[Union[str, ModelEnum]]): A default model identifier used when none is provided.
+            default_model_id (Optional[Union[str, Enum]]): A default model identifier used when none is provided.
         """
         self._registry: ModelRegistry = registry
         self._usage_service: UsageService = usage_service
-        self._default_model_id: Optional[Union[str, ModelEnum]] = default_model_id
+        self._default_model_id: Optional[Union[str, Enum]] = default_model_id
 
     def get_model(
         self, model_id: Optional[Union[str, ModelEnum]] = None
@@ -105,7 +106,7 @@ class ModelService:
 
     def __call__(
         self,
-        model_id: Optional[Union[str, ModelEnum]] = None,
+        model_id: Optional[Union[str, Enum]] = None,
         prompt: str = "",
         **kwargs: Any,
     ) -> Any:

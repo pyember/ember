@@ -6,7 +6,7 @@ from ..base_discovery import BaseDiscoveryProvider
 logger = logging.getLogger(__name__)
 
 
-class GeminiDiscovery(BaseDiscoveryProvider):
+class DeepmindDiscovery(BaseDiscoveryProvider):
     """Discovery provider for Google Gemini models.
 
     This provider fetches available models from the Google Generative AI service.

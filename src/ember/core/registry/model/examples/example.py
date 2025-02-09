@@ -4,7 +4,6 @@ from typing import Any, List
 from ember.core.registry.model.settings import (
     initialize_global_registry,
     GLOBAL_MODEL_REGISTRY,
-    GLOBAL_USAGE_SERVICE,
 )
 from ember.core.registry.model.core.services.model_service import ModelService
 
@@ -34,7 +33,7 @@ def main() -> None:
         "openai:gpt-4o",
         "openai:gpt-4o-mini",
         "anthropic:claude-3.5-sonnet",
-        "google:gemini-1.5-pro",
+        "deepmind:gemini-1.5-pro",
     ]
 
     # Step 4: Iterate over each model ID to demonstrate usage.

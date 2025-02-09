@@ -16,9 +16,9 @@ class AnthropicModelEnum(str, Enum):
 
 
 class GoogleModelEnum(str, Enum):
-    GEMINI_1_5_PRO = "google:gemini-1.5-pro"
-    GEMINI_2_0_FLASH = "google:gemini-2.0-flash"
-    GEMINI_EXP_1206 = "google:gemini-exp-1206"
+    GEMINI_1_5_PRO = "deepmind:gemini-1.5-pro"
+    GEMINI_2_0_FLASH = "deepmind:gemini-2.0-flash"
+    GEMINI_EXP_1206 = "deepmind:gemini-exp-1206"
 
 
 ALL_PROVIDER_ENUMS: List[Type[Enum]] = [
