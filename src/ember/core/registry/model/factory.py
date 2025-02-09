@@ -80,7 +80,9 @@ class ModelFactory:
         available_providers: Dict[str, Type[BaseProviderModel]] = discover_providers(
             package="src.ember.core.registry.model.provider_registry"
         )
-        provider_class: Optional[Type[BaseProviderModel]] = available_providers.get(provider_name)
+        provider_class: Optional[Type[BaseProviderModel]] = available_providers.get(
+            provider_name
+        )
         if provider_class is None:
             raise ProviderConfigError(f"Unsupported provider '{provider_name}'.")
 

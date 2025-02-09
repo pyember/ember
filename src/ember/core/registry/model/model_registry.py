@@ -39,8 +39,12 @@ class ModelRegistry:
         """
         with self._lock:
             if model_info.model_id in self._models:
-                raise ValueError(f"Model '{model_info.model_id}' is already registered.")
-            model: BaseProviderModel = ModelFactory.create_model_from_info(model_info=model_info)
+                raise ValueError(
+                    f"Model '{model_info.model_id}' is already registered."
+                )
+            model: BaseProviderModel = ModelFactory.create_model_from_info(
+                model_info=model_info
+            )
             self._models[model_info.model_id] = model
             self._model_infos[model_info.model_id] = model_info
 
@@ -54,7 +58,9 @@ class ModelRegistry:
             model_info (ModelInfo): The configuration and metadata used to instantiate or update the model.
         """
         with self._lock:
-            model: BaseProviderModel = ModelFactory.create_model_from_info(model_info=model_info)
+            model: BaseProviderModel = ModelFactory.create_model_from_info(
+                model_info=model_info
+            )
             self._models[model_info.model_id] = model
             self._model_infos[model_info.model_id] = model_info
 

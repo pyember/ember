@@ -88,11 +88,15 @@ def load_full_config(*, base_config_path: str) -> Dict[str, Any]:
         FileNotFoundError: If the base configuration file does not exist.
     """
     if not os.path.exists(path=base_config_path):
-        raise FileNotFoundError(f"Model configuration file not found: {base_config_path}")
+        raise FileNotFoundError(
+            f"Model configuration file not found: {base_config_path}"
+        )
     with open(file=base_config_path, mode="r", encoding="utf-8") as config_file:
         base_config: Dict[str, Any] = yaml.safe_load(config_file) or {}  # type: ignore
 
-    included_configs: List[str] = base_config.get("registry", {}).get("included_configs", [])
+    included_configs: List[str] = base_config.get("registry", {}).get(
+        "included_configs", []
+    )
     for include_path in included_configs:
         logger.info("Merging included config: %s", include_path)
         if os.path.exists(path=include_path):
@@ -114,6 +118,7 @@ class RegistryConfig(BaseModel):
         included_configs (List[str]): File paths for additional configuration files.
         models (List[ModelInfo]): Locally defined model information objects.
     """
+
     auto_register: bool = False
     auto_discover: bool = False
     included_configs: List[str] = Field(default_factory=list)
@@ -127,6 +132,7 @@ class OtherSettings(BaseModel):
         debug (Optional[bool]): Optional flag to enable debug mode.
         logging (Optional[Dict[str, Any]]): Optional logging configuration settings.
     """
+
     debug: Optional[bool] = None
     logging: Optional[Dict[str, Any]] = None
 
@@ -143,6 +149,7 @@ class EmberSettings(BaseSettings):
         other (OtherSettings): Additional miscellaneous settings.
         model_config (SettingsConfigDict): Pydantic settings configuration for loading from .env files.
     """
+
     model_config_path: str = Field(
         default_factory=lambda: os.path.join(os.path.dirname(__file__), "config.yaml")
     )
@@ -178,19 +185,24 @@ def initialize_global_registry() -> None:
     env_settings: EmberSettings = EmberSettings()
 
     # Step 2: Load and merge the YAML configuration.
-    merged_config: Dict[str, Any] = load_full_config(base_config_path=env_settings.model_config_path)
+    merged_config: Dict[str, Any] = load_full_config(
+        base_config_path=env_settings.model_config_path
+    )
     final_settings: EmberSettings = EmberSettings(**merged_config)
 
     # Step 3: Optionally auto-discover models.
     discovered_models: Dict[str, ModelInfo] = {}
     if final_settings.registry.auto_discover:
         from .discovery_service import ModelDiscoveryService
+
         discovery_service = ModelDiscoveryService(ttl=3600)
         discovered: Dict[str, ModelInfo] = discovery_service.discover_models()
         discovered_models = discovery_service.merge_with_config(discovery=discovered)
 
     # Step 4: Merge locally defined models (local models override discovered ones).
-    local_models: Dict[str, ModelInfo] = {model.model_id: model for model in final_settings.registry.models}
+    local_models: Dict[str, ModelInfo] = {
+        model.model_id: model for model in final_settings.registry.models
+    }
     discovered_models.update(local_models)
 
     # Step 5: Register all models in the global registry.
