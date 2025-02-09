@@ -7,5 +7,5 @@ __all__ = [
     "BaseDiscoveryProvider",
     "OpenAIDiscovery",
     "AnthropicDiscovery",
-    "GeminiDiscovery"
+    "GeminiDiscovery",
 ]

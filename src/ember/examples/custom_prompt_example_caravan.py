@@ -163,7 +163,9 @@ class CaravanLabelingSignature(BaseModel):
     """
     Minimal local signature container with prompt string.
     """
+
     prompt_template: str = CARAVAN_PROMPT_FULL
+
     def render_prompt(self, inputs: Dict[str, Any]) -> str:
         return self.prompt_template.format(**inputs)
 
@@ -184,6 +186,7 @@ class SimplePromptSignature(BaseModel):
         "Provide a concise single-sentence answer to the following question:\n"
         "QUESTION: {question}\n"
     )
+
     def render_prompt(self, inputs: Dict[str, Any]) -> str:
         return self.prompt_template.format(**inputs)
 

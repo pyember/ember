@@ -7,6 +7,7 @@ from ember.core.registry.model.core.schemas.usage import (
     UsageStats,
 )
 
+
 class UsageService:
     """Manages in-memory usage records in a thread-safe manner.
 

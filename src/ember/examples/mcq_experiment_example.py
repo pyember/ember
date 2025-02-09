@@ -332,7 +332,7 @@ class MultiModelEnsemble(
         )
         # Step 2: Judge synthesis aggregator.
         self.judge = non.JudgeSynthesis(model_name=model_name, temperature=temperature)
-        
+
         # Step 3: Optional get_answer operator.
         self.get_concise_answer_without_explanation = non.GetAnswer(
             model_name=model_name, temperature=0.1

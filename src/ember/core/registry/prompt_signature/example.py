@@ -12,6 +12,7 @@ class CaravanLabelsOutput(BaseModel):
     Attributes:
         label (Literal["0", "1"]): The label assigned to the input. It must be "0" (benign) or "1" (malicious).
     """
+
     label: Literal["0", "1"]
 
 
@@ -21,6 +22,7 @@ class CaravanLabelingInputs(BaseModel):
     Attributes:
         question (str): The question text used for labeling.
     """
+
     question: str
 
 
@@ -32,6 +34,7 @@ class CaravanLabelingSignature(Signature):
         structured_output (Optional[Type[BaseModel]]): Output model class used to validate results.
         input_model (Optional[Type[BaseModel]]): Input model class used to validate inputs.
     """
+
     prompt_template: str = (
         "You are a network security expert.\n"
         "Given these unlabeled flows:\n{question}\n"
