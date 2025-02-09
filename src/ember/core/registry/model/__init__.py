@@ -25,11 +25,13 @@ Exposed Components:
 
 from __future__ import annotations
 
+from .provider_registry.base_provider import BaseChatParameters
+
 # Core schemas:
 from .core.schemas.model_info import ModelInfo
 from .core.schemas.provider_info import ProviderInfo
 from .core.schemas.cost import ModelCost, RateLimit
-from .core.schemas.chat_schemas import ChatRequest, ChatResponse, BaseChatParameters
+from .core.schemas.chat_schemas import ChatRequest, ChatResponse
 from .core.schemas.usage import UsageStats, UsageRecord, UsageSummary
 
 # Core services:

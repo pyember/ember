@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from .core.schemas.model_info import ModelInfo
 from .factory import ModelFactory
-from .provider_registry.base import BaseProviderModel
+from .provider_registry.base_provider import BaseProviderModel
 
 
 class ModelRegistry:

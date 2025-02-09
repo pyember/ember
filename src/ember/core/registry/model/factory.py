@@ -5,7 +5,7 @@ import pkgutil
 from typing import Dict, List, Optional, Type
 
 from .utils.model_registry_exceptions import ProviderConfigError
-from .provider_registry.base import BaseProviderModel
+from .provider_registry.base_provider import BaseProviderModel
 from .core.schemas.model_info import ModelInfo
 from .model_enum import parse_model_str
 

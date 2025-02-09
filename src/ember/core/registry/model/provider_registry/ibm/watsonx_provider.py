@@ -6,7 +6,7 @@ try:
 except ImportError:
     ibm_models = None  # Gracefully handle the absence of the ibm_watsonx_ai package.
 
-from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.provider_registry.base_provider import BaseProviderModel
 from ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,

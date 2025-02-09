@@ -12,9 +12,11 @@ from ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.provider_registry.base import BaseProviderModel
-from ember.core.registry.model.core.schemas.chat_schemas import (
+from ember.core.registry.model.provider_registry.base_provider import (
     BaseChatParameters,
+    BaseProviderModel,
+)
+from ember.core.registry.model.core.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )

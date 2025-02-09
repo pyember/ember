@@ -3,7 +3,7 @@ from enum import Enum
 
 from ember.core.registry.model.model_enum import ModelEnum, parse_model_str
 from ember.core.registry.model.model_registry import ModelRegistry
-from ember.core.registry.model.provider_registry.base import BaseProviderModel
+from ember.core.registry.model.provider_registry.base_provider import BaseProviderModel
 from ember.core.registry.model.core.services.usage_service import UsageService
 
 
