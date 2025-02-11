@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from src.ember.core.app_context import EmberAppContext
-from src.ember.core.registry.model.model_registry import ModelRegistry
+from ember.core.registry.model.registry.model_registry import ModelRegistry
 
 
 class EmberError(Exception):

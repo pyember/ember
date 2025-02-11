@@ -20,7 +20,7 @@ from prettytable import PrettyTable
 
 # ember imports
 from ember.core.configs.config import initialize_system
-from ember.core.registry.model.model_registry import GLOBAL_MODEL_REGISTRY
+from ember.core.registry.model.registry.model_registry import GLOBAL_MODEL_REGISTRY
 from ember.xcs.graph_ir.operator_graph import OperatorGraph
 from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
 from ember.xcs.tracer.tracer_decorator import jit

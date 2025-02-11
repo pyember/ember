@@ -1,73 +1,67 @@
 import logging
-from typing import Any, List, Union
+from typing import List
 
-from ember.core.registry.model.settings import (
-    initialize_global_registry,
-    GLOBAL_MODEL_REGISTRY,
-)
-from ember.core.registry.model.core.services.model_service import ModelService
-from ember.core.registry.model.core.schemas.chat_schemas import ChatResponse
-from ember.core.registry.model.provider_registry.base_provider import BaseProviderModel
+from ember import initialize_ember, get_model
+from ember.core.registry.model import load_model, ChatResponse
+from ember.core.registry.model.services.model_service import ModelService
 
 logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    """Demonstrate usage of multiple AI models via the global registry and ModelService.
+    """Demonstrate Ember models usage patterns with robust error handling.
 
-    This function initializes the global registry, creates a ModelService instance,
-    and iterates over a list of model IDs to execute and display responses using both
-    service-based and direct model invocations.
+    This function initializes the Ember model registry with explicit configuration,
+    creates a ModelService instance, and tests multiple model invocations using both
+    service-based and direct approaches.
+
+    Raises:
+        Exception: Propagates any unhandled initialization errors.
     """
-    # Step 1: Initialize the global registry with auto_discover=True for auto discovery of viable models
-    initialize_global_registry(auto_discover=True)
+    try:
+        # Initialize the registry of models from the merged YAML configuration.
+        registry = initialize_ember(auto_register=True, auto_discover=True)
 
-    # Step 2: Create a ModelService, but skip usage_service if you don't need usage logs
-    service: ModelService = ModelService(
-        registry=GLOBAL_MODEL_REGISTRY,
-        usage_service=None,  # <--- For simplicity, we can omit usage tracking and usage logging
-    )
+        # Create a ModelService instance.
+        service = ModelService(registry=registry)
 
-    # Step 3: Define a list of model IDs expected to be used for this demonstration.
-    model_ids: List[str] = [
-        "openai:o1",
-        "openai:gpt-4o",
-        "openai:gpt-4o-mini",
-        "anthropic:claude-3.5-sonnet",
-        "deepmind:gemini-1.5-pro",
-    ]
+        # Define a list of model IDs to test — note that one of them is intentionally invalid.
+        model_ids: List[str] = [
+            "openai:o1",
+            "openai:gpt-4o",
+            "openai:gpt-4o-mini",
+            "anthropic:claude-3.5-sonnet",
+            "invalid:model",  # Expected to trigger an error.
+            "deepmind:gemini-1.5-pro",
+        ]
 
-    # Step 4: Iterate over each model ID to demonstrate invocation.
-    for model_id in model_ids:
-        try:
-            logger.info("Invoking model: %s", model_id)
+        for model_id in model_ids:
+            try:
+                logger.info("➡️ Testing model: %s", model_id)
 
-            # (A) Service-based usage: Invoke the service with named parameters.
-            prompt_text: str = f"Hello from {model_id}, can you introduce yourself?"
-            response: ChatResponse = service(prompt=prompt_text, model_id=model_id)
-            print(f"Service-based response from '{model_id}': {response.data}")
+                # Two usage styles are demonstrated below:
+                # 1. Service-based invocation: Recommended for automatic usage tracking.
+                service_response: ChatResponse = service.invoke(
+                    model_id=model_id,
+                    prompt="Explain quantum computing in 50 words",
+                )
+                print(f"🛎️ Service response from {model_id}:\n{service_response.data}\n")
 
-            # (B) Direct usage from the registry: Retrieve the model instance for direct invocation.
-            model_instance: Union[BaseProviderModel, None] = (
-                GLOBAL_MODEL_REGISTRY.get_model(model_id)
-            )
-            if model_instance is None:
-                print("No model instance found in registry for '%s'" % model_id)
+                # 2. Direct model instance usage: Useful for more granular or PyTorch-like workflows.
+                model = load_model(model_id=model_id, registry=registry)
+                direct_response: ChatResponse = model(
+                    prompt="What's the capital of France?"
+                )
+                print(f"🎯 Direct response from {model_id}:\n{direct_response.data}\n")
+
+            except Exception as error:
+                logger.error("❌ Error with model %s: %s", model_id, str(error))
                 continue
 
-            direct_prompt: str = (
-                "What's your top recommendation for a productivity hack?"
-            )
-            direct_response: ChatResponse = model_instance(prompt=direct_prompt)
-            print(
-                "Direct usage response from '%s': %s" % (model_id, direct_response.data)
-            )
-
-        except Exception as exc:
-            logger.error("Error invoking model '%s': %s", model_id, exc)
-
-    print("\nDone invoking all example models.")
+    except Exception as error:
+        logger.critical("🔥 Critical initialization error: %s", str(error))
+        raise
 
 
 if __name__ == "__main__":

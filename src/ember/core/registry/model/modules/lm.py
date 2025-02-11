@@ -2,12 +2,8 @@ import logging
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
-from ember.core.registry.model.core.services.model_service import ModelService
-from ember.core.registry.model.core.services.usage_service import UsageService
-from ember.core.registry.model.model_registry import (
-    ModelRegistry,
-    GLOBAL_MODEL_REGISTRY,
-)
+from ember.core.registry.model.services.model_service import ModelService
+from ember.core.registry.model.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -25,7 +21,7 @@ class LMModuleConfig(BaseModel):
 
     model_id: str = Field(
         default="openai:gpt-4o",
-        description="String or enum-based identifier for picking the underlying model provider.",
+        description="Identifier for the underlying model provider.",
     )
     temperature: float = Field(
         default=1.0,
@@ -35,31 +31,31 @@ class LMModuleConfig(BaseModel):
     )
     max_tokens: Optional[int] = Field(
         default=None,
-        description="Maximum tokens to generate in a single forward call.",
+        description="Maximum tokens to generate in one call.",
     )
     cot_prompt: Optional[str] = Field(
         default=None,
-        description="Optional chain-of-thought prompt or format appended to the user's prompt.",
+        description="Optional chain-of-thought prompt to append.",
     )
     persona: Optional[str] = Field(
         default=None,
-        description="Optional persona or role context to be prepended to the user query.",
+        description="Optional persona context to prepend to the query.",
     )
 
 
-def get_default_model_service(
-    registry: ModelRegistry, usage_service: UsageService
-) -> ModelService:
-    """Creates and returns a default ModelService instance.
+def get_default_model_service() -> ModelService:
+    """Creates and returns a default ModelService instance using the new unified initializer.
 
-    This function uses the global model registry and instantiates a new UsageService.
-    Default models can be registered here if needed.
-
-    Returns:
-        ModelService: A ModelService initialized with the global registry and a new UsageService.
+    Instead of relying on a global registry, we explicitly call initialize_ember()
+    so that the registry is built from the current configuration.
     """
-    registry = GLOBAL_MODEL_REGISTRY
-    usage_service = UsageService()
+    from ember.core.registry.model.config.settings import initialize_ember
+
+    # Initialize the registry (with default flags; these can be adjusted as needed).
+    registry = initialize_ember(auto_register=True, auto_discover=True)
+    usage_service = (
+        UsageService()
+    )  # Optionally, you might inject a custom usage service.
     return ModelService(registry=registry, usage_service=usage_service)
 
 

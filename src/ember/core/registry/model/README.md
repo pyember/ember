@@ -137,6 +137,17 @@ registry/
    ```
    That's it! The `ModelService` will look up `"openai:gpt-4o"` in the `GLOBAL_MODEL_REGISTRY`, which was populated by `initialize_global_registry()`.
 
+## Quick Start – One-Line Initialization
+
+```python
+import ember
+
+# Automatically initialize registry and model service.
+service = ember.init()
+response = service("openai:gpt-4o", "Hello world!")
+print(response.data)
+```
+
 ## Usage Example
 
 Below is a simplified usage example (see `example.py` in the `examples/` folder for a more detailed version):

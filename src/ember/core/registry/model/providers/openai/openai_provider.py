@@ -10,7 +10,7 @@ from ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.provider_registry.base_provider import (
+from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
@@ -20,6 +20,7 @@ from ember.core.registry.model.core.schemas.chat_schemas import (
 )
 from ember.core.registry.model.core.schemas.usage import UsageStats
 from ember.core.registry.model.core.schemas.model_info import ModelInfo
+from ember.plugin_system import provider
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ class OpenAIExtraParams(BaseModel):
     # Additional overrideable parameters can be defined here as needed.
 
 
+@provider("OpenAI")
 class OpenAIModel(BaseProviderModel):
     """Implementation for OpenAI-based models.
 

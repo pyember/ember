@@ -6,21 +6,23 @@ try:
 except ImportError:
     ibm_models = None  # Gracefully handle the absence of the ibm_watsonx_ai package.
 
-from ember.core.registry.model.provider_registry.base_provider import BaseProviderModel
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.core.schemas.chat_schemas import (
+from ember.core.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
-from ember.core.registry.model.core.schemas.usage import UsageStats
+from ember.core.registry.model.schemas.usage import UsageStats
 from tenacity import retry, wait_exponential, stop_after_attempt
+from ember.plugin_system import provider
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+@provider("WatsonX")
 class WatsonXModel(BaseProviderModel):
     """IBM WatsonX provider implementation."""
 

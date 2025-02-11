@@ -8,19 +8,20 @@ import yaml
 from pydantic import Field, field_validator
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from ember.plugin_system import provider
 from ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.provider_registry.base_provider import (
+from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from ember.core.registry.model.core.schemas.chat_schemas import (
+from ember.core.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
-from ember.core.registry.model.core.schemas.usage import UsageStats
+from ember.core.registry.model.schemas.usage import UsageStats
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -154,6 +155,7 @@ class AnthropicChatParameters(BaseChatParameters):
         return kwargs
 
 
+@provider("Anthropic")
 class AnthropicModel(BaseProviderModel):
     """Concrete implementation for interacting with Anthropic models (e.g., Claude).
 

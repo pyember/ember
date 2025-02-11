@@ -8,7 +8,7 @@ from ember.core.configs.config import (
 )
 from ember.core.registry.model.core.services.model_service import ModelService
 from ember.core.registry.model.core.services.usage_service import UsageService
-from ember.core.registry.model.model_registry import ModelRegistry
+from ember.core.registry.model.registry.model_registry import ModelRegistry
 
 
 class EmberAppContext:
