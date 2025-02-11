@@ -4,7 +4,10 @@ from pydantic import BaseModel, Field
 
 from ember.core.registry.model.core.services.model_service import ModelService
 from ember.core.registry.model.core.services.usage_service import UsageService
-from ember.core.registry.model.settings import GLOBAL_MODEL_REGISTRY
+from ember.core.registry.model.model_registry import (
+    ModelRegistry,
+    GLOBAL_MODEL_REGISTRY,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -44,7 +47,9 @@ class LMModuleConfig(BaseModel):
     )
 
 
-def get_default_model_service() -> ModelService:
+def get_default_model_service(
+    registry: ModelRegistry, usage_service: UsageService
+) -> ModelService:
     """Creates and returns a default ModelService instance.
 
     This function uses the global model registry and instantiates a new UsageService.

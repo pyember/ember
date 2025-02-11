@@ -49,8 +49,8 @@ def main() -> None:
             print(f"Service-based response from '{model_id}': {response.data}")
 
             # (B) Direct usage from the registry: Retrieve the model instance for direct invocation.
-            model_instance: Union[BaseProviderModel, None] = GLOBAL_MODEL_REGISTRY.get_model(
-                model_id
+            model_instance: Union[BaseProviderModel, None] = (
+                GLOBAL_MODEL_REGISTRY.get_model(model_id)
             )
             if model_instance is None:
                 print("No model instance found in registry for '%s'" % model_id)

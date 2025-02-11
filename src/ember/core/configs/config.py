@@ -4,44 +4,74 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from src.ember.core.app_context import EmberAppContext
+from src.ember.core.registry.model.model_registry import ModelRegistry
 
-# -------------------------------------------------------------------
-# 1) Configuration Manager
-# -------------------------------------------------------------------
-class ConfigManager:
-    """Manages configuration using configparser.
 
-    This class loads and writes configuration settings from a file.
-    If the specified configuration file does not exist, it initializes
-    default settings and saves them to disk.
+class EmberError(Exception):
+    """Base class for all custom exceptions in the Ember library.
 
     Attributes:
-        _config (configparser.ConfigParser): The internal configuration parser.
-        _config_path (Path): The filesystem path to the configuration file.
+        Exception: Base exception for Ember-related errors.
     """
 
-    def __init__(self, config_filename: Optional[str] = None) -> None:
-        """Initializes a ConfigManager instance.
+    pass
+
+
+class ConfigManager:
+    """Manages configuration using configparser with dependency injection support.
+
+    Attributes:
+        _config (configparser.ConfigParser): Internal configuration parser.
+        _config_path (Path): Filesystem path to the configuration file.
+        _logger (logging.Logger): Logger instance used for configuration events.
+    """
+
+    def __init__(
+        self,
+        config_filename: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
+        """Initialize a ConfigManager instance.
 
         Args:
-            config_filename (Optional[str]): An optional explicit path to the
-                configuration file. If provided, this overrides the 'ember_CONFIG'
-                environment variable. Defaults to None, which results in using
-                'config.ini' if neither is set.
+            config_filename (Optional[str]): Explicit path to the configuration file.
+                Overrides the 'ember_CONFIG' environment variable if provided.
+                Defaults to None, which results in 'config.ini' if not set.
+            logger (Optional[logging.Logger]): Logger instance to use. Defaults to None,
+                in which case a default logger is created.
+
+        Returns:
+            None
         """
         self._config: configparser.ConfigParser = configparser.ConfigParser()
+        self._logger: logging.Logger = (
+            logger if logger is not None else logging.getLogger(self.__class__.__name__)
+        )
         env_path: str = (
             os.environ.get("ember_CONFIG") or config_filename or "config.ini"
         )
         self._config_path: Path = Path(env_path).resolve()
         self._load_or_init_config()
 
-    def _load_or_init_config(self) -> None:
-        """Loads the configuration file if it exists or initializes default settings.
+    @property
+    def logger(self) -> logging.Logger:
+        """Return the internal logger instance.
 
-        If the configuration file exists at the resolved path, this method reads it;
-        otherwise, it initializes a default configuration and persists it.
-        Subsequently, it ensures that required sections and keys are present.
+        Returns:
+            logging.Logger: The logger used by this ConfigManager.
+        """
+        return self._logger
+
+    def _load_or_init_config(self) -> None:
+        """Load configuration from disk or initialize default settings.
+
+        If the configuration file exists at the resolved path, it is read. Otherwise, the
+        default configuration is initialized and persisted. Additionally, mandatory sections
+        and keys are ensured.
+
+        Returns:
+            None
         """
         if self._config_path.exists():
             self._config.read(self._config_path)
@@ -49,47 +79,56 @@ class ConfigManager:
             self._init_defaults()
             self._save()
 
-        # Ensure that the 'models' section exists.
         if "models" not in self._config:
             self._config["models"] = {}
 
-        # Ensure that the 'openai_api_key' is present in the 'models' section.
         if "openai_api_key" not in self._config["models"]:
             self._config["models"]["openai_api_key"] = ""
 
-        # Re-save configuration if defaults were added.
         self._save()
 
     def _init_defaults(self) -> None:
-        """Initializes default configuration settings."""
+        """Initialize default configuration settings.
+
+        Returns:
+            None
+        """
         self._config["models"] = {"openai_api_key": ""}
 
     def _save(self) -> None:
-        """Saves the current configuration to disk."""
+        """Persist the current configuration to disk.
+
+        Returns:
+            None
+        """
         with self._config_path.open(mode="w") as configfile:
             self._config.write(configfile)
 
-    def get(self, section: str, key: str, fallback: Any = None) -> Any:
-        """Retrieves a configuration value.
+    def get(
+        self, section: str, key: str, fallback: Optional[str] = None
+    ) -> Optional[str]:
+        """Retrieve a configuration value.
 
         Args:
-            section (str): The section from which to retrieve the value.
-            key (str): The key whose value is to be retrieved.
-            fallback (Any, optional): A default value if the key is not found.
-                Defaults to None.
+            section (str): The configuration section to query.
+            key (str): The key within the section whose value is desired.
+            fallback (Optional[str]): The default value if the key is not found. Defaults to None.
 
         Returns:
-            Any: The configuration value, or the fallback if the key is not found.
+            Optional[str]: The configuration value if it exists; otherwise, the fallback.
         """
         return self._config.get(section=section, option=key, fallback=fallback)
 
     def set(self, section: str, key: str, value: Any) -> None:
-        """Sets a configuration value and persists the change.
+        """Set a configuration value and persist the change.
 
         Args:
-            section (str): The section in which to set the value.
-            key (str): The key for the configuration entry.
-            value (Any): The value to store.
+            section (str): The configuration section in which to set the value.
+            key (str): The key to set within the section.
+            value (Any): The value to store (will be converted to a string).
+
+        Returns:
+            None
         """
         if not self._config.has_section(section):
             self._config.add_section(section)
@@ -97,73 +136,86 @@ class ConfigManager:
         self._save()
 
 
-# Global, shared configuration object.
-CONFIG: ConfigManager = ConfigManager()
+def initialize_api_keys(
+    config_manager: ConfigManager, logger: Optional[logging.Logger] = None
+) -> None:
+    """Initialize API keys from environment variables into the configuration.
 
+    This function retrieves API keys from environment variables and updates the
+    configuration accordingly. If an API key is missing in both the environment and the
+    configuration, a warning is logged.
 
-# -------------------------------------------------------------------
-# 2) API Key Initialization
-# -------------------------------------------------------------------
-def initialize_api_keys() -> None:
-    """Initializes API keys from environment variables.
+    Args:
+        config_manager (ConfigManager): The configuration manager to update.
+        logger (Optional[logging.Logger]): Optional logger for warnings. If None, the
+            logger from config_manager is used.
 
-    This function loads or overrides the model API keys from environment variables,
-    updating the configuration accordingly. It logs warnings if any expected API key
-    is missing.
+    Returns:
+        None
     """
-    # OpenAI API Key initialization.
+    local_logger: logging.Logger = (
+        logger if logger is not None else config_manager.logger
+    )
+
     openai_api_key: Optional[str] = os.environ.get("OPENAI_API_KEY")
     if openai_api_key:
-        CONFIG.set(section="models", key="openai_api_key", value=openai_api_key)
-    elif not CONFIG.get(section="models", key="openai_api_key"):
-        logging.warning(
+        config_manager.set(section="models", key="openai_api_key", value=openai_api_key)
+    elif not config_manager.get(section="models", key="openai_api_key"):
+        local_logger.warning(
             "WARNING: OpenAI API key not found in environment variables or configuration file."
         )
 
-    # Anthropic API Key initialization.
     anthropic_api_key: Optional[str] = os.environ.get("ANTHROPIC_API_KEY")
     if anthropic_api_key:
-        CONFIG.set(section="models", key="anthropic_api_key", value=anthropic_api_key)
-    elif not CONFIG.get(section="models", key="anthropic_api_key"):
-        logging.warning(
+        config_manager.set(
+            section="models", key="anthropic_api_key", value=anthropic_api_key
+        )
+    elif not config_manager.get(section="models", key="anthropic_api_key"):
+        local_logger.warning(
             "WARNING: Anthropic API key not found in environment variables or configuration file."
         )
 
-    # Google API Key initialization.
     google_api_key: Optional[str] = os.environ.get("GOOGLE_API_KEY")
     if google_api_key:
-        CONFIG.set(section="models", key="google_api_key", value=google_api_key)
-    elif not CONFIG.get(section="models", key="google_api_key"):
-        logging.warning(
+        config_manager.set(section="models", key="google_api_key", value=google_api_key)
+    elif not config_manager.get(section="models", key="google_api_key"):
+        local_logger.warning(
             "WARNING: Google API key not found in environment variables or configuration file."
         )
 
 
-# -------------------------------------------------------------------
-# 3) Model Registration Logic
-# -------------------------------------------------------------------
-def auto_register_known_models(registry: Any) -> None:
-    """Auto-registers known models into a model registry.
+def auto_register_known_models(
+    registry: ModelRegistry, config_manager: ConfigManager
+) -> None:
+    """Automatically register known models in the model registry.
 
-    This function pre-populates the provided registry with default models if they are
-    not already registered. For demonstration purposes, it auto-registers an OpenAI GPT-4o model.
+    Checks whether a known model is present in the registry; if not, it registers
+    the model using configuration settings.
 
     Args:
-        registry (Any): An object supporting the methods get_model() and register_model().
+        registry (ModelRegistry): The model registry to update.
+        config_manager (ConfigManager): The configuration manager providing model settings.
+
+    Returns:
+        None
     """
-    from src.ember.registry.model.schemas.model_info import ModelInfo
-    from src.ember.registry.model.schemas.provider_info import ProviderInfo
-    from src.ember.registry.model.schemas.cost import ModelCost, RateLimit
+    local_logger: logging.Logger = config_manager.logger
+    from ember.core.registry.model.core.schemas.model_info import ModelInfo
+    from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
+    from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
 
     known_model_id: str = "openai:gpt-4o"
     if registry.get_model(model_id=known_model_id) is None:
-        logging.info("Auto-registering known model: %s", known_model_id)
+        local_logger.info("Auto-registering known model: %s", known_model_id)
         cost: ModelCost = ModelCost(
             input_cost_per_thousand=0.03, output_cost_per_thousand=0.06
         )
         rate: RateLimit = RateLimit(tokens_per_minute=80000, requests_per_minute=5000)
-        openai_api_key: str = CONFIG.get(
-            section="models", key="openai_api_key", fallback="DUMMY_KEY"
+        openai_api_key: str = (
+            config_manager.get(
+                section="models", key="openai_api_key", fallback="DUMMY_KEY"
+            )
+            or "DUMMY_KEY"
         )
         model_info: ModelInfo = ModelInfo(
             model_id=known_model_id,
@@ -176,23 +228,35 @@ def auto_register_known_models(registry: Any) -> None:
         registry.register_model(model_info=model_info)
 
 
-# -------------------------------------------------------------------
-# 4) Initialization Entry Point
-# -------------------------------------------------------------------
-def initialize_system(registry: Optional[Any] = None) -> None:
-    """Initializes system configuration and model registry.
+def initialize_system(
+    app_context: Optional[EmberAppContext] = None,
+    registry: Optional[ModelRegistry] = None,
+) -> None:
+    """Initialize system configuration and model registry.
 
-    This function loads API keys from the environment and, if a model registry is provided,
-    auto-registers known models into it.
+    Depending on the presence of an application context, this function initializes API keys and,
+    if provided, auto-registers known models using the configuration manager from the application context.
+    If no application context is provided, a temporary configuration manager is used and a warning
+    is logged.
 
     Args:
-        registry (Optional[Any]): An optional model registry supporting auto-registration.
-            Defaults to None.
+        app_context (Optional[EmberAppContext]): The application context containing configuration.
+        registry (Optional[ModelRegistry]): The model registry for auto-registration of models.
+
+    Returns:
+        None
     """
-    initialize_api_keys()
-    if registry is not None:
-        auto_register_known_models(registry=registry)
-
-
-# Automatically initialize API keys upon module import.
-initialize_api_keys()
+    if app_context is not None:
+        initialize_api_keys(config_manager=app_context.config_manager)
+        if registry is not None:
+            auto_register_known_models(
+                registry=registry, config_manager=app_context.config_manager
+            )
+    else:
+        temp_config: ConfigManager = ConfigManager()
+        temp_config.logger.warning(
+            "Initializing without AppContext - prefer create_ember_app()"
+        )
+        initialize_api_keys(config_manager=temp_config)
+        if registry is not None:
+            auto_register_known_models(registry=registry, config_manager=temp_config)

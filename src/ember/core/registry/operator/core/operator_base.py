@@ -81,6 +81,7 @@ class Operator(ABC, Generic[T_in, T_out]):
         if signature is not None:
             self.metadata.signature = signature
 
+        # TODO (jaredquincy): revisit how we name, register, and store sub-operators.
         if sub_operators is not None:
             for index, sub_operator in enumerate(sub_operators):
                 setattr(self, f"sub_op_{index}", sub_operator)

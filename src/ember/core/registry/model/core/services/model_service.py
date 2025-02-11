@@ -1,5 +1,6 @@
 from typing import Any, Optional, Union
 from enum import Enum
+import logging
 
 from ember.core.registry.model.model_enum import ModelEnum, parse_model_str
 from ember.core.registry.model.model_registry import ModelRegistry
@@ -23,19 +24,24 @@ class ModelService:
     def __init__(
         self,
         registry: ModelRegistry,
-        usage_service: UsageService,
+        usage_service: Optional[UsageService] = None,
         default_model_id: Optional[Union[str, Enum]] = None,
+        logger: Optional[logging.Logger] = None,
     ) -> None:
         """Initializes ModelService with a registry, usage service, and an optional default model identifier.
 
         Args:
             registry (ModelRegistry): An instance of ModelRegistry for retrieving model objects.
-            usage_service (UsageService): An instance of UsageService for logging model usage statistics.
+            usage_service (Optional[UsageService]): An instance of UsageService for logging model usage statistics.
             default_model_id (Optional[Union[str, Enum]]): A default model identifier used when none is provided.
+            logger (Optional[logging.Logger]): Logger instance.
         """
         self._registry: ModelRegistry = registry
-        self._usage_service: UsageService = usage_service
+        self._usage_service: Optional[UsageService] = usage_service
         self._default_model_id: Optional[Union[str, Enum]] = default_model_id
+        self._logger: logging.Logger = logger or logging.getLogger(
+            self.__class__.__name__
+        )
 
     def get_model(
         self, model_id: Optional[Union[str, Enum]] = None
@@ -94,15 +100,23 @@ class ModelService:
             ChatResponse: The response from the model invocation.
         """
         model: BaseProviderModel = self.get_model(model_id=model_id)
-        response: ChatResponse = model.__call__(
-            prompt=prompt, **kwargs
-        )  # Explicit named method invocation.
+        try:
+            response: ChatResponse = model(prompt=prompt, **kwargs)
+        except Exception as exc:
+            self._logger.exception("Error invoking model %s", model.model_info.model_id)
+            # Wrap the external exception in a domain-specific error.
+            from ember.core.exceptions import ProviderAPIError
 
-        usage = getattr(response, "usage", None)
-        if usage is not None:
-            self._usage_service.add_usage_record(
-                model_id=model.model_info.model_id, usage_stats=usage
-            )
+            raise ProviderAPIError(
+                f"Error invoking model {model.model_info.model_id}"
+            ) from exc
+
+        if self._usage_service:  # Check if usage_service is provided
+            usage = getattr(response, "usage", None)
+            if usage is not None:
+                self._usage_service.add_usage_record(
+                    model_id=model.model_info.model_id, usage_stats=usage
+                )
         return response
 
     def __call__(

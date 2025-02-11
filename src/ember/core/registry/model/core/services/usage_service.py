@@ -1,5 +1,6 @@
 import threading
-from typing import Dict, Union
+from typing import Dict, Union, Optional
+import logging
 
 from ember.core.registry.model.core.schemas.usage import (
     UsageRecord,
@@ -16,14 +17,20 @@ class UsageService:
     by employing a locking mechanism.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
         """Initializes a new instance of UsageService.
 
         Establishes an empty usage summary store and initializes a lock to ensure
         thread-safe operations.
+
+        Args:
+            logger (logging.Logger): Logger instance.
         """
         self._lock: threading.Lock = threading.Lock()
         self._usage_summaries: Dict[str, UsageSummary] = {}
+        self._logger: logging.Logger = logger or logging.getLogger(
+            self.__class__.__name__
+        )  # Provide a fallback
 
     def add_usage_record(
         self, *, model_id: str, usage_stats: Union[UsageStats, dict]
@@ -53,7 +60,7 @@ class UsageService:
                 else usage_stats
             )
             usage_record: UsageRecord = UsageRecord(usage_stats=converted_usage_stats)
-            usage_summary.add_record(usage_record=usage_record)
+            usage_summary.add_usage_record(usage_record=usage_record)
 
     def get_usage_summary(self, *, model_id: str) -> UsageSummary:
         """Retrieves the current usage summary for the specified model in a thread-safe manner.

@@ -1,17 +1,21 @@
 import threading
+import logging
 from typing import Dict, List, Optional
 
 from .core.schemas.model_info import ModelInfo
 from .factory import ModelFactory
 from .provider_registry.base_provider import BaseProviderModel
+from .utils.model_registry_exceptions import ModelNotFoundError
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ModelRegistry:
-    """Thread-safe registry for managing model instances and their associated metadata.
+    """
+    Thread-safe registry for managing model instances and their associated metadata.
 
-    This registry provides a thread-safe mechanism to register, update, and retrieve model
-    instances along with their metadata. For everyday usage, higher-level abstractions (such as
-    ModelService or LMModule) are recommended. Direct access is reserved for advanced orchestration.
+    This registry is designed for explicit dependency injection. Avoid using global singleton
+    instances; instead, pass an instance (typically via EmberAppContext) to components that need it.
 
     Attributes:
         _lock (threading.Lock): A lock object ensuring thread-safe operations.
@@ -19,11 +23,14 @@ class ModelRegistry:
         _model_infos (Dict[str, ModelInfo]): A mapping from model IDs to their metadata.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, logger: Optional[logging.Logger] = None) -> None:
         """Initializes a new instance of ModelRegistry."""
         self._lock: threading.Lock = threading.Lock()
         self._models: Dict[str, BaseProviderModel] = {}
         self._model_infos: Dict[str, ModelInfo] = {}
+        self._logger: logging.Logger = logger or logging.getLogger(
+            self.__class__.__name__
+        )
 
     def register_model(self, model_info: ModelInfo) -> None:
         """Registers a new model using its metadata.
@@ -47,6 +54,7 @@ class ModelRegistry:
             )
             self._models[model_info.model_id] = model
             self._model_infos[model_info.model_id] = model_info
+            self._logger.info(f"Registered model: {model_info.model_id}")
 
     def register_or_update_model(self, model_info: ModelInfo) -> None:
         """Registers a new model or updates an existing model using the provided metadata.
@@ -74,7 +82,10 @@ class ModelRegistry:
             Optional[BaseProviderModel]: The model instance if found; otherwise, None.
         """
         with self._lock:
-            return self._models.get(model_id)
+            try:
+                return self._models[model_id]
+            except KeyError:
+                raise ModelNotFoundError(f"Model '{model_id}' not found in registry.")
 
     def list_models(self) -> List[str]:
         """Lists all registered model IDs.
@@ -97,5 +108,13 @@ class ModelRegistry:
         with self._lock:
             return self._model_infos.get(model_id)
 
-
-GLOBAL_MODEL_REGISTRY: ModelRegistry = ModelRegistry()
+    def unregister_model(self, model_id: str) -> None:
+        """Unregisters a model by its ID."""
+        with self._lock:
+            if model_id in self._models:
+                del self._models[model_id]
+                self._logger.info(f"Unregistered model: {model_id}")
+            else:
+                self._logger.warning(
+                    f"Model '{model_id}' not found for unregistration."
+                )

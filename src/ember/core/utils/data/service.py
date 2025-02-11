@@ -40,13 +40,15 @@ class DatasetService:
             loader (IDatasetLoader): An instance for loading datasets.
             validator (IDatasetValidator): An instance for validating dataset structures.
             sampler (IDatasetSampler): An instance for sampling dataset records.
-            transformers (Optional[Iterable[IDatasetTransformer]]): Optional iterable of 
+            transformers (Optional[Iterable[IDatasetTransformer]]): Optional iterable of
                 transformers to be applied sequentially.
         """
         self._loader: IDatasetLoader = loader
         self._validator: IDatasetValidator = validator
         self._sampler: IDatasetSampler = sampler
-        self._transformers: List[IDatasetTransformer] = list(transformers) if transformers else []
+        self._transformers: List[IDatasetTransformer] = (
+            list(transformers) if transformers else []
+        )
 
     def _resolve_loader_config(
         self, config: Union[str, BaseDatasetConfig, None]
@@ -81,15 +83,23 @@ class DatasetService:
             logger.info("Dataset loaded with columns: %s", dataset)
             if hasattr(dataset, "keys") and callable(dataset.keys):
                 for split_name in dataset.keys():
-                    split_columns: Optional[Any] = getattr(dataset[split_name], "column_names", None)
-                    logger.debug("Columns for split '%s': %s", split_name, split_columns)
+                    split_columns: Optional[Any] = getattr(
+                        dataset[split_name], "column_names", None
+                    )
+                    logger.debug(
+                        "Columns for split '%s': %s", split_name, split_columns
+                    )
             else:
-                logger.debug("Dataset columns: %s", getattr(dataset, "column_names", "Unknown"))
+                logger.debug(
+                    "Dataset columns: %s", getattr(dataset, "column_names", "Unknown")
+                )
         except Exception as exc:
             logger.debug("Failed to log dataset columns: %s", exc)
         return dataset
 
-    def select_split(self, dataset: Any, config_obj: Optional[BaseDatasetConfig]) -> Any:
+    def select_split(
+        self, dataset: Any, config_obj: Optional[BaseDatasetConfig]
+    ) -> Any:
         """Selects a specific split from the dataset based on the provided configuration.
 
         If the configuration object contains a 'split' attribute and the dataset includes that
@@ -153,7 +163,9 @@ class DatasetService:
         """
         first_item: Any = data[0]
         required_keys: List[str] = prepper.get_required_keys()
-        self._validator.validate_required_keys(item=first_item, required_keys=required_keys)
+        self._validator.validate_required_keys(
+            item=first_item, required_keys=required_keys
+        )
 
     def _sample_data(self, data: Any, num_samples: Optional[int]) -> Any:
         """Downsamples the dataset to a specified number of samples if provided.
@@ -229,7 +241,9 @@ class DatasetService:
             num_samples,
         )
 
-        logger.info("[load_and_prepare] Converting configuration for loader compatibility.")
+        logger.info(
+            "[load_and_prepare] Converting configuration for loader compatibility."
+        )
         resolved_config: Optional[str] = self._resolve_loader_config(config=config)
         logger.info("[load_and_prepare] Resolved configuration: '%s'.", resolved_config)
 
@@ -237,7 +251,9 @@ class DatasetService:
             "[load_and_prepare] Loading data from source='%s' with resolved configuration.",
             dataset_info.source,
         )
-        dataset: Any = self._load_data(source=dataset_info.source, config=resolved_config)
+        dataset: Any = self._load_data(
+            source=dataset_info.source, config=resolved_config
+        )
         logger.info("[load_and_prepare] Data loaded successfully.")
 
         if hasattr(dataset, "__len__"):
@@ -247,7 +263,9 @@ class DatasetService:
                 len(dataset),
             )
             if len(dataset) > 0:
-                logger.info("[load_and_prepare] Sample record from dataset: %s", dataset)
+                logger.info(
+                    "[load_and_prepare] Sample record from dataset: %s", dataset
+                )
         else:
             logger.info(
                 "[load_and_prepare] Dataset type: %s, size: Unknown",
@@ -315,15 +333,21 @@ class DatasetService:
         logger.info("[load_and_prepare] Required keys validated successfully.")
 
         logger.info("[load_and_prepare] Sampling data as specified.")
-        sampled_data: Any = self._sample_data(data=transformed_data, num_samples=num_samples)
-        logger.info("[load_and_prepare] Sampling completed. Sampled data: %s", sampled_data)
+        sampled_data: Any = self._sample_data(
+            data=transformed_data, num_samples=num_samples
+        )
+        logger.info(
+            "[load_and_prepare] Sampling completed. Sampled data: %s", sampled_data
+        )
         if hasattr(sampled_data, "__len__"):
             logger.info(
-                "[load_and_prepare] Number of records after sampling: %d", len(sampled_data)
+                "[load_and_prepare] Number of records after sampling: %d",
+                len(sampled_data),
             )
             if len(sampled_data) > 0:
                 logger.info(
-                    "[load_and_prepare] Sample record from sampled data: %s", sampled_data
+                    "[load_and_prepare] Sample record from sampled data: %s",
+                    sampled_data,
                 )
         else:
             logger.info("[load_and_prepare] Number of records after sampling: Unknown")

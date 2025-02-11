@@ -108,6 +108,5 @@ class DatasetLoaderFactory:
         for dataset_name, prepper_cls in discovered_preppers.items():
             self.register(dataset_name=dataset_name, prepper_class=prepper_cls)
         logger.info(
-            "Auto-registered plugin preppers: %s",
-            list(discovered_preppers.keys())
+            "Auto-registered plugin preppers: %s", list(discovered_preppers.keys())
         )

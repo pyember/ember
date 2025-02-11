@@ -78,6 +78,7 @@ class IOutputExtractor(ABC, Generic[T_out, T_truth]):
         """
         raise NotImplementedError
 
+
 OutType = TypeVar("OutType")
 ExtractedType = TypeVar("ExtractedType")
 
@@ -227,6 +228,7 @@ class CodeExecutionEvaluator(IEvaluator[str]):
                 score=0.0,
                 metadata={"error": str(error)},
             )
+
 
 class RegexExtractor(IOutputExtractor[str, str]):
     """Extractor that uses a regular expression to select a substring.
