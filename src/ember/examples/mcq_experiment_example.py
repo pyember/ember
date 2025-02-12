@@ -52,7 +52,7 @@ from ember.core.registry.operator.core.operator_base import (
     OperatorMetadata,
 )
 from ember.core.registry.prompt_signature.signatures import Signature
-from ember.core.registry.model.core.modules.lm_modules import LMModuleConfig
+from ember.core.registry.model.modules.lm import LMModuleConfig
 
 
 ###############################################################################
