@@ -1,4 +1,5 @@
 import logging
+import random
 from typing import Any, Iterable, List, Optional, Union
 
 from ember.core.utils.data.base.loaders import IDatasetLoader
@@ -14,17 +15,17 @@ logger.setLevel(logging.DEBUG)
 
 
 class DatasetService:
-    """Service for orchestrating dataset operations including loading, validating,
+    """Service for orchestrating operations on datasets such as loading, validating,
     transforming, sampling, and preparing dataset entries.
 
-    This service executes the following steps in sequence:
-      1. Loads the dataset from a given source.
-      2. Validates the overall structure of the dataset.
-      3. Optionally selects a specific split.
-      4. Applies sequential transformations.
-      5. Validates the presence of required keys.
-      6. Downsamples the dataset if needed.
-      7. Prepares the final dataset entries.
+    The pipeline executed by this service follows these sequential steps:
+      1. Load the dataset from a given source.
+      2. Validate the overall structure of the dataset.
+      3. Optionally select a specific split.
+      4. Apply sequential transformations.
+      5. Validate the presence of required keys.
+      6. Downsample the dataset if desired.
+      7. Prepare the final dataset entries.
     """
 
     def __init__(
@@ -34,14 +35,14 @@ class DatasetService:
         sampler: IDatasetSampler,
         transformers: Optional[Iterable[IDatasetTransformer]] = None,
     ) -> None:
-        """Initializes the DatasetService instance.
+        """Initialize a DatasetService instance.
 
         Args:
-            loader (IDatasetLoader): An instance for loading datasets.
-            validator (IDatasetValidator): An instance for validating dataset structures.
+            loader (IDatasetLoader): An instance responsible for loading datasets.
+            validator (IDatasetValidator): An instance responsible for validating dataset structures.
             sampler (IDatasetSampler): An instance for sampling dataset records.
-            transformers (Optional[Iterable[IDatasetTransformer]]): Optional iterable of
-                transformers to be applied sequentially.
+            transformers (Optional[Iterable[IDatasetTransformer]]): An optional iterable of transformers
+                applied sequentially to the dataset.
         """
         self._loader: IDatasetLoader = loader
         self._validator: IDatasetValidator = validator
@@ -50,14 +51,14 @@ class DatasetService:
             list(transformers) if transformers else []
         )
 
-    def _resolve_loader_config(
+    def _resolve_config_name(
         self, config: Union[str, BaseDatasetConfig, None]
     ) -> Optional[str]:
-        """Resolves a configuration object into a string compatible with the loader.
+        """Convert a configuration parameter into a string compatible with the loader.
 
         Args:
-            config (Union[str, BaseDatasetConfig, None]): A configuration identifier provided
-                as a string, a BaseDatasetConfig instance, or None.
+            config (Union[str, BaseDatasetConfig, None]): A configuration identifier provided as a string,
+                a BaseDatasetConfig instance, or None.
 
         Returns:
             Optional[str]: A configuration string if resolvable; otherwise, None.
@@ -68,20 +69,20 @@ class DatasetService:
             return config
         return None
 
-    def _load_data(self, source: str, config: Optional[str] = None) -> Any:
-        """Loads data from the specified source using an optional configuration.
+    def _load_data(self, dataset_name: str, config: Optional[str] = None) -> Any:
+        """Load data from a specified dataset using an optional configuration string.
 
         Args:
-            source (str): The source from which to load the dataset (e.g., file path, URL).
-            config (Optional[str]): Optional configuration string for data loading.
+            dataset_name (str): The identifier of the dataset to load.
+            config (Optional[str]): An optional configuration string for data loading.
 
         Returns:
             Any: The dataset loaded from the source.
         """
-        dataset: Any = self._loader.load(source=source, config=config)
+        dataset: Any = self._loader.load(dataset_name=dataset_name, config=config)
         try:
             logger.info("Dataset loaded with columns: %s", dataset)
-            if hasattr(dataset, "keys") and callable(dataset.keys):
+            if hasattr(dataset, "keys") and callable(getattr(dataset, "keys", None)):
                 for split_name in dataset.keys():
                     split_columns: Optional[Any] = getattr(
                         dataset[split_name], "column_names", None
@@ -94,23 +95,21 @@ class DatasetService:
                     "Dataset columns: %s", getattr(dataset, "column_names", "Unknown")
                 )
         except Exception as exc:
-            logger.debug("Failed to log dataset columns: %s", exc)
+            logger.debug("Failed to log dataset columns: %s", exc, exc_info=True)
         return dataset
 
     def select_split(
         self, dataset: Any, config_obj: Optional[BaseDatasetConfig]
     ) -> Any:
-        """Selects a specific split from the dataset based on the provided configuration.
-
-        If the configuration object contains a 'split' attribute and the dataset includes that
-        split, then the specified split is returned. Otherwise, the original dataset is returned.
+        """Select a specific dataset split based on the provided configuration.
 
         Args:
-            dataset (Any): The dataset, which may contain multiple splits.
-            config_obj (Optional[BaseDatasetConfig]): Configuration instance that may specify a split.
+            dataset (Any): A dataset that may contain multiple splits.
+            config_obj (Optional[BaseDatasetConfig]): A configuration instance that may specify a split via its
+                'split' attribute.
 
         Returns:
-            Any: The selected dataset split if available; otherwise, the original dataset.
+            Any: The selected dataset split if found; otherwise, the original dataset.
         """
         if config_obj is None or not hasattr(config_obj, "split"):
             return dataset
@@ -122,26 +121,26 @@ class DatasetService:
         return dataset
 
     def _validate_structure(self, dataset: Any) -> Any:
-        """Validates the structural integrity of the dataset.
+        """Validate the structural integrity of the provided dataset.
 
         Args:
-            dataset (Any): The dataset to be validated.
+            dataset (Any): The dataset to validate.
 
         Returns:
-            Any: The dataset after successful structural validation.
+            Any: The validated dataset.
         """
         return self._validator.validate_structure(dataset=dataset)
 
     def _transform_data(self, data: Any) -> Any:
-        """Applies a series of transformations to the dataset.
+        """Apply a sequence of transformations to the input dataset.
 
-        Each transformer in the configured list is sequentially applied to the data.
+        Each transformer in the configured list is applied in order.
 
         Args:
-            data (Any): The input dataset to be transformed.
+            data (Any): The input dataset to transform.
 
         Returns:
-            Any: The dataset after all transformations have been applied.
+            Any: The dataset after applying all transformations.
         """
         transformed: Any = data
         for transformer in self._transformers:
@@ -149,50 +148,49 @@ class DatasetService:
         return transformed
 
     def _validate_keys(self, data: Any, prepper: IDatasetPrepper) -> None:
-        """Validates that the first record in the dataset contains the required keys.
+        """Validate that a sample of dataset items contains the required keys.
 
-        This method extracts the first item from the dataset and checks for required keys using
-        the provided prepper.
+        A random sample of items from the dataset is inspected.
 
         Args:
-            data (Any): The dataset from which the first record is checked.
-            prepper (IDatasetPrepper): The instance supplying the required keys list.
-
-        Raises:
-            KeyError, ValueError, or TypeError: Propagates any exceptions raised during validation.
+            data (Any): The dataset whose items will be validated.
+            prepper (IDatasetPrepper): The prepper providing the set of required keys.
         """
-        first_item: Any = data[0]
         required_keys: List[str] = prepper.get_required_keys()
-        self._validator.validate_required_keys(
-            item=first_item, required_keys=required_keys
-        )
+        sample_size: int = min(5, len(data))
+        sample_indices: List[int] = random.sample(range(len(data)), sample_size)
+        for idx in sample_indices:
+            self._validator.validate_required_keys(
+                item=data[idx], required_keys=required_keys
+            )
 
     def _sample_data(self, data: Any, num_samples: Optional[int]) -> Any:
-        """Downsamples the dataset to a specified number of samples if provided.
+        """Downsample the dataset to a specified number of samples if requested.
 
         Args:
-            data (Any): The dataset to sample.
-            num_samples (Optional[int]): The number of samples desired; if None, the data is unchanged.
+            data (Any): The dataset to be sampled.
+            num_samples (Optional[int]): The desired number of samples; if None, returns the original dataset.
 
         Returns:
-            Any: The subset of the dataset after sampling.
+            Any: The downsampled dataset, or the original dataset if num_samples is None.
         """
         return self._sampler.sample(data=data, num_samples=num_samples)
 
     def _prep_data(
         self, dataset_info: DatasetInfo, sampled_data: Any, prepper: IDatasetPrepper
     ) -> List[DatasetEntry]:
-        """Prepares the final dataset entries from the sampled data.
+        """Prepare and validate the final dataset entries from the supplied sampled data.
 
-        Each record is validated and transformed into one or more DatasetEntry objects.
+        Each item is validated and converted into one or more DatasetEntry objects. Malformed items are
+        skipped with a warning logged.
 
         Args:
             dataset_info (DatasetInfo): Metadata describing the dataset.
             sampled_data (Any): The dataset after sampling.
-            prepper (IDatasetPrepper): The instance used for final record validation and entry creation.
+            prepper (IDatasetPrepper): The prepper used for record validation and entry creation.
 
         Returns:
-            List[DatasetEntry]: A list of the final DatasetEntry objects.
+            List[DatasetEntry]: The list of final DatasetEntry objects.
         """
         entries: List[DatasetEntry] = []
         required_keys: List[str] = prepper.get_required_keys()
@@ -233,7 +231,7 @@ class DatasetService:
             List[DatasetEntry]: A list of processed DatasetEntry objects ready for further consumption.
         """
         logger.info(
-            "[load_and_prepare] Starting process for dataset '%s' with source='%s', "
+            "[load_and_prepare] Starting process for dataset '%s' with dataset_name='%s', "
             "config='%s', num_samples='%s'.",
             dataset_info.name,
             dataset_info.source,
@@ -244,15 +242,15 @@ class DatasetService:
         logger.info(
             "[load_and_prepare] Converting configuration for loader compatibility."
         )
-        resolved_config: Optional[str] = self._resolve_loader_config(config=config)
+        resolved_config: Optional[str] = self._resolve_config_name(config=config)
         logger.info("[load_and_prepare] Resolved configuration: '%s'.", resolved_config)
 
         logger.info(
-            "[load_and_prepare] Loading data from source='%s' with resolved configuration.",
+            "[load_and_prepare] Loading data from dataset_name='%s'...",
             dataset_info.source,
         )
         dataset: Any = self._load_data(
-            source=dataset_info.source, config=resolved_config
+            dataset_name=dataset_info.source, config=resolved_config
         )
         logger.info("[load_and_prepare] Data loaded successfully.")
 

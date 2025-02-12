@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from ember import initialize_ember, get_model
+from ember import initialize_ember
 from ember.core.registry.model import load_model, ChatResponse
 from ember.core.registry.model.services.model_service import ModelService
 

@@ -17,7 +17,7 @@ class Signature(BaseModel):
     prompt_template: Optional[str] = None
     structured_output: Optional[Type[BaseModel]] = None
     input_model: Optional[Type[BaseModel]] = None
-    check_all_placeholders: bool = True
+    check_all_placeholders: bool = False
 
     @model_validator(mode="after")
     @classmethod
@@ -39,7 +39,7 @@ class Signature(BaseModel):
         """
         template: Optional[str] = values.get("prompt_template")
         input_model: Optional[Type[BaseModel]] = values.get("input_model")
-        check_all: bool = values.get("check_all_placeholders", True)
+        check_all: bool = values.get("check_all_placeholders", False)
         if template is not None and input_model is not None and check_all:
             for field_name, field in input_model.model_fields.items():
                 if field.required:

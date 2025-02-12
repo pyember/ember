@@ -77,11 +77,15 @@ def load_model(*, model_id: str, registry: ModelRegistry) -> BaseProviderModel:
         ValueError: If the provided registry is None.
     """
     if registry is None:
-        raise ValueError("Registry is not initialized. Please call 'initialize_ember()' first.")
+        raise ValueError(
+            "Registry is not initialized. Please call 'initialize_ember()' first."
+        )
     return registry.get_model(model_id=model_id)
 
 
-def get_service(*, usage_tracking: bool = False, registry: Optional[ModelRegistry] = None) -> ModelService:
+def get_service(
+    *, usage_tracking: bool = False, registry: Optional[ModelRegistry] = None
+) -> ModelService:
     """Obtain a ModelService instance configured for advanced operations.
 
     If no registry is provided, a new ModelRegistry is automatically initialized using
@@ -100,15 +104,17 @@ def get_service(*, usage_tracking: bool = False, registry: Optional[ModelRegistr
     return ModelService(registry=registry, usage_service=usage_service)
 
 
-def initialize_ember_service(*, usage_tracking: bool = False, config_path: Optional[str] = None) -> ModelService:
+def initialize_ember_service(
+    *, usage_tracking: bool = False, config_path: Optional[str] = None
+) -> ModelService:
     """Initialize Ember and return a fully configured ModelService instance.
 
     This convenience function initializes the Ember registry using the merged configuration and
     creates a ModelService with optional usage tracking.
 
     Args:
-        usage_tracking (bool): If True, a UsageService is attached for usage logging. Defaults to False.
-        config_path (Optional[str]): Custom path to the YAML configuration file. If None, the default configuration is used.
+        usage_tracking (bool): If True, attaches a UsageService for usage logging. Defaults to False.
+        config_path (Optional[str]): Custom path to the YAML configuration file. Defaults to None.
 
     Returns:
         ModelService: A fully configured service instance ready for model invocation.
@@ -118,6 +124,32 @@ def initialize_ember_service(*, usage_tracking: bool = False, config_path: Optio
     return ModelService(registry=registry, usage_service=usage_service)
 
 
+# ------------------------------------------------------------------------------
+# Additional shortcut helper for single-step initialization.
+def init(
+    usage_tracking: bool = False, config_path: Optional[str] = None
+) -> ModelService:
+    """Shortcut function to initialize Ember and return a ready-to-use ModelService.
+
+    This is equivalent to calling:
+
+        registry = initialize_ember(config_path=config_path, auto_register=True, auto_discover=True)
+        usage_service = UsageService() if usage_tracking else None
+        return ModelService(registry=registry, usage_service=usage_service)
+
+    Args:
+        usage_tracking (bool): If True, attaches a UsageService for usage tracking.
+        config_path (Optional[str]): Custom path to the YAML configuration file.
+
+    Returns:
+        ModelService: A fully configured ModelService instance.
+    """
+    return initialize_ember_service(
+        usage_tracking=usage_tracking, config_path=config_path
+    )
+
+
+# ------------------------------------------------------------------------------
 # Public API alias.
 get_model = load_model
 
@@ -144,4 +176,5 @@ __all__: List[str] = [
     "get_service",
     "get_model",
     "initialize_ember_service",
+    "init",
 ]

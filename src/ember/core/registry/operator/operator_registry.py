@@ -51,6 +51,28 @@ class OperatorRegistry:
         """
         return self._registry.get(operator_code)
 
+    def create_operator(self, operator_code: str, **params: Any) -> Operator[Any, Any]:
+        """Creates and returns an instance of a registered operator using the provided parameters.
+
+        This factory method retrieves the operator class associated with the given operator code and
+        instantiates it by invoking its constructor with the provided keyword arguments.
+
+        Args:
+            operator_code (str): The unique identifier for the operator.
+            **params (Any): Arbitrary keyword arguments to be passed to the operator's constructor.
+
+        Returns:
+            Operator[Any, Any]: A new instance of the operator corresponding to the specified operator code.
+
+        Raises:
+            ValueError: If no operator is registered under the provided operator code.
+        """
+        operator_cls: Optional[Type[Operator[Any, Any]]] = self.get(operator_code)
+        if operator_cls is None:
+            raise ValueError(f"No operator registered under code '{operator_code}'.")
+        operator_instance: Operator[Any, Any] = operator_cls(**params)
+        return operator_instance
+
 
 ####################################################
 # Global Registry Instance and Decorator

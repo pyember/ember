@@ -3,7 +3,19 @@ from typing import Optional
 
 
 class BaseDatasetConfig(BaseModel):
-    """A generic dataset config class. Subclasses can add fields as needed."""
+    """Generic dataset configuration model.
 
-    # We can define shared fields like "split" or "version" here if desired.
-    pass
+    This model encapsulates common dataset configuration parameters,
+    including an optional identifier for a sub-dataset variation and the
+    designated data split (e.g., 'train', 'test', or 'validation'). Subclasses
+    should extend this model with additional, dataset-specific fields as needed.
+
+    Attributes:
+        config_name (Optional[str]): Optional identifier for a sub-dataset configuration.
+            Defaults to None.
+        split (Optional[str]): The data split to use for dataset processing.
+            Defaults to 'train'.
+    """
+
+    config_name: Optional[str] = None
+    split: Optional[str] = "train"

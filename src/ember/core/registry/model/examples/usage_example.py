@@ -1,25 +1,54 @@
-# # Summoned via the ModelService with an ENUM
-# response = model_service(ModelEnum.OPENAI_GPT4, "Hello world!")
-# print(response.data)
+import logging
+from ember import init
 
-# # Or: direct usage
-# gpt4_model = model_service.get_model(ModelEnum.OPENAI_GPT4)
-# response = gpt4_model("What is the capital of France?")
-# print(response.data)
+# Optional: import ModelEnum for safer, type-checked invocation if available.
+try:
+    from ember.core.registry.model.registry.model_enum import ModelEnum
+except ImportError:
+    ModelEnum = None
 
-# model_service = ModelService(registry)
 
-# # Option 1: Using enum
-# response = model_service(ModelEnum.OPENAI_GPT4, "What is the capital of France?")
-# print(response.data)
-# print(response.usage)
+def main() -> None:
+    """
+    This example demonstrates three ways of invoking a model:
+      1. Using the single-step `init()` helper with a string identifier.
+      2. Retrieving the model instance directly for "PyTorch-like" invocation.
+      3. (Optional) Using an Enum to invoke the model for safer type-checking.
+    """
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
 
-# # Option 2: Using string
-# response = model_service("openai:gpt-4", "What is the capital of France?")
+    # Initialize the ModelService via the single-step helper.
+    service = init(usage_tracking=True)
 
-# # Pytorch-like
-# gpt4_model = model_service.get_model(ModelEnum.OPENAI_GPT4)
-# response_via_forward = gpt4_model.forward("What is the capital of France?")
-# response_via_call = gpt4_model("What is the capital of France?")
-# print(response_via_forward.data)
-# print(response_via_call.data)
+    # Example 1: Service-based invocation using a string model ID.
+    try:
+        response_str = service("openai:gpt-4o", "Hello from string ID!")
+        print("Response using string ID:\n", response_str.data)
+    except Exception as e:
+        logger.exception("Error during string ID invocation: %s", e)
+
+    # Example 2: Direct model invocation (PyTorch-like usage).
+    try:
+        gpt4o = service.get_model("openai:gpt-4o")
+        response_direct = gpt4o("What is the capital of France?")
+        print("Direct model call response:\n", response_direct.data)
+    except Exception as e:
+        logger.exception("Error during direct model invocation: %s", e)
+
+    # Example 3: (Optional) Service-based invocation using an Enum.
+    # This pattern provides safer type-checking if your application maintains enumerations.
+    if ModelEnum is not None:
+        try:
+            response_enum = service(
+                ModelEnum.OPENAI_GPT4, "Hello from Enum invocation!"
+            )
+            print("Response using Enum:\n", response_enum.data)
+        except Exception as e:
+            logger.exception("Error during enum-based invocation: %s", e)
+    else:
+        print("ModelEnum not available; skipping enum-based example.")
+
+
+if __name__ == "__main__":
+    main()
