@@ -20,10 +20,10 @@ class CaravanLabelingInputs(BaseModel):
     """Pydantic model for Caravan labeling inputs.
 
     Attributes:
-        question (str): The question text used for labeling.
+        flow (str): The flow stream used for labeling.
     """
 
-    question: str
+    flow: str
 
 
 class CaravanLabelingSignature(Signature):
@@ -37,7 +37,7 @@ class CaravanLabelingSignature(Signature):
 
     prompt_template: str = (
         "You are a network security expert.\n"
-        "Given these unlabeled flows:\n{question}\n"
+        "Given these unlabeled flows:\n{flow}\n"
         "Label each flow as 0 for benign or 1 for malicious, one per line, no explanation.\n"
     )
     structured_output: Optional[Type[BaseModel]] = CaravanLabelsOutput

@@ -20,6 +20,7 @@ class EvaluationResult:
         score (float): Numeric score reflecting accuracy or quality.
         metadata (Optional[Dict[str, Any]]): Additional details about the evaluation.
     """
+
     is_correct: bool
     score: float
     metadata: Optional[Dict[str, Any]] = None
@@ -35,7 +36,9 @@ class IEvaluator(ABC, Generic[T_out, T_ans]):
     """
 
     @abstractmethod
-    def evaluate(self, system_output: T_out, correct_answer: T_ans, **kwargs: Any) -> EvaluationResult:
+    def evaluate(
+        self, system_output: T_out, correct_answer: T_ans, **kwargs: Any
+    ) -> EvaluationResult:
         """Evaluates the system output against the expected correct answer.
 
         Args:
@@ -60,7 +63,9 @@ class IStatefulEvaluator(ABC, Generic[T_out, T_ans]):
     """
 
     @abstractmethod
-    def update(self, system_output: T_out, correct_answer: T_ans, **kwargs: Any) -> None:
+    def update(
+        self, system_output: T_out, correct_answer: T_ans, **kwargs: Any
+    ) -> None:
         """Accumulates internal state with a new sample evaluation.
 
         Args:
@@ -79,7 +84,9 @@ class IStatefulEvaluator(ABC, Generic[T_out, T_ans]):
         """
         raise NotImplementedError
 
-    def evaluate(self, system_output: T_out, correct_answer: T_ans, **kwargs: Any) -> EvaluationResult:
+    def evaluate(
+        self, system_output: T_out, correct_answer: T_ans, **kwargs: Any
+    ) -> EvaluationResult:
         """Convenience method for single-sample evaluation: updates state and computes the result.
 
         Args:
@@ -91,4 +98,4 @@ class IStatefulEvaluator(ABC, Generic[T_out, T_ans]):
             EvaluationResult: The evaluation result for the sample.
         """
         self.update(system_output, correct_answer, **kwargs)
-        return self.compute() 
+        return self.compute()

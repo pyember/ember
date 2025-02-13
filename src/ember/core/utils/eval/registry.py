@@ -1,6 +1,7 @@
 from typing import Any, Callable, Dict
 from .base_evaluator import IEvaluator
 
+
 class EvaluatorRegistry:
     """Registry for storing and retrieving evaluator factories by a unique name.
 
@@ -10,6 +11,7 @@ class EvaluatorRegistry:
         register: Registers an evaluator factory with a unique name.
         create: Creates an evaluator instance using the registered factory.
     """
+
     def __init__(self) -> None:
         self._registry: Dict[str, Callable[..., IEvaluator[Any, Any]]] = {}
 
@@ -37,4 +39,4 @@ class EvaluatorRegistry:
         """
         if name not in self._registry:
             raise KeyError(f"No evaluator registered with name: {name}")
-        return self._registry[name](**kwargs) 
+        return self._registry[name](**kwargs)

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .base_evaluator import IEvaluator, EvaluationResult
 
+
 class PipelineEvaluator(IEvaluator[Any, Any]):
     """Evaluator that applies a sequence of transformations before final evaluation.
 
@@ -15,11 +16,15 @@ class PipelineEvaluator(IEvaluator[Any, Any]):
         evaluator (IEvaluator[Any, Any]): The evaluator to be applied on the transformed output.
     """
 
-    def __init__(self, transforms: List[Callable[[Any], Any]], evaluator: IEvaluator[Any, Any]) -> None:
+    def __init__(
+        self, transforms: List[Callable[[Any], Any]], evaluator: IEvaluator[Any, Any]
+    ) -> None:
         self.transforms = transforms
         self.evaluator = evaluator
 
-    def evaluate(self, system_output: Any, correct_answer: Any, **kwargs: Any) -> EvaluationResult:
+    def evaluate(
+        self, system_output: Any, correct_answer: Any, **kwargs: Any
+    ) -> EvaluationResult:
         """Evaluates the system output after applying a sequence of transformations.
 
         Args:
@@ -45,6 +50,7 @@ class BatchEvaluationSummary:
         mean_score (float): Average score computed across all evaluations.
         accuracy (float): Proportion of evaluations that were correct.
     """
+
     results: List[EvaluationResult]
     mean_score: float
     accuracy: float
@@ -63,7 +69,9 @@ def summarize_batch(results: List[EvaluationResult]) -> BatchEvaluationSummary:
     count = len(results)
     mean_score = total_score / count if count else 0.0
     accuracy = sum(1 for r in results if r.is_correct) / count if count else 0.0
-    return BatchEvaluationSummary(results=results, mean_score=mean_score, accuracy=accuracy)
+    return BatchEvaluationSummary(
+        results=results, mean_score=mean_score, accuracy=accuracy
+    )
 
 
 def evaluate_batch(
@@ -107,4 +115,4 @@ def evaluate_batch_with_summary(
         BatchEvaluationSummary: Aggregated summary containing mean score and accuracy.
     """
     results = evaluate_batch(evaluator, system_outputs, correct_answers, **kwargs)
-    return summarize_batch(results) 
+    return summarize_batch(results)

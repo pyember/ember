@@ -1,127 +1,116 @@
-from typing import Any, Dict, List, Optional, Type, TypeVar
 from collections import Counter
+from typing import Any, Callable, Dict, List, Optional, Type
+
 from pydantic import BaseModel, Field
 
-from ember.core.registry.operator.core.operator_base import (
-    Operator,
-    OperatorMetadata,
-    LMModule,
-)
+from ember.core.registry.operator.core.operator_base import Operator, OperatorMetadata
+from ember.core.registry.model.modules.lm import LMModule
 from ember.core.registry.prompt_signature.signatures import Signature
-from ember.xcs.scheduler import ExecutionPlan, ExecutionTask
-
-T_in = TypeVar("T_in", bound=BaseModel)
-T_out = TypeVar("T_out")
+from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.engine.plan_builder import PlanBuilder
 
 
+##############################################################################
+# Operator Registry and Registration Decorator
+##############################################################################
 class OperatorRegistry:
-    """Global registry mapping operator codes to operator classes.
+    """Global registry for mapping operator codes to operator classes.
 
-    This registry provides mechanisms to register operator classes with unique codes
-    and to retrieve them during runtime.
-
-    Attributes:
-        _registry (Dict[str, Type[Operator[Any, Any]]]): Internal mapping from operator codes
-            to their corresponding classes.
+    This registry provides methods for registering, retrieving, and instantiating
+    operator classes using unique string identifiers.
     """
 
     def __init__(self) -> None:
-        """Initializes an empty OperatorRegistry."""
+        """Initializes an empty OperatorRegistry instance."""
         self._registry: Dict[str, Type[Operator[Any, Any]]] = {}
 
     def register(
         self, operator_code: str, operator_cls: Type[Operator[Any, Any]]
     ) -> None:
-        """Registers an operator class with a unique code.
+        """Registers an operator class with the specified operator code.
 
         Args:
-            operator_code (str): A unique string identifier for the operator.
+            operator_code (str): A unique identifier for the operator.
             operator_cls (Type[Operator[Any, Any]]): The operator class to register.
         """
         self._registry[operator_code] = operator_cls
 
     def get(self, operator_code: str) -> Optional[Type[Operator[Any, Any]]]:
-        """Retrieves an operator class by its unique code.
+        """Retrieves the operator class associated with the given operator code.
 
         Args:
             operator_code (str): The unique identifier for the operator.
 
         Returns:
-            Optional[Type[Operator[Any, Any]]]: The operator class if found; otherwise, None.
+            Optional[Type[Operator[Any, Any]]]: The corresponding operator class if found; otherwise, None.
         """
         return self._registry.get(operator_code)
 
     def create_operator(self, operator_code: str, **params: Any) -> Operator[Any, Any]:
-        """Creates and returns an instance of a registered operator using the provided parameters.
-
-        This factory method retrieves the operator class associated with the given operator code and
-        instantiates it by invoking its constructor with the provided keyword arguments.
+        """Instantiates an operator using its registered code and provided parameters.
 
         Args:
             operator_code (str): The unique identifier for the operator.
-            **params (Any): Arbitrary keyword arguments to be passed to the operator's constructor.
+            **params (Any): Additional keyword arguments for the operator's constructor.
 
         Returns:
-            Operator[Any, Any]: A new instance of the operator corresponding to the specified operator code.
+            Operator[Any, Any]: An instance of the specified operator.
 
         Raises:
-            ValueError: If no operator is registered under the provided operator code.
+            ValueError: If no operator is registered with the provided code.
         """
         operator_cls: Optional[Type[Operator[Any, Any]]] = self.get(operator_code)
         if operator_cls is None:
             raise ValueError(f"No operator registered under code '{operator_code}'.")
-        operator_instance: Operator[Any, Any] = operator_cls(**params)
-        return operator_instance
+        return operator_cls(**params)
 
 
-####################################################
-# Global Registry Instance and Decorator
-####################################################
-
-OperatorRegistryGlobal: OperatorRegistry = OperatorRegistry()
+OPERATOR_REGISTRY_GLOBAL: OperatorRegistry = OperatorRegistry()
 
 
-def register_operator(registry: OperatorRegistry, code: Optional[str] = None):
-    """Decorator to automatically register an operator with the provided registry.
+def register_operator(
+    registry: OperatorRegistry, code: Optional[str] = None
+) -> Callable[[Type[Operator[Any, Any]]], Type[Operator[Any, Any]]]:
+    """Decorator factory for registering an operator class in a given registry.
 
-    If no explicit code is given, the decorator uses the operator code specified in the class metadata.
+    If an explicit code is provided, it is used for registration;
+    otherwise, the operator class's metadata.code attribute is utilized.
 
     Args:
-        registry (OperatorRegistry): The operator registry instance.
-        code (Optional[str]): An explicit operator code override (if provided).
+        registry (OperatorRegistry): The registry instance in which to register the operator.
+        code (Optional[str]): Optional override code for registration.
 
     Returns:
-        Callable[[Type[Operator[Any, Any]]], Type[Operator[Any, Any]]]: The decorator function.
+        Callable[[Type[Operator[Any, Any]]], Type[Operator[Any, Any]]]:
+            A decorator that registers the operator class.
     """
 
     def decorator(cls: Type[Operator[Any, Any]]) -> Type[Operator[Any, Any]]:
-        operator_code: str = code if code is not None else cls.metadata.code
-        registry.register(operator_code, cls)
+        registration_code: str = code if code is not None else cls.metadata.code
+        registry.register(registration_code, cls)
         return cls
 
     return decorator
 
 
-####################################################
+##############################################################################
 # 1) EnsembleOperator
-####################################################
-
-
+##############################################################################
 class EnsembleOperatorInputs(BaseModel):
-    """Input data model for EnsembleOperator.
+    """Input model for EnsembleOperator.
 
     Attributes:
-        query (str): The query string used to render the prompt.
+        query (str): The query string used for prompt rendering.
     """
-
     query: str
 
 
-@register_operator(registry=OperatorRegistryGlobal)
+@register_operator(registry=OPERATOR_REGISTRY_GLOBAL)
 class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
-    """Operator that executes parallel calls to multiple LMModules.
+    """Operator to execute parallel calls to multiple LMModules concurrently.
 
-    Each LMModule processes the same prompt concurrently and produces its respective response.
+    This operator renders a prompt from the input and invokes each attached LMModule
+    concurrently, aggregating their outputs.
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
@@ -130,95 +119,121 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, Dict[str, Any]]):
         signature=Signature(input_model=EnsembleOperatorInputs),
     )
 
-    def forward(self, inputs: EnsembleOperatorInputs) -> Dict[str, Any]:
-        """Performs a forward pass by concurrently invoking all attached LMModules.
+    def forward(self, *, inputs: EnsembleOperatorInputs) -> Dict[str, Any]:
+        """Executes synchronous LMModule calls using the rendered prompt.
 
         Args:
-            inputs (EnsembleOperatorInputs): The input containing the query string.
+            inputs (EnsembleOperatorInputs): Input data required for prompt rendering.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'responses' mapping to the list of responses.
+            Dict[str, Any]: A dictionary with the key 'responses' mapping to the list of LMModule outputs.
         """
-        prompt: str = self.metadata.signature.render_prompt(inputs=inputs.model_dump())
-        responses: List[str] = [lm(prompt=prompt) for lm in self.lm_modules]
+        rendered_prompt: str = self.metadata.signature.render_prompt(
+            inputs=inputs.model_dump()
+        )
+        responses: List[Any] = [lm(prompt=rendered_prompt) for lm in self.lm_modules]
         return {"responses": responses}
 
-    def to_plan(self, inputs: EnsembleOperatorInputs) -> Optional[ExecutionPlan]:
-        """Creates an execution plan to invoke each LMModule in parallel.
+    def to_plan(self, *, inputs: EnsembleOperatorInputs) -> Optional[XCSGraph]:
+        """Builds an execution plan for concurrent LMModule calls.
+
+        The plan creates individual tasks for each LMModule call and aggregates their responses.
 
         Args:
-            inputs (EnsembleOperatorInputs): The input containing the query.
+            inputs (EnsembleOperatorInputs): Input data for constructing the execution plan.
 
         Returns:
-            Optional[ExecutionPlan]: An execution plan if LMModules exist; otherwise, None.
+            Optional[XCSGraph]: An execution plan graph if LMModules are present; otherwise, None.
         """
         if not self.lm_modules:
             return None
-        prompt: str = self.metadata.signature.render_prompt(inputs=inputs.model_dump())
-        plan: ExecutionPlan = ExecutionPlan()
-        for index, lm in enumerate(self.lm_modules):
-            task_id: str = f"ensemble_task_{index}"
-            plan.add_task(
-                ExecutionTask(
-                    task_id=task_id,
-                    function=self._lm_call_wrapper,
-                    inputs={"prompt": prompt, "lm": lm},
-                    dependencies=[],
-                )
+
+        global_input: Dict[str, Any] = {
+            "prompt": self.metadata.signature.render_prompt(
+                inputs=inputs.model_dump()
             )
-        return plan
+        }
+        plan_builder: PlanBuilder[Dict[str, Any]] = PlanBuilder()
 
-    def _lm_call_wrapper(self, *, prompt: str, lm: LMModule) -> str:
-        """Wrapper to invoke an LMModule using the provided prompt.
+        def create_lm_call_task(lm_instance: LMModule) -> Callable[[Dict[str, Any], Dict[str, Any]], Any]:
+            """Creates a task function that calls the provided LMModule with the global prompt.
 
-        Args:
-            prompt (str): The prompt string to send to the LMModule.
-            lm (LMModule): The LMModule instance to be invoked.
+            Args:
+                lm_instance (LMModule): The LMModule instance to invoke.
 
-        Returns:
-            str: The response from the LMModule.
-        """
-        return lm(prompt=prompt)
+            Returns:
+                Callable[[Dict[str, Any], Dict[str, Any]], Any]: A task function for the LMModule call.
+            """
+
+            def lm_call_task(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> Any:
+                return lm_instance(prompt=g_in["prompt"])
+
+            return lm_call_task
+
+        for index, lm_instance in enumerate(self.lm_modules):
+            plan_builder.add_task(
+                name=f"lm_call_{index}",
+                function=create_lm_call_task(lm_instance),
+            )
+
+        def aggregate_responses(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> Dict[str, Any]:
+            """Aggregates outputs from LMModule tasks.
+
+            Args:
+                g_in (Dict[str, Any]): Global input data (unused in aggregation).
+                upstream (Dict[str, Any]): Mapping of task names to their outputs.
+
+            Returns:
+                Dict[str, Any]: A dictionary with aggregated responses under the key 'responses'.
+            """
+            return {"responses": list(upstream.values())}
+
+        plan_builder.add_task(
+            name="aggregate_responses",
+            function=aggregate_responses,
+            depends_on=plan_builder.get_task_names(),
+        )
+
+        return plan_builder.build()
 
     def combine_plan_results(
-        self, results: Dict[str, Any], inputs: Dict[str, Any]
+        self, *, results: Dict[str, Any], inputs: EnsembleOperatorInputs
     ) -> Dict[str, Any]:
-        """Combines results from an execution plan into a consolidated response.
+        """Combines results from the execution plan into a final aggregated response.
 
         Args:
-            results (Dict[str, Any]): A mapping from task IDs to their individual results.
-            inputs (Dict[str, Any]): The original input dictionary.
+            results (Dict[str, Any]): Mapping of task outputs.
+            inputs (EnsembleOperatorInputs): The original input instance.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'responses' mapping to the ordered list of responses.
+            Dict[str, Any]: A dictionary with the key 'responses' containing the aggregated outputs.
         """
-        sorted_task_ids: List[str] = sorted(results.keys())
-        sorted_responses: List[Any] = [results[task_id] for task_id in sorted_task_ids]
-        return {"responses": sorted_responses}
+        aggregated: Optional[Any] = results.get("aggregate_responses")
+        if aggregated is not None:
+            return aggregated
+        return {"responses": list(results.values())}
 
 
-####################################################
+##############################################################################
 # 2) MostCommonOperator
-####################################################
-
-
+##############################################################################
 class MostCommonOperatorInputs(BaseModel):
-    """Input data model for MostCommonOperator.
+    """Input model for MostCommonOperator.
 
     Attributes:
         query (str): The query string.
         responses (List[str]): A list of response strings.
     """
-
     query: str
     responses: List[str]
 
 
-@register_operator(registry=OperatorRegistryGlobal)
+@register_operator(registry=OPERATOR_REGISTRY_GLOBAL)
 class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
-    """Operator that selects the most common response from a collection of responses.
+    """Operator to determine the most common answer among provided responses.
 
-    This operator aggregates the responses and determines the most frequently occurring answer.
+    This operator offers both synchronous evaluation and an execution plan to concurrently
+    count and aggregate responses.
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
@@ -227,123 +242,126 @@ class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
         signature=Signature(input_model=MostCommonOperatorInputs),
     )
 
-    def forward(self, inputs: MostCommonOperatorInputs) -> Dict[str, Any]:
-        """Selects and returns the most common response.
+    def forward(self, *, inputs: MostCommonOperatorInputs) -> Dict[str, Any]:
+        """Determines the most frequent response synchronously.
 
         Args:
-            inputs (MostCommonOperatorInputs): The input containing the query and responses.
+            inputs (MostCommonOperatorInputs): Input data containing the query and responses.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'final_answer' set to the most common response.
+            Dict[str, Any]: A dictionary with 'final_answer' mapped to the most common response.
         """
         if not inputs.responses:
             return {"final_answer": None}
-        counts: Counter[str] = Counter(inputs.responses)
-        final_answer, _ = counts.most_common(1)[0]
-        return {"final_answer": final_answer}
+        response_counts: Counter = Counter(inputs.responses)
+        most_common_answer, _ = response_counts.most_common(1)[0]
+        return {"final_answer": most_common_answer}
 
-    def to_plan(self, inputs: MostCommonOperatorInputs) -> Optional[ExecutionPlan]:
-        """Generates an execution plan to concurrently aggregate response frequencies.
+    def to_plan(self, *, inputs: MostCommonOperatorInputs) -> Optional[XCSGraph]:
+        """Constructs an execution plan to count response occurrences concurrently.
 
         Args:
-            inputs (MostCommonOperatorInputs): The input containing the query and responses.
+            inputs (MostCommonOperatorInputs): Input data containing the query and responses.
 
         Returns:
-            Optional[ExecutionPlan]: An execution plan if responses exist; otherwise, None.
+            Optional[XCSGraph]: An execution plan graph if responses are present; otherwise, None.
         """
         if not inputs.responses:
             return None
 
-        plan: ExecutionPlan = ExecutionPlan()
-        # Create counting tasks for each individual response.
-        for index, response in enumerate(inputs.responses):
-            task_id: str = f"count_task_{index}"
-            plan.add_task(
-                ExecutionTask(
-                    task_id=task_id,
-                    function=self._count_single_response,
-                    inputs={"response": response},
-                    dependencies=[],
-                )
-            )
-        # Create an aggregator task to determine the most common response.
-        aggregator_task_id: str = "aggregate_most_common"
-        plan.add_task(
-            ExecutionTask(
-                task_id=aggregator_task_id,
-                function=self._aggregate_counts,
-                inputs={},
-                dependencies=[f"count_task_{i}" for i in range(len(inputs.responses))],
-            )
+        global_input: Dict[str, Any] = {"responses": inputs.responses}
+        plan_builder: PlanBuilder[Dict[str, Any]] = PlanBuilder()
+
+        def create_count_task(response: str) -> Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, int]]:
+            """Creates a task function that counts an individual response.
+
+            Args:
+                response (str): The response string to count.
+
+            Returns:
+                Callable[[Dict[str, Any], Dict[str, Any]], Dict[str, int]]:
+                    A task function returning a count dictionary for the response.
+            """
+
+            def count_task(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> Dict[str, int]:
+                return {response: 1}
+
+            return count_task
+
+        for idx, response in enumerate(global_input["responses"]):
+            plan_builder.add_task(name=f"count_{idx}", function=create_count_task(response))
+
+        plan_builder.add_task(
+            name="aggregate_counts",
+            function=self._agg_counts_list,
+            depends_on=plan_builder.get_task_names(),
         )
-        return plan
 
-    def _count_single_response(self, *, response: str) -> Dict[str, int]:
-        """Counts the occurrence of a single response.
+        return plan_builder.build()
 
-        Args:
-            response (str): A response string.
-
-        Returns:
-            Dict[str, int]: A dictionary mapping the response to the count 1.
-        """
-        return {response: 1}
-
-    def _aggregate_counts(self, **kwargs: Any) -> Dict[str, Any]:
-        """Aggregates individual count dictionaries to determine the most common response.
+    def _agg_counts_list(self, *, upstream: Dict[str, Any]) -> Dict[str, Any]:
+        """Aggregates counts from multiple tasks to determine the most common response.
 
         Args:
-            **kwargs (Any): A collection of count dictionaries from individual tasks.
+            upstream (Dict[str, Any]): Mapping of task names to count outputs.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'final_answer' set to the most common response.
+            Dict[str, Any]: A dictionary with 'final_answer' mapped to the most common response,
+            or None if no counts were aggregated.
         """
-        aggregate_counter: Counter[str] = Counter()
-        for value in kwargs.values():
-            if isinstance(value, dict):
-                aggregate_counter.update(value)
-        if not aggregate_counter:
+        aggregated_counts: Counter = Counter()
+        for count_dict in upstream.values():
+            aggregated_counts.update(count_dict)
+        if not aggregated_counts:
             return {"final_answer": None}
-        final_answer, _ = aggregate_counter.most_common(1)[0]
-        return {"final_answer": final_answer}
+        most_common_answer, _ = aggregated_counts.most_common(1)[0]
+        return {"final_answer": most_common_answer}
 
     def combine_plan_results(
-        self, results: Dict[str, Any], inputs: Dict[str, Any]
+        self, *, results: Dict[str, Any], inputs: MostCommonOperatorInputs
     ) -> Dict[str, Any]:
-        """Combines results from the execution plan, extracting the aggregated final answer.
+        """Combines outputs from concurrent tasks to yield the most common answer.
 
         Args:
-            results (Dict[str, Any]): A mapping from task IDs to their outputs.
-            inputs (Dict[str, Any]): The original input dictionary.
+            results (Dict[str, Any]): A mapping of task outputs.
+            inputs (MostCommonOperatorInputs): The original input instance.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'final_answer' representing the most common answer.
+            Dict[str, Any]: A dictionary with 'final_answer' derived from aggregated counts.
         """
-        return results.get("aggregate_most_common", {"final_answer": None})
+        aggregated: Optional[Any] = results.get("aggregate_counts")
+        if aggregated is not None:
+            return aggregated
+
+        combined_counts: Counter = Counter()
+        for task_result in results.values():
+            if isinstance(task_result, dict):
+                combined_counts.update(task_result)
+        if not combined_counts:
+            return {"final_answer": None}
+        common_answer, _ = combined_counts.most_common(1)[0]
+        return {"final_answer": common_answer}
 
 
-####################################################
+##############################################################################
 # 3) GetAnswerOperator
-####################################################
-
-
+##############################################################################
 class GetAnswerOperatorInputs(BaseModel):
-    """Input data model for GetAnswerOperator.
+    """Input model for GetAnswerOperator.
 
     Attributes:
         query (str): The query string.
-        responses (List[str]): A list of response strings to process.
+        responses (List[str]): A list of response strings.
     """
-
     query: str
     responses: List[str]
 
 
-@register_operator(registry=OperatorRegistryGlobal)
+@register_operator(registry=OPERATOR_REGISTRY_GLOBAL)
 class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
-    """Operator that processes responses to generate a final answer.
+    """Operator to process responses and generate a final answer using an LMModule.
 
-    Typically, only the first LMModule is used for generating the answer.
+    Typically, only the first LMModule is utilized to synthesize the final answer.
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
@@ -352,125 +370,153 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
         signature=Signature(input_model=GetAnswerOperatorInputs),
     )
 
-    def forward(self, inputs: GetAnswerOperatorInputs) -> Dict[str, Any]:
-        """Generates a final answer by processing the provided responses.
+    def forward(self, *, inputs: GetAnswerOperatorInputs) -> Dict[str, Any]:
+        """Generates a final answer using the first available LMModule.
 
         Args:
-            inputs (GetAnswerOperatorInputs): The input containing the query and responses.
+            inputs (GetAnswerOperatorInputs): Input data containing the query and responses.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'final_answer' produced by the LMModule.
+            Dict[str, Any]: A dictionary with 'final_answer' containing the processed answer.
 
         Raises:
-            ValueError: If no LMModule is attached.
+            ValueError: If no LMModule is attached to the operator.
         """
-        prompt_inputs: Dict[str, Any] = inputs.model_dump()
-        prompt: str = self.metadata.signature.render_prompt(inputs=prompt_inputs)
+        rendered_prompt: str = self.metadata.signature.render_prompt(
+            inputs=inputs.model_dump()
+        )
         if not self.lm_modules:
-            raise ValueError("No LM module is attached to GetAnswerOperator.")
-        single_char_answer: str = self.call_lm(
-            prompt=prompt, lm=self.lm_modules[0]
-        ).strip()
-        return {"final_answer": single_char_answer}
+            raise ValueError("No LM module attached to GetAnswerOperator.")
+        final_answer: str = self.call_lm(prompt=rendered_prompt, lm=self.lm_modules[0]).strip()
+        return {"final_answer": final_answer}
 
-    def to_plan(self, inputs: GetAnswerOperatorInputs) -> Optional[ExecutionPlan]:
-        """Creates an execution plan to concurrently process each response.
+    def to_plan(self, *, inputs: GetAnswerOperatorInputs) -> Optional[XCSGraph]:
+        """Constructs an execution plan for processing responses concurrently.
 
         Args:
-            inputs (GetAnswerOperatorInputs): The input containing the query and responses.
+            inputs (GetAnswerOperatorInputs): Input data containing the query and responses.
 
         Returns:
-            Optional[ExecutionPlan]: An execution plan if LMModules and responses exist; otherwise, None.
+            Optional[XCSGraph]: An execution plan graph if conditions are met; otherwise, None.
         """
         if not self.lm_modules or not inputs.responses:
             return None
 
-        plan: ExecutionPlan = ExecutionPlan()
-        for index, response in enumerate(inputs.responses):
-            task_id: str = f"get_answer_task_{index}"
-            plan.add_task(
-                ExecutionTask(
-                    task_id=task_id,
-                    function=self._process_single_response,
-                    inputs={"query": inputs.query, "response": response},
-                    dependencies=[],
-                )
-            )
-        return plan
+        global_input: Dict[str, Any] = {
+            "prompt": self.metadata.signature.render_prompt(inputs=inputs.model_dump())
+        }
+        plan_builder: PlanBuilder[Dict[str, Any]] = PlanBuilder()
 
-    def _process_single_response(self, *, query: str, response: str) -> str:
-        """Processes an individual response to produce an answer.
+        def create_process_task(response: str) -> Callable[[Dict[str, Any], Dict[str, Any]], str]:
+            """Creates a task function that processes an individual response.
+
+            Args:
+                response (str): A response string to process.
+
+            Returns:
+                Callable[[Dict[str, Any], Dict[str, Any]], str]:
+                    A task function that processes the response and returns the processed output.
+            """
+
+            def process_task(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> str:
+                return self._process_single_response(prompt=g_in["prompt"], response=response)
+
+            return process_task
+
+        for i, response in enumerate(inputs.responses):
+            plan_builder.add_task(name=f"process_{i}", function=create_process_task(response))
+
+        def select_first_nonempty(
+            *, g_in: Dict[str, Any], upstream: Dict[str, Any]
+        ) -> Dict[str, str]:
+            """Selects and returns the first non-empty processed response.
+
+            Args:
+                g_in (Dict[str, Any]): Global input data (unused).
+                upstream (Dict[str, Any]): Mapping of task outputs.
+
+            Returns:
+                Dict[str, str]: A dictionary with 'final_answer' mapped to the first non-empty output,
+                or an empty string if none are found.
+            """
+            for output in upstream.values():
+                if output:
+                    return {"final_answer": output}
+            return {"final_answer": ""}
+
+        plan_builder.add_task(
+            name="select_first",
+            function=select_first_nonempty,
+            depends_on=plan_builder.get_task_names(),
+        )
+
+        return plan_builder.build()
+
+    def _process_single_response(self, *, prompt: str, response: str) -> str:
+        """Processes a single response by stripping excess whitespace.
 
         Args:
-            query (str): The query string.
-            response (str): A single response string.
+            prompt (str): The prompt that was used.
+            response (str): The response string to process.
 
         Returns:
-            str: The answer produced by the LMModule, with extraneous whitespace removed.
+            str: The processed response.
         """
-        prompt_inputs: Dict[str, Any] = {"query": query, "response": response}
-        prompt: str = self.metadata.signature.render_prompt(inputs=prompt_inputs)
-        answer: str = self.call_lm(prompt=prompt, lm=self.lm_modules[0]).strip()
-        return answer
+        return response.strip()
 
     def combine_plan_results(
-        self, results: Dict[str, Any], inputs: Dict[str, Any]
+        self, *, results: Dict[str, Any], inputs: GetAnswerOperatorInputs
     ) -> Dict[str, Any]:
-        """Combines individual task results by selecting the first non-empty answer.
+        """Combines outputs from the execution plan to yield the final answer.
 
         Args:
-            results (Dict[str, Any]): A mapping from task IDs to their respective responses.
-            inputs (Dict[str, Any]): The original input dictionary.
+            results (Dict[str, Any]): Mapping of task outputs.
+            inputs (GetAnswerOperatorInputs): The original input instance.
 
         Returns:
-            Dict[str, Any]: A dictionary with the key 'final_answer' set to the first non-empty answer,
-            or an empty string if none are found.
+            Dict[str, Any]: A dictionary with 'final_answer' selected from the first non-empty response.
         """
-        for task_id in sorted(results.keys()):
-            answer: str = results[task_id]
-            if answer:
-                return {"final_answer": answer}
+        selected: Optional[Any] = results.get("select_first")
+        if selected is not None:
+            return selected
+
+        for result in results.values():
+            if isinstance(result, dict) and result.get("final_answer"):
+                return result
         return {"final_answer": ""}
 
 
-####################################################
+##############################################################################
 # 4) JudgeSynthesisOperator
-####################################################
-
-
+##############################################################################
 class JudgeSynthesisInputs(BaseModel):
-    """Input data model for JudgeSynthesisOperator.
+    """Input model for JudgeSynthesisOperator.
 
     Attributes:
         query (str): The query string.
-        responses (List[str]): Aggregated list of all ensemble responses.
+        responses (List[str]): Aggregated ensemble responses.
     """
-
     query: str
-    responses: List[str] = Field(
-        ..., description="Aggregated list of all ensemble responses."
-    )
+    responses: List[str] = Field(..., description="Aggregated ensemble responses.")
 
 
 class JudgeSynthesisOutputs(BaseModel):
-    """Output data model for JudgeSynthesisOperator.
+    """Output model for JudgeSynthesisOperator.
 
     Attributes:
         final_answer (str): The synthesized final answer.
     """
-
     final_answer: str
 
 
 class JudgeSynthesisSignature(Signature):
-    """Signature for JudgeSynthesisOperator.
+    """Signature for JudgeSynthesisOperator, defining the synthesis prompt template.
 
     Attributes:
-        prompt_template (str): Template for constructing the LM prompt.
-        structured_output (Optional[Type[BaseModel]]): The output model.
-        input_model (Type[JudgeSynthesisInputs]): The input data model.
+        prompt_template (str): Template for rendering the synthesis prompt.
+        structured_output (Optional[Type[BaseModel]]): Optional output model.
+        input_model (Type[BaseModel]): The input model type.
     """
-
     prompt_template: str = (
         "We have multiple advisors who proposed different answers:\n"
         "{responses}\n"
@@ -485,37 +531,39 @@ class JudgeSynthesisSignature(Signature):
     input_model: Type[JudgeSynthesisInputs] = JudgeSynthesisInputs
 
 
-@register_operator(registry=OperatorRegistryGlobal)
+@register_operator(registry=OPERATOR_REGISTRY_GLOBAL)
 class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
-    """Operator that synthesizes a final answer with reasoning from multiple responses.
+    """Operator to synthesize a final answer with reasoning from multiple responses.
 
-    This operator leverages LMModules to produce a consolidated answer based on aggregated responses.
+    This operator processes multiple responses via LMModule calls and aggregates them to determine
+    the final answer.
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
         code="JUDGE_SYNTHESIS",
-        description="Synthesizes a final answer with reasoning from multiple responses.",
+        description="Synthesizes a final answer with reasoning from multiple responses",
         signature=JudgeSynthesisSignature(),
     )
 
-    def forward(self, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
-        """Synthesizes a final answer from multiple responses using an LMModule.
+    def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
+        """Synthesizes a final answer by combining multiple ensemble responses.
 
         Args:
-            inputs (JudgeSynthesisInputs): The input containing the query and aggregated responses.
+            inputs (JudgeSynthesisInputs): Input containing the query and ensemble responses.
 
         Returns:
-            Dict[str, Any]: A dictionary with keys 'final_answer' and 'reasoning' derived from the LMModule output.
+            Dict[str, Any]: A dictionary with keys 'final_answer' and 'reasoning'.
 
         Raises:
-            ValueError: If no LMModules are attached.
+            ValueError: If no LMModule is attached to the operator.
         """
         if not self.lm_modules:
             raise ValueError("No LM modules attached to JudgeSynthesisOperator.")
-        lm: LMModule = self.lm_modules[0]
-        prompt: str = self.metadata.signature.render_prompt(inputs=inputs.model_dump())
-        raw_output: str = self.call_lm(prompt=prompt, lm=lm).strip()
-
+        lm_module: LMModule = self.lm_modules[0]
+        rendered_prompt: str = self.metadata.signature.render_prompt(
+            inputs=inputs.model_dump()
+        )
+        raw_output: str = self.call_lm(prompt=rendered_prompt, lm=lm_module).strip()
         final_answer: str = "Unknown"
         reasoning_lines: List[str] = []
         for line in raw_output.split("\n"):
@@ -526,134 +574,92 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
         reasoning: str = "\n".join(reasoning_lines)
         return {"final_answer": final_answer, "reasoning": reasoning}
 
-    def to_plan(self, inputs: JudgeSynthesisInputs) -> Optional[ExecutionPlan]:
-        """Creates an execution plan to synthesize a final answer from multiple responses.
+    def to_plan(self, *, inputs: JudgeSynthesisInputs) -> Optional[XCSGraph]:
+        """Builds an execution plan to judge responses and synthesize a final answer.
+
+        The plan creates individual judgement tasks for each response and aggregates them in a synthesis task.
 
         Args:
-            inputs (JudgeSynthesisInputs): The input containing the query and responses.
+            inputs (JudgeSynthesisInputs): Input containing the query and ensemble responses.
 
         Returns:
-            Optional[ExecutionPlan]: An execution plan if LMModules and responses exist; otherwise, None.
+            Optional[XCSGraph]: An execution plan graph if LMModules and responses are available; otherwise, None.
         """
         if not self.lm_modules or not inputs.responses:
             return None
 
-        plan: ExecutionPlan = ExecutionPlan()
-        # Create tasks for processing each individual response.
-        for index, response in enumerate(inputs.responses):
-            task_id: str = f"judge_single_{index}"
-            plan.add_task(
-                ExecutionTask(
-                    task_id=task_id,
-                    function=self._judge_single_response,
-                    inputs={"query": inputs.query, "response": response},
-                    dependencies=[],
-                )
-            )
-        # Aggregator task to synthesize the final answer.
-        plan.add_task(
-            ExecutionTask(
-                task_id="judge_synthesis_agg",
-                function=self._synthesis_responses,
-                inputs={},
-                dependencies=[
-                    f"judge_single_{i}" for i in range(len(inputs.responses))
-                ],
-            )
+        global_input: Dict[str, Any] = {"query": inputs.query, "responses": inputs.responses}
+        plan_builder: PlanBuilder[Dict[str, Any]] = PlanBuilder()
+
+        def create_judge_task(response: str) -> Callable[[Dict[str, Any], Dict[str, Any]], Any]:
+            """Creates a task function to judge an individual ensemble response.
+
+            Args:
+                response (str): A single ensemble response.
+
+            Returns:
+                Callable[[Dict[str, Any], Dict[str, Any]], Any]:
+                    A task function that returns the judgement for the provided response.
+            """
+
+            def judge_task(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> Any:
+                return self._judge_single_response(query=g_in["query"], response=response)
+
+            return judge_task
+
+        for index, response in enumerate(global_input["responses"]):
+            plan_builder.add_task(name=f"judge_{index}", function=create_judge_task(response))
+
+        def synthesize_task(*, g_in: Dict[str, Any], upstream: Dict[str, Any]) -> Any:
+            """Aggregates judgement outputs to synthesize the final answer."""
+            return self._synthesis_responses(upstream=upstream)
+
+        plan_builder.add_task(
+            name="synthesize",
+            function=synthesize_task,
+            depends_on=plan_builder.get_task_names(),
         )
-        return plan
 
-    def _judge_single_response(self, *, query: str, response: str) -> Dict[str, Any]:
-        """Evaluates a single response to produce a partial judgment.
-
-        Args:
-            query (str): The query string.
-            response (str): A single response string to evaluate.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the original response and its partial judgment.
-        """
-        prompt_inputs: Dict[str, Any] = {"query": query, "responses": [response]}
-        prompt: str = self.metadata.signature.render_prompt(inputs=prompt_inputs)
-        partial_output: str = self.call_lm(prompt=prompt, lm=self.lm_modules[0]).strip()
-        return {"response": response, "partial_judgment": partial_output}
-
-    def _synthesis_responses(self, **kwargs: Any) -> Dict[str, Any]:
-        """Synthesizes the final answer and reasoning from partial judgments.
-
-        Args:
-            **kwargs (Any): Task results containing the partial judgments.
-
-        Returns:
-            Dict[str, Any]: A dictionary with keys 'final_answer' and 'reasoning' synthesized from the judgments.
-        """
-        partial_data: List[Any] = list(kwargs.values())
-        if not partial_data:
-            return {"final_answer": "No responses", "reasoning": ""}
-        combined_judgments: str = "\n".join(
-            f"{entry['response']}: {entry['partial_judgment']}"
-            for entry in partial_data
-            if isinstance(entry, dict)
-        )
-        final_answer: str = "Synthesized answer from partial_judgments"
-        return {"final_answer": final_answer, "reasoning": combined_judgments}
+        return plan_builder.build()
 
     def combine_plan_results(
-        self, results: Dict[str, Any], inputs: Dict[str, Any]
+        self, *, results: Dict[str, Any], inputs: JudgeSynthesisInputs
     ) -> Dict[str, Any]:
-        """Combines results from the execution plan by extracting the aggregator task's output.
+        """Aggregates outputs from judgement tasks to yield the final synthesized answer.
 
         Args:
-            results (Dict[str, Any]): A mapping from task IDs to their outputs.
-            inputs (Dict[str, Any]): The original input data.
+            results (Dict[str, Any]): Mapping of task outputs.
+            inputs (JudgeSynthesisInputs): The original input instance.
 
         Returns:
-            Dict[str, Any]: A dictionary with the synthesized 'final_answer' and 'reasoning'.
+            Dict[str, Any]: A dictionary with 'final_answer' derived from the aggregated synthesis task output.
         """
-        return results.get("judge_synthesis_agg", {"final_answer": "Unknown"})
+        aggregated: Optional[Any] = results.get("synthesize")
+        if aggregated is not None:
+            return aggregated
+        return {"final_answer": "Unknown"}
 
 
-####################################################
+##############################################################################
 # 5) VerifierOperator
-####################################################
-
-
+##############################################################################
 class VerifierOperatorInputs(BaseModel):
-    """Input data model for VerifierOperator.
+    """Input model for VerifierOperator.
 
     Attributes:
         query (str): The query string.
         candidate_answer (str): The candidate answer to verify.
     """
-
     query: str
     candidate_answer: str
 
 
-@register_operator(registry=OperatorRegistryGlobal)
-class VerifierOperatorOutputs(BaseModel):
-    """Output data model for VerifierOperator.
-
-    Attributes:
-        verdict (str): The verification verdict.
-        explanation (str): Explanation for the verdict.
-        revised_answer (Optional[str]): An optional revised answer, if applicable.
-    """
-
-    verdict: str
-    explanation: str
-    revised_answer: Optional[str] = None
-
-
 class VerifierSignature(Signature):
-    """Signature for VerifierOperator.
+    """Signature for VerifierOperator that defines a verification prompt.
 
     Attributes:
-        prompt_template (str): The template for the verification prompt.
-        structured_output (Optional[Type[BaseModel]]): The output model for verification results.
-        input_model (Type[VerifierOperatorInputs]): The input model for verification.
+        prompt_template (str): Template for constructing the verification prompt.
     """
-
     prompt_template: str = (
         "You are a verifier of correctness.\n"
         "Question: {query}\n"
@@ -663,67 +669,61 @@ class VerifierSignature(Signature):
         "Explanation: <Your reasoning>\n"
         "Revised Answer (optional): <If you want to provide a corrected version>\n"
     )
-    structured_output: Optional[Type[BaseModel]] = VerifierOperatorOutputs
-    input_model: Type[VerifierOperatorInputs] = VerifierOperatorInputs
 
 
-@register_operator(registry=OperatorRegistryGlobal)
+@register_operator(registry=OPERATOR_REGISTRY_GLOBAL)
 class VerifierOperator(Operator[VerifierOperatorInputs, Dict[str, Any]]):
-    """Operator that verifies a candidate answer and optionally provides a revised answer.
+    """Operator to verify a candidate answer synchronously and optionally suggest a revision.
 
-    Analyzes the candidate answer using an LMModule to produce a verdict, explanation, and possibly a revised answer.
+    This operator operates synchronously without constructing an execution plan.
     """
 
     metadata: OperatorMetadata = OperatorMetadata(
         code="VERIFIER",
-        description="Verifies the correctness of a final answer and may revise it.",
+        description="Verifies the correctness of a final answer and may revise it",
         signature=VerifierSignature(),
     )
 
-    def forward(self, inputs: VerifierOperatorInputs) -> Dict[str, Any]:
-        """Verifies the candidate answer and optionally generates a revised answer.
+    def forward(self, *, inputs: VerifierOperatorInputs) -> Dict[str, Any]:
+        """Verifies a candidate answer synchronously.
 
         Args:
-            inputs (VerifierOperatorInputs): The input containing the query and candidate answer.
+            inputs (VerifierOperatorInputs): Input data containing the query and candidate answer.
 
         Returns:
-            Dict[str, Any]: A dictionary with keys 'verdict', 'explanation', and 'revised_answer' (if available).
+            Dict[str, Any]: A dictionary with keys 'verdict', 'explanation', and 'revised_answer'.
 
         Raises:
-            ValueError: If no LMModules are attached.
+            ValueError: If no LMModule is attached to the operator.
         """
         if not self.lm_modules:
             raise ValueError("No LM modules attached to VerifierOperator.")
-        lm: LMModule = self.lm_modules[0]
-        prompt: str = self.metadata.signature.render_prompt(inputs=inputs.model_dump())
-        raw_output: str = self.call_lm(prompt=prompt, lm=lm).strip()
-
-        verdict: str = "Unknown"
-        explanation: str = ""
-        revised_answer: Optional[str] = None
+        lm_module: LMModule = self.lm_modules[0]
+        rendered_prompt: str = self.metadata.signature.render_prompt(
+            inputs=inputs.model_dump()
+        )
+        raw_output: str = self.call_lm(prompt=rendered_prompt, lm=lm_module).strip()
+        verification: Dict[str, Any] = {
+            "verdict": "Unknown",
+            "explanation": "",
+            "revised_answer": None,
+        }
         for line in raw_output.split("\n"):
             if line.startswith("Verdict:"):
-                verdict = line.replace("Verdict:", "").strip()
+                verification["verdict"] = line.replace("Verdict:", "").strip()
             elif line.startswith("Explanation:"):
-                explanation = line.replace("Explanation:", "").strip()
+                verification["explanation"] = line.replace("Explanation:", "").strip()
             elif line.startswith("Revised Answer:"):
-                revised_answer = line.replace("Revised Answer:", "").strip()
-        return {
-            "verdict": verdict,
-            "explanation": explanation,
-            "revised_answer": revised_answer,
-        }
+                verification["revised_answer"] = line.replace("Revised Answer:", "").strip()
+        return verification
 
-    def to_plan(self, inputs: VerifierOperatorInputs) -> Optional[ExecutionPlan]:
-        """Generates an execution plan for verifying the candidate answer.
-
-        Note:
-            This operator does not utilize an execution plan and always returns None.
+    def to_plan(self, *, inputs: VerifierOperatorInputs) -> Optional[XCSGraph]:
+        """Since VerifierOperator runs synchronously, no execution plan is constructed.
 
         Args:
-            inputs (VerifierOperatorInputs): The input containing the query and candidate answer.
+            inputs (VerifierOperatorInputs): Input data containing the query and candidate answer.
 
         Returns:
-            Optional[ExecutionPlan]: Always returns None.
+            None.
         """
         return None

@@ -7,12 +7,14 @@ from typing import Any, Optional, TypeVar, Generic
 T_out = TypeVar("T_out")
 T_truth = TypeVar("T_truth")
 
+
 class IOutputExtractor(Generic[T_out, T_truth]):
     """
     Interface for extracting or converting raw system output into a refined form.
-    
+
     Implementers should provide an `extract` method.
     """
+
     def extract(self, system_output: T_out, **kwargs: Any) -> T_truth:
         raise NotImplementedError
 
@@ -23,6 +25,7 @@ class RegexExtractor(IOutputExtractor[str, str]):
 
     Returns the first captured group, or an empty string if no match is found.
     """
+
     def __init__(self, pattern: str) -> None:
         self.compiled_pattern: re.Pattern = re.compile(pattern)
 
@@ -39,4 +42,4 @@ class RegexExtractor(IOutputExtractor[str, str]):
         match: Optional[re.Match] = self.compiled_pattern.search(system_output)
         if match is None:
             return ""
-        return match.group(1) 
+        return match.group(1)

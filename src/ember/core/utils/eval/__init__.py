@@ -12,6 +12,11 @@ from .evaluators import (
     ComposedEvaluator,
     PartialRegexEvaluator,
 )
-from .pipeline import PipelineEvaluator, BatchEvaluationSummary, evaluate_batch, evaluate_batch_with_summary
+from .pipeline import (
+    PipelineEvaluator,
+    BatchEvaluationSummary,
+    evaluate_batch,
+    evaluate_batch_with_summary,
+)
 from .registry import EvaluatorRegistry
 from .stateful_evaluators import AggregatorEvaluator

@@ -2,6 +2,7 @@ from typing import Any, List
 from .base_evaluator import IEvaluator, IStatefulEvaluator, EvaluationResult
 from .pipeline import summarize_batch, BatchEvaluationSummary
 
+
 class AggregatorEvaluator(IStatefulEvaluator[Any, Any]):
     """Evaluator that aggregates results from multiple samples.
 
@@ -13,6 +14,7 @@ class AggregatorEvaluator(IStatefulEvaluator[Any, Any]):
         compute: Aggregates stored results and returns a final EvaluationResult.
         evaluate: Convenience method to update and compute for a single sample.
     """
+
     def __init__(self, evaluator: IEvaluator[Any, Any]) -> None:
         self.evaluator = evaluator
         self.results: List[EvaluationResult] = []
@@ -39,10 +41,12 @@ class AggregatorEvaluator(IStatefulEvaluator[Any, Any]):
         return EvaluationResult(
             is_correct=aggregated_correct,
             score=summary.mean_score,
-            metadata={'accuracy': summary.accuracy, 'total_samples': len(self.results)}
+            metadata={"accuracy": summary.accuracy, "total_samples": len(self.results)},
         )
 
-    def evaluate(self, system_output: Any, correct_answer: Any, **kwargs: Any) -> EvaluationResult:
+    def evaluate(
+        self, system_output: Any, correct_answer: Any, **kwargs: Any
+    ) -> EvaluationResult:
         """Updates the evaluator with a new sample and computes the aggregated result.
 
         Args:
@@ -54,4 +58,4 @@ class AggregatorEvaluator(IStatefulEvaluator[Any, Any]):
             EvaluationResult: The updated aggregated evaluation result.
         """
         self.update(system_output, correct_answer, **kwargs)
-        return self.compute() 
+        return self.compute()
