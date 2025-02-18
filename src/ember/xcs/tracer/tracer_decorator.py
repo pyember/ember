@@ -39,22 +39,26 @@ T = TypeVar("T", bound=Operator)
 # IR Graph and Node Definitions
 # ------------------------------------------------------------------------------
 
+
 @dataclass
 class IRNode:
     """
     Represents a node in the intermediate representation (IR) graph.
     For inputs, operator can be None.
     """
+
     node_id: str
     operator: Optional[Operator]
     inputs: List[str] = field(default_factory=list)
     attrs: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class IRGraph:
     """
     Represents an IR graph constructed from tracing an operator.
     """
+
     nodes: Dict[str, IRNode] = field(default_factory=dict)
     input_mapping: Dict[str, str] = field(default_factory=dict)
     output_mapping: Dict[str, str] = field(default_factory=dict)
@@ -79,6 +83,7 @@ class IRGraph:
 # ------------------------------------------------------------------------------
 # Tracer Context using PyTree Flattening
 # ------------------------------------------------------------------------------
+
 
 class TracerContext(ContextDecorator):
     """
@@ -110,7 +115,12 @@ class TracerContext(ContextDecorator):
             self._input_tracers[key] = node_id
         return self
 
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc_value: Optional[BaseException], traceback: Optional[Any]) -> Optional[bool]:
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_value: Optional[BaseException],
+        traceback: Optional[Any],
+    ) -> Optional[bool]:
         self._clear_current()
         return None
 
@@ -155,6 +165,7 @@ class TracerContext(ContextDecorator):
 # JIT Decorator for Operator Tracing/Compilation
 # ------------------------------------------------------------------------------
 
+
 def jit(
     *,
     sample_input: Optional[Dict[str, Any]] = None,
@@ -171,9 +182,12 @@ def jit(
         force_trace_forward: If True, trace on every call rather than caching.
         cache_key_fn: A function that computes a string key from inputs for plan caching.
     """
+
     def decorator(cls: Type[T]) -> Type[T]:
         if not issubclass(cls, Operator):
-            raise TypeError("@jit decorator can only be applied to an Operator subclass.")
+            raise TypeError(
+                "@jit decorator can only be applied to an Operator subclass."
+            )
 
         original_init = cls.__init__
         original_call = cls.__call__
@@ -215,7 +229,9 @@ def jit(
 
             # If forced or not yet traced for this key, do a trace
             if self._force_trace_forward or cache_key not in self._jit_traced:
-                self._trace_and_compile(trace_input=validated_inputs, cache_key=cache_key)
+                self._trace_and_compile(
+                    trace_input=validated_inputs, cache_key=cache_key
+                )
                 self._jit_traced[cache_key] = True
 
             # Execute compiled plan and retrieve the final output from the "compiled_root" node.
@@ -226,7 +242,9 @@ def jit(
             )
             return result if "compiled_root" not in result else result["compiled_root"]
 
-        def _trace_and_compile(self: T, *, trace_input: Dict[str, Any], cache_key: str) -> None:
+        def _trace_and_compile(
+            self: T, *, trace_input: Dict[str, Any], cache_key: str
+        ) -> None:
             """
             Performs the actual tracing by creating a TracerContext, capturing the IR,
             and compiling it to an XCSPlan. The resulting plan is stored in self._compiled_plans[cache_key].
@@ -246,7 +264,9 @@ def jit(
                 with TracerContext(top_operator=self, sample_input=sample) as tracer:
                     ir_graph = tracer.run_trace()
                 plan = compile_graph(
-                    graph=_convert_ir_graph_to_xcs_graph(ir_graph=ir_graph, operator=self)
+                    graph=_convert_ir_graph_to_xcs_graph(
+                        ir_graph=ir_graph, operator=self
+                    )
                 )
                 self._compiled_plans[cache_key] = plan
             finally:
@@ -266,7 +286,10 @@ def jit(
 # Conversion Helper: IRGraph to XCSGraph
 # ------------------------------------------------------------------------------
 
-def _convert_ir_graph_to_xcs_graph(*, ir_graph: IRGraph, operator: Operator) -> XCSGraph:
+
+def _convert_ir_graph_to_xcs_graph(
+    *, ir_graph: IRGraph, operator: Operator
+) -> XCSGraph:
     """
     Converts an IRGraph (obtained via tracing) into an XCSGraph that wraps the operator call.
     For simplicity, all input nodes feed into a single 'compiled_root' node that calls
@@ -279,7 +302,9 @@ def _convert_ir_graph_to_xcs_graph(*, ir_graph: IRGraph, operator: Operator) -> 
         return operator.forward(inputs=validated_inputs)
 
     # Add a root with the traced operator
-    root_id: str = xcs_graph.add_node(operator=compiled_operator, node_id="compiled_root")
+    root_id: str = xcs_graph.add_node(
+        operator=compiled_operator, node_id="compiled_root"
+    )
 
     # Make each IRGraph input node (which should have a "value") feed into the root.
     for node_id, node in ir_graph.nodes.items():

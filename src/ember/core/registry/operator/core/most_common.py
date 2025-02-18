@@ -13,11 +13,9 @@ class MostCommonOperatorInputs(BaseModel):
     """Input model for MostCommonOperator.
 
     Attributes:
-        query (str): The query string.
         responses (List[str]): A list of response strings.
     """
 
-    query: str
     responses: List[str]
 
 

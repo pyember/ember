@@ -117,16 +117,13 @@ class MostCommonInputs(BaseModel):
     """Typed input for the MostCommon operator.
 
     Attributes:
-        query (str): The initial query.
         responses (List[str]): List of candidate responses.
     """
 
-    query: str
     responses: List[str]
 
 
 class MostCommonSignature(Signature):
-    required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = MostCommonInputs
 
 
@@ -147,7 +144,7 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 
     def forward(self, *, inputs: MostCommonInputs) -> Dict[str, Any]:
         """Delegates execution to the underlying MostCommonOperator."""
-        return self.most_common_op.forward(inputs=inputs)
+        return self.most_common_op(inputs=inputs.model_dump())
 
 
 # ------------------------------------------------------------------------------
@@ -306,7 +303,6 @@ class VerifierInputs(BaseModel):
 
 
 class VerifierSignature(Signature):
-    required_inputs: List[str] = ["query", "candidate_answer"]
     input_model: Type[BaseModel] = VerifierInputs
 
 
@@ -345,7 +341,7 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
 
     def forward(self, *, inputs: VerifierInputs) -> Dict[str, Any]:
         """Delegates execution to the underlying VerifierOperator."""
-        return self.verifier_op.forward(inputs=inputs)
+        return self.verifier_op(inputs=inputs.model_dump())
 
 
 # ------------------------------------------------------------------------------
@@ -434,5 +430,5 @@ class Sequential(Operator[T_in, T_out]):
     def forward(self, *, inputs: T_in) -> T_out:
         """Executes the operators sequentially."""
         for op in self.operators:
-            inputs = op.forward(inputs=inputs)
+            inputs = op(inputs=inputs)
         return inputs

@@ -21,6 +21,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 # Immutable Execution Plan
 # ------------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class XCSPlanTask:
     """
@@ -31,6 +32,7 @@ class XCSPlanTask:
         operator (Callable[..., Any]): The callable operator.
         inbound_nodes (List[str]): List of node IDs that supply inputs.
     """
+
     node_id: str
     operator: Callable[..., Any]
     inbound_nodes: List[str] = field(default_factory=list)
@@ -40,9 +42,12 @@ class XCSPlan:
     """
     Immutable execution plan compiled from an XCSGraph.
     """
+
     def __init__(self, tasks: Dict[str, XCSPlanTask], original_graph: Any) -> None:
         self._tasks = tasks
-        self.original_graph = original_graph  # Store the original XCSGraph for later use.
+        self.original_graph = (
+            original_graph  # Store the original XCSGraph for later use.
+        )
 
     @property
     def tasks(self) -> Dict[str, XCSPlanTask]:
@@ -76,10 +81,12 @@ def compile_graph(*, graph: XCSGraph) -> XCSPlan:
 # Scheduler Interface and Implementation
 # ------------------------------------------------------------------------------
 
+
 class IScheduler(ABC):
     """
     Abstract scheduler interface for executing an XCSPlan.
     """
+
     @abstractmethod
     def run_plan(
         self,
@@ -98,6 +105,7 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     """
     Scheduler implementation using topological sorting and parallel dispatch.
     """
+
     def __init__(self, *, max_workers: Optional[int] = None) -> None:
         self._max_workers = max_workers
 
@@ -117,7 +125,9 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
                 reverse_dependencies.setdefault(parent, []).append(task_id)
 
         # Initialize tasks with zero dependencies.
-        available_tasks: List[str] = [tid for tid, count in dependency_count.items() if count == 0]
+        available_tasks: List[str] = [
+            tid for tid, count in dependency_count.items() if count == 0
+        ]
         results: Dict[str, Any] = {}
         pending_futures: List[Future[Any]] = []
         future_to_task: Dict[Future[Any], str] = {}
@@ -201,6 +211,7 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
 # Top-Level API
 # ------------------------------------------------------------------------------
 
+
 def execute_graph(
     *,
     graph: Any,  # can be an XCSGraph or an XCSPlan
@@ -223,12 +234,16 @@ def execute_graph(
     if scheduler is None:
         scheduler = TopologicalSchedulerWithParallelDispatch()
     if concurrency:
-        results = scheduler.run_plan(plan=plan, global_input=global_input, graph=orig_graph)
+        results = scheduler.run_plan(
+            plan=plan, global_input=global_input, graph=orig_graph
+        )
         return results
     else:
         results = {}
         for task in plan.tasks:
             node = task.node
-            input_data = task.compute_inputs(global_input=global_input, graph=orig_graph)
+            input_data = task.compute_inputs(
+                global_input=global_input, graph=orig_graph
+            )
             results[node] = node.operator(inputs=input_data)
         return results

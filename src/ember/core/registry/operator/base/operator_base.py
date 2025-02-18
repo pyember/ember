@@ -70,7 +70,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         if self.signature is None:
             raise ValueError("Operator signature must be defined.")
         return self.signature
-    
+
     # --------------------------------------------------------------------------
     # Callable Interface
     # --------------------------------------------------------------------------

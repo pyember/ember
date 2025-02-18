@@ -87,6 +87,7 @@ from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
 from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
 from src.ember.core.registry.prompt_signature.signatures import Signature
 
+
 def register_custom_model() -> None:
     """
     Registers the user-specified custom model with a local ModelRegistry instance.
@@ -197,10 +198,12 @@ class SimplePromptSignature(BaseModel):
 from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core import non
 
+
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
     """
     Single-step operator for 'simple' Q&A.
     """
+
     signature: SimplePromptSignature
     ensemble: non.Ensemble
 
@@ -223,6 +226,7 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
     """
     Operator that uses a big, multi-part 'Caravan' prompt to label flows 0 or 1.
     """
+
     signature: Signature = CaravanLabelingSignature
     ensemble: non.UniformEnsemble
     judge: non.JudgeSynthesis
@@ -230,15 +234,10 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
     def __init__(self, model_name: str):
         self.signature = CaravanLabelingSignature()
         self.ensemble = non.UniformEnsemble(
-            num_units=3, 
-            model_name=model_name, 
-            temperature=0.0, 
-            max_tokens=256
+            num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
         )
         self.judge = non.JudgeSynthesis(
-            model_name=model_name,
-            temperature=0.0,
-            max_tokens=256
+            model_name=model_name, temperature=0.0, max_tokens=256
         )
 
     def forward(self, inputs: CaravanLabelingInputs) -> Dict[str, Any]:
@@ -247,8 +246,7 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
         ensemble_output = self.ensemble(inputs=ensemble_inputs)
 
         judge_inputs = non.JudgeSynthesisInputs(
-            query=prompt,
-            responses=ensemble_output.get("responses", [])
+            query=prompt, responses=ensemble_output.get("responses", [])
         )
         judge_output = self.judge(inputs=judge_inputs)
         return {"final_answer": judge_output.get("final_answer", "").strip()}

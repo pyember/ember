@@ -26,21 +26,22 @@ logger: logging.Logger = logging.getLogger(__name__)
 class OperatorCallable(Protocol):
     """
     Protocol for an operator callable.
-    
+
     An operator must implement a __call__ method accepting a keyword-only
     argument 'inputs'.
     """
-    def __call__(self, *, inputs: Dict[str, Any]) -> Any:
-        ...
+
+    def __call__(self, *, inputs: Dict[str, Any]) -> Any: ...
 
 
 class TraceRecord(BaseModel):
     """
     Represents a trace record for a single operator invocation.
-    
+
     Stores the operator name, the node ID in the traced graph, the inputs and outputs,
     and a timestamp.
     """
+
     operator_name: str
     node_id: str
     inputs: Dict[str, Any]
@@ -51,7 +52,7 @@ class TraceRecord(BaseModel):
 class TracerContext(ContextDecorator):
     """
     Context manager to trace operator execution and build an XCSGraph.
-    
+
     This context patched the class-level __call__ methods of operator instances so that
     each operator call is recorded as a node in the graph and a corresponding TraceRecord
     is generated. Patching is done recursively for sub-operators.
@@ -133,7 +134,7 @@ class TracerContext(ContextDecorator):
                     operator_name=operator_name,
                     node_id=node_id,
                     inputs=inputs,
-                    outputs=result
+                    outputs=result,
                 )
             )
             return result
@@ -158,7 +159,7 @@ class TracerContext(ContextDecorator):
     def run_trace(self) -> IRGraph:
         """
         Executes the top operator with the sample input to build the trace.
-        
+
         Returns:
             IRGraph: The constructed execution graph.
         """
@@ -208,7 +209,7 @@ def convert_traced_graph_to_plan(*, tracer_graph: IRGraph) -> Any:
 def get_current_trace_context() -> Optional[TracerContext]:
     """
     Retrieve the current trace context if available.
-    
+
     This stub can later be extended (for example, using thread-local storage)
     to provide global access to the current trace context.
     """

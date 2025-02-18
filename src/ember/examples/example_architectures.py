@@ -14,6 +14,7 @@ class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
         ensemble (non.Ensemble): An ensemble operator with 2 units of "gpt-4o".
         refine (non.SelfRefinement): A self-refinement operator using "gpt-4o".
     """
+
     signature: Signature = Signature(input_model=None)
     ensemble: non.Ensemble
     refine: non.SelfRefinement
@@ -52,6 +53,7 @@ class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
         sub2 (SubNetwork): The second sub-network instance.
         judge (non.Judge): A judge operator using "gpt-4o".
     """
+
     signature: Signature = Signature(input_model=None)
     sub1: SubNetwork
     sub2: SubNetwork

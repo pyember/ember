@@ -3,13 +3,12 @@ from random import sample
 
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import (
-    Operator
-)
+from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core import non
 from src.ember.core.registry.operator.base._module import ember_field
 from src.ember.core.registry.model.modules.lm import LMModule
+
 
 def usage_example() -> None:
     """Demonstrates usage of MultiPrefixEnsembleOperator with distinct prefixes for each language model.
@@ -34,7 +33,7 @@ def usage_example() -> None:
         prefixes=example_prefixes,
         name="MultiPrefixEnsembleExample",
         num_units=3,
-        temperature=0.5
+        temperature=0.5,
     )
 
     # Create input data.
@@ -59,7 +58,7 @@ class MultiPrefixOperatorInputs(BaseModel):
 
 class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, Any]]):
     """Operator that applies different prefixes using UniformEnsemble."""
-    
+
     signature: Signature = Signature(
         required_inputs=["query"],
         input_model=MultiPrefixOperatorInputs,
@@ -84,7 +83,7 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, 
 
     def forward(self, inputs: MultiPrefixOperatorInputs) -> Dict[str, Any]:
         chosen_prefixes = sample(self.prefixes, len(self.lm_modules))
-        
+
         responses: List[str] = []
         for prefix, lm in zip(chosen_prefixes, self.lm_modules):
             prompt = f"{prefix}\n{inputs.query}"
