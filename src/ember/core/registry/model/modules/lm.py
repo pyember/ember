@@ -2,8 +2,8 @@ import logging
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
-from ember.core.registry.model.services.model_service import ModelService
-from ember.core.registry.model.services.usage_service import UsageService
+from src.ember.core.registry.model.services.model_service import ModelService
+from src.ember.core.registry.model.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -12,14 +12,14 @@ class LMModuleConfig(BaseModel):
     """Configuration settings for the Language Model module.
 
     Attributes:
-        model_id (str): Identifier for selecting the underlying model provider.
+        id (str): Identifier for selecting the underlying model provider.
         temperature (float): Sampling temperature for model generation.
         max_tokens (Optional[int]): Maximum tokens to generate in a single forward call.
         cot_prompt (Optional[str]): Chain-of-thought prompt appended to the user's prompt.
         persona (Optional[str]): Persona or role context prepended to the user query.
     """
 
-    model_id: str = Field(
+    id: str = Field(
         default="openai:gpt-4o",
         description="Identifier for the underlying model provider.",
     )
@@ -49,7 +49,7 @@ def get_default_model_service() -> ModelService:
     Instead of relying on a global registry, we explicitly call initialize_ember()
     so that the registry is built from the current configuration.
     """
-    from ember.core.registry.model.config.settings import initialize_ember
+    from src.ember.core.registry.model.config.settings import initialize_ember
 
     # Initialize the registry (with default flags; these can be adjusted as needed).
     registry = initialize_ember(auto_register=True, auto_discover=True)
@@ -61,6 +61,8 @@ def get_default_model_service() -> ModelService:
 
 class LMModule:
     """Language Model module that integrates with ModelService and optional usage tracking.
+
+    When the flag `simulate_api` is True, this module returns a dummy response rather than calling the real API.
 
     This module is designed to generate text responses based on a user prompt. It merges
     persona and chain-of-thought details into the prompt and delegates model invocation to
@@ -76,6 +78,7 @@ class LMModule:
         self,
         config: LMModuleConfig,
         model_service: Optional[ModelService] = None,
+        simulate_api: bool = False,
     ) -> None:
         """Initializes the LMModule.
 
@@ -83,11 +86,13 @@ class LMModule:
             config (LMModuleConfig): Configuration for model settings such as model_id and temperature.
             model_service (Optional[ModelService]): Service for model invocation. If None, a
                 default ModelService is created.
+            simulate_api (bool): Flag indicating whether to simulate API calls.
         """
         if model_service is None:
             model_service = get_default_model_service()
         self.config: LMModuleConfig = config
         self.model_service: ModelService = model_service
+        self.simulate_api: bool = simulate_api
         self._logger: logging.Logger = logging.getLogger(self.__class__.__name__)
 
     def __call__(self, prompt: str, **kwargs: Any) -> str:
@@ -105,7 +110,7 @@ class LMModule:
         return self.forward(prompt=prompt, **kwargs)
 
     def forward(self, prompt: str, **kwargs: Any) -> str:
-        """Generates text from a prompt by delegating the call to the ModelService.
+        """Generates text from a prompt by delegating to the ModelService.
 
         This method assembles a final prompt by merging persona information and a chain-of-thought
         prompt (if provided) with the user's prompt, then calls the ModelService to generate
@@ -117,10 +122,16 @@ class LMModule:
 
         Returns:
             str: The generated text response.
+            If the module is configured to simulate API calls and the flag simulate_api is True,
+            returns a dummy response immediately.
+
         """
+        if self.simulate_api:
+            self._logger.debug("Simulating API call for prompt: %s", prompt)
+            return f"SIMULATED_RESPONSE: {prompt}"
         final_prompt: str = self._assemble_full_prompt(user_prompt=prompt)
         response: Any = self.model_service.invoke_model(
-            model_id=self.config.model_id,
+            model_id=self.config.id,
             prompt=final_prompt,
             temperature=kwargs.get("temperature", self.config.temperature),
             max_tokens=kwargs.get("max_tokens", self.config.max_tokens),

@@ -1,47 +1,7 @@
-from ember.xcs.graph_ir.graph_executor import NoNGraphBuilder, NoNGraphData
-
-
-def multi_model_graph() -> NoNGraphData:
-    """Constructs a multi-model NoN graph with multiple model ensembles and a final judge.
-
-    Builds a NoNGraph structure that includes:
-        1. An ensemble of 3 "gpt-4o" models.
-        2. An ensemble of 3 "gpt-4-turbo" models.
-        3. An ensemble of 4 "gemini-1.5-pro" models.
-        4. A final judge using a single "gpt-4o" model.
-
-    Returns:
-        NoNGraphData: A configured multi-model graph structure encapsulating diverse model inputs.
-    """
-    graph_config: dict = {
-        "openai_ensemble": {
-            "op": "E",
-            "params": {"model_name": "gpt-4o", "count": 3},
-        },
-        "openai_turbo": {
-            "op": "E",
-            "params": {"model_name": "gpt-4-turbo", "count": 3},
-        },
-        "gemini_1_5": {
-            "op": "E",
-            "params": {"model_name": "gemini-1.5-pro", "count": 4},
-        },
-        "final_judge": {
-            "op": "JB",
-            "params": {"model_name": "gpt-4o", "count": 1},
-            "inputs": [
-                "openai_ensemble",
-                "openai_turbo",
-                "gemini_1_5",
-            ],
-        },
-    }
-    return NoNGraphBuilder().parse_graph(graph_config=graph_config)
-
-
 from typing import Dict, Any
-from ember.core.registry.operator.core.operator_base import Operator
-from ember.core import non
+from src.ember.core.registry.operator.base.operator_base import Operator
+from src.ember.core import non
+from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
 class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
@@ -54,6 +14,9 @@ class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
         ensemble (non.Ensemble): An ensemble operator with 2 units of "gpt-4o".
         refine (non.SelfRefinement): A self-refinement operator using "gpt-4o".
     """
+    signature: Signature = Signature(input_model=None)
+    ensemble: non.Ensemble
+    refine: non.SelfRefinement
 
     def __init__(self) -> None:
         """Initializes the SubNetwork with a specified ensemble and self-refinement components."""
@@ -89,6 +52,10 @@ class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
         sub2 (SubNetwork): The second sub-network instance.
         judge (non.Judge): A judge operator using "gpt-4o".
     """
+    signature: Signature = Signature(input_model=None)
+    sub1: SubNetwork
+    sub2: SubNetwork
+    judge: non.Judge
 
     def __init__(self) -> None:
         """Initializes the NestedNetwork with two SubNetwork instances and a final Judge operator."""
@@ -106,8 +73,8 @@ class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
         Returns:
             Dict[str, Any]: The final judged output after aggregating sub-network responses.
         """
-        s1_out: Dict[str, Any] = self.sub1.forward(inputs=inputs)
-        s2_out: Dict[str, Any] = self.sub2.forward(inputs=inputs)
+        s1_out: Dict[str, Any] = self.sub1(inputs=inputs)
+        s2_out: Dict[str, Any] = self.sub2(inputs=inputs)
         judge_input: Dict[str, Any] = {
             "query": inputs.get("query", ""),
             "responses": [

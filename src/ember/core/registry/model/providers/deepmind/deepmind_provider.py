@@ -7,16 +7,16 @@ from google.generativeai import GenerativeModel, types
 from pydantic import Field, field_validator
 from tenacity import retry, wait_exponential, stop_after_attempt
 
-from ember.core.registry.model.providers.base_provider import (
+from src.ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from ember.core.registry.model.schemas.chat_schemas import (
+from src.ember.core.registry.model.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
-from ember.core.registry.model.schemas.usage import UsageStats
-from ember.plugin_system import provider
+from src.ember.core.registry.model.schemas.usage import UsageStats
+from src.ember.plugin_system import provider
 
 logger: logging.Logger = logging.getLogger(__name__)
 

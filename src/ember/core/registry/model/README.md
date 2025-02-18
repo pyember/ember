@@ -257,14 +257,14 @@ If you don't need advanced discovery or usage tracking, here's a minimal workflo
 2. **Initialize the global registry** in your application start-up code:
 
 ```python
-from ember.core.registry.model.settings import initialize_global_registry
+from src.ember.core.registry.model.settings import initialize_global_registry
 
 initialize_global_registry()  # Reads and merges config, registers models
 ```
 
 3. **Use the ModelService or LMModule** to run inference:
 ```python
-from ember.core.registry.model.core.modules.lm_modules import LMModule, LMModuleConfig
+from src.ember.core.registry.model.core.modules.lm_modules import LMModule, LMModuleConfig
 
 # Minimal usage with an LMModule:
 config = LMModuleConfig(model_id="openai:gpt-4o", temperature=0.7)
@@ -273,7 +273,7 @@ response_text = lm("Hello world!")
 print("Got:", response_text)
 
 # Or via ModelService:
-from ember.core.registry.model.core.services.model_service import ModelService
+from src.ember.core.registry.model.core.services.model_service import ModelService
 service = ModelService(registry=GLOBAL_MODEL_REGISTRY, usage_service=None)
 resp = service.invoke_model(model_id="openai:gpt-4o", prompt="Hello world!")
 print("Got:", resp.data)

@@ -4,8 +4,7 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-from src.ember.core.app_context import EmberAppContext
-from ember.core.registry.model.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.registry.model_registry import ModelRegistry
 
 
 class EmberError(Exception):
@@ -200,9 +199,9 @@ def auto_register_known_models(
         None
     """
     local_logger: logging.Logger = config_manager.logger
-    from ember.core.registry.model.core.schemas.model_info import ModelInfo
-    from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
-    from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
+    from src.ember.core.registry.model.core.schemas.model_info import ModelInfo
+    from src.ember.core.registry.model.core.schemas.provider_info import ProviderInfo
+    from src.ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
 
     known_model_id: str = "openai:gpt-4o"
     if registry.get_model(model_id=known_model_id) is None:
@@ -229,7 +228,7 @@ def auto_register_known_models(
 
 
 def initialize_system(
-    app_context: Optional[EmberAppContext] = None,
+    app_context: Optional["EmberAppContext"] = None,
     registry: Optional[ModelRegistry] = None,
 ) -> None:
     """Initialize system configuration and model registry.
@@ -240,7 +239,7 @@ def initialize_system(
     is logged.
 
     Args:
-        app_context (Optional[EmberAppContext]): The application context containing configuration.
+        app_context (Optional["EmberAppContext"]): The application context containing configuration.
         registry (Optional[ModelRegistry]): The model registry for auto-registration of models.
 
     Returns:

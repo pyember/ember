@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 
-from ember.core.registry.model.core.schemas.usage import UsageStats
+from src.ember.core.registry.model.schemas.usage import UsageStats
 
 
 class ChatRequest(BaseModel):
@@ -37,5 +37,5 @@ class ChatResponse(BaseModel):
     """
 
     data: str
-    raw_output: Any
+    raw_output: Any = None
     usage: Optional[UsageStats] = None

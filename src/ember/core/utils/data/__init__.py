@@ -1,15 +1,21 @@
 from typing import List, Optional, Type, Union
 
-from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from ember.core.utils.data.initialization import initialize_dataset_registry
-from ember.core.utils.data.base.models import DatasetEntry, DatasetInfo
-from ember.core.utils.data.base.config import BaseDatasetConfig
-from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader, IDatasetLoader
-from ember.core.utils.data.base.validators import DatasetValidator, IDatasetValidator
-from ember.core.utils.data.base.samplers import DatasetSampler, IDatasetSampler
-from ember.core.utils.data.service import DatasetService
-from ember.core.utils.data.base.preppers import IDatasetPrepper
+from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from src.ember.core.utils.data.initialization import initialize_dataset_registry
+from src.ember.core.utils.data.base.models import DatasetEntry, DatasetInfo
+from src.ember.core.utils.data.base.config import BaseDatasetConfig
+from src.ember.core.utils.data.base.loaders import (
+    HuggingFaceDatasetLoader,
+    IDatasetLoader,
+)
+from src.ember.core.utils.data.base.validators import (
+    DatasetValidator,
+    IDatasetValidator,
+)
+from src.ember.core.utils.data.base.samplers import DatasetSampler, IDatasetSampler
+from src.ember.core.utils.data.service import DatasetService
+from src.ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 def load_dataset_entries(
@@ -28,7 +34,7 @@ def load_dataset_entries(
       5. Executes the complete dataset preparation pipeline via the DatasetService.
 
     Example:
-        from ember.core.utils.data import load_dataset_entries
+        from src.ember.core.utils.data import load_dataset_entries
         entries = load_dataset_entries(
             dataset_name="mmlu",
             config={"config_name": "abstract_algebra", "split": "dev"},

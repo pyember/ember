@@ -2,10 +2,12 @@ import threading
 import logging
 from typing import Dict, List, Optional
 
-from ember.core.registry.model import ModelFactory
-from ember.core.registry.model.schemas.model_info import ModelInfo
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
-from ember.core.registry.model.utils.model_registry_exceptions import ModelNotFoundError
+from src.ember.core.registry.model.registry.factory import ModelFactory
+from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
+from src.ember.core.registry.model.utils.model_registry_exceptions import (
+    ModelNotFoundError,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 

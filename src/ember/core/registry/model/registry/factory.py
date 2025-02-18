@@ -10,12 +10,12 @@ import logging
 import pkgutil
 from typing import Any, Dict, Optional, Type
 
-from ember.core.registry.model.utils.model_registry_exceptions import (
+from src.ember.core.registry.model.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
-from ember.core.registry.model.schemas.model_info import ModelInfo
-from ember.core.registry.model.registry.model_enum import parse_model_str
+from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
+from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.registry.model_enum import parse_model_str
 
 logger: logging.Logger = logging.getLogger(__name__)
 

@@ -6,18 +6,15 @@ try:
 except ImportError:
     ibm_models = None  # Gracefully handle the absence of the ibm_watsonx_ai package.
 
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
-from ember.core.registry.model.utils.model_registry_exceptions import (
+from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
+from src.ember.core.registry.model.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.schemas.chat_schemas import (
-    ChatRequest,
-    ChatResponse,
-)
-from ember.core.registry.model.schemas.usage import UsageStats
+from src.ember.core.registry.model.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.schemas.usage import UsageStats
 from tenacity import retry, wait_exponential, stop_after_attempt
-from ember.plugin_system import provider
+from src.ember.plugin_system import provider
 
 logger: logging.Logger = logging.getLogger(__name__)
 

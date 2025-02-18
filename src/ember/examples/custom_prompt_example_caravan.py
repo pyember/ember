@@ -19,9 +19,9 @@ import argparse
 import logging
 import os
 import sys
-from typing import Dict, Any, Optional, List, Type, Union
+from typing import Dict, Any
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 # ------------------------------------------------------------------------------------
 # Logging Setup
@@ -81,11 +81,11 @@ def check_env() -> None:
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
-from ember.core.registry.model.registry.model_registry import ModelRegistry
-from ember.core.registry.model.schemas.model_info import ModelInfo
-from ember.core.registry.model.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.schemas.cost import ModelCost, RateLimit
-
+from src.ember.core.registry.model.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.prompt_signature.signatures import Signature
 
 def register_custom_model() -> None:
     """
@@ -194,17 +194,17 @@ class SimplePromptSignature(BaseModel):
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
-from ember.core.registry.operator.core.operator_base import Operator
-from ember.core import non
-
+from src.ember.core.registry.operator.base.operator_base import Operator
+from src.ember.core import non
 
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
     """
     Single-step operator for 'simple' Q&A.
     """
+    signature: SimplePromptSignature
+    ensemble: non.Ensemble
 
     def __init__(self, model_name: str):
-        super().__init__()
         self.signature = SimplePromptSignature()
         self.ensemble = non.Ensemble(
             num_units=1, model_name=model_name, temperature=0.2, max_tokens=64
@@ -223,24 +223,34 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
     """
     Operator that uses a big, multi-part 'Caravan' prompt to label flows 0 or 1.
     """
+    signature: Signature = CaravanLabelingSignature
+    ensemble: non.UniformEnsemble
+    judge: non.JudgeSynthesis
 
     def __init__(self, model_name: str):
-        super().__init__()
         self.signature = CaravanLabelingSignature()
-        self.ensemble = non.Ensemble(
-            num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
+        self.ensemble = non.UniformEnsemble(
+            num_units=3, 
+            model_name=model_name, 
+            temperature=0.0, 
+            max_tokens=256
         )
-        self.judge = non.Judge(model_name=model_name, temperature=0.0, max_tokens=256)
+        self.judge = non.JudgeSynthesis(
+            model_name=model_name,
+            temperature=0.0,
+            max_tokens=256
+        )
 
     def forward(self, inputs: CaravanLabelingInputs) -> Dict[str, Any]:
-        prompt = self.signature.render_prompt(inputs.dict())
+        prompt = self.signature.render_prompt(inputs=inputs.dict())
         ensemble_inputs = non.EnsembleInputs(query=prompt)
-        ensemble_output = self.ensemble(ensemble_inputs)
+        ensemble_output = self.ensemble(inputs=ensemble_inputs)
 
-        judge_inputs = non.JudgeInputs(
-            query=prompt, responses=ensemble_output.get("responses", [])
+        judge_inputs = non.JudgeSynthesisInputs(
+            query=prompt,
+            responses=ensemble_output.get("responses", [])
         )
-        judge_output = self.judge(judge_inputs)
+        judge_output = self.judge(inputs=judge_inputs)
         return {"final_answer": judge_output.get("final_answer", "").strip()}
 
 

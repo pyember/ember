@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 
 class UsageStats(BaseModel):
@@ -64,11 +64,7 @@ class UsageSummary(BaseModel):
 
     model_name: str
     total_usage: UsageStats = UsageStats()
-
-    class Config:
-        """Pydantic configuration for UsageSummary."""
-
-        protected_namespaces = ()
+    model_config = ConfigDict(protected_namespaces=())
 
     @property
     def total_tokens_used(self) -> int:

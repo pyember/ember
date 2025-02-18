@@ -1,24 +1,28 @@
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field, field_validator, ValidationInfo
+from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
 
-from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
 
 
 class ModelInfo(BaseModel):
     """Metadata and configuration for instantiating a model.
 
     Attributes:
-        model_id (str): Unique identifier for the model.
-        model_name (str): Human-readable name of the model.
+        id (str): Unique identifier for the model.
+        name (str): Human-readable name of the model.
         cost (ModelCost): Cost details associated with the model.
         rate_limit (RateLimit): Rate limiting parameters for model usage.
         provider (ProviderInfo): Provider information containing defaults and endpoints.
         api_key (Optional[str]): API key for authentication. If omitted, the provider's default API key is used.
     """
 
-    model_id: str = Field(...)
-    model_name: str = Field(...)
+    model_config = ConfigDict(
+        protected_namespaces=(),  # Disable Pydantic's protected namespace checks.
+    )
+
+    id: str = Field(...)
+    name: str = Field(...)
     cost: ModelCost
     rate_limit: RateLimit
     provider: ProviderInfo
@@ -65,7 +69,3 @@ class ModelInfo(BaseModel):
             Optional[str]: The base URL specified by the provider, or None if not available.
         """
         return self.provider.base_url
-
-    model_config = {
-        "protected_namespaces": (),  # Disable Pydantic's protected namespace checks.
-    }

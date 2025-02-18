@@ -27,32 +27,33 @@ from pydantic import BaseModel
 from prettytable import PrettyTable
 
 # ember imports: use only the typed pipeline definitions (avoid direct registry references).
-from ember.core.non import Ensemble, JudgeSynthesis
-from ember.core.registry.model.registry.model_registry import get_model_registry
-from ember.core import non
-from ember.xcs.graph_ir.operator_graph import OperatorGraph
-from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
-from ember.core.registry.model.registry.model_registry import GLOBAL_MODEL_REGISTRY
-from ember.core.configs.config import CONFIG, initialize_system
+from src.ember.core.non import Ensemble, JudgeSynthesis
+from src.ember.core.registry.model.registry.model_registry import get_model_registry
+from src.ember.core import non
+from src.ember.core.registry.model.registry.model_registry import GLOBAL_MODEL_REGISTRY
+from src.ember.core.configs.config import CONFIG, initialize_system
 
 # For dataset usage:
-from ember.core.utils.data.base.models import DatasetEntry
-from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
-from ember.core.utils.data.service import DatasetService
-from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-from ember.core.utils.data.base.samplers import DatasetSampler
-from ember.core.utils.data.base.validators import DatasetValidator
-from ember.core.utils.data.initialization import initialize_dataset_registry
-from ember.xcs.scheduler import ExecutionPlan
-from ember.core.registry.operator.core.operator_base import (
+from src.ember.core.utils.data.base.models import DatasetEntry
+from src.ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from src.ember.core.utils.data.service import DatasetService
+from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from src.ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
+from src.ember.core.utils.data.base.samplers import DatasetSampler
+from src.ember.core.utils.data.base.validators import DatasetValidator
+from src.ember.core.utils.data.initialization import initialize_dataset_registry
+from src.ember.xcs.scheduler import ExecutionPlan
+from src.ember.core.registry.operator.base.operator_base import (
     LMModule,
     Operator,
     OperatorMetadata,
 )
-from ember.core.registry.prompt_signature.signatures import Signature
-from ember.core.registry.model.modules.lm import LMModuleConfig
+from src.ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core.registry.model.modules.lm import LMModuleConfig
+
+# ADD the execute_graph import:
+from src.ember.xcs.engine.xcs_engine import execute_graph
 
 
 ###############################################################################
@@ -599,8 +600,6 @@ def main() -> None:
     ensemble_graph: OperatorGraph = build_pipeline_graph(pipeline_op=ensemble_op)
     varied_graph: OperatorGraph = build_pipeline_graph(pipeline_op=varied_op)
 
-    runner: OperatorGraphRunner = OperatorGraphRunner(max_workers=args.max_workers)
-
     def score_single_entry(index: int, entry: DatasetEntry) -> Tuple[int, int, int]:
         """Scores a single dataset entry using all three pipelines.
 
@@ -617,26 +616,29 @@ def main() -> None:
         choices: Dict[str, str] = entry.choices
         correct_answer: str = entry.metadata.get("correct_answer", "").upper()
 
-        # Evaluate the baseline pipeline.
-        baseline_out = runner.run(
-            pipeline=baseline_graph,
-            inputs={"query": query, "choices": choices},
+        # Evaluate the baseline pipeline:
+        baseline_out = execute_graph(
+            graph=baseline_graph,
+            global_input={"query": query, "choices": choices},
+            max_workers=args.max_workers,
         )
         base_pred: str = getattr(baseline_out, "final_answer", "").upper()
         baseline_correct: int = 1 if (base_pred == correct_answer) else 0
 
-        # Evaluate the ensemble pipeline.
-        ensemble_out = runner.run(
-            pipeline=ensemble_graph,
-            inputs={"query": query, "choices": choices},
+        # Evaluate the ensemble pipeline:
+        ensemble_out = execute_graph(
+            graph=ensemble_graph,
+            global_input={"query": query, "choices": choices},
+            max_workers=args.max_workers,
         )
         ens_pred: str = getattr(ensemble_out, "final_answer", "").upper()
         ensemble_correct: int = 1 if (ens_pred == correct_answer) else 0
 
-        # Evaluate the varied pipeline.
-        varied_out = runner.run(
-            pipeline=varied_graph,
-            inputs={"query": query, "choices": choices},
+        # Evaluate the varied pipeline:
+        varied_out = execute_graph(
+            graph=varied_graph,
+            global_input={"query": query, "choices": choices},
+            max_workers=args.max_workers,
         )
         varied_pred: str = getattr(varied_out, "final_answer", "").upper()
         varied_correct: int = 1 if (varied_pred == correct_answer) else 0

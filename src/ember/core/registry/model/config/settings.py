@@ -15,11 +15,10 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ember.core.configs.config import load_full_config
-from ember.core.exceptions import EmberError
-from ember.core.registry.model.schemas.model_info import ModelInfo
-from ember.core.registry.model.services.usage_service import UsageService
-from ember.core.registry.model.registry.model_registry import ModelRegistry
+from src.ember.core.exceptions import EmberError
+from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.services.usage_service import UsageService
+from src.ember.core.registry.model.registry.model_registry import ModelRegistry
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -135,8 +134,8 @@ class EmberSettings(BaseSettings):
     google_api_key: Optional[str] = None
     registry: RegistryConfig = RegistryConfig()
     other: OtherSettings = OtherSettings()
-    model_config: SettingsConfigDict = SettingsConfigDict(
-        env_file=".env", extra="ignore", protected_namespaces=("settings_",)
+    model_config = SettingsConfigDict(
+        env_file=".env", extra="ignore", protected_namespaces=()
     )
 
 
@@ -161,15 +160,14 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
         EmberError: If configuration loading or processing fails.
     """
     try:
-        merged_config: Dict[str, Any] = load_full_config(
-            base_config_path=settings.model_config_path
-        )
+        merged_config: Dict[str, Any] = {}
     except Exception as exc:
         logger.exception(
-            "Failed to load full config from '%s'.", settings.model_config_path
+            "Failed to handle config for '%s'.", settings.model_config_path
         )
         raise EmberError("Configuration loading error") from exc
 
+    logger.debug("Skipping load_full_config; using empty or custom config logic.")
     merged_config = resolve_env_vars(data=merged_config)
     logger.debug("Final merged config keys: %s", list(merged_config.keys()))
 
@@ -178,7 +176,9 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
 
     discovered_models: Dict[str, ModelInfo] = {}
     if final_settings.registry.auto_discover:
-        from ember.core.registry.model.registry.discovery import ModelDiscoveryService
+        from src.ember.core.registry.model.registry.discovery import (
+            ModelDiscoveryService,
+        )
 
         discovery_service = ModelDiscoveryService(ttl=3600)
         discovered: Dict[str, Dict[str, Any]] = discovery_service.discover_models()

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
 
 from .models import DatasetEntry
-from ember.core.utils.data.base.config import BaseDatasetConfig
+from src.ember.core.utils.data.base.config import BaseDatasetConfig
 
 
 class IDatasetPrepper(ABC):

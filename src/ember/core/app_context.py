@@ -1,14 +1,9 @@
 import logging
-from typing import Optional
+from typing import Optional, Any, Dict
 
-from ember.core.configs.config import (
-    ConfigManager,
-    initialize_api_keys,
-    auto_register_known_models,
-)
-from ember.core.registry.model.core.services.model_service import ModelService
-from ember.core.registry.model.core.services.usage_service import UsageService
-from ember.core.registry.model.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.services.model_service import ModelService
+from src.ember.core.registry.model.services.usage_service import UsageService
+from src.ember.core.registry.model.registry.model_registry import ModelRegistry
 
 
 class EmberAppContext:
@@ -21,7 +16,7 @@ class EmberAppContext:
 
     def __init__(
         self,
-        config_manager: ConfigManager,
+        config_manager: "Any",  # kept generic; its concrete type comes from config.
         model_registry: ModelRegistry,
         usage_service: Optional[UsageService],
         logger: logging.Logger,
@@ -45,6 +40,12 @@ def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
     """
     logger = logging.getLogger("ember")
 
+    from src.ember.core.configs.config import (
+        ConfigManager,
+        initialize_api_keys,
+        auto_register_known_models,
+    )
+
     # 1) Create the configuration manager with dependency injection.
     config_manager = ConfigManager(config_filename=config_filename, logger=logger)
 
@@ -65,3 +66,16 @@ def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
         usage_service=usage_service,
         logger=logger,
     )
+
+
+class EmberContext:
+    """Global application context placeholder."""
+
+    pass
+
+
+__all__ = [
+    "EmberAppContext",
+    "create_ember_app",
+    "EmberContext",
+]

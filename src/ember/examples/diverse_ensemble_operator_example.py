@@ -3,12 +3,13 @@ from random import sample
 
 from pydantic import BaseModel
 
-from ember.core.registry.operator.core.operator_base import (
-    Operator,
-    OperatorMetadata,
+from src.ember.core.registry.operator.base.operator_base import (
+    Operator
 )
-from ember.core.registry.prompt_signature.signatures import Signature
-
+from src.ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core import non
+from src.ember.core.registry.operator.base._module import ember_field
+from src.ember.core.registry.model.modules.lm import LMModule
 
 def usage_example() -> None:
     """Demonstrates usage of MultiPrefixEnsembleOperator with distinct prefixes for each language model.
@@ -29,9 +30,11 @@ def usage_example() -> None:
 
     # Instantiate the operator with named parameters.
     operator: MultiPrefixEnsembleOperator = MultiPrefixEnsembleOperator(
-        lm_modules=mock_lm_modules,
+        model_name="anthropic:claude-3-opus",
         prefixes=example_prefixes,
         name="MultiPrefixEnsembleExample",
+        num_units=3,
+        temperature=0.5
     )
 
     # Create input data.
@@ -55,30 +58,17 @@ class MultiPrefixOperatorInputs(BaseModel):
 
 
 class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, Any]]):
-    """Operator that applies different prefixes for each language model call in an ensemble.
-
-    This operator randomly selects a prefix for each language model, concatenates it with the provided query,
-    and aggregates the responses.
-
-    Attributes:
-        metadata: Operator metadata describing the operator's code, description, and input signature.
-        prefixes: List of prefix strings used to modify the query for each language model.
-        lm_modules: List of callables representing language model modules. Each callable takes a prompt string
-            and returns a response string.
-    """
-
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="MP_ENSEMBLE",
-        description="Ensemble with distinct prefix per LM invocation.",
-        signature=Signature(
-            required_inputs=["query"],
-            input_model=MultiPrefixOperatorInputs,
-        ),
+    """Operator that applies different prefixes using UniformEnsemble."""
+    
+    signature: Signature = Signature(
+        required_inputs=["query"],
+        input_model=MultiPrefixOperatorInputs,
     )
+    lm_modules: List[LMModule]
 
     def __init__(
         self,
-        lm_modules: List[Callable[[str], str]],
+        lm_modules: List[LMModule],
         prefixes: List[str],
         name: str = "MultiPrefixEnsemble",
     ) -> None:
@@ -89,26 +79,16 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, Dict[str, 
             prefixes: A list of prefix strings to be used for each LM call.
             name: The name identifier for this operator instance.
         """
-        super().__init__(name=name, lm_modules=lm_modules)
         self.prefixes: List[str] = prefixes
+        self.lm_modules: List[LMModule] = lm_modules
 
     def forward(self, inputs: MultiPrefixOperatorInputs) -> Dict[str, Any]:
-        """Executes the operator by prepending randomly selected prefixes to the input query.
-
-        For each language model module, a prefix is chosen at random, concatenated with the query separated by
-        a newline, and passed to the language model module. The responses are aggregated into a dictionary.
-
-        Args:
-            inputs: An instance of MultiPrefixOperatorInputs containing the query.
-
-        Returns:
-            A dictionary with a single key 'responses' mapping to a list of response strings from the LM modules.
-        """
-        chosen_prefixes: List[str] = sample(self.prefixes, len(self.lm_modules))
+        chosen_prefixes = sample(self.prefixes, len(self.lm_modules))
+        
         responses: List[str] = []
-        for lm, prefix in zip(self.lm_modules, chosen_prefixes):
-            prompt: str = f"{prefix}\n{inputs.query}"
-            response: str = lm(prompt=prompt)
+        for prefix, lm in zip(chosen_prefixes, self.lm_modules):
+            prompt = f"{prefix}\n{inputs.query}"
+            response = lm(prompt=prompt)
             responses.append(response)
         return {"responses": responses}
 

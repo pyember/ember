@@ -8,11 +8,46 @@ returns a fully-configured ModelService instance. This is the primary entry poin
 for initializing Ember models.
 """
 
+from __future__ import annotations
+
+# Lazy imports to prevent circular dependencies
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.ember.core.registry.model import ModelRegistry, ModelService
+    from src.ember.core.registry.model import initialize_ember
+
 from typing import Optional
 
-from ember.core.registry.model.config.settings import initialize_ember
-from ember.core.registry.model.services.model_service import ModelService
-from ember.core.registry.model.services.usage_service import UsageService
+from .core.registry.model import initialize_ember, ModelRegistry, ModelService
+from .core.registry.model.services.usage_service import UsageService
+
+__version__ = "0.1.0"
+__all__ = ["ModelRegistry", "ModelService", "initialize_ember"]
+
+# Package version and metadata
+_PACKAGE_METADATA = {
+    "name": "ember",
+    "version": __version__,
+    "description": "Compound AI Systems framework for Network of Network (NON) construction.",
+}
+
+
+def __getattr__(name: str) -> object:
+    """Lazy load main components using absolute imports."""
+    if name == "ModelRegistry":
+        from src.ember.core.registry.model.registry.model_registry import ModelRegistry
+
+        return ModelRegistry
+    if name == "ModelService":
+        from src.ember.core.registry.model.services.model_service import ModelService
+
+        return ModelService
+    if name == "initialize_ember":
+        from src.ember.core.registry.model import initialize_ember
+
+        return initialize_ember
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def init(

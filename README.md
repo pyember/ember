@@ -98,7 +98,7 @@ Why Modules?
 ### Basic Pattern
 
 ```python
-from Ember.registry.operator.operator_base import LMModuleConfig, LMModule
+from src.ember.registry.operator.operator_base import LMModuleConfig, LMModule
 
 config = LMModuleConfig(
     model_name="gpt-4o",
@@ -200,7 +200,7 @@ Takes in multiple responses in a structured input, passes those calls to a judge
 
 ```python
 from collections import Counter
-from Ember.registry.operator.operator_base import Operator
+from src.ember.registry.operator.operator_base import Operator
 
 class JudgeExplainerOperator(Operator):
 
@@ -235,9 +235,9 @@ Let's demonstrate a bigger pipeline:
 1. **Goal**: Query three different models (gemini-1.5-pro, claude-3.5-sonnet, and gpt-4o) in parallel, then have a “judge” operator (which itself might be an LM-based aggregator) decide on a final best answer.
 2. **Setup**
 ```python
-from Ember.registry.model.model_registry import ModelRegistry
-from Ember.registry.operator.operator_registry import EnsembleOperator, GetAnswerOperator
-from Ember.registry.operator.operator_base import LMModuleConfig, LMModule
+from src.ember.registry.model.model_registry import ModelRegistry
+from src.ember.registry.operator.operator_registry import EnsembleOperator, GetAnswerOperator
+from src.ember.registry.operator.operator_base import LMModuleConfig, LMModule
 
 # 1) Register the models
 registry = ModelRegistry()
@@ -259,7 +259,7 @@ judge_op = ...
 
 3.	Create a NoNGraph
 ```python
-from Ember.core.graph_executor import NoNGraphData, GraphExecutorService
+from src.ember.core.graph_executor import NoNGraphData, GraphExecutorService
 
 graph_data = NoNGraphData()
 # Node: "ensemble"

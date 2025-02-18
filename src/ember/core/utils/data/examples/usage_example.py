@@ -2,11 +2,11 @@ import logging
 from typing import Any, List
 
 # Import for the high-level one-liner API function.
-from ember.core.utils.data import load_dataset_entries
+from src.ember.core.utils.data import load_dataset_entries
 
 # Import for configuration classes.
-from ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
-from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
+from src.ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
 
 
 def main() -> None:

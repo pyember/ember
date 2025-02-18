@@ -1,31 +1,34 @@
-# ------------------------------------------------------------------------------
-# Extended "non" module providing strongly typed wrappers for the built-in
-# ember operators from the operator registry. Each wrapper adheres to the
-# Google Python Style Guide with comprehensive type annotations and explicit
-# named method invocations, ensuring clarity, maintainability, and scalability.
-# ------------------------------------------------------------------------------
+"""
+non.py: NON wrapper module
 
-from typing import Any, Dict, List, Optional, Type, Union
+This module provides strongly typed wrappers for Ember's built-in operators.
+Since the base classes (EmberModule/Operator) already enforce immutability and
+tree registration (akin to eqx.Module in Equinox), these wrappers simply subclass
+Operator and initialize their sub-operators in __post_init__. The metadata field is
+declared with init=False so that each instance always uses the class's intended metadata.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
 
-# Ember package imports:
-from ember.core.registry.operator.core.operator_base import (
+# Ember package imports
+from src.ember.core.registry.operator.base._module import ember_field
+from src.ember.core.registry.operator.base.operator_base import (
     Operator,
-    OperatorMetadata,
     T_in,
     T_out,
 )
-from ember.core.registry.prompt_signature.signatures import Signature
-from ember.core.registry.operator.operator_registry import (
-    EnsembleOperator,
-    MostCommonOperator,
-    GetAnswerOperator,
-    JudgeSynthesisOperator,
-    VerifierOperator,
-)
-from ember.core.registry.model.services.model_service import ModelService
-from ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
+from src.ember.core.registry.operator.core.ensemble import EnsembleOperator
+from src.ember.core.registry.operator.core.get_answer import GetAnswerOperator
+from src.ember.core.registry.operator.core.most_common import MostCommonOperator
+from src.ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
+from src.ember.core.registry.operator.core.verifier import VerifierOperator
+from src.ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core.registry.model.services.model_service import ModelService
+from src.ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
 
 
 # ------------------------------------------------------------------------------
@@ -34,7 +37,7 @@ from ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
 
 
 class EnsembleInputs(BaseModel):
-    """Represents the typed input for the Ensemble operator.
+    """Typed input for the Ensemble operator.
 
     Attributes:
         query (str): The input query to be processed.
@@ -44,78 +47,65 @@ class EnsembleInputs(BaseModel):
 
 
 class EnsembleSignature(Signature):
-    required_inputs: List[str] = ["query"]
     input_model: Type[BaseModel] = EnsembleInputs
 
 
-class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
-    """Wrapper around EnsembleOperator for executing parallel LM module calls.
-
-    This operator creates multiple LMModule instances and leverages the underlying
-    EnsembleOperator to perform parallel language model invocations.
+class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
+    """Wrapper around EnsembleOperator for parallel LM module calls.
 
     Example:
-        ensemble = Ensemble(num_units=2, model_name="gpt-4-turbo")
+        ensemble = UniformEnsemble(
+            num_units=3,
+            model_name="openai:gpt-4o",
+            temperature=1.0
+        )
         output = ensemble(inputs=EnsembleInputs(query="What is the capital of France?"))
-        # output: {"responses": ["Paris", "Paris", ...]}
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="ENSEMBLE_WRAPPER",
-        description="Wrapper around EnsembleOperator for parallel model calls.",
-        signature=EnsembleSignature(),
-    )
+    num_units: int
+    model_name: str
+    temperature: float
+    max_tokens: Optional[int]
+    model_service: Optional[ModelService]
+
+    signature: Signature = EnsembleSignature()
+
+    ensemble_op: EnsembleOperator = ember_field(init=False)
 
     def __init__(
         self,
         *,
-        num_units: int = 3,
-        model_name: str = "gpt-4o",
-        temperature: float = 1.0,
+        num_units: int,
+        model_name: str,
+        temperature: float,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs: Any,
     ) -> None:
-        """Initializes the Ensemble operator.
+        # Normal, conventional __init__ assignments:
+        self.num_units = num_units
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.model_service = model_service
 
-        Args:
-            num_units (int): Number of LMModule instances to instantiate.
-            model_name (str): Identifier for the model used in each LMModule.
-            temperature (float): Temperature parameter for LM sampling.
-            max_tokens (Optional[int]): Maximum tokens allowed per LM call.
-            model_service (Optional[ModelService]): Service instance for LMModules; if None, defaults are used.
-            **kwargs: Additional keyword arguments forwarded to EnsembleOperator.
-        """
-        super().__init__(name="Ensemble", signature=self.metadata.signature)
+        # Construct LM modules based on the provided parameters.
         lm_modules: List[LMModule] = [
             LMModule(
                 config=LMModuleConfig(
-                    model_name=model_name,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+                    model_name=self.model_name,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
                 ),
-                model_service=model_service,
+                model_service=self.model_service,
             )
-            for _ in range(num_units)
+            for _ in range(self.num_units)
         ]
-        self._ensemble_op: EnsembleOperator = EnsembleOperator(
-            lm_modules=lm_modules, **kwargs
-        )
-        self.ensemble_op: EnsembleOperator = (
-            self._ensemble_op
-        )  # For sub-operator auto-discovery.
+        # Use our helper to set the computed field.
+        self.ensemble_op = EnsembleOperator(lm_modules=lm_modules)
 
     def forward(self, *, inputs: EnsembleInputs) -> Dict[str, Any]:
-        """Executes the ensemble operation on the provided inputs.
-
-        Args:
-            inputs (EnsembleInputs): Input parameters containing the query.
-
-        Returns:
-            Dict[str, Any]: Dictionary with responses from each LMModule.
-        """
-        input_data: Dict[str, Any] = inputs.model_dump()
-        return self._ensemble_op.forward(inputs=input_data)
+        """Delegates execution to the underlying EnsembleOperator."""
+        return self.ensemble_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -124,11 +114,11 @@ class Ensemble(Operator[EnsembleInputs, Dict[str, Any]]):
 
 
 class MostCommonInputs(BaseModel):
-    """Represents the typed input for the MostCommon operator.
+    """Typed input for the MostCommon operator.
 
     Attributes:
         query (str): The initial query.
-        responses (List[str]): List of candidate responses to determine consensus.
+        responses (List[str]): List of candidate responses.
     """
 
     query: str
@@ -141,7 +131,7 @@ class MostCommonSignature(Signature):
 
 
 class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
-    """Wrapper around MostCommonOperator for determining a consensus answer.
+    """Wrapper around MostCommonOperator for consensus selection.
 
     Example:
         aggregator = MostCommon()
@@ -149,33 +139,15 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
         # output: {"final_answer": "A"}
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="MOST_COMMON_WRAPPER",
-        description="Wrapper around MostCommonOperator to select the best consensus answer.",
-        signature=MostCommonSignature(),
-    )
+    signature: Signature = MostCommonSignature()
+    most_common_op: MostCommonOperator = ember_field(init=False)
 
-    def __init__(self, **kwargs: Any) -> None:
-        """Initializes the MostCommon operator.
-
-        Args:
-            **kwargs: Additional arguments forwarded to MostCommonOperator.
-        """
-        super().__init__(name="MostCommon", signature=self.metadata.signature)
-        self._mc_op: MostCommonOperator = MostCommonOperator(lm_modules=[], **kwargs)
-        self.mc_op: MostCommonOperator = self._mc_op
+    def __init__(self):
+        self.most_common_op = MostCommonOperator()
 
     def forward(self, *, inputs: MostCommonInputs) -> Dict[str, Any]:
-        """Determines the most common response from candidate responses.
-
-        Args:
-            inputs (MostCommonInputs): Input parameters including query and responses.
-
-        Returns:
-            Dict[str, Any]: Dictionary with the final consensus answer.
-        """
-        input_data: Dict[str, Any] = inputs.model_dump()
-        return self._mc_op.forward(inputs=input_data)
+        """Delegates execution to the underlying MostCommonOperator."""
+        return self.most_common_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -184,17 +156,17 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 
 
 class GetAnswerInputs(BaseModel):
-    """Represents the typed input for the GetAnswer operator.
+    """Typed input for the GetAnswer operator.
 
     Attributes:
         query (str): The query for which an answer is sought.
-        responses (List[str]): List of candidate responses to be processed.
+        responses (List[str]): List of candidate responses.
     """
 
     query: str
     responses: List[str] = Field(
         ...,
-        description="List of candidate response strings from which a final answer is extracted.",
+        description="Candidate response strings from which a final answer is extracted.",
     )
 
 
@@ -204,18 +176,19 @@ class GetAnswerSignature(Signature):
 
 
 class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
-    """Wrapper around GetAnswerOperator to extract a single final answer.
+    """Wrapper around GetAnswerOperator to select a final answer.
 
     Example:
         getter = GetAnswer(model_name="gpt-4o")
         output = getter(inputs=GetAnswerInputs(query="Which label is correct?", responses=["A", "B"]))
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="GET_ANSWER_WRAPPER",
-        description="Wrapper around GetAnswerOperator to extract a single answer from multiple responses.",
-        signature=GetAnswerSignature(),
-    )
+    signature: Signature = GetAnswerSignature()
+    model_name: str
+    temperature: float = 0.0
+    max_tokens: Optional[int] = None
+    model_service: Optional[ModelService] = None
+    get_answer_op: GetAnswerOperator = ember_field(init=False)
 
     def __init__(
         self,
@@ -224,19 +197,9 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
         temperature: float = 0.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs: Any,
     ) -> None:
-        """Initializes the GetAnswer operator.
-
-        Args:
-            model_name (str): Identifier for the LMModule model.
-            temperature (float): Temperature parameter for LM sampling.
-            max_tokens (Optional[int]): Maximum tokens allowed per LM call.
-            model_service (Optional[ModelService]): Service instance for LMModule; defaults if None.
-            **kwargs: Additional keyword arguments forwarded to GetAnswerOperator.
-        """
-        super().__init__(name="GetAnswer", signature=self.metadata.signature)
-        lm_module: LMModule = LMModule(
+        # Create a single LMModule and instantiate the underlying GetAnswerOperator.
+        lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
                 temperature=temperature,
@@ -244,22 +207,11 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._get_answer_op: GetAnswerOperator = GetAnswerOperator(
-            lm_modules=[lm_module], **kwargs
-        )
-        self.get_answer_op: GetAnswerOperator = self._get_answer_op
+        self.get_answer_op = GetAnswerOperator(lm_module=lm_module)
 
     def forward(self, *, inputs: GetAnswerInputs) -> Dict[str, Any]:
-        """Extracts a single final answer from multiple candidate responses.
-
-        Args:
-            inputs (GetAnswerInputs): Input parameters including query and candidate responses.
-
-        Returns:
-            Dict[str, Any]: Dictionary containing the extracted final answer.
-        """
-        input_data: Dict[str, Any] = inputs.model_dump()
-        return self._get_answer_op.forward(inputs=input_data)
+        """Delegates execution to the underlying GetAnswerOperator."""
+        return self.get_answer_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -268,17 +220,17 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
 
 
 class JudgeSynthesisInputs(BaseModel):
-    """Represents the typed input for the JudgeSynthesis operator.
+    """Typed input for the JudgeSynthesis operator.
 
     Attributes:
         query (str): The query to be synthesized.
-        responses (List[str]): List of responses to be aggregated into a final answer.
+        responses (List[str]): List of responses to combine.
     """
 
     query: str
     responses: List[str] = Field(
         ...,
-        description="List of responses to synthesize into a single, reasoned answer.",
+        description="Multiple responses to be synthesized into a single reasoned answer.",
     )
 
 
@@ -288,19 +240,19 @@ class JudgeSynthesisSignature(Signature):
 
 
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
-    """Wrapper around JudgeSynthesisOperator for multi-response reasoning synthesis.
+    """Wrapper around JudgeSynthesisOperator for multi-response synthesis.
 
     Example:
         judge = JudgeSynthesis(model_name="gpt-4o")
         output = judge(inputs=JudgeSynthesisInputs(query="What is 2+2?", responses=["3", "4", "2"]))
-        # output: {"final_answer": "...", "reasoning": "..."}
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="JUDGE_SYNTHESIS_WRAPPER",
-        description="Wrapper around JudgeSynthesisOperator for synthesizing multi-response answers.",
-        signature=JudgeSynthesisSignature(),
-    )
+    signature: Signature = JudgeSynthesisSignature()
+    model_name: str
+    temperature: float
+    max_tokens: Optional[int]
+    model_service: Optional[ModelService]
+    judge_synthesis_op: JudgeSynthesisOperator = ember_field(init=False)
 
     def __init__(
         self,
@@ -309,19 +261,14 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs: Any,
     ) -> None:
-        """Initializes the JudgeSynthesis operator.
+        super().__init__()
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.model_service = model_service
 
-        Args:
-            model_name (str): Identifier for the LMModule model.
-            temperature (float): Temperature parameter for LM sampling.
-            max_tokens (Optional[int]): Maximum tokens allowed per LM call.
-            model_service (Optional[ModelService]): Service instance for LMModule; using default if None.
-            **kwargs: Additional keyword arguments forwarded to JudgeSynthesisOperator.
-        """
-        super().__init__(name="JudgeSynthesis", signature=self.metadata.signature)
-        lm_module: LMModule = LMModule(
+        lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
                 temperature=temperature,
@@ -329,22 +276,13 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._judge_synth_op: JudgeSynthesisOperator = JudgeSynthesisOperator(
-            lm_modules=[lm_module]
+        self._init_field(
+            "judge_synthesis_op", JudgeSynthesisOperator(lm_module=lm_module)
         )
-        self.judge_synth_op: JudgeSynthesisOperator = self._judge_synth_op
 
     def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
-        """Synthesizes a final answer from multiple responses.
-
-        Args:
-            inputs (JudgeSynthesisInputs): Input parameters including query and responses.
-
-        Returns:
-            Dict[str, Any]: Dictionary containing the final answer and reasoned explanation.
-        """
-        input_data: Dict[str, Any] = inputs.model_dump()
-        return self._judge_synth_op.forward(inputs=input_data)
+        """Delegates execution to the underlying JudgeSynthesisOperator."""
+        return self.judge_synthesis_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -353,17 +291,17 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
 
 
 class VerifierInputs(BaseModel):
-    """Represents the typed input for the Verifier operator.
+    """Typed input for the Verifier operator.
 
     Attributes:
         query (str): The query string.
-        candidate_answer (str): The candidate answer to be verified.
+        candidate_answer (str): The candidate answer to verify.
     """
 
     query: str
     candidate_answer: str = Field(
         ...,
-        description="The candidate answer whose correctness is to be verified.",
+        description="The candidate answer to be verified.",
     )
 
 
@@ -373,40 +311,29 @@ class VerifierSignature(Signature):
 
 
 class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
-    """Wrapper around VerifierOperator to evaluate and potentially revise a candidate answer.
+    """Wrapper around VerifierOperator to verify and potentially revise a candidate answer.
 
     Example:
         verifier = Verifier(model_name="gpt-4o")
         output = verifier(inputs=VerifierInputs(query="What is 2+2?", candidate_answer="5"))
-        # output: {"verdict": "Incorrect", "explanation": "...", "revised_answer": "4"}
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="VERIFIER_WRAPPER",
-        description="Wrapper around VerifierOperator for verifying and revising candidate answers.",
-        signature=VerifierSignature(),
-    )
+    signature: Signature = VerifierSignature()
+    model_name: str
+    temperature: float
+    max_tokens: Optional[int]
+    model_service: Optional[ModelService]
+    verifier_op: VerifierOperator = ember_field(init=False)
 
     def __init__(
         self,
         *,
-        model_name: str = "gpt-4o",
-        temperature: float = 1.0,
+        model_name: str,
+        temperature: float,
         max_tokens: Optional[int] = None,
         model_service: Optional[ModelService] = None,
-        **kwargs: Any,
     ) -> None:
-        """Initializes the Verifier operator.
-
-        Args:
-            model_name (str): Identifier for the LMModule model.
-            temperature (float): Temperature parameter for LM sampling.
-            max_tokens (Optional[int]): Maximum tokens allowed per LM call.
-            model_service (Optional[ModelService]): Service instance for LMModule; defaults used if None.
-            **kwargs: Additional keyword arguments forwarded to VerifierOperator.
-        """
-        super().__init__(name="Verifier", signature=self.metadata.signature)
-        lm_module: LMModule = LMModule(
+        lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
                 temperature=temperature,
@@ -414,22 +341,11 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
             ),
             model_service=model_service,
         )
-        self._verifier_op: VerifierOperator = VerifierOperator(
-            lm_modules=[lm_module], **kwargs
-        )
-        self.verifier_op: VerifierOperator = self._verifier_op
+        self.verifier_op = VerifierOperator(lm_module=lm_module)
 
     def forward(self, *, inputs: VerifierInputs) -> Dict[str, Any]:
-        """Verifies the correctness of a candidate answer.
-
-        Args:
-            inputs (VerifierInputs): Input parameters including query and candidate answer.
-
-        Returns:
-            Dict[str, Any]: Dictionary with verification verdict, explanation, and optional revised answer.
-        """
-        input_data: Dict[str, Any] = inputs.model_dump()
-        return self._verifier_op.forward(inputs=input_data)
+        """Delegates execution to the underlying VerifierOperator."""
+        return self.verifier_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -438,7 +354,7 @@ class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
 
 
 class VariedEnsembleInputs(BaseModel):
-    """Represents the typed input for the VariedEnsemble operator.
+    """Typed input for the VariedEnsemble operator.
 
     Attributes:
         query (str): The query to be processed across various model configurations.
@@ -448,7 +364,7 @@ class VariedEnsembleInputs(BaseModel):
 
 
 class VariedEnsembleOutputs(BaseModel):
-    """Represents the typed output for the VariedEnsemble operator.
+    """Typed output for the VariedEnsemble operator.
 
     Attributes:
         responses (List[str]): Collection of responses from different LM configurations.
@@ -458,126 +374,65 @@ class VariedEnsembleOutputs(BaseModel):
 
 
 class VariedEnsembleSignature(Signature):
-    required_inputs: List[str] = ["query"]
     input_model: Type[BaseModel] = VariedEnsembleInputs
-    # Optionally, an output_model may be defined.
 
 
 class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
-    """Executes multiple LM configurations in parallel or sequentially and aggregates their outputs.
+    """Wrapper around multiple LM modules that runs varied configurations and aggregates outputs.
 
     Example:
         varied_ensemble = VariedEnsemble(model_configs=[config1, config2])
         outputs = varied_ensemble(inputs=VariedEnsembleInputs(query="Example query"))
-        # outputs: VariedEnsembleOutputs containing responses from each model.
     """
 
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="VARIED_ENSEMBLE",
-        description="Runs multiple distinct models in parallel, returning all responses.",
-        signature=VariedEnsembleSignature(),
-    )
+    signature: Signature = VariedEnsembleSignature()
+    model_configs: List[LMModuleConfig]
+    varied_ensemble_op: EnsembleOperator = ember_field(init=False)
 
-    def __init__(
-        self,
-        *,
-        model_configs: List[LMModuleConfig],
-        name: str = "VariedEnsemble",
-    ) -> None:
-        """Initializes the VariedEnsemble operator.
+    def __init__(self, *, model_configs: List[LMModuleConfig]) -> None:
+        self.model_configs = model_configs
+        self.lm_modules = tuple(LMModule(config=config) for config in model_configs)
+        self.varied_ensemble_op = EnsembleOperator(
+            lm_modules=tuple(LMModule(config=config) for config in model_configs)
+        )
 
-        Args:
-            model_configs (List[LMModuleConfig]): A list of LMModuleConfig objects for each distinct model.
-            name (str): Operator name for debugging and introspection.
+    def build_prompt(self, *, inputs: Dict[str, Any]) -> str:
+        """Builds a prompt from the input dictionary.
+
+        If a prompt_template is defined in the signature, it is used; otherwise, defaults to the query.
         """
-        super().__init__(name=name, signature=self.metadata.signature)
-        self.lm_modules: List[LMModule] = [
-            LMModule(config=config) for config in model_configs
-        ]
+        if self.signature and self.signature.prompt_template:
+            return self.signature.render_prompt(inputs=inputs)
+        return str(inputs.get("query", ""))
 
     def forward(self, *, inputs: VariedEnsembleInputs) -> VariedEnsembleOutputs:
-        """Executes the varied ensemble operation and aggregates the responses.
-
-        Args:
-            inputs (VariedEnsembleInputs): Input parameters containing the query.
-
-        Returns:
-            VariedEnsembleOutputs: Typed output containing responses from each LM configuration.
-        """
-        input_dict: Dict[str, Any] = inputs.model_dump()
-        prompt: str = self.build_prompt(inputs=input_dict)
+        """Executes the varied ensemble operation and aggregates responses."""
+        input_dict = inputs.model_dump()
+        prompt = self.build_prompt(inputs=input_dict)
         responses: List[str] = []
-        # Iterate over each LMModule and collect responses.
         for lm in self.lm_modules:
-            response_text: str = self.call_lm(prompt=prompt, lm=lm).strip()
+            response_text = self.call_lm(prompt=prompt, lm=lm).strip()
             responses.append(response_text)
         return VariedEnsembleOutputs(responses=responses)
 
 
 class Sequential(Operator[T_in, T_out]):
-    """Compositional operator chaining multiple operators in sequence.
+    """Compositional operator that chains multiple operators sequentially.
 
     Example:
-        pipeline = Sequential(operators=[
-            EnsembleOperator(...),
-            JudgeSynthesisOperator(...),
-            VerifierOperator(...)
-        ])
-        final_output = pipeline(inputs={"query": "Hello?"})
+        pipeline = Sequential(operators=[op1, op2])
+        final_output = pipeline(inputs={"value": 0})
     """
 
+    operators: List[Operator[Any, Any]]
+    signature: Signature = Signature(input_model=None)
+
     def __init__(self, *, operators: List[Operator[Any, Any]]) -> None:
-        """Initializes the Sequential pipeline operator.
+        super().__init__()
+        self.operators = operators
 
-        Args:
-            operators (List[Operator[Any, Any]]): List of operator instances to be chained.
-        """
-        super().__init__(name="SequentialPipeline")
-        self._operators: List[Operator[Any, Any]] = operators
-
-    def forward(self, *, inputs: Union[T_in, Dict[str, Any]]) -> T_out:
-        """Executes the chained operators sequentially.
-
-        Args:
-            inputs (Union[T_in, Dict[str, Any]]): Initial input data for the pipeline.
-
-        Returns:
-            T_out: Final output after all operators have been applied.
-        """
-        data: Union[T_in, Dict[str, Any]] = inputs
-        # Sequentially invoke each operator with named parameters.
-        for operator in self._operators:
-            data = operator(inputs=data)
-        return data  # type: ignore
-
-
-# ------------------------------------------------------------------------------
-# 7) Bringing It All Together
-# ------------------------------------------------------------------------------
-#
-# This module defines strongly typed wrappers for ember's built-in operators.
-# Each wrapper subclasses the base Operator and enforces stringent type safety
-# for inputs, processing, and outputs of the underlying registry operators.
-# By composing these wrappers, robust multi-step pipelines can be built following
-# the core "NestedNetwork" pattern.
-#
-# Example pipeline:
-#
-#     class MyPipeline(Operator[MyPipelineInputs, Dict[str, Any]]):
-#         def __init__(self) -> None:
-#             super().__init__()
-#             self.ensemble = Ensemble(num_units=3, ...)
-#             self.most_common = MostCommon()
-#             self.verifier = Verifier(...)
-#
-#         def forward(self, *, inputs: MyPipelineInputs) -> Dict[str, Any]:
-#             out1 = self.ensemble(inputs=EnsembleInputs(query=inputs.query))
-#       def forward(self, inputs: MyPipelineInputs) -> Dict[str, Any]:
-#           out1 = self.ensemble({"query": inputs.query})
-#           out2 = self.most_common({"query": inputs.query, "responses": out1["responses"]})
-#           out3 = self.verifier({"query": inputs.query, "candidate_answer": out2["final_answer"]})
-#           return out3
-#
-# This pattern serves as the foundation for building advanced, multi-step pipelines in ember.
-#
-# This pattern serves as the foundation for building advanced, multi-step pipelines in ember.
+    def forward(self, *, inputs: T_in) -> T_out:
+        """Executes the operators sequentially."""
+        for op in self.operators:
+            inputs = op.forward(inputs=inputs)
+        return inputs

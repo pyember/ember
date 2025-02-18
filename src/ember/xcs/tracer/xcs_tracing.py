@@ -1,137 +1,215 @@
 """
 Unified Tracing Module for XCS.
 
-Provides the TracerContext for capturing sub-operator calls during execution
-and converting a traced graph into an execution plan.
+This module provides a TracerContext for capturing operator calls
+and constructing an XCSGraph-based execution IR. It patches operator calls,
+records trace events, and then restores the originals.
 """
 
+from __future__ import annotations
+
 import logging
+import time
+from contextlib import ContextDecorator
 from functools import wraps
-from types import TracebackType
-from typing import Any, Callable, Dict, Optional, Protocol, Type
+from typing import Any, Callable, Dict, Optional, Protocol, cast
 
-from ..graph.xcs_graph import XCSGraph
+from pydantic import BaseModel, Field
 
-logger = logging.getLogger(__name__)
+from src.ember.xcs.tracer.tracer_decorator import IRGraph
+from src.ember.xcs.tracer._context_types import TraceContextData
+from src.ember.xcs.utils.tree_util import tree_flatten, tree_unflatten
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class OperatorCallable(Protocol):
-    """Protocol for an operator callable accepting a named 'inputs' argument.
-
-    This protocol ensures that an operator’s __call__ method accepts an 'inputs'
-    keyword argument of type Dict[str, Any] and returns an arbitrary result.
     """
+    Protocol for an operator callable.
+    
+    An operator must implement a __call__ method accepting a keyword-only
+    argument 'inputs'.
+    """
+    def __call__(self, *, inputs: Dict[str, Any]) -> Any:
+        ...
 
-    def __call__(self, *, inputs: Dict[str, Any]) -> Any: ...
+
+class TraceRecord(BaseModel):
+    """
+    Represents a trace record for a single operator invocation.
+    
+    Stores the operator name, the node ID in the traced graph, the inputs and outputs,
+    and a timestamp.
+    """
+    operator_name: str
+    node_id: str
+    inputs: Dict[str, Any]
+    outputs: Any
+    timestamp: float = Field(default_factory=time.time)
 
 
-class TracerContext:
-    """Captures operator calls during execution to build a traced XCSGraph.
-
-    The TracerContext patches the __call__ method of the provided top-level operator
-    to record execution traces. The captured information is accumulated in an internal
-    XCSGraph, which can later be converted to an executable plan.
+class TracerContext(ContextDecorator):
+    """
+    Context manager to trace operator execution and build an XCSGraph.
+    
+    This context patched the class-level __call__ methods of operator instances so that
+    each operator call is recorded as a node in the graph and a corresponding TraceRecord
+    is generated. Patching is done recursively for sub-operators.
     """
 
     def __init__(
-        self, top_operator: OperatorCallable, sample_input: Dict[str, Any]
+        self,
+        top_operator: OperatorCallable,
+        sample_input: Dict[str, Any],
+        extra_context: Optional[TraceContextData] = None,
     ) -> None:
-        """Initializes a TracerContext instance.
-
+        """
         Args:
-            top_operator (OperatorCallable): The top-level operator to be traced.
-            sample_input (Dict[str, Any]): A sample input dictionary used for tracing.
+            top_operator (OperatorCallable): The operator to trace.
+            sample_input (Dict[str, Any]): Sample input for tracing.
+            extra_context (Optional[TraceContextData]): Additional context info.
         """
-        self.top_operator: OperatorCallable = top_operator
-        self.sample_input: Dict[str, Any] = sample_input
-        self.graph: XCSGraph = XCSGraph()
-        self._patched: bool = False
-        self._original_call: Optional[Callable[..., Any]] = getattr(
-            top_operator, "__call__", None
-        )
+        self.top_operator = top_operator
+        self.sample_input = sample_input
+        self.extra_context = extra_context
+        self.graph = IRGraph()
+        self._input_tracers: Dict[str, str] = {}
+        # Keep track of which operator instances we patched.
+        self._patched: set[OperatorCallable] = set()
+        self.trace_records: list[TraceRecord] = []
 
-    def __enter__(self) -> "TracerContext":
-        """Enters the tracing context by patching the operator's __call__ method.
+    def __enter__(self) -> TracerContext:
+        # Flatten the sample_input so each leaf becomes a node.
+        leaves, aux = tree_flatten(tree=self.sample_input)
+        for i, leaf in enumerate(leaves):
+            node_id = self.graph.add_node(
+                operator=None,
+                inputs=[],
+                attrs={"value": leaf, "index": i},
+            )
+            key = f"input_{i}"
+            self.graph.input_mapping[key] = node_id
+            self._input_tracers[key] = node_id
 
-        Returns:
-            TracerContext: This context instance.
-        """
-        self._patch_operator(op=self.top_operator)
-        self._patched = True
+        self._patch_operator(self.top_operator)
         return self
 
-    def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        exc_tb: Optional[TracebackType],
-    ) -> Optional[bool]:
-        """Exits the tracing context and restores the original operator __call__ method.
-
-        Args:
-            exc_type (Optional[Type[BaseException]]): The exception type, if any.
-            exc_value (Optional[BaseException]): The exception instance, if any.
-            exc_tb (Optional[TracebackType]): The traceback, if any.
-
-        Returns:
-            Optional[bool]: Always returns None.
-        """
-        if self._patched and self._original_call is not None:
-            self.top_operator.__call__ = self._original_call
-        self._patched = False
+    def __exit__(self, exc_type, exc_value, traceback) -> Optional[bool]:
+        self._restore_operators()
         return None
 
     def _patch_operator(self, op: OperatorCallable) -> None:
-        """Patches the operator's __call__ method to record tracing data.
-
-        The patched __call__ method creates a node in the tracing graph, invokes the
-        original __call__ with the given inputs, captures its outputs in the graph node,
-        and returns the result.
-
-        Args:
-            op (OperatorCallable): The operator whose __call__ method is to be patched.
         """
-        original_call = op.__call__
+        Recursively patch an operator's class-level __call__ so that calls produce trace records.
+        """
+        # Avoid re-patching an operator instance.
+        if getattr(op, "_tracer_patched", False):
+            return
+
+        cls = op.__class__
+        # If this class hasn't been patched yet, save its original call.
+        if not hasattr(cls, "_tracer_original_call"):
+            setattr(cls, "_tracer_original_call", cls.__call__)
+
+        original_call = cls.__call__
 
         @wraps(original_call)
-        def wrapped_call(*, inputs: Dict[str, Any]) -> Any:
-            # Create a node in the tracing graph.
-            node_id: str = self.graph.add_node(operator=op)
-            result: Any = original_call(inputs=inputs)
-            self.graph.get_node(node_id).captured_outputs = result
+        def patched_call(this, *, inputs: Dict[str, Any]) -> Any:
+            operator_name = getattr(this, "name", this.__class__.__name__)
+            node_id = self.graph.add_node(operator=this, inputs=[])
+            node = self.graph.nodes[node_id]
+            node.attrs["name"] = operator_name
+
+            # Recursively patch sub-operators.
+            if hasattr(this, "sub_operators") and isinstance(this.sub_operators, dict):
+                for sub_op in this.sub_operators.values():
+                    self._patch_operator(sub_op)
+
+            result = original_call(this, inputs=inputs)
+            node.captured_inputs = inputs
+            node.captured_outputs = result
+            self.trace_records.append(
+                TraceRecord(
+                    operator_name=operator_name,
+                    node_id=node_id,
+                    inputs=inputs,
+                    outputs=result
+                )
+            )
             return result
 
-        op.__call__ = wrapped_call
+        cls.__call__ = patched_call
+        object.__setattr__(op, "_tracer_patched", True)
+        self._patched.add(op)
 
-    def run_trace(self) -> XCSGraph:
-        """Executes the top operator with the sample input to populate the tracing graph.
-
-        Returns:
-            XCSGraph: The traced graph populated during operator execution.
+    def _restore_operators(self) -> None:
         """
-        self.top_operator(inputs=self.sample_input)
+        Restore each operator's class to its original call method.
+        """
+        for op in self._patched:
+            cls = op.__class__
+            if hasattr(cls, "_tracer_original_call"):
+                cls.__call__ = getattr(cls, "_tracer_original_call")
+                delattr(cls, "_tracer_original_call")
+            if hasattr(op, "_tracer_patched"):
+                delattr(op, "_tracer_patched")
+        self._patched.clear()
+
+    def run_trace(self) -> IRGraph:
+        """
+        Executes the top operator with the sample input to build the trace.
+        
+        Returns:
+            IRGraph: The constructed execution graph.
+        """
+        # Reconstruct inputs as a PyTree using the tracer references.
+        leaves, aux = tree_flatten(tree=self.sample_input)
+        unflattened_inputs = tree_unflatten(aux=aux, children=leaves)
+
+        # Add the operator node
+        operator_node_id = self.graph.add_node(
+            operator=self.top_operator,
+            inputs=list(self._input_tracers.values()),
+        )
+
+        # Invoke the operator with reconstructed inputs
+        output = self.top_operator(inputs=cast(Dict[str, Any], unflattened_inputs))
+
+        # Flatten and record the output leaves
+        out_leaves, out_aux = tree_flatten(tree=output)
+        # Ensure the operator node has an 'attrs' attribute (for cases where it is a XCSNode)
+        if not hasattr(self.graph.nodes[operator_node_id], "attrs"):
+            self.graph.nodes[operator_node_id].attrs = {}
+        for i, leaf in enumerate(out_leaves):
+            self.graph.output_mapping[f"output_{i}"] = operator_node_id
+            # Store the output leaves in the operator node for reference
+            self.graph.nodes[operator_node_id].attrs[f"output_{i}"] = leaf
+
+        logger.debug("Constructed IR graph with %d nodes.", len(self.graph.nodes))
         return self.graph
 
 
-def convert_traced_graph_to_plan(*, tracer_graph: XCSGraph) -> Any:
-    """Converts a traced XCSGraph into an executable plan.
-
-    This function iterates over all nodes in the traced graph, creates corresponding
-    execution plan tasks, and aggregates them into a comprehensive execution plan.
-
-    Args:
-        tracer_graph (XCSGraph): The traced XCSGraph instance.
-
-    Returns:
-        Any: The execution plan derived from the traced graph.
+def convert_traced_graph_to_plan(*, tracer_graph: IRGraph) -> Any:
     """
-    # Import here to avoid circular dependency issues.
-    from ..engine.xcs_engine import XCSPlan, XCSPlanTask
+    Converts a traced XCSGraph into an executable plan (XCSPlan).
+    """
+    from src.ember.xcs.engine.xcs_engine import XCSPlan, XCSPlanTask
 
-    plan: XCSPlan = XCSPlan()
+    tasks: Dict[str, XCSPlanTask] = {}
     for node_id, node in tracer_graph.nodes.items():
-        task: XCSPlanTask = XCSPlanTask(
-            node_id=node_id, operator=node.operator, inbound_nodes=node.inbound_edges
+        tasks[node_id] = XCSPlanTask(
+            node_id=node_id,
+            operator=node.operator,
+            inbound_nodes=node.inputs,
         )
-        plan.add_task(task)
-    return plan
+    return XCSPlan(tasks=tasks, original_graph=tracer_graph)
+
+
+def get_current_trace_context() -> Optional[TracerContext]:
+    """
+    Retrieve the current trace context if available.
+    
+    This stub can later be extended (for example, using thread-local storage)
+    to provide global access to the current trace context.
+    """
+    return None

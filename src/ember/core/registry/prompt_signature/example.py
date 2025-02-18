@@ -3,7 +3,7 @@ from typing import Literal, Optional, Type
 
 from pydantic import BaseModel
 
-from ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
 class CaravanLabelsOutput(BaseModel):
@@ -45,8 +45,8 @@ class CaravanLabelingSignature(Signature):
 
 
 # Example usage with an ensemble operator:
-# from ember.registry.operators.operator_registry import EnsembleOperator, EnsembleOperatorInputs
-# from ember.registry.operators.operator_base import LMModuleConfig, LMModule
+# from src.ember.registry.operators.operator_registry import EnsembleOperator, EnsembleOperatorInputs
+# from src.ember.registry.operators.operator_base import LMModuleConfig, LMModule
 #
 # question_data = "What is the capital of France?"
 #

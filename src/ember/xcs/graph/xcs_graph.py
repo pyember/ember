@@ -58,6 +58,11 @@ class XCSNode:
         if to_id not in self.outbound_edges:
             self.outbound_edges.append(to_id)
 
+    @property
+    def attrs(self) -> Dict[str, Any]:
+        """Alias for attributes, for compatibility with tracing code."""
+        return self.attributes
+
 
 class XCSGraph:
     """
@@ -179,3 +184,34 @@ class XCSGraph:
             raise ValueError("Graph contains a cycle or is not a valid DAG.")
 
         return sorted_list
+
+
+# Helper function to merge two XCSGraphs.
+def merge_xcs_graphs(
+    *, base: XCSGraph, additional: XCSGraph, namespace: Optional[str] = None
+) -> XCSGraph:
+    """
+    Merge two XCSGraph objects into one unified execution graph with namespaced node IDs.
+
+    Args:
+        base (XCSGraph): The base execution graph.
+        additional (XCSGraph): The graph to merge into the base.
+        namespace (Optional[str]): Optional namespace prefix for node IDs.
+
+    Returns:
+        XCSGraph: The merged execution graph.
+    """
+    ns_prefix: str = f"{namespace}_" if namespace else ""
+    for node_id, node in additional.nodes.items():
+        new_node_id: str = f"{ns_prefix}{node_id}"
+        while new_node_id in base.nodes:
+            new_node_id += "_dup"
+        node.node_id = new_node_id
+        base.nodes[new_node_id] = node
+    if additional.exit_node:
+        namespaced_exit: str = f"{ns_prefix}{additional.exit_node}"
+        if base.exit_node:
+            base.add_edge(from_id=namespaced_exit, to_id=base.exit_node)
+        else:
+            base.exit_node = namespaced_exit
+    return base

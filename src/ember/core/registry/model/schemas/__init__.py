@@ -1,11 +1,15 @@
 # new file to mark 'model.schemas' as a Python package
 
-from ...providers.base_provider import BaseChatParameters
-from .chat_schemas import ChatRequest, ChatResponse
-from .model_info import ModelInfo
-from .provider_info import ProviderInfo
-from .cost import ModelCost, RateLimit
-from .usage import UsageStats, UsageRecord, UsageSummary
+from src.ember.core.registry.model.providers.base_provider import BaseChatParameters
+from src.ember.core.registry.model.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.schemas.usage import (
+    UsageStats,
+    UsageRecord,
+    UsageSummary,
+)
 
 __all__ = [
     "ChatRequest",

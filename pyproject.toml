@@ -6,7 +6,9 @@ authors = ["Jared Quincy Davis <jaredq@cs.stanford.edu>"]
 readme = "README.md"
 license = "Apache-2.0"
 keywords = ["AI", "Networks of Networks", "Machine Learning"]
-packages = [{ include = "ember", from = "src" }]
+packages = [
+    { include = "ember/**/*.py", from = "src" },
+]
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
@@ -108,12 +110,15 @@ ipykernel = "6.26.0"
 
 [tool.pytest.ini_options]
 pythonpath = [
-  ".",
-  "src"
+    ".",
+    "src",
+    "tests"
 ]
-markers = [
-    "integration: Mark test as an integration test."
-]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "--import-mode=importlib"
 
 [build-system]
 requires = ["poetry-core>=1.5.0"]
