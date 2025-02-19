@@ -18,7 +18,10 @@ def test_get_answer_operator_forward() -> None:
     dummy_lm = DummyLMModule()
     op = GetAnswerOperator(lm_module=dummy_lm)
 
-    inputs = GetAnswerOperatorInputs(query="What is 2+2?", responses=["unused"])
+    inputs = GetAnswerOperatorInputs(
+        query="What is 2+2?",
+        response="The answer is 4."
+    )
     result: Dict[str, Any] = op(inputs=inputs)
 
     # Validate the final answer matches what the LM returns

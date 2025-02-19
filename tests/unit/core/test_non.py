@@ -111,7 +111,10 @@ def test_most_common_operator_normal() -> None:
 def test_get_answer_operator_normal(mock_invoke) -> None:
     """Test that GetAnswer extracts the final answer from LM module output."""
     getter = GetAnswer(model_name="dummy", temperature=0.0)
-    inputs: GetAnswerInputs = GetAnswerInputs(query="Test", responses=["ignored"])
+    inputs: GetAnswerInputs = GetAnswerInputs(
+        query="Test",
+        response="Previous response" 
+    )
     output: Dict[str, Any] = getter(inputs=inputs)
     assert "final_answer" in output, "Output should contain 'final_answer'."
     assert output["final_answer"] == "AnswerX", "The final answer should be 'AnswerX'."

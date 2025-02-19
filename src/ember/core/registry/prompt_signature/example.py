@@ -7,32 +7,38 @@ from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
 class CaravanLabelsOutput(BaseModel):
-    """Pydantic model for Caravan labeling output.
+    """
+    Data model representing Caravan labeling output.
 
     Attributes:
-        label (Literal["0", "1"]): The label assigned to the input. It must be "0" (benign) or "1" (malicious).
+        label (Literal["0", "1"]): The assigned label, where "0" indicates benign and "1" indicates malicious.
     """
 
     label: Literal["0", "1"]
 
 
 class CaravanLabelingInputs(BaseModel):
-    """Pydantic model for Caravan labeling inputs.
+    """
+    Data model representing Caravan labeling inputs.
 
     Attributes:
-        flow (str): The flow stream used for labeling.
+        flow (str): The flow stream data used for labeling network traffic.
     """
 
     flow: str
 
 
-class CaravanLabelingSignature(Signature):
-    """Signature for labeling network flows as benign or malicious.
+class CaravanLabelingSignature(Signature[CaravanLabelingInputs, CaravanLabelsOutput]):
+    """
+    Signature for labeling network flows as benign or malicious.
+
+    This signature defines a prompt template for network security experts to label input flows.
+    It leverages associated Pydantic models to validate both the inputs and the outputs.
 
     Attributes:
-        prompt_template (str): The prompt template for processing the input.
-        structured_output (Optional[Type[BaseModel]]): Output model class used to validate results.
-        input_model (Optional[Type[BaseModel]]): Input model class used to validate inputs.
+        prompt_template (str): The prompt template that incorporates input data via placeholders.
+        structured_output (Optional[Type[CaravanLabelsOutput]]): The output model used for validating results.
+        input_model (Optional[Type[CaravanLabelingInputs]]): The input model used for validating provided inputs.
     """
 
     prompt_template: str = (
@@ -40,30 +46,5 @@ class CaravanLabelingSignature(Signature):
         "Given these unlabeled flows:\n{flow}\n"
         "Label each flow as 0 for benign or 1 for malicious, one per line, no explanation.\n"
     )
-    structured_output: Optional[Type[BaseModel]] = CaravanLabelsOutput
-    input_model: Optional[Type[BaseModel]] = CaravanLabelingInputs
-
-
-# Example usage with an ensemble operator:
-# from src.ember.registry.operators.operator_registry import EnsembleOperator, EnsembleOperatorInputs
-# from src.ember.registry.operators.operator_base import LMModuleConfig, LMModule
-#
-# question_data = "What is the capital of France?"
-#
-# # Define LMModule configurations
-# lm_configs = [
-#     LMModuleConfig(model_name="gpt-4o", temperature=0.7) for _ in range(3)
-# ]
-#
-# # Create LMModules from the configurations
-# lm_modules = [LMModule(config=config) for config in lm_configs]
-#
-# # Create an instance of the EnsembleOperator with the LMModules and signature
-# caravan_operator = EnsembleOperator(lm_modules=lm_modules)
-#
-# # Build the inputs using the signature's input model
-# inputs = caravan_operator.build_inputs(query=question_data)
-#
-# # Execute the operator
-# result = caravan_operator(inputs=inputs)
-# print(result)
+    structured_output: Optional[Type[CaravanLabelsOutput]] = CaravanLabelsOutput
+    input_model: Optional[Type[CaravanLabelingInputs]] = CaravanLabelingInputs

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel
 
 from src.ember.core.registry.operator.base.operator_base import (
@@ -17,11 +17,11 @@ class GetAnswerOperatorInputs(BaseModel):
 
     Attributes:
         query (str): The query string.
-        responses (List[str]): A list of response strings.
+        response (str): The response string.
     """
 
     query: str
-    responses: List[str]
+    response: str
 
 
 class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
@@ -29,7 +29,11 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
 
     signature: Signature = Signature(
         input_model=GetAnswerOperatorInputs,
-        prompt_template="GetAnswer Prompt: {query}",
+        prompt_template=(
+            "GetAnswer Prompt:\n"
+            "Query: {query}\n"
+            "Previous Response: {response}"
+        ),
     )
     lm_module: LMModule
 

@@ -153,22 +153,17 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 
 
 class GetAnswerInputs(BaseModel):
-    """Typed input for the GetAnswer operator.
+    """Input model for GetAnswer operator.
 
     Attributes:
-        query (str): The query for which an answer is sought.
-        responses (List[str]): List of candidate responses.
+        query (str): The query string.
+        response (str): The previous response.
     """
-
     query: str
-    responses: List[str] = Field(
-        ...,
-        description="Candidate response strings from which a final answer is extracted.",
-    )
+    response: str
 
 
 class GetAnswerSignature(Signature):
-    required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = GetAnswerInputs
 
 
@@ -177,7 +172,7 @@ class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
 
     Example:
         getter = GetAnswer(model_name="gpt-4o")
-        output = getter(inputs=GetAnswerInputs(query="Which label is correct?", responses=["A", "B"]))
+        output = getter(inputs=GetAnswerInputs(query="Which label is correct?", response="The answer is A."))
     """
 
     signature: Signature = GetAnswerSignature()

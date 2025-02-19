@@ -1,7 +1,17 @@
 from __future__ import annotations
-from typing import Dict, Optional, Type, Union, TypeVar, Generic
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
+import logging
 
 from pydantic import BaseModel, model_validator
+
+from src.ember.core.registry.prompt_signature.exceptions import (
+    PromptSignatureError,
+    PlaceholderMissingError,
+    MismatchedModelError,
+    InvalidInputTypeError,
+)
+
+logger = logging.getLogger(__name__)
 
 InputModelT = TypeVar("InputModelT", bound=BaseModel)
 OutputModelT = TypeVar("OutputModelT", bound=BaseModel)
@@ -11,148 +21,199 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
     """Base class representing an operator's signature.
 
     Attributes:
-        prompt_template (Optional[str]): Template string that may reference input names.
-        structured_output (Optional[Type[BaseModel]]): Pydantic model class for validating the output.
-        input_model (Optional[Type[BaseModel]]): Pydantic model class defining the expected input fields.
-        check_all_placeholders (bool): Flag to enforce the inclusion of all required placeholders.
+        prompt_template (Optional[str]): Template string that may reference input field names.
+        structured_output (Optional[Type[OutputModelT]]): Pydantic model class used for output validation.
+        input_model (Optional[Type[InputModelT]]): Pydantic model class defining the expected input fields.
+        check_all_placeholders (bool): Flag to enforce that all required placeholders are included in the prompt template.
     """
 
     prompt_template: Optional[str] = None
     structured_output: Optional[Type[OutputModelT]] = None
     input_model: Optional[Type[InputModelT]] = None
-    check_all_placeholders: bool = False
+    check_all_placeholders: bool = True
+
+    def _get_required_fields(self) -> List[str]:
+        """Retrieve the names of required fields from the input model.
+
+        Returns:
+            List[str]: A list of required field names if an input_model is defined; otherwise, an empty list.
+        """
+        if self.input_model is None:
+            return []
+        return [
+            field_name
+            for field_name, field in self.input_model.model_fields.items()
+            if field.is_required()
+        ]
 
     @model_validator(mode="after")
-    def check_template(self) -> Signature[InputModelT, OutputModelT]:
-        """Validates that the prompt_template contains required input placeholders."""
+    def _validate_template(self) -> Signature[InputModelT, OutputModelT]:
+        """Ensure the prompt template contains all required placeholders.
+
+        Returns:
+            Signature[InputModelT, OutputModelT]: The validated signature instance.
+
+        Raises:
+            PlaceholderMissingError: If one or more required placeholders are missing in the prompt template.
+        """
         if (
             self.prompt_template is not None
             and self.input_model is not None
             and self.check_all_placeholders
         ):
-            required_fields = [
-                name
-                for name, field in self.input_model.model_fields.items()
-                if field.is_required()
+            required_fields: List[str] = self._get_required_fields()
+            missing_fields: List[str] = [
+                field
+                for field in required_fields
+                if f"{{{field}}}" not in self.prompt_template
             ]
-            for field_name in required_fields:
-                placeholder: str = f"{{{field_name}}}"
-                if placeholder not in self.prompt_template:
-                    raise ValueError(
-                        f"Required input '{field_name}' not found in prompt_template."
-                    )
+            if missing_fields:
+                error_msg: str = (
+                    f"Missing placeholders in prompt_template: {', '.join(missing_fields)}"
+                )
+                logger.error(error_msg)
+                raise PlaceholderMissingError(
+                    message=error_msg, missing_placeholder=", ".join(missing_fields)
+                )
         return self
 
-    def render_prompt(self, inputs: Dict[str, object]) -> str:
-        """Renders a prompt string based on provided inputs and configuration.
+    def render_prompt(self, *, inputs: Dict[str, Any]) -> str:
+        """Render a prompt using the provided inputs.
 
-        If a prompt_template is defined, the method formats it using the values from 'inputs'.
-        Otherwise, if an input_model is available, it concatenates the values of the required fields.
-        If neither is available, a ValueError is raised.
+        If a prompt_template is specified, formats it using the given inputs.
+        Otherwise, if an input_model is defined, concatenates its required fields' values.
+        If neither is available, raises an error.
 
         Args:
-            inputs (Dict[str, object]): Dictionary containing input values.
+            inputs (Dict[str, Any]): A dictionary containing input values.
 
         Returns:
-            str: The prompt string generated from the inputs.
+            str: The rendered prompt string.
 
         Raises:
-            ValueError: If neither a prompt_template nor an input_model is defined for rendering prompt.
+            PlaceholderMissingError: If placeholder validation is enabled without an input_model,
+                if a required placeholder value is missing, or if neither a prompt_template nor an input_model is defined.
         """
         if self.check_all_placeholders and self.input_model is None:
-            raise ValueError("Missing input_model for placeholder validation.")
-        if self.prompt_template:
-            return self.prompt_template.format(**inputs)
-        if self.input_model:
-            required_fields = [
-                name
-                for name, field in self.input_model.model_fields.items()
-                if getattr(field, "required", False)
-            ]
-            return "\n".join(str(inputs.get(name, "")) for name in required_fields)
-        raise ValueError(
+            error_msg: str = "Missing input_model for placeholder validation."
+            logger.error(error_msg)
+            raise PlaceholderMissingError(message=error_msg)
+
+        if self.prompt_template is not None:
+            try:
+                prompt: str = self.prompt_template.format(**inputs)
+                return prompt
+            except KeyError as key_err:
+                error_msg: str = f"Missing input for placeholder: {key_err}"
+                logger.error(error_msg)
+                raise PlaceholderMissingError(
+                    message=error_msg, missing_placeholder=str(key_err)
+                ) from key_err
+
+        if self.input_model is not None:
+            required_fields: List[str] = self._get_required_fields()
+            return "\n".join(str(inputs.get(field, "")) for field in required_fields)
+
+        error_msg: str = (
             "No prompt_template or input_model defined for rendering prompt."
         )
+        logger.error(error_msg)
+        raise PlaceholderMissingError(message=error_msg)
 
-    def model_json_schema(self) -> Dict[str, object]:
-        """Retrieves the JSON schema for the input model.
-
-        If an input_model is defined, its JSON schema is returned; otherwise, an empty dictionary is provided.
-
-        Returns:
-            Dict[str, object]: The JSON schema of the input_model or an empty dict if not defined.
-        """
-        if self.input_model is not None:
-            return self.input_model.model_json_schema()
-        return {}
-
-    def validate_inputs(
-        self, inputs: Union[Dict[str, object], InputModelT]
-    ) -> Union[InputModelT, Dict[str, object]]:
-        """Validates and parses raw inputs using the defined input model.
-
-        When an input_model is specified, this method converts the raw input (either a dict or BaseModel)
-        into an instance of that model. If no input_model is available, the input is returned as provided,
-        granted that it is a dict or a BaseModel instance.
+    def model_json_schema(self, *, by_alias: bool = True) -> Dict[str, Any]:
+        """Return the JSON schema for the input model.
 
         Args:
-            inputs (Union[Dict[str, object], InputModelT]): The raw input data.
+            by_alias (bool): Whether to use field aliases in the schema.
 
         Returns:
-            Union[InputModelT, Dict[str, object]]: A validated model instance or the original input.
-
-        Raises:
-            ValueError: If a BaseModel input is not an instance of the expected input_model.
-            TypeError: If the input is neither a dict nor a Pydantic model.
+            Dict[str, Any]: The JSON schema for the input_model or an empty dict if it is not defined.
         """
         if self.input_model is not None:
-            if isinstance(inputs, dict):
-                return self.input_model.model_validate(inputs)
-            if isinstance(inputs, BaseModel):
-                if not isinstance(inputs, self.input_model):
-                    raise ValueError(
-                        f"Input model mismatch. Expected {self.input_model.__name__}, "
-                        f"got {type(inputs).__name__}."
-                    )
-                return inputs
-            raise TypeError(
-                f"Inputs must be a dict or a Pydantic model, got {type(inputs).__name__}."
+            return self.input_model.model_json_schema(by_alias=by_alias)
+        return {}
+
+    def _validate_data(
+        self,
+        *,
+        data: Union[Dict[str, Any], BaseModel],
+        model: Type[BaseModel],
+        model_label: str,
+    ) -> BaseModel:
+        """Validate the provided data against a specified Pydantic model.
+
+        Args:
+            data (Union[Dict[str, Any], BaseModel]): The data to validate.
+            model (Type[BaseModel]): The Pydantic model for validation.
+            model_label (str): A label for error messages (e.g., "Input" or "Output").
+
+        Returns:
+            BaseModel: A validated instance of the specified model.
+
+        Raises:
+            MismatchedModelError: If a BaseModel instance does not match the expected model.
+            InvalidInputTypeError: If the data is neither a dict nor a Pydantic model.
+        """
+        if isinstance(data, dict):
+            return model.model_validate(data)
+        if isinstance(data, BaseModel):
+            if not isinstance(data, model):
+                error_msg: str = (
+                    f"{model_label} model mismatch. Expected {model.__name__}, got {type(data).__name__}."
+                )
+                logger.error(error_msg)
+                raise MismatchedModelError(message=error_msg)
+            return data
+        error_msg: str = (
+            f"{model_label} must be a dict or a Pydantic model, got {type(data).__name__}."
+        )
+        logger.error(error_msg)
+        raise InvalidInputTypeError(message=error_msg)
+
+    def validate_inputs(
+        self, *, inputs: Union[Dict[str, Any], InputModelT]
+    ) -> Union[InputModelT, Dict[str, Any]]:
+        """Validate and parse raw inputs per the defined input model.
+
+        Args:
+            inputs (Union[Dict[str, Any], InputModelT]): Raw input data as a dictionary or Pydantic model.
+
+        Returns:
+            Union[InputModelT, Dict[str, Any]]: A validated input model instance or the original inputs.
+
+        Raises:
+            MismatchedModelError: If the provided BaseModel does not match the expected input_model.
+            InvalidInputTypeError: If inputs are neither a dict nor a Pydantic model.
+        """
+        if self.input_model is not None:
+            return self._validate_data(
+                data=inputs, model=self.input_model, model_label="Input"
             )
         if isinstance(inputs, (dict, BaseModel)):
             return inputs
-        raise TypeError(
+        error_msg: str = (
             f"Inputs must be a dict or a Pydantic model, got {type(inputs).__name__}."
         )
+        logger.error(error_msg)
+        raise InvalidInputTypeError(message=error_msg)
 
     def validate_output(
-        self, output: Union[Dict[str, object], OutputModelT]
-    ) -> Union[OutputModelT, Dict[str, object]]:
-        """Validates and parses the operator's raw output via the structured output model.
-
-        If a structured_output model is defined, this method converts the raw output (either a dict or a BaseModel)
-        into a validated instance of that model. Otherwise, it returns the raw output unmodified.
+        self, *, output: Union[Dict[str, Any], OutputModelT]
+    ) -> Union[OutputModelT, Dict[str, Any]]:
+        """Validate and parse raw output using the structured output model.
 
         Args:
-            output (Union[Dict[str, object], OutputModelT]): The raw output data.
+            output (Union[Dict[str, Any], OutputModelT]): Raw output data as a dictionary or Pydantic model.
 
         Returns:
-            Union[OutputModelT, Dict[str, object]]: A validated output model instance if structured_output is defined; otherwise, the raw output.
+            Union[OutputModelT, Dict[str, Any]]: A validated structured output instance or the original output.
 
         Raises:
-            ValueError: If a BaseModel output is not an instance of the expected structured_output type.
-            TypeError: If output is neither a dict nor a Pydantic model when a structured_output model is defined.
+            MismatchedModelError: If the provided BaseModel does not match the expected structured_output.
+            InvalidInputTypeError: If output is neither a dict nor a Pydantic model when a structured_output model is defined.
         """
         if self.structured_output is not None:
-            if isinstance(output, dict):
-                return self.structured_output.model_validate(output)
-            if isinstance(output, BaseModel):
-                if not isinstance(output, self.structured_output):
-                    raise ValueError(
-                        f"Output model mismatch. Expected {self.structured_output.__name__}, "
-                        f"got {type(output).__name__}."
-                    )
-                return output
-            raise TypeError(
-                f"Output must be a dict or a Pydantic model, got {type(output).__name__}."
+            return self._validate_data(
+                data=output, model=self.structured_output, model_label="Output"
             )
         return output
