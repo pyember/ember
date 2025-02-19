@@ -170,18 +170,18 @@ class GeminiModel(BaseProviderModel):
             "Gemini forward invoked",
             extra={
                 "provider": self.PROVIDER_NAME,
-                "model_name": self.model_info.model_name,
+                "model_name": self.model_info.name,
                 "prompt_length": len(request.prompt),
             },
         )
 
         final_model_ref: str = self._normalize_gemini_model_name(
-            self.model_info.model_name
+            self.model_info.name
         )
 
         # Convert the universal ChatRequest into Gemini-specific parameters.
         gemini_params: GeminiChatParameters = GeminiChatParameters(
-            **request.dict(exclude={"provider_params"})
+            **request.model_dump(exclude={"provider_params"})
         )
         gemini_kwargs: Dict[str, Any] = gemini_params.to_gemini_kwargs()
 

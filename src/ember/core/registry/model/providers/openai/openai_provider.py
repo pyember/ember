@@ -166,7 +166,7 @@ class OpenAIModel(BaseProviderModel):
             "OpenAI forward invoked",
             extra={
                 "provider": self.PROVIDER_NAME,
-                "model_name": self.model_info.model_name,
+                "model_name": self.model_info.name,
                 "prompt_length": len(request.prompt),
             },
         )
@@ -191,13 +191,13 @@ class OpenAIModel(BaseProviderModel):
 
         # Prune parameters that are unsupported by the current model.
         openai_kwargs = self._prune_unsupported_params(
-            model_name=self.model_info.model_name,
+            model_name=self.model_info.name,
             kwargs=openai_kwargs,
         )
 
         try:
             response: Any = self.client.chat.completions.create(
-                model=self.model_info.model_name,
+                model=self.model_info.name,
                 **openai_kwargs,
             )
             content: str = response.choices[0].message.content.strip()

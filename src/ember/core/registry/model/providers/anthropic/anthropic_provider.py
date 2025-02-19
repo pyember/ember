@@ -229,14 +229,14 @@ class AnthropicModel(BaseProviderModel):
             "Anthropic forward() invoked",
             extra={
                 "provider": self.PROVIDER_NAME,
-                "model_name": self.model_info.model_name,
+                "model_name": self.model_info.name,
                 "correlation_id": correlation_id,
                 "prompt_length": len(request.prompt),
             },
         )
 
         final_model_name: str = self._normalize_anthropic_model_name(
-            self.model_info.model_name
+            self.model_info.name
         )
         anthropic_params: AnthropicChatParameters = AnthropicChatParameters(
             **request.model_dump(exclude={"provider_params"})

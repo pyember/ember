@@ -66,7 +66,7 @@ class ModelFactory:
             4. Instantiates the provider model using named parameter invocation.
 
         Args:
-            model_info (ModelInfo): Configuration details for the model, including the model_id and provider.
+            model_info (ModelInfo): Configuration details for the model, including the id and provider.
 
         Returns:
             BaseProviderModel: An instantiated provider model corresponding to the provided configuration.
@@ -76,11 +76,11 @@ class ModelFactory:
         """
         # Validate the model ID.
         try:
-            validated_model_id: str = parse_model_str(model_info.model_id)
+            validated_model_id: str = parse_model_str(model_info.id)
             _ = validated_model_id  # The validated ID is not further used.
         except ValueError as value_error:
             raise ProviderConfigError(
-                f"Unrecognized model ID '{model_info.model_id}'."
+                f"Unrecognized model ID '{model_info.id}'."
             ) from value_error
 
         provider_name: str = model_info.provider.name
@@ -99,7 +99,7 @@ class ModelFactory:
 
         logger.debug(
             "Creating model '%s' using provider class '%s'.",
-            model_info.model_id,
+            model_info.id,
             provider_class.__name__,
         )
         model_instance: BaseProviderModel = provider_class(model_info=model_info)

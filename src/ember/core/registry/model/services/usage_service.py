@@ -60,7 +60,7 @@ class UsageService:
                 else usage_stats
             )
             usage_record: UsageRecord = UsageRecord(usage_stats=converted_usage_stats)
-            usage_summary.add_usage_record(usage_record=usage_record)
+            usage_summary.add_usage_record(usage_record)
 
     def get_usage_summary(self, *, model_id: str) -> UsageSummary:
         """Retrieves the current usage summary for the specified model in a thread-safe manner.

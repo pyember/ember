@@ -52,16 +52,16 @@ class ModelRegistry:
             ValueError: If a model with the provided model ID is already registered.
         """
         with self._lock:
-            if model_info.model_id in self._models:
+            if model_info.id in self._models:
                 raise ValueError(
-                    "Model '{}' is already registered.".format(model_info.model_id)
+                    "Model '{}' is already registered.".format(model_info.id)
                 )
             model: BaseProviderModel = ModelFactory.create_model_from_info(
                 model_info=model_info
             )
-            self._models[model_info.model_id] = model
-            self._model_infos[model_info.model_id] = model_info
-            self._logger.info("Registered model: %s", model_info.model_id)
+            self._models[model_info.id] = model
+            self._model_infos[model_info.id] = model_info
+            self._logger.info("Registered model: %s", model_info.id)
 
     def register_or_update_model(self, model_info: ModelInfo) -> None:
         """Registers a new model or updates an existing model with provided metadata.
@@ -76,8 +76,8 @@ class ModelRegistry:
             model: BaseProviderModel = ModelFactory.create_model_from_info(
                 model_info=model_info
             )
-            self._models[model_info.model_id] = model
-            self._model_infos[model_info.model_id] = model_info
+            self._models[model_info.id] = model
+            self._model_infos[model_info.id] = model_info
 
     def get_model(self, model_id: str) -> BaseProviderModel:
         """Retrieves a registered model instance by its model ID.
