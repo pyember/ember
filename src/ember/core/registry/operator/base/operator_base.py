@@ -98,9 +98,15 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         except Exception as error:
             operator_name: str = self.__class__.__name__
             error_message: str = (
-                f"[{operator_name}] Input validation failed for inputs: {inputs}"
+                f"[{operator_name}] Input validation failed for inputs: {inputs}. "
+                "Please ensure the input conforms to the expected schema: "
+                f"{getattr(signature, 'input_model', 'Unknown')}"
             )
-            logger.error(error_message, extra={"operator": operator_name}, exc_info=True)
+            logger.error(
+                error_message,
+                extra={"operator": operator_name, "input_schema": getattr(signature, 'input_model', None)},
+                exc_info=True
+            )
             raise SignatureValidationError(error_message) from error
 
         # Execute forward computation.

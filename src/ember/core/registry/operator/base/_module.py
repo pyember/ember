@@ -93,6 +93,9 @@ def _flatten_ember_module(instance: Any) -> Tuple[List[Any], Dict[str, Any]]:
         Tuple[List[Any], Dict[str, Any]]: A tuple containing a list of dynamic field values and
         a dictionary mapping static field names to their values.
     """
+    if hasattr(instance, '_flattened_cache'):
+        return instance._flattened_cache  # type: ignore
+
     dynamic_fields: List[Any] = []
     static_fields: Dict[str, Any] = {}
     for field_info in dataclasses.fields(instance):
@@ -101,7 +104,10 @@ def _flatten_ember_module(instance: Any) -> Tuple[List[Any], Dict[str, Any]]:
             static_fields[field_info.name] = value
         else:
             dynamic_fields.append(value)
-    return dynamic_fields, static_fields
+
+    flattened = (dynamic_fields, static_fields)
+    object.__setattr__(instance, '_flattened_cache', flattened)  # Cache the result.
+    return flattened
 
 
 def _unflatten_ember_module(
