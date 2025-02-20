@@ -30,9 +30,7 @@ class GetAnswerOperator(Operator[GetAnswerOperatorInputs, Dict[str, Any]]):
     signature: Signature = Signature(
         input_model=GetAnswerOperatorInputs,
         prompt_template=(
-            "GetAnswer Prompt:\n"
-            "Query: {query}\n"
-            "Previous Response: {response}"
+            "GetAnswer Prompt:\n" "Query: {query}\n" "Previous Response: {response}"
         ),
     )
     lm_module: LMModule

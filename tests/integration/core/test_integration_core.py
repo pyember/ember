@@ -6,10 +6,20 @@ and verifies that inputs propagate correctly, prompts are rendered, and the fina
 output contains expected verification details.
 """
 
-from src.ember.core.non import UniformEnsemble, MostCommon, Verifier, Sequential, EnsembleInputs
+from src.ember.core.non import (
+    UniformEnsemble,
+    MostCommon,
+    Verifier,
+    Sequential,
+    EnsembleInputs,
+)
 from unittest.mock import patch
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="AnswerX")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="AnswerX",
+)
 def test_multi_stage_pipeline_integration(mock_invoke_model) -> None:
     # Set up an Ensemble operator.
     ensemble = UniformEnsemble(num_units=3, model_name="dummy", temperature=1.0)
@@ -20,7 +30,9 @@ def test_multi_stage_pipeline_integration(mock_invoke_model) -> None:
     # Set up a Verifier operator.
     verifier = Verifier(model_name="dummy", temperature=0.0)
     for lm in [verifier.verifier_op.lm_module]:
-        lm.__call__ = lambda *, prompt: "Verdict: Correct\nExplanation: Verified\nRevised Answer: FinalAnswer"
+        lm.__call__ = (
+            lambda *, prompt: "Verdict: Correct\nExplanation: Verified\nRevised Answer: FinalAnswer"
+        )
     # Chain the operators into a pipeline.
     pipeline = Sequential(operators=[ensemble, most_common])
     input_data: EnsembleInputs = EnsembleInputs(query="What is the answer?")

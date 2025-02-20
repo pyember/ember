@@ -24,6 +24,7 @@ class DummyModel:
         class DummyResponse:
             data = f"Echo: {prompt}"
             usage = None
+
         return DummyResponse()
 
 
@@ -44,8 +45,11 @@ def dummy_registry(monkeypatch: pytest.MonkeyPatch) -> ModelRegistry:
     registry = ModelRegistry()
     dummy_info = create_dummy_model_info("dummy:service")
     from src.ember.core.registry.model.registry.factory import ModelFactory
+
     monkeypatch.setattr(
-        ModelFactory, "create_model_from_info", lambda *, model_info: DummyModel(model_info)
+        ModelFactory,
+        "create_model_from_info",
+        lambda *, model_info: DummyModel(model_info),
     )
     registry.register_model(dummy_info)
     return registry
@@ -69,6 +73,7 @@ def test_invoke_model(dummy_registry: ModelRegistry) -> None:
 def test_get_model_invalid(dummy_registry: ModelRegistry) -> None:
     """Test that requesting an unregistered model raises a ModelNotFoundError."""
     from src.ember.core.exceptions import ModelNotFoundError
+
     service = ModelService(registry=dummy_registry)
     with pytest.raises(ModelNotFoundError):
         service.get_model("nonexistent:model")

@@ -38,7 +38,9 @@ class DummySignature(Signature):
         return DummyInput(**inputs)
 
     def validate_output(self, output: Any) -> DummyOutput:
-        return DummyOutput(**(output.model_dump() if hasattr(output, "model_dump") else output))
+        return DummyOutput(
+            **(output.model_dump() if hasattr(output, "model_dump") else output)
+        )
 
 
 class AddOneOperator(Operator[DummyInput, DummyOutput]):
@@ -57,6 +59,7 @@ def test_operator_call_valid() -> None:
 
 def test_missing_signature_error() -> None:
     """Test that calling an operator without a signature raises OperatorSignatureNotDefinedError."""
+
     class NoSignatureOperator(Operator):
         signature = None
 

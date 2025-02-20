@@ -141,4 +141,3 @@ def test_nested_jit() -> None:
     op = OuterOperator()
     result = op(inputs={"value": "test"})
     assert result["outer"] == "test_inner_outer"
-

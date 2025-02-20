@@ -175,9 +175,7 @@ class GeminiModel(BaseProviderModel):
             },
         )
 
-        final_model_ref: str = self._normalize_gemini_model_name(
-            self.model_info.name
-        )
+        final_model_ref: str = self._normalize_gemini_model_name(self.model_info.name)
 
         # Convert the universal ChatRequest into Gemini-specific parameters.
         gemini_params: GeminiChatParameters = GeminiChatParameters(

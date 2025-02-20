@@ -10,11 +10,12 @@ from __future__ import annotations
 import abc
 import dataclasses
 from dataclasses import field, Field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar
 
 from src.ember.xcs.utils.tree_util import register_tree, tree_flatten
 from src.ember.core.registry.operator.exceptions import BoundMethodNotInitializedError
 
+T = TypeVar("T")
 
 def static_field(**kwargs: Any) -> Field:
     """Creates a dataclass field marked as static.
@@ -42,10 +43,10 @@ def ember_field(
     static to exclude it from tree transformations.
 
     Args:
-        converter (Optional[Callable[[Any], Any]]): Optional function to convert the field's value
-            during initialization.
+        converter (Optional[Callable[[Any], Any]]): Optional function to convert the field's
+            value during initialization.
         static (bool): If True, marks the field as static. Defaults to False.
-        **kwargs: Additional keyword arguments for dataclasses.field.
+        **kwargs: Additional keyword arguments passed to dataclasses.field.
 
     Returns:
         Field: A dataclass field configured with Ember-specific settings.
@@ -58,17 +59,17 @@ def ember_field(
     return field(metadata=metadata, **kwargs)
 
 
-def _make_initable_wrapper(cls: Type[Any]) -> Type[Any]:
+def _make_initable_wrapper(cls: Type[T]) -> Type[T]:
     """Creates a temporary mutable wrapper for a frozen class.
 
-    This wrapper allows mutations during initialization (i.e., __init__ and __post_init__),
+    This wrapper allows mutations during initialization (i.e. __init__ and __post_init__),
     after which the instance's class is reverted to the original frozen class.
 
     Args:
-        cls (Type[Any]): The original frozen class.
+        cls (Type[T]): The original frozen class.
 
     Returns:
-        Type[Any]: A mutable subclass of the original class.
+        Type[T]: A mutable subclass of the original class.
     """
     class Initable(cls):  # type: ignore
         def __setattr__(self, name: str, value: Any) -> None:
@@ -164,7 +165,7 @@ class EmberModuleMeta(abc.ABCMeta):
         )
         return new_class
 
-    def __call__(cls, *args: Any, **kwargs: Any) -> Any:
+    def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
         """Overrides instantiation to allow temporary mutable initialization.
 
         A mutable wrapper is used for __init__ and __post_init__ to set fields, after which
@@ -175,10 +176,10 @@ class EmberModuleMeta(abc.ABCMeta):
             **kwargs: Keyword arguments for the instance.
 
         Returns:
-            Any: An instance of the EmberModule subclass.
+            T: An instance of the EmberModule subclass.
         """
-        mutable_cls: Type[Any] = _make_initable_wrapper(cls)
-        instance: Any = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
+        mutable_cls: Type[T] = _make_initable_wrapper(cls)
+        instance: T = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
         object.__setattr__(instance, "__class__", cls)
         return instance
 
@@ -190,16 +191,16 @@ class EmberModule(metaclass=EmberModuleMeta):
     transformation tree system.
     """
 
-    def _init_field(self, name: str, value: Any) -> None:
+    def _init_field(self, *, field_name: str, value: Any) -> None:
         """Sets a field during initialization.
 
         Intended to be used within __post_init__ for computed or derived fields.
 
         Args:
-            name (str): The name of the field.
+            field_name (str): The name of the field.
             value (Any): The value to be assigned to the field.
         """
-        object.__setattr__(self, name, value)
+        object.__setattr__(self, field_name, value)
 
     def __hash__(self) -> int:
         """Computes a hash based on the dynamic fields.

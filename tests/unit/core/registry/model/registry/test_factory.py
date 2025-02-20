@@ -11,7 +11,9 @@ from src.ember.core.registry.model.registry.factory import ModelFactory
 from src.ember.core.registry.model.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
 from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.model.utils.model_registry_exceptions import ProviderConfigError
+from src.ember.core.registry.model.utils.model_registry_exceptions import (
+    ProviderConfigError,
+)
 
 
 # Dummy provider class for testing
@@ -45,7 +47,7 @@ def create_dummy_model_info(model_id: str = "dummy:factory") -> ModelInfo:
         cost=ModelCost(input_cost_per_thousand=1.0, output_cost_per_thousand=2.0),
         rate_limit=RateLimit(tokens_per_minute=1000, requests_per_minute=100),
         provider=ProviderInfo(name="DummyProvider", default_api_key="dummy_key"),
-        api_key="dummy_key"
+        api_key="dummy_key",
     )
 
 
@@ -60,15 +62,15 @@ def test_create_model_from_info_success() -> None:
 def test_create_model_from_info_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that an invalid model id causes ProviderConfigError."""
     dummy_info = create_dummy_model_info("invalid:model")
-    
+
     # Monkey-patch parse_model_str to always raise ValueError
     def mock_parse_model_str(model_str: str) -> str:
         raise ValueError("Invalid model ID format")
-        
+
     monkeypatch.setattr(
         "src.ember.core.registry.model.registry.factory.parse_model_str",
-        mock_parse_model_str
+        mock_parse_model_str,
     )
-    
+
     with pytest.raises(ProviderConfigError):
         ModelFactory.create_model_from_info(model_info=dummy_info)

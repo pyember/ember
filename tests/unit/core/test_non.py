@@ -33,6 +33,7 @@ from src.ember.core.non import (
     VariedEnsembleInputs,
     VariedEnsembleOutputs,
 )
+
 # For dummy operator in sequential test.
 from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core.registry.prompt_signature.signatures import Signature
@@ -42,25 +43,26 @@ from src.ember.core.registry.prompt_signature.signatures import Signature
 # Helper: Dummy LM behavior
 # ------------------------------------------------------------------------------
 
+
 def dummy_response_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that always returns a fixed response."""
     return "response"
+
 
 def dummy_final_answer_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that returns a final answer string."""
     return "Final Answer: AnswerX"
 
+
 def dummy_reasoning_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that returns reasoning and a final answer."""
     return "Reasoning: Some reasoning\nFinal Answer: Synthesized"
 
+
 def dummy_verifier_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that returns a verification output."""
-    return (
-        "Verdict: Correct\n"
-        "Explanation: All good\n"
-        "Revised Answer: AnswerY"
-    )
+    return "Verdict: Correct\n" "Explanation: All good\n" "Revised Answer: AnswerY"
+
 
 def failing_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that always raises an exception."""
@@ -71,7 +73,11 @@ def failing_lm(*, prompt: str) -> str:
 # 1) UniformEnsemble Operator Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="response")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="response",
+)
 def test_uniform_ensemble_operator_normal(mock_invoke):
     """Test that UniformEnsemble returns a dictionary with responses from multiple LM modules."""
     uniform_ensemble = UniformEnsemble(num_units=3, model_name="dummy", temperature=1.0)
@@ -86,7 +92,7 @@ def test_uniform_ensemble_operator_normal(mock_invoke):
     assert isinstance(responses, list), "'responses' should be a list."
     assert len(responses) == 3, "There should be 3 responses."
     for resp in responses:
-        print('resp: ', resp)
+        print("resp: ", resp)
         assert resp == "response", "Each response should be 'response'."
 
 
@@ -94,10 +100,13 @@ def test_uniform_ensemble_operator_normal(mock_invoke):
 # 2) MostCommon Operator Tests
 # ------------------------------------------------------------------------------
 
+
 def test_most_common_operator_normal() -> None:
     """Test that MostCommon returns the most common answer from candidate responses."""
     aggregator = MostCommon()
-    inputs: MostCommonInputs = MostCommonInputs(query="Test", responses=["A", "B", "A", "C", "A"])
+    inputs: MostCommonInputs = MostCommonInputs(
+        query="Test", responses=["A", "B", "A", "C", "A"]
+    )
     output: Dict[str, Any] = aggregator.forward(inputs=inputs)
     assert "final_answer" in output, "Output should include 'final_answer'."
     assert output["final_answer"] == "A", "The most common answer should be 'A'."
@@ -107,13 +116,16 @@ def test_most_common_operator_normal() -> None:
 # 3) GetAnswer Operator Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="AnswerX")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="AnswerX",
+)
 def test_get_answer_operator_normal(mock_invoke) -> None:
     """Test that GetAnswer extracts the final answer from LM module output."""
     getter = GetAnswer(model_name="dummy", temperature=0.0)
     inputs: GetAnswerInputs = GetAnswerInputs(
-        query="Test",
-        response="Previous response" 
+        query="Test", response="Previous response"
     )
     output: Dict[str, Any] = getter(inputs=inputs)
     assert "final_answer" in output, "Output should contain 'final_answer'."
@@ -124,26 +136,40 @@ def test_get_answer_operator_normal(mock_invoke) -> None:
 # 4) JudgeSynthesis Operator Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="Reasoning: Some reasoning\nFinal Answer: Synthesized")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="Reasoning: Some reasoning\nFinal Answer: Synthesized",
+)
 def test_judge_synthesis_operator_normal(mock_invoke) -> None:
     """Test that JudgeSynthesis synthesizes a final answer and reasoning."""
     judge = JudgeSynthesis(model_name="dummy", temperature=1.0)
     # Override __call__ on LM module(s) to simulate LM output with reasoning.
     for lm in [judge.judge_synthesis_op.lm_module]:
         lm.__call__ = dummy_reasoning_lm  # type: ignore
-    inputs: JudgeSynthesisInputs = JudgeSynthesisInputs(query="Test", responses=["Resp1", "Resp2"])
+    inputs: JudgeSynthesisInputs = JudgeSynthesisInputs(
+        query="Test", responses=["Resp1", "Resp2"]
+    )
     output: Dict[str, Any] = judge(inputs=inputs)
     assert "final_answer" in output, "Output must include 'final_answer'."
     assert "reasoning" in output, "Output must include 'reasoning'."
-    assert output["final_answer"] == "Synthesized", "Final answer should be 'Synthesized'."
-    assert "Some reasoning" in output["reasoning"], "Reasoning should contain 'Some reasoning'."
+    assert (
+        output["final_answer"] == "Synthesized"
+    ), "Final answer should be 'Synthesized'."
+    assert (
+        "Some reasoning" in output["reasoning"]
+    ), "Reasoning should contain 'Some reasoning'."
 
 
 # ------------------------------------------------------------------------------
 # 5) Verifier Operator Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="Verdict: Correct\nExplanation: All good\nRevised Answer: AnswerY")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="Verdict: Correct\nExplanation: All good\nRevised Answer: AnswerY",
+)
 def test_verifier_operator_normal(mock_invoke) -> None:
     """Test that Verifier returns a verdict, explanation, and revised answer."""
     verifier = Verifier(model_name="dummy", temperature=1.0)
@@ -163,17 +189,24 @@ def test_verifier_operator_normal(mock_invoke) -> None:
 # 6) VariedEnsemble Operator Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", return_value="varied response")
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    return_value="varied response",
+)
 def test_varied_ensemble_operator_normal(mock_invoke) -> None:
     """Test that VariedEnsemble aggregates responses from multiple LM configurations."""
     from src.ember.core.registry.model.modules.lm import LMModuleConfig
+
     dummy_config: LMModuleConfig = LMModuleConfig(model_id="dummy", temperature=1.0)
     varied_ensemble = VariedEnsemble(model_configs=[dummy_config, dummy_config])
     # Override call_lm to return a fixed response.
     varied_ensemble.call_lm = lambda *, prompt, lm: "varied response"  # type: ignore
     inputs: VariedEnsembleInputs = VariedEnsembleInputs(query="Test")
     outputs: VariedEnsembleOutputs = varied_ensemble(inputs=inputs)
-    assert isinstance(outputs, VariedEnsembleOutputs), "Output should be an instance of VariedEnsembleOutputs."
+    assert isinstance(
+        outputs, VariedEnsembleOutputs
+    ), "Output should be an instance of VariedEnsembleOutputs."
     assert isinstance(outputs.responses, list), "The responses should be a list."
     assert len(outputs.responses) == 2, "There should be 2 responses."
     for resp in outputs.responses:
@@ -184,9 +217,10 @@ def test_varied_ensemble_operator_normal(mock_invoke) -> None:
 # 7) Sequential Pipeline Tests
 # ------------------------------------------------------------------------------
 
+
 def test_sequential_pipeline_operator_normal() -> None:
     """Test that Sequential chains operators in order."""
-    
+
     # Define a dummy operator that increments a value.
     class DummyOp(Operator[Dict[str, Any], Dict[str, Any]]):
         # Provide a dummy signature so that __call__ does not fail.
@@ -195,7 +229,7 @@ def test_sequential_pipeline_operator_normal() -> None:
         def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             # Increment the value by 1.
             return {"value": inputs.get("value", 0) + 1}
-    
+
     # Instantiate two dummy operators.
     op1 = DummyOp()
     op2 = DummyOp()
@@ -209,7 +243,11 @@ def test_sequential_pipeline_operator_normal() -> None:
 # 8) Error Propagation Tests
 # ------------------------------------------------------------------------------
 
-@patch("src.ember.core.registry.model.services.model_service.ModelService.invoke_model", side_effect=Exception("Simulated LM failure"))
+
+@patch(
+    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    side_effect=Exception("Simulated LM failure"),
+)
 def test_uniform_ensemble_operator_failure_propagation(mock_invoke) -> None:
     """Test that UniformEnsemble propagates errors when an LM module fails."""
     uniform_ensemble = UniformEnsemble(num_units=1, model_name="dummy", temperature=1.0)

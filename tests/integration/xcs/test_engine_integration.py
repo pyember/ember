@@ -7,7 +7,10 @@ These tests ensure that tasks execute in dependency order, errors in tasks are r
 
 import pytest
 from src.ember.xcs.graph.xcs_graph import XCSGraph
-from src.ember.xcs.engine.xcs_engine import compile_graph, TopologicalSchedulerWithParallelDispatch as XCSScheduler
+from src.ember.xcs.engine.xcs_engine import (
+    compile_graph,
+    TopologicalSchedulerWithParallelDispatch as XCSScheduler,
+)
 
 
 def task_return_one(*, inputs: dict) -> int:

@@ -22,7 +22,7 @@ def create_dummy_model_info(model_id: str = "dummy:1") -> ModelInfo:
         cost=ModelCost(input_cost_per_thousand=1.0, output_cost_per_thousand=2.0),
         rate_limit=RateLimit(tokens_per_minute=1000, requests_per_minute=100),
         provider=ProviderInfo(name="Dummy", default_api_key="dummy_key"),
-        api_key="dummy_key"
+        api_key="dummy_key",
     )
 
 
@@ -46,8 +46,11 @@ def test_register_and_get_model(model_registry: ModelRegistry) -> None:
 
     # Monkey-patch ModelFactory.create_model_from_info to return our dummy provider.
     from src.ember.core.registry.model.registry.factory import ModelFactory
+
     original_create = ModelFactory.create_model_from_info
-    ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: DummyProvider(model_info))
+    ModelFactory.create_model_from_info = staticmethod(
+        lambda *, model_info: DummyProvider(model_info)
+    )
 
     try:
         model_registry.register_model(dummy_info)
@@ -61,6 +64,7 @@ def test_register_duplicate_model(model_registry: ModelRegistry) -> None:
     """Test that attempting to register a duplicate model raises a ValueError."""
     dummy_info = create_dummy_model_info("dummy:dup")
     from src.ember.core.registry.model.registry.factory import ModelFactory
+
     original_create = ModelFactory.create_model_from_info
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
 
@@ -82,6 +86,7 @@ def test_unregister_model(model_registry: ModelRegistry) -> None:
     """Test that a registered model can be unregistered successfully."""
     dummy_info = create_dummy_model_info("dummy:unreg")
     from src.ember.core.registry.model.registry.factory import ModelFactory
+
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
 
     model_registry.register_model(dummy_info)

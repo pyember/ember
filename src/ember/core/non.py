@@ -159,6 +159,7 @@ class GetAnswerInputs(BaseModel):
         query (str): The query string.
         response (str): The previous response.
     """
+
     query: str
     response: str
 
@@ -269,7 +270,8 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
             model_service=model_service,
         )
         self._init_field(
-            "judge_synthesis_op", JudgeSynthesisOperator(lm_module=lm_module)
+            field_name="judge_synthesis_op",
+            value=JudgeSynthesisOperator(lm_module=lm_module)
         )
 
     def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:

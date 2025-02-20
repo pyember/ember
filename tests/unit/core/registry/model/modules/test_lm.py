@@ -21,6 +21,7 @@ class DummyModelService:
         class DummyResponse:
             data = f"Dummy response for prompt: {prompt}"
             usage = None
+
         return DummyResponse()
 
 
@@ -42,14 +43,18 @@ def test_lm_module_simulate(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_lm_module_forward_calls_service(dummy_service: DummyModelService) -> None:
     """Test that LMModule.forward calls the underlying model_service when simulate_api is False."""
-    config = LMModuleConfig(id="openai:gpt-4o", temperature=0.8, cot_prompt="Think step-by-step")
+    config = LMModuleConfig(
+        id="openai:gpt-4o", temperature=0.8, cot_prompt="Think step-by-step"
+    )
     # When simulate_api is False, LMModule should call the model service.
     lm = LMModule(config=config, model_service=dummy_service, simulate_api=False)
     prompt = "Test prompt"
     response = lm.forward(prompt)
     expected_fragment = "Dummy response for prompt:"
     # Since lm.forward returns a string, we check the content of the string directly.
-    assert expected_fragment in response, "LMModule did not call the dummy service correctly."
+    assert (
+        expected_fragment in response
+    ), "LMModule did not call the dummy service correctly."
 
 
 def test_lm_module_assemble_full_prompt() -> None:
@@ -58,7 +63,7 @@ def test_lm_module_assemble_full_prompt() -> None:
         id="openai:gpt-4o",
         temperature=0.8,
         cot_prompt="Chain of Thought",
-        persona="Friendly"
+        persona="Friendly",
     )
     lm = LMModule(config=config, simulate_api=True)
     # Access the private method directly (acceptable in tests)

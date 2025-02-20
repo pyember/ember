@@ -13,7 +13,9 @@ for path in (str(PROJECT_ROOT), str(SRC_PATH)):
     if path not in sys.path:
         sys.path.insert(0, path)
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -31,7 +33,7 @@ def global_setup_teardown():
 def mock_lm_generation(mocker):
     """
     Mocks LMModule model_instance.generate calls to return predictable responses.
-    Ensures deterministic tests regardless of input prompt. 
+    Ensures deterministic tests regardless of input prompt.
     """
 
     def mock_generate(prompt, temperature=1.0, max_tokens=None):

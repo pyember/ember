@@ -56,6 +56,7 @@ def test_cycle_detection() -> None:
 # (Optional) Test merging of two graphs with namespace prefixes.
 def test_merge_xcs_graphs_namespace() -> None:
     from src.ember.xcs.graph.xcs_graph import merge_xcs_graphs
+
     base = XCSGraph()
     additional = XCSGraph()
     base.add_node(operator=dummy_operator, node_id="base1")

@@ -3,13 +3,14 @@ from typing import Dict, Any, List
 
 from src.ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
-    EnsembleOperatorInputs
+    EnsembleOperatorInputs,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
 class DummyLMModule:
     """Simple mock LM module that returns a standardized response."""
+
     def __call__(self, *, prompt: str) -> str:
         return f"LM response to: {prompt}"
 
@@ -20,10 +21,8 @@ def test_ensemble_operator_forward() -> None:
 
     # Optionally customize the operator's signature:
     custom_signature = Signature(
-        input_model=EnsembleOperatorInputs,
-        prompt_template="Ensemble Prompt: {query}"
+        input_model=EnsembleOperatorInputs, prompt_template="Ensemble Prompt: {query}"
     )
-
 
     op = EnsembleOperator(lm_modules=[dummy_lm1, dummy_lm2])
     # Override the default signature:
@@ -41,4 +40,6 @@ def test_ensemble_operator_forward() -> None:
         ]
     }
 
-    assert result == expected, "EnsembleOperator forward did not return expected aggregated responses." 
+    assert (
+        result == expected
+    ), "EnsembleOperator forward did not return expected aggregated responses."

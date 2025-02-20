@@ -5,7 +5,10 @@
 import pytest
 from typing import Any
 
-from src.ember.core.registry.model.providers.deepmind.deepmind_provider import GeminiModel, GeminiChatParameters
+from src.ember.core.registry.model.providers.deepmind.deepmind_provider import (
+    GeminiModel,
+    GeminiChatParameters,
+)
 from src.ember.core.registry.model.schemas.chat_schemas import ChatResponse, ChatRequest
 from src.ember.core.registry.model.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
@@ -15,7 +18,15 @@ from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
 class DummyGeminiResponse:
     def __init__(self) -> None:
         self.text = "Gemini response text"
-        self.usage_metadata = type("UsageMeta", (), {"prompt_token_count": 50, "candidates_token_count": 20, "total_token_count": 70})
+        self.usage_metadata = type(
+            "UsageMeta",
+            (),
+            {
+                "prompt_token_count": 50,
+                "candidates_token_count": 20,
+                "total_token_count": 70,
+            },
+        )
 
 
 def create_dummy_deepmind_model_info() -> ModelInfo:
@@ -38,7 +49,13 @@ def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
     # Patch GenerativeModel to be our dummy.
     monkeypatch.setattr(
         "src.ember.core.registry.model.providers.deepmind.deepmind_provider.GenerativeModel",
-        lambda model_ref: type("DummyGenerativeModel", (), {"generate_content": lambda self, prompt, generation_config, **kwargs: DummyGeminiResponse()})(),
+        lambda model_ref: type(
+            "DummyGenerativeModel",
+            (),
+            {
+                "generate_content": lambda self, prompt, generation_config, **kwargs: DummyGeminiResponse()
+            },
+        )(),
     )
 
 

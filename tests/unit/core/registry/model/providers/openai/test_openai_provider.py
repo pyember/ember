@@ -28,7 +28,11 @@ class DummyChoice:
 class DummyOpenAIResponse:
     def __init__(self) -> None:
         self.choices = [DummyChoice("Test response.")]
-        self.usage = type("Usage", (), {"total_tokens": 100, "prompt_tokens": 40, "completion_tokens": 60})
+        self.usage = type(
+            "Usage",
+            (),
+            {"total_tokens": 100, "prompt_tokens": 40, "completion_tokens": 60},
+        )
 
 
 def create_dummy_model_info() -> ModelInfo:
@@ -54,6 +58,7 @@ class DummyOpenAIClient:
 @pytest.fixture(autouse=True)
 def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     import openai
+
     monkeypatch.setattr(openai, "chat", DummyOpenAIClient().chat)
 
 
@@ -62,7 +67,9 @@ def test_openai_forward(monkeypatch: pytest.MonkeyPatch) -> None:
     dummy_info = create_dummy_model_info()
     model = OpenAIModel(dummy_info)
     # Patch client.chat.completions.create to return our dummy response.
-    monkeypatch.setattr(model.client.chat.completions, "create", lambda **kwargs: DummyOpenAIResponse())
+    monkeypatch.setattr(
+        model.client.chat.completions, "create", lambda **kwargs: DummyOpenAIResponse()
+    )
     request = ChatRequest(prompt="Hello OpenAI", temperature=0.7, max_tokens=100)
     response = model.forward(request)
     assert isinstance(response, ChatResponse)
@@ -73,7 +80,9 @@ def test_openai_forward(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_openai_parameters() -> None:
     """Test that OpenAIChatParameters converts prompt to messages properly."""
-    params = OpenAIChatParameters(prompt="Hello", context="System message", temperature=0.5, max_tokens=None)
+    params = OpenAIChatParameters(
+        prompt="Hello", context="System message", temperature=0.5, max_tokens=None
+    )
     kwargs = params.to_openai_kwargs()
     assert "messages" in kwargs
     messages = kwargs["messages"]
