@@ -12,6 +12,13 @@ class EmberException(Exception):
     pass
 
 
+class FlattenError(EmberException):
+    """Raised when flattening an EmberModule fails due to inconsistent field states."""
+
+    def __init__(self, message: str = "Failed to flatten EmberModule due to field inconsistency."):
+        super().__init__(message)
+
+
 class OperatorSignatureNotDefinedError(EmberException):
     """Raised when an Operator's signature is not defined."""
 

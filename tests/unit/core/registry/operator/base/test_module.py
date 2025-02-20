@@ -91,6 +91,19 @@ class TestFieldFunctions(unittest.TestCase):
                          second=5,
                          msg="Expected default value to be 5")
 
+    def test_ember_field_converter_application(self) -> None:
+        """Verify that ember_field converter is applied during initialization."""
+        @dataclasses.dataclass(frozen=True)
+        class ConverterModule(EmberModule):
+            x: int = ember_field(converter=lambda v: int(v))
+
+        instance = ConverterModule(x="42")
+        self.assertEqual(
+            instance.x,
+            42,
+            "Converter should convert string '42' to int 42"
+        )
+
 
 class TestInitableWrapper(unittest.TestCase):
     """Unit tests for the _make_initable_wrapper functionality."""

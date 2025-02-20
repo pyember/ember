@@ -72,66 +72,53 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         return self.signature
 
     def __call__(self, *, inputs: Union[T_in, Dict[str, Any]]) -> T_out:
-        """Executes the operator using its defined signature and forward computation.
-
-        The execution workflow entails:
-          1. Validating the provided inputs via the operator's signature.
-          2. Running the forward computation with the validated inputs.
-          3. Validating and returning the computed output.
+        """Executes the operator by validating inputs, running the forward computation,
+        and validating the output.
 
         Args:
-            inputs (Union[T_in, Dict[str, Any]]): The raw or prevalidated input data.
+            inputs (Union[T_in, Dict[str, Any]]): Either an already validated input model
+            (T_in) or a raw dictionary that needs validation.
 
         Returns:
-            T_out: The validated output after operator execution.
+            The validated, computed output of type T_out.
 
         Raises:
-            OperatorSignatureNotDefinedError: If the operator's signature is not defined.
+            OperatorSignatureNotDefinedError: If this operator has no signature defined.
             SignatureValidationError: If input or output validation fails.
-            OperatorExecutionError: If an error occurs during the forward computation.
+            OperatorExecutionError: If any error occurs in the forward computation.
         """
         signature: Signature = self.get_signature()
 
-        # Validate inputs with detailed logging.
-        try:
-            validated_inputs: T_in = signature.validate_inputs(inputs=inputs)
-        except Exception as error:
-            operator_name: str = self.__class__.__name__
-            error_message: str = (
-                f"[{operator_name}] Input validation failed for inputs: {inputs}. "
-                "Please ensure the input conforms to the expected schema: "
-                f"{getattr(signature, 'input_model', 'Unknown')}"
-            )
-            logger.error(
-                error_message,
-                extra={"operator": operator_name, "input_schema": getattr(signature, 'input_model', None)},
-                exc_info=True
-            )
-            raise SignatureValidationError(error_message) from error
+        validated_inputs: T_in
+        if isinstance(inputs, dict):
+            validated_inputs = signature.validate_inputs(inputs=inputs)
+        else:
+            validated_inputs = inputs
 
-        # Execute forward computation.
+        # Forward computation with structured error handling.
         try:
             operator_output: T_out = self.forward(inputs=validated_inputs)
         except Exception as error:
-            contextual_message: str = (
-                f"Error during operator forward computation "
-                f"with validated inputs: {validated_inputs}"
+            error_code = "E_FORWARD_COMPUTATION"
+            contextual_message = (
+                f"[{self.__class__.__name__}] [{error_code}] "
+                f"Error during forward() with validated inputs: {validated_inputs}"
             )
-            # Combine your contextual info with the original error text so that
-            # tests can match on strings like "Simulated LM failure."
-            full_message: str = f"{contextual_message} | Original error: {error}"
+            full_message = f"{contextual_message} | Original error: {error}"
             logger.exception(full_message)
             raise OperatorExecutionError(full_message) from error
 
-        # Validate output with detailed logging.
+        # Validate output with structured logging.
         try:
             validated_output: T_out = signature.validate_output(output=operator_output)
         except Exception as error:
-            operator_name: str = self.__class__.__name__
-            error_message: str = (
-                f"[{operator_name}] Output validation failed for operator output: {operator_output}"
+            operator_name = self.__class__.__name__
+            error_code = "E_OUTPUT_VALIDATION"
+            error_message = (
+                f"[{operator_name}] [{error_code}] Output validation failed for "
+                f"operator output: {operator_output} | Error: {error}"
             )
-            logger.error(error_message, extra={"operator": operator_name}, exc_info=True)
+            logger.error(error_message, extra={"operator": operator_name, "error_code": error_code}, exc_info=True)
             raise SignatureValidationError(error_message) from error
 
         return validated_output

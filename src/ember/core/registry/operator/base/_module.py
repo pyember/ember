@@ -11,11 +11,18 @@ import abc
 import dataclasses
 from dataclasses import field, Field
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar
+import threading
 
 from src.ember.xcs.utils.tree_util import register_tree, tree_flatten
-from src.ember.core.registry.operator.exceptions import BoundMethodNotInitializedError
+from src.ember.core.registry.operator.exceptions import (
+    BoundMethodNotInitializedError,
+    FlattenError,
+)
 
 T = TypeVar("T")
+
+_flatten_cache_lock = None  # Deprecated; replaced by thread-local storage
+_thread_local = threading.local()
 
 def static_field(**kwargs: Any) -> Field:
     """Creates a dataclass field marked as static.
@@ -90,23 +97,31 @@ def _flatten_ember_module(instance: Any) -> Tuple[List[Any], Dict[str, Any]]:
         instance (Any): The EmberModule instance to flatten.
 
     Returns:
-        Tuple[List[Any], Dict[str, Any]]: A tuple containing a list of dynamic field values and
-        a dictionary mapping static field names to their values.
+        Tuple[List[Any], Dict[str, Any]]: A tuple containing a list of dynamic field values
+        and a dictionary mapping static field names to their values.
     """
-    if hasattr(instance, '_flattened_cache'):
-        return instance._flattened_cache  # type: ignore
+    if not hasattr(_thread_local, "flatten_cache"):
+        _thread_local.flatten_cache = {}
+    cache = _thread_local.flatten_cache
+    instance_id = id(instance)
+
+    if instance_id in cache:
+        return cache[instance_id]
 
     dynamic_fields: List[Any] = []
     static_fields: Dict[str, Any] = {}
     for field_info in dataclasses.fields(instance):
-        value: Any = getattr(instance, field_info.name)
+        try:
+            value: Any = getattr(instance, field_info.name)
+        except AttributeError:
+            raise FlattenError(f"Field '{field_info.name}' missing in instance")
         if field_info.metadata.get("static", False):
             static_fields[field_info.name] = value
         else:
             dynamic_fields.append(value)
 
     flattened = (dynamic_fields, static_fields)
-    object.__setattr__(instance, '_flattened_cache', flattened)  # Cache the result.
+    cache[instance_id] = flattened
     return flattened
 
 
@@ -184,8 +199,19 @@ class EmberModuleMeta(abc.ABCMeta):
         Returns:
             T: An instance of the EmberModule subclass.
         """
+        # Wrap in a mutable class for __init__ and __post_init__.
         mutable_cls: Type[T] = _make_initable_wrapper(cls)
         instance: T = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
+
+        # Apply any 'converter' metadata on fields after init but before freezing.
+        for field_info in dataclasses.fields(cls):
+            converter = field_info.metadata.get("converter", None)
+            if converter is not None:
+                current_value = getattr(instance, field_info.name)
+                converted_value = converter(current_value)
+                object.__setattr__(instance, field_info.name, converted_value)
+
+        # Revert the instance's class back to the original, frozen one.
         object.__setattr__(instance, "__class__", cls)
         return instance
 
@@ -193,8 +219,20 @@ class EmberModuleMeta(abc.ABCMeta):
 class EmberModule(metaclass=EmberModuleMeta):
     """Base class for Ember modules.
 
-    Subclass EmberModule to create immutable, strongly-typed modules that participate in the
-    transformation tree system.
+    Subclass EmberModule to create immutable, strongly-typed modules that integrate with
+    the transformation tree system (e.g., for XCS `jit` or `grad` operations).
+    Fields marked with `static_field` or `ember_field(static=True)` are excluded from
+    tree transformations, suitable for hyperparameters or fixed configurations, 
+    while dynamic fields (default `ember_field`) participate in transformations, 
+    such as model/router weights.
+
+    **Performance Notes**:
+    - Flattening/unflattening has complexity proportional to the number of fields on the module.
+      Use `static_field` for fields that do not require transformation to reduce overhead.
+    - Thread-local caching is employed to avoid global lock contention. This speeds up repeated
+      flatten calls within the same thread.
+    - For large or deeply nested modules, consider benchmarking to ensure that tree operations
+      meet performance needs.
     """
 
     def _init_field(self, *, field_name: str, value: Any) -> None:
@@ -237,6 +275,30 @@ class EmberModule(metaclass=EmberModuleMeta):
             str: A string showing the class name and its field values.
         """
         return f"{self.__class__.__name__}({dataclasses.asdict(self)})"
+
+    def __pytree_flatten__(self):
+        """
+        Skeuomorphic flatten protocol.
+
+        Returns:
+            A tuple of (dynamic_fields, static_fields).
+        """
+        dynamic, aux = _flatten_ember_module(self)
+        return dynamic, aux
+
+    @classmethod
+    def __pytree_unflatten__(cls, aux, children):
+        """
+        Skeuomorphic unflatten protocol.
+
+        Args:
+            aux: The static fields.
+            children: A list of dynamic field values.
+
+        Returns:
+            An instance of the EmberModule reconstructed from flattened components.
+        """
+        return _unflatten_ember_module(cls=cls, aux=aux, children=children)
 
 
 class BoundMethod(EmberModule):
