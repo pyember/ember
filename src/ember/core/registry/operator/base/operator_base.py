@@ -3,8 +3,6 @@
 An Operator is an immutable, pure function with an associated Signature.
 Operators are implemented as frozen dataclasses and automatically registered
 as PyTree nodes. Subclasses must implement forward() to define their computation.
-Operators must explicitly provide a metadata (with a valid signature) rather than
-relying on a default.
 """
 
 from __future__ import annotations
@@ -17,6 +15,11 @@ from pydantic import BaseModel
 
 from src.ember.core.registry.operator.base._module import EmberModule
 from src.ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core.registry.operator.exceptions import (
+    OperatorSignatureNotDefinedError,
+    SignatureValidationError,
+    OperatorExecutionError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +32,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
     """Abstract base class for an operator in Ember.
 
     Each operator must explicitly define its Signature (with required input and output models).
-    This aligns with our specifications model, which is conducive to rigor, clarity, etc while being minimal.
+    This aligns with our specifications model, conducive to rigor and clarity.
 
     Operator extends EmberModule, which automatically registers the operator as a PyTree node.
     This allows operators to be used in XCS execution plans, traced, etc.
@@ -65,10 +68,10 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             The signature instance associated with this operator.
 
         Raises:
-            ValueError: If the signature is not defined.
+            OperatorSignatureNotDefinedError: If the signature is not defined.
         """
         if self.signature is None:
-            raise ValueError("Operator signature must be defined.")
+            raise OperatorSignatureNotDefinedError()
         return self.signature
 
     # --------------------------------------------------------------------------
@@ -79,7 +82,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
 
         Workflow:
           1. Validate inputs using the operator's signature.
-          2. Record an execution trace.
+          2. Execute the operator's forward computation.
           3. Validate and return the output.
 
         Args:
@@ -89,12 +92,27 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             The validated output.
 
         Raises:
-            ValueError: If the operator's signature is not defined.
+            OperatorSignatureNotDefinedError: If the signature is not defined.
+            SignatureValidationError: If input or output validation fails.
+            OperatorExecutionError: If an error occurs during forward computation.
         """
         if self.signature is None:
-            raise ValueError("Operator signature must be defined.")
+            raise OperatorSignatureNotDefinedError()
 
-        validated_inputs: T_in = self.signature.validate_inputs(inputs=inputs)
+        try:
+            validated_inputs: T_in = self.signature.validate_inputs(inputs=inputs)
+        except Exception as e:
+            raise SignatureValidationError("Input validation failed.") from e
 
-        raw_output = self.forward(inputs=validated_inputs)
-        return self.signature.validate_output(output=raw_output)
+        try:
+            raw_output = self.forward(inputs=validated_inputs)
+        except Exception as e:
+            logger.exception("Error during operator forward computation.")
+            raise OperatorExecutionError(str(e)) from e
+
+        try:
+            validated_output = self.signature.validate_output(output=raw_output)
+        except Exception as e:
+            raise SignatureValidationError("Output validation failed.") from e
+        return validated_output
+

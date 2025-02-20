@@ -13,6 +13,7 @@ import pytest
 from pydantic import BaseModel
 from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core.registry.prompt_signature.signatures import Signature
+from src.ember.core.registry.operator.exceptions import OperatorSignatureNotDefinedError
 
 
 class DummyInput(BaseModel):
@@ -45,14 +46,14 @@ def test_operator_call_valid() -> None:
 
 
 def test_missing_signature_error() -> None:
-    # An operator with no signature should raise a ValueError when called.
+    """Test that calling an operator without a signature raises OperatorSignatureNotDefinedError."""
     class NoSignatureOperator(Operator):
         signature = None
 
         def forward(self, *, inputs: Any) -> Any:
             return inputs
 
-    op = NoSignatureOperator()
-    with pytest.raises(ValueError) as excinfo:
-        op(inputs={"any": "data"})
-    assert "Operator signature must be defined" in str(excinfo.value)
+    operator = NoSignatureOperator()
+    with pytest.raises(OperatorSignatureNotDefinedError) as exc_info:
+        operator(inputs={"value": "test"})
+    assert str(exc_info.value) == "Operator signature must be defined."

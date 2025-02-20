@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import abc
 import dataclasses
-from dataclasses import field
-from typing import Any, Callable, Dict, List, Type, Optional
+from dataclasses import field, Field
+from typing import Any, Callable, Dict, List, Type, Optional, Tuple
 
 from src.ember.xcs.utils.tree_util import register_tree, tree_flatten
+from src.ember.core.registry.operator.exceptions import BoundMethodNotInitializedError
 
 
-def static_field(**kwargs: Any) -> dataclasses.Field:
+def static_field(**kwargs: Any) -> Field:
     """Create a dataclass field marked as static.
 
     Static fields are excluded from tree transformations.
@@ -34,7 +35,7 @@ def ember_field(
     converter: Optional[Callable[[Any], Any]] = None,
     static: bool = False,
     **kwargs: Any,
-) -> dataclasses.Field:
+) -> Field:
     """Create a dataclass field with Ember-specific functionality.
 
     Supports defining converters and marking fields as static.
@@ -68,7 +69,6 @@ def _make_initable_wrapper(cls: Type[Any]) -> Type[Any]:
     Returns:
         Type[Any]: A mutable subclass of cls.
     """
-
     class Initable(cls):  # type: ignore
         def __setattr__(self, name: str, value: Any) -> None:
             """Allow attribute mutation during initialization."""
@@ -80,7 +80,7 @@ def _make_initable_wrapper(cls: Type[Any]) -> Type[Any]:
     return Initable
 
 
-def _flatten_ember_module(instance: Any) -> tuple[List[Any], Dict[str, Any]]:
+def _flatten_ember_module(instance: Any) -> Tuple[List[Any], Dict[str, Any]]:
     """Flatten an EmberModule instance into dynamic and static fields.
 
     Dynamic fields participate in tree transformations while static fields remain fixed.
@@ -89,7 +89,7 @@ def _flatten_ember_module(instance: Any) -> tuple[List[Any], Dict[str, Any]]:
         instance (Any): The EmberModule instance to flatten.
 
     Returns:
-        tuple: A tuple of a list of dynamic field values and a dict of static field values.
+        tuple: A tuple containing a list of dynamic field values and a dict of static field values.
     """
     dynamic_fields: List[Any] = []
     static_fields: Dict[str, Any] = {}
@@ -236,7 +236,11 @@ class EmberModule(metaclass=EmberModuleMeta):
 
 
 class BoundMethod(EmberModule):
-    """A bound method that also participates in the transformation tree system."""
+    """A bound method that also participates in the transformation tree system.
+
+    This class encapsulates a function and its bound instance, and allows the function to be
+    invoked as a method with the bound instance.
+    """
 
     __func__: Callable[..., Any] = ember_field(static=True)
     __self__: EmberModule
@@ -250,7 +254,12 @@ class BoundMethod(EmberModule):
 
         Returns:
             Any: The result of calling the bound function.
+
+        Raises:
+            BoundMethodNotInitializedError: If __func__ or __self__ is not set.
         """
+        if self.__func__ is None or self.__self__ is None:
+            raise BoundMethodNotInitializedError()
         return self.__func__(self.__self__, *args, **kwargs)
 
     @property
