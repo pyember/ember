@@ -228,11 +228,9 @@ class EmberModule(metaclass=EmberModuleMeta):
 
     **Performance Notes**:
     - Flattening/unflattening has complexity proportional to the number of fields on the module.
-      Use `static_field` for fields that do not require transformation to reduce overhead.
-    - Thread-local caching is employed to avoid global lock contention. This speeds up repeated
+      So we use `static_field` for fields that do not require transformation to reduce overhead.
+    - Thread-local caching is employed to avoid global lock contention. This is a nice first step and speeds up repeated
       flatten calls within the same thread.
-    - For large or deeply nested modules, consider benchmarking to ensure that tree operations
-      meet performance needs.
     """
 
     def _init_field(self, *, field_name: str, value: Any) -> None:

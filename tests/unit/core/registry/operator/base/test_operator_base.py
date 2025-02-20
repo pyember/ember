@@ -20,7 +20,6 @@ from src.ember.core.registry.operator.exceptions import (
     SignatureValidationError,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.operator.base._module import ember_field
 
 
 class DummyInput(BaseModel):
@@ -156,6 +155,7 @@ def test_output_validation_failure() -> None:
         signature: Signature = DummySignature()
 
         def forward(self, *, inputs: DummyInput) -> DummyOutput:
+            """Returns a dictionary with an invalid type for 'result' to trigger validation failure."""
             return {"result": "not an int"}  # type: ignore
 
     operator_instance: InvalidOutputOperator = InvalidOutputOperator()
