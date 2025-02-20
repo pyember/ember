@@ -1,8 +1,8 @@
 """Core Operator Abstraction for Ember.
 
 An Operator is an immutable, pure function with an associated Signature.
-Operators are implemented as frozen dataclasses and automatically registered
-as PyTree nodes. Subclasses must implement forward() to define their computation.
+Operators are implemented as frozen dataclasses and automatically registered as PyTree nodes.
+Subclasses must implement forward() to define their computation.
 """
 
 from __future__ import annotations
@@ -32,87 +32,83 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
     """Abstract base class for an operator in Ember.
 
     Each operator must explicitly define its Signature (with required input and output models).
-    This aligns with our specifications model, conducive to rigor and clarity.
-
-    Operator extends EmberModule, which automatically registers the operator as a PyTree node.
-    This allows operators to be used in XCS execution plans, traced, etc.
+    This design encourages immutability and explicitness, aligning with functional programming
+    principles and drawing inspiration from frameworks such as JAX Equinox.
 
     Attributes:
-        signature: Contains the operator's input/output signature spec.
+        signature (Signature): Contains the operator's input/output signature specification.
     """
 
     signature: Signature
 
-    # --------------------------------------------------------------------------
-    # Core Computation
-    # --------------------------------------------------------------------------
     @abc.abstractmethod
     def forward(self, *, inputs: T_in) -> T_out:
         """Performs the operator's primary computation.
 
         Args:
-            inputs: Validated input data.
+            inputs (T_in): Validated input data.
 
         Returns:
-            The computed output.
+            T_out: The computed output.
+
+        Raises:
+            NotImplementedError: Must be implemented by subclasses.
         """
         raise NotImplementedError("Subclasses must implement forward()")
 
-    # --------------------------------------------------------------------------
-    # Signature Access
-    # --------------------------------------------------------------------------
     def get_signature(self) -> Signature:
-        """Returns the operator's signature.
+        """Retrieves the operator's signature.
 
         Returns:
-            The signature instance associated with this operator.
+            Signature: The operator's associated signature.
 
         Raises:
-            OperatorSignatureNotDefinedError: If the signature is not defined.
+            OperatorSignatureNotDefinedError: If the signature has not been defined.
         """
-        if self.signature is None:
-            raise OperatorSignatureNotDefinedError()
+        if not getattr(self, "signature", None):
+            raise OperatorSignatureNotDefinedError("Operator signature must be defined.")
         return self.signature
 
-    # --------------------------------------------------------------------------
-    # Callable Interface
-    # --------------------------------------------------------------------------
     def __call__(self, *, inputs: Union[T_in, Dict[str, Any]]) -> T_out:
-        """Executes the operator.
+        """Executes the operator using its defined signature and forward computation.
 
-        Workflow:
-          1. Validate inputs using the operator's signature.
-          2. Execute the operator's forward computation.
-          3. Validate and return the output.
+        The execution workflow entails:
+          1. Validating the provided inputs via the operator's signature.
+          2. Running the forward computation with the validated inputs.
+          3. Validating and returning the computed output.
 
         Args:
-            inputs: Raw or prevalidated input data.
+            inputs (Union[T_in, Dict[str, Any]]): The raw or prevalidated input data.
 
         Returns:
-            The validated output.
+            T_out: The validated output after operator execution.
 
         Raises:
-            OperatorSignatureNotDefinedError: If the signature is not defined.
+            OperatorSignatureNotDefinedError: If the operator's signature is not defined.
             SignatureValidationError: If input or output validation fails.
-            OperatorExecutionError: If an error occurs during forward computation.
+            OperatorExecutionError: If an error occurs during the forward computation.
         """
-        if self.signature is None:
-            raise OperatorSignatureNotDefinedError()
+        signature: Signature = self.get_signature()
 
         try:
-            validated_inputs: T_in = self.signature.validate_inputs(inputs=inputs)
-        except Exception as e:
-            raise SignatureValidationError("Input validation failed.") from e
+            validated_inputs: T_in = signature.validate_inputs(inputs=inputs)
+        except Exception as error:
+            error_message: str = "Input validation failed."
+            logger.error(error_message, exc_info=True)
+            raise SignatureValidationError(error_message) from error
 
         try:
-            raw_output = self.forward(inputs=validated_inputs)
-        except Exception as e:
-            logger.exception("Error during operator forward computation.")
-            raise OperatorExecutionError(str(e)) from e
+            operator_output: T_out = self.forward(inputs=validated_inputs)
+        except Exception as error:
+            error_message: str = "Error during operator forward computation."
+            logger.exception(error_message)
+            raise OperatorExecutionError(str(error)) from error
 
         try:
-            validated_output = self.signature.validate_output(output=raw_output)
-        except Exception as e:
-            raise SignatureValidationError("Output validation failed.") from e
+            validated_output: T_out = signature.validate_output(output=operator_output)
+        except Exception as error:
+            error_message: str = "Output validation failed."
+            logger.error(error_message, exc_info=True)
+            raise SignatureValidationError(error_message) from error
+
         return validated_output
-

@@ -132,6 +132,13 @@ class TestFlattenAndUnflatten(unittest.TestCase):
             _flatten_ember_module(instance_reconstructed),
         )
 
+    def test_unflatten_error_on_mismatch(self) -> None:
+        """Test that _unflatten_ember_module raises ValueError when children count mismatches."""
+        aux: Dict[str, Any] = {"b": 20}
+        children: List[Any] = []  # Missing dynamic fields.
+        with self.assertRaises(ValueError):
+            _unflatten_ember_module(cls=self.DummyModule, aux=aux, children=children)
+
 
 class TestEmberModule(unittest.TestCase):
     """Tests for the EmberModule base class, including initialization, immutability,
