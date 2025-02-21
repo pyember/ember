@@ -128,7 +128,7 @@ def test_missing_signature_error() -> None:
     operator_instance = NoSignatureOperator()
     with pytest.raises(OperatorSignatureNotDefinedError) as exception_info:
         operator_instance(inputs={"value": "test"})
-    assert str(exception_info.value) == "Operator signature must be defined.", (
+    assert str(exception_info.value) == "[Error 2002] Operator signature must be defined.", (
         "Expected error message for missing signature."
     )
 
