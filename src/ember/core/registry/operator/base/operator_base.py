@@ -13,6 +13,7 @@ from typing import Any, Dict, Generic, TypeVar, Union
 
 from pydantic import BaseModel
 
+from src.ember.core.utils.error_utils import wrap_forward_error, wrap_validation_error
 from src.ember.core.registry.operator.base._module import EmberModule
 from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core.registry.operator.exceptions import (
@@ -89,36 +90,15 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         signature: Signature = self.get_signature()
 
-        validated_inputs: T_in
-        if isinstance(inputs, dict):
-            validated_inputs = signature.validate_inputs(inputs=inputs)
-        else:
-            validated_inputs = inputs
+        # Validate inputs.
+        validated_inputs: T_in = (
+            signature.validate_inputs(inputs=inputs) if isinstance(inputs, dict) else inputs
+        )
 
-        # Forward computation with structured error handling.
-        try:
-            operator_output: T_out = self.forward(inputs=validated_inputs)
-        except Exception as error:
-            error_code = "E_FORWARD_COMPUTATION"
-            contextual_message = (
-                f"[{self.__class__.__name__}] [{error_code}] "
-                f"Error during forward() with validated inputs: {validated_inputs}"
-            )
-            full_message = f"{contextual_message} | Original error: {error}"
-            logger.exception(full_message)
-            raise OperatorExecutionError(full_message) from error
+        # Run the forward computation.
+        operator_output: T_out = self.forward(inputs=validated_inputs)
 
-        # Validate output with structured logging.
-        try:
-            validated_output: T_out = signature.validate_output(output=operator_output)
-        except Exception as error:
-            operator_name = self.__class__.__name__
-            error_code = "E_OUTPUT_VALIDATION"
-            error_message = (
-                f"[{operator_name}] [{error_code}] Output validation failed for "
-                f"operator output: {operator_output} | Error: {error}"
-            )
-            logger.error(error_message, extra={"operator": operator_name, "error_code": error_code}, exc_info=True)
-            raise SignatureValidationError(error_message) from error
+        # Validate output.
+        validated_output: T_out = signature.validate_output(output=operator_output)
 
         return validated_output

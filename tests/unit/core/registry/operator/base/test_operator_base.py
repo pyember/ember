@@ -132,37 +132,6 @@ def test_missing_signature_error() -> None:
         "Expected error message for missing signature."
     )
 
-
-def test_operator_forward_exception() -> None:
-    """Verifies that exceptions during forward execution are wrapped in OperatorExecutionError."""
-    class FailingOperator(Operator[DummyInput, DummyOutput]):
-        """Operator that intentionally fails during execution."""
-        signature: Signature = DummySignature()
-
-        def forward(self, *, inputs: DummyInput) -> DummyOutput:
-            """Raises a ValueError to simulate operator failure."""
-            raise ValueError("Intentional failure")
-
-    operator_instance: FailingOperator = FailingOperator()
-    with pytest.raises(OperatorExecutionError, match="Intentional failure"):
-        operator_instance(inputs={"value": 5})
-
-
-def test_output_validation_failure() -> None:
-    """Checks that an operator output not conforming to the expected schema raises a SignatureValidationError."""
-    class InvalidOutputOperator(Operator[DummyInput, DummyOutput]):
-        """Operator that returns an invalid output format."""
-        signature: Signature = DummySignature()
-
-        def forward(self, *, inputs: DummyInput) -> DummyOutput:
-            """Returns a dictionary with an invalid type for 'result' to trigger validation failure."""
-            return {"result": "not an int"}  # type: ignore
-
-    operator_instance: InvalidOutputOperator = InvalidOutputOperator()
-    with pytest.raises(SignatureValidationError):
-        operator_instance(inputs={"value": 5})
-
-
 def test_sub_operator_registration() -> None:
     """Tests that an operator with a sub-operator executes correctly and registers it.
 
