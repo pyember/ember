@@ -63,11 +63,13 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             T_out: The validated, computed output.
 
         Raises:
-            OperatorSignatureNotDefinedError: If this operator has no signature defined.
+            OperatorSignatureNotDefinedError: If this operator has no valid signature defined.
             SignatureValidationError: If input or output validation fails.
             OperatorExecutionError: If any error occurs in the forward computation.
         """
-        signature: Signature = self.signature
+        signature: Signature = getattr(self.__class__, "signature", None)
+        if signature is None or not hasattr(signature, "validate_inputs"):
+            raise OperatorSignatureNotDefinedError("Operator signature must be defined.")
 
         # Validate inputs.
         validated_inputs: T_in = (

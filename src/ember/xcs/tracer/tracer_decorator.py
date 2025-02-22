@@ -220,7 +220,7 @@ def jit(
 
         @functools.wraps(original_call)
         def new_call(self: T, *, inputs: Dict[str, Any]) -> Any:
-            validated_inputs = self.get_signature().validate_inputs(inputs)
+            validated_inputs = self.signature.validate_inputs(inputs)
             cache_key = self._cache_key_fn(validated_inputs)
 
             # If we are inside a tracing call, just do the raw operator call
@@ -298,7 +298,7 @@ def _convert_ir_graph_to_xcs_graph(
     xcs_graph: XCSGraph = XCSGraph()
 
     def compiled_operator(*, inputs: Dict[str, Any]) -> Any:
-        validated_inputs = operator.get_signature().validate_inputs(inputs)
+        validated_inputs = operator.signature.validate_inputs(inputs)
         return operator.forward(inputs=validated_inputs)
 
     # Add a root with the traced operator

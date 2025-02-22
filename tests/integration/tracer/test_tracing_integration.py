@@ -23,11 +23,7 @@ class DummySignature:
 
 
 class DummyTracingOperator(Operator):
-    def __init__(self):
-        self.signature = DummySignature()
-
-    def get_signature(self):
-        return self.signature
+    signature = DummySignature()
 
     def forward(self, *, inputs: dict) -> dict:
         return {"output": "traced"}
@@ -61,11 +57,7 @@ def test_convert_traced_graph_to_plan() -> None:
 def test_jit_caching() -> None:
     @jit()
     class DummyJITOperator(Operator):
-        def __init__(self):
-            self.signature = DummySignature()
-
-        def get_signature(self):
-            return self.signature
+        signature = DummySignature()
 
         def forward(self, *, inputs: dict) -> dict:
             # Mimic some transformation by appending "_processed"
@@ -89,13 +81,8 @@ def test_jit_caching() -> None:
 def test_force_trace_forward() -> None:
     @jit(sample_input={"value": 1}, force_trace_forward=True)
     class DummyForceJITOperator(Operator):
+        signature = DummySignature()
         trace_count = 0
-
-        def __init__(self):
-            self.signature = DummySignature()
-
-        def get_signature(self):
-            return self.signature
 
         def forward(self, *, inputs: dict) -> dict:
             DummyForceJITOperator.trace_count += 1
@@ -116,23 +103,18 @@ def test_force_trace_forward() -> None:
 def test_nested_jit() -> None:
     @jit()
     class InnerOperator(Operator):
-        def __init__(self):
-            self.signature = DummySignature()
-
-        def get_signature(self):
-            return self.signature
+        signature = DummySignature()
 
         def forward(self, *, inputs: dict) -> dict:
             return {"inner": inputs["value"] + "_inner"}
 
     @jit()
     class OuterOperator(Operator):
-        def __init__(self):
-            self.signature = DummySignature()
-            self.inner = InnerOperator()
+        signature = DummySignature()
 
-        def get_signature(self):
-            return self.signature
+        def __init__(self):
+            # Only instance-level state needed is the inner operator.
+            self.inner = InnerOperator()
 
         def forward(self, *, inputs: dict) -> dict:
             inner_out = self.inner(inputs=inputs)
