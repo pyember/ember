@@ -16,39 +16,37 @@ from pydantic import BaseModel, Field
 
 # Ember package imports
 from src.ember.core.registry.operator.base._module import ember_field
-from src.ember.core.registry.operator.base.operator_base import (
-    Operator,
-    T_in,
-    T_out,
+from src.ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
+from src.ember.core.registry.operator.core.ensemble import EnsembleOperator, EnsembleOperatorInputs
+from src.ember.core.registry.operator.core.most_common import (
+    MostCommonAnswerSelectorOperator,
+    MostCommonAnswerSelectorOperatorInputs,
 )
-from src.ember.core.registry.operator.core.ensemble import EnsembleOperator
-from src.ember.core.registry.operator.core.most_common import MostCommonAnswerSelectorOperator
-from src.ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
-from src.ember.core.registry.operator.core.verifier import VerifierOperator
+from src.ember.core.registry.operator.core.synthesis_judge import (
+    JudgeSynthesisOperator,
+    JudgeSynthesisInputs,
+    JudgeSynthesisOutputs,
+    JudgeSynthesisSignature,
+)
+from src.ember.core.registry.operator.core.verifier import (
+    VerifierOperator,
+    VerifierOperatorInputs,
+    VerifierOperatorOutputs,
+    VerifierSignature,
+)
 from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core.registry.model.services.model_service import ModelService
 from src.ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
-from src.ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOutputs as CoreJudgeSynthesisOutputs
-from src.ember.core.registry.operator.core.verifier import VerifierOperatorOutputs as CoreVerifierOperatorOutputs
 
+# Re-export types for backward compatibility with existing clients/tests.
+EnsembleInputs = EnsembleOperatorInputs
+MostCommonInputs = MostCommonAnswerSelectorOperatorInputs
+VerifierInputs = VerifierOperatorInputs
+VerifierOutputs = VerifierOperatorOutputs
 
 # ------------------------------------------------------------------------------
 # 1) Ensemble Operator Wrapper
 # ------------------------------------------------------------------------------
-
-
-class EnsembleInputs(BaseModel):
-    """Typed input for the Ensemble operator.
-
-    Attributes:
-        query (str): The input query to be processed.
-    """
-
-    query: str
-
-
-class EnsembleSignature(Signature):
-    input_model: Type[BaseModel] = EnsembleInputs
 
 
 class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
@@ -69,7 +67,7 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
     max_tokens: Optional[int]
     model_service: Optional[ModelService]
 
-    signature: Signature = EnsembleSignature()
+    signature: Signature = EnsembleOperator.signature
 
     ensemble_op: EnsembleOperator = ember_field(init=False)
 
@@ -113,21 +111,6 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
 # 2) MostCommon Operator Wrapper
 # ------------------------------------------------------------------------------
 
-
-class MostCommonInputs(BaseModel):
-    """Typed input for the MostCommon operator.
-
-    Attributes:
-        responses (List[str]): List of candidate responses.
-    """
-
-    responses: List[str]
-
-
-class MostCommonSignature(Signature):
-    input_model: Type[BaseModel] = MostCommonInputs
-
-
 class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     """Wrapper around MostCommonOperator for consensus selection.
 
@@ -137,7 +120,7 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
         # output: {"final_answer": "A"}
     """
 
-    signature: Signature = MostCommonSignature()
+    signature: Signature = MostCommonAnswerSelectorOperator.signature
     most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
     def __init__(self):
@@ -151,39 +134,6 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 # ------------------------------------------------------------------------------
 # 4) JudgeSynthesis Operator Wrapper
 # ------------------------------------------------------------------------------
-
-
-class JudgeSynthesisInputs(BaseModel):
-    """Typed input for the JudgeSynthesis operator.
-
-    Attributes:
-        query (str): The query to be synthesized.
-        responses (List[str]): List of responses to combine.
-    """
-
-    query: str
-    responses: List[str] = Field(
-        ...,
-        description="Multiple responses to be synthesized into a single reasoned answer.",
-    )
-
-
-class JudgeSynthesisOutputs(BaseModel):
-    """Typed output for the JudgeSynthesis operator.
-
-    Attributes:
-        final_answer (str): The synthesized final answer.
-        reasoning (str): The reasoning behind the final answer.
-    """
-
-    final_answer: str
-    reasoning: str
-
-
-class JudgeSynthesisSignature(Signature):
-    required_inputs: List[str] = ["query", "responses"]
-    input_model: Type[BaseModel] = JudgeSynthesisInputs
-    structured_output: Optional[Type[BaseModel]] = CoreJudgeSynthesisOutputs
 
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Wrapper around JudgeSynthesisOperator for multi-response synthesis.
@@ -236,40 +186,6 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
 # 5) Verifier Operator Wrapper
 # ------------------------------------------------------------------------------
 
-
-class VerifierInputs(BaseModel):
-    """Typed input for the Verifier operator.
-
-    Attributes:
-        query (str): The query string.
-        candidate_answer (str): The candidate answer to verify.
-    """
-
-    query: str
-    candidate_answer: str = Field(
-        ...,
-        description="The candidate answer to be verified.",
-    )
-
-
-class VerifierOutputs(BaseModel):
-    """Typed output for the Verifier operator.
-
-    Attributes:
-        verdict (int): The verdict of the verification.
-        explanation (str): The explanation of the verification.
-    """
-
-    verdict: int
-    explanation: str
-    revised_answer: Optional[str]
-
-
-class VerifierSignature(Signature):
-    input_model: Type[BaseModel] = VerifierInputs
-    structured_output: Optional[Type[BaseModel]] = CoreVerifierOperatorOutputs
-
-
 class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     """Wrapper around VerifierOperator to verify and potentially revise a candidate answer.
 
@@ -311,7 +227,6 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
 # ------------------------------------------------------------------------------
 # 6) VariedEnsemble Operator Wrapper and Sequential Pipeline
 # ------------------------------------------------------------------------------
-
 
 class VariedEnsembleInputs(BaseModel):
     """Typed input for the VariedEnsemble operator.
