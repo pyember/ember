@@ -4,6 +4,7 @@ from typing import Dict, Any
 from src.ember.core.registry.operator.core.verifier import (
     VerifierOperator,
     VerifierOperatorInputs,
+    VerifierOperatorOutputs,
 )
 
 
@@ -12,7 +13,7 @@ class CustomVerifierLM:
 
     def __call__(self, *, prompt: str) -> str:
         return (
-            "Verdict: Correct\n"
+            "Verdict: 1\n"
             "Explanation: The answer is correct because...\n"
             "Revised Answer: \n"
         )
@@ -23,11 +24,8 @@ def test_verifier_operator_forward() -> None:
     op = VerifierOperator(lm_module=custom_lm)
 
     inputs = VerifierOperatorInputs(query="Verify this", candidate_answer="Answer")
-    result: Dict[str, Any] = op(inputs=inputs)
+    result: VerifierOperatorOutputs = op(inputs=inputs)
 
-    assert (
-        result.get("verdict") == "Correct"
-    ), "VerifierOperator did not return the expected verdict."
-    assert (
-        result.get("explanation") == "The answer is correct because..."
-    ), "VerifierOperator did not return the expected explanation."
+    # Verdict is numeric: 1 means correct.
+    assert result.verdict == 1, "VerifierOperator did not return the expected verdict (1 for correct)."
+    assert result.explanation == "The answer is correct because...", "VerifierOperator did not return the expected explanation."

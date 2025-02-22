@@ -22,13 +22,14 @@ from src.ember.core.registry.operator.base.operator_base import (
     T_out,
 )
 from src.ember.core.registry.operator.core.ensemble import EnsembleOperator
-from src.ember.core.registry.operator.core.get_answer import GetAnswerOperator
-from src.ember.core.registry.operator.core.most_common import MostCommonOperator
+from src.ember.core.registry.operator.core.most_common import MostCommonAnswerSelectorOperator
 from src.ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
 from src.ember.core.registry.operator.core.verifier import VerifierOperator
 from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core.registry.model.services.model_service import ModelService
 from src.ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
+from src.ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOutputs as CoreJudgeSynthesisOutputs
+from src.ember.core.registry.operator.core.verifier import VerifierOperatorOutputs as CoreVerifierOperatorOutputs
 
 
 # ------------------------------------------------------------------------------
@@ -137,74 +138,14 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     """
 
     signature: Signature = MostCommonSignature()
-    most_common_op: MostCommonOperator = ember_field(init=False)
+    most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
     def __init__(self):
-        self.most_common_op = MostCommonOperator()
+        self.most_common_op = MostCommonAnswerSelectorOperator()
 
     def forward(self, *, inputs: MostCommonInputs) -> Dict[str, Any]:
         """Delegates execution to the underlying MostCommonOperator."""
         return self.most_common_op(inputs=inputs.model_dump())
-
-
-# ------------------------------------------------------------------------------
-# 3) GetAnswer Operator Wrapper
-# ------------------------------------------------------------------------------
-
-
-class GetAnswerInputs(BaseModel):
-    """Input model for GetAnswer operator.
-
-    Attributes:
-        query (str): The query string.
-        response (str): The previous response.
-    """
-
-    query: str
-    response: str
-
-
-class GetAnswerSignature(Signature):
-    input_model: Type[BaseModel] = GetAnswerInputs
-
-
-class GetAnswer(Operator[GetAnswerInputs, Dict[str, Any]]):
-    """Wrapper around GetAnswerOperator to select a final answer.
-
-    Example:
-        getter = GetAnswer(model_name="gpt-4o")
-        output = getter(inputs=GetAnswerInputs(query="Which label is correct?", response="The answer is A."))
-    """
-
-    signature: Signature = GetAnswerSignature()
-    model_name: str
-    temperature: float = 0.0
-    max_tokens: Optional[int] = None
-    model_service: Optional[ModelService] = None
-    get_answer_op: GetAnswerOperator = ember_field(init=False)
-
-    def __init__(
-        self,
-        *,
-        model_name: str = "gpt-4o",
-        temperature: float = 0.0,
-        max_tokens: Optional[int] = None,
-        model_service: Optional[ModelService] = None,
-    ) -> None:
-        # Create a single LMModule and instantiate the underlying GetAnswerOperator.
-        lm_module = LMModule(
-            config=LMModuleConfig(
-                model_name=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            ),
-            model_service=model_service,
-        )
-        self.get_answer_op = GetAnswerOperator(lm_module=lm_module)
-
-    def forward(self, *, inputs: GetAnswerInputs) -> Dict[str, Any]:
-        """Delegates execution to the underlying GetAnswerOperator."""
-        return self.get_answer_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -227,12 +168,24 @@ class JudgeSynthesisInputs(BaseModel):
     )
 
 
+class JudgeSynthesisOutputs(BaseModel):
+    """Typed output for the JudgeSynthesis operator.
+
+    Attributes:
+        final_answer (str): The synthesized final answer.
+        reasoning (str): The reasoning behind the final answer.
+    """
+
+    final_answer: str
+    reasoning: str
+
+
 class JudgeSynthesisSignature(Signature):
     required_inputs: List[str] = ["query", "responses"]
     input_model: Type[BaseModel] = JudgeSynthesisInputs
+    structured_output: Optional[Type[BaseModel]] = CoreJudgeSynthesisOutputs
 
-
-class JudgeSynthesis(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
+class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Wrapper around JudgeSynthesisOperator for multi-response synthesis.
 
     Example:
@@ -299,11 +252,25 @@ class VerifierInputs(BaseModel):
     )
 
 
+class VerifierOutputs(BaseModel):
+    """Typed output for the Verifier operator.
+
+    Attributes:
+        verdict (int): The verdict of the verification.
+        explanation (str): The explanation of the verification.
+    """
+
+    verdict: int
+    explanation: str
+    revised_answer: Optional[str]
+
+
 class VerifierSignature(Signature):
     input_model: Type[BaseModel] = VerifierInputs
+    structured_output: Optional[Type[BaseModel]] = CoreVerifierOperatorOutputs
 
 
-class Verifier(Operator[VerifierInputs, Dict[str, Any]]):
+class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     """Wrapper around VerifierOperator to verify and potentially revise a candidate answer.
 
     Example:

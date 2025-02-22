@@ -21,7 +21,6 @@ from src.ember.core.registry.operator.exceptions import (
 
 T = TypeVar("T")
 
-_flatten_cache_lock = None  # Deprecated; replaced by thread-local storage
 _thread_local = threading.local()
 
 def static_field(**kwargs: Any) -> Field:
@@ -224,12 +223,12 @@ class EmberModule(metaclass=EmberModuleMeta):
     Fields marked with `static_field` or `ember_field(static=True)` are excluded from
     tree transformations, suitable for hyperparameters or fixed configurations, 
     while dynamic fields (default `ember_field`) participate in transformations, 
-    such as model/router weights.
+    such as model/router weights getting backpropped through.
 
-    **Performance Notes**:
+    **Brief Performance Notes**:
     - Flattening/unflattening has complexity proportional to the number of fields on the module.
       So we use `static_field` for fields that do not require transformation to reduce overhead.
-    - Thread-local caching is employed to avoid global lock contention. This is a nice first step and speeds up repeated
+    - Thread-local caching is employed to avoid global lock contention. This is a simple first step and speeds up repeated
       flatten calls within the same thread.
     """
 

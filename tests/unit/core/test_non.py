@@ -10,26 +10,24 @@ These tests verify that each wrapper:
 This file is production grade, strongly typed, and follows the Google Python Style Guide.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 import pytest
-from pydantic import BaseModel, Field
 from unittest.mock import patch
-from src.ember.core.registry.model.services.model_service import ModelService
 
 # Import the wrappers and their input/output types from non.py.
 from src.ember.core.non import (
     UniformEnsemble,
     MostCommon,
-    GetAnswer,
     JudgeSynthesis,
     Verifier,
     VariedEnsemble,
     Sequential,
     EnsembleInputs,
     MostCommonInputs,
-    GetAnswerInputs,
     JudgeSynthesisInputs,
+    JudgeSynthesisOutputs,
     VerifierInputs,
+    VerifierOutputs,
     VariedEnsembleInputs,
     VariedEnsembleOutputs,
 )
@@ -61,7 +59,7 @@ def dummy_reasoning_lm(*, prompt: str) -> str:
 
 def dummy_verifier_lm(*, prompt: str) -> str:
     """Dummy LM __call__ that returns a verification output."""
-    return "Verdict: Correct\n" "Explanation: All good\n" "Revised Answer: AnswerY"
+    return "Verdict: 1\nExplanation: All good\nRevised Answer: AnswerY"
 
 
 def failing_lm(*, prompt: str) -> str:
@@ -113,26 +111,6 @@ def test_most_common_operator_normal() -> None:
 
 
 # ------------------------------------------------------------------------------
-# 3) GetAnswer Operator Tests
-# ------------------------------------------------------------------------------
-
-
-@patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
-    return_value="AnswerX",
-)
-def test_get_answer_operator_normal(mock_invoke) -> None:
-    """Test that GetAnswer extracts the final answer from LM module output."""
-    getter = GetAnswer(model_name="dummy", temperature=0.0)
-    inputs: GetAnswerInputs = GetAnswerInputs(
-        query="Test", response="Previous response"
-    )
-    output: Dict[str, Any] = getter(inputs=inputs)
-    assert "final_answer" in output, "Output should contain 'final_answer'."
-    assert output["final_answer"] == "AnswerX", "The final answer should be 'AnswerX'."
-
-
-# ------------------------------------------------------------------------------
 # 4) JudgeSynthesis Operator Tests
 # ------------------------------------------------------------------------------
 
@@ -150,15 +128,9 @@ def test_judge_synthesis_operator_normal(mock_invoke) -> None:
     inputs: JudgeSynthesisInputs = JudgeSynthesisInputs(
         query="Test", responses=["Resp1", "Resp2"]
     )
-    output: Dict[str, Any] = judge(inputs=inputs)
-    assert "final_answer" in output, "Output must include 'final_answer'."
-    assert "reasoning" in output, "Output must include 'reasoning'."
-    assert (
-        output["final_answer"] == "Synthesized"
-    ), "Final answer should be 'Synthesized'."
-    assert (
-        "Some reasoning" in output["reasoning"]
-    ), "Reasoning should contain 'Some reasoning'."
+    output = judge(inputs=inputs)
+    assert output.final_answer == "Synthesized", "Final answer should be 'Synthesized'."
+    assert "Some reasoning" in output.reasoning, "Reasoning should contain 'Some reasoning'."
 
 
 # ------------------------------------------------------------------------------
@@ -168,7 +140,7 @@ def test_judge_synthesis_operator_normal(mock_invoke) -> None:
 
 @patch(
     "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
-    return_value="Verdict: Correct\nExplanation: All good\nRevised Answer: AnswerY",
+    return_value="Verdict: 1\nExplanation: All good\nRevised Answer: AnswerY",
 )
 def test_verifier_operator_normal(mock_invoke) -> None:
     """Test that Verifier returns a verdict, explanation, and revised answer."""
@@ -177,12 +149,10 @@ def test_verifier_operator_normal(mock_invoke) -> None:
     for lm in [verifier.verifier_op.lm_module]:
         lm.__call__ = dummy_verifier_lm  # type: ignore
     inputs: VerifierInputs = VerifierInputs(query="Test", candidate_answer="AnswerX")
-    output: Dict[str, Any] = verifier(inputs=inputs)
-    assert "verdict" in output, "Output must include 'verdict'."
-    assert "explanation" in output, "Output must include 'explanation'."
-    assert "revised_answer" in output, "Output must include 'revised_answer'."
-    assert output["verdict"] == "Correct", "Verdict should be 'Correct'."
-    assert output["revised_answer"] == "AnswerY", "Revised answer should be 'AnswerY'."
+    output: VerifierOutputs = verifier(inputs=inputs)
+    assert output.verdict == 1, "Verdict should be 1 (correct)."
+    assert output.explanation == "All good", "Explanation should be 'All good'."
+    assert output.revised_answer == "AnswerY", "Revised answer should be 'AnswerY'."
 
 
 # ------------------------------------------------------------------------------

@@ -14,11 +14,7 @@ import pytest
 from pydantic import BaseModel
 
 from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core.registry.operator.exceptions import (
-    OperatorExecutionError,
-    OperatorSignatureNotDefinedError,
-    SignatureValidationError,
-)
+from src.ember.core.registry.operator.exceptions import OperatorSignatureNotDefinedError
 from src.ember.core.registry.prompt_signature.signatures import Signature
 
 

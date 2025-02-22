@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Type
+from typing import List, Optional, Type
 from pydantic import BaseModel, Field
 
 from src.ember.core.registry.operator.base.operator_base import Operator
@@ -12,14 +12,24 @@ from src.ember.core.registry.operator.base._module import ember_field
 
 
 class JudgeSynthesisInputs(BaseModel):
-    """Input model for JudgeSynthesisOperator."""
+    """Input model for JudgeSynthesisOperator.
+
+    Attributes:
+        query (str): The query text.
+        responses (List[str]): Aggregated ensemble responses.
+    """
 
     query: str
     responses: List[str] = Field(..., description="Aggregated ensemble responses.")
 
 
 class JudgeSynthesisOutputs(BaseModel):
-    """Output model for JudgeSynthesisOperator."""
+    """Output model for JudgeSynthesisOperator.
+
+    Attributes:
+        final_answer (str): Synthetically combined best final answer.
+        reasoning (str): Rationale behind the combined answer choice.
+    """
 
     final_answer: str
     reasoning: str
@@ -42,30 +52,36 @@ class JudgeSynthesisSignature(Signature):
     input_model: Type[BaseModel] = JudgeSynthesisInputs
 
 
-class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, Dict[str, Any]]):
+class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Operator to synthesize a final answer and reasoning from multiple responses."""
 
     signature: Signature = JudgeSynthesisSignature()
     lm_module: LMModule
 
     def __init__(self, *, lm_module: LMModule) -> None:
+        """Initialize the synthesis judge with a language model module."""
         self.lm_module = lm_module
 
-    def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs.model_dump())
+    def forward(self, *, inputs: JudgeSynthesisInputs) -> JudgeSynthesisOutputs:
         if not self.lm_module:
-            raise MissingLMModuleError(
-                "No LM module attached to JudgeSynthesisOperator."
-            )
+            raise MissingLMModuleError("No LM module attached to JudgeSynthesisOperator.")
+
+        rendered_prompt: str = self.signature.render_prompt(inputs=inputs.model_dump())
         raw_output: str = self.lm_module(prompt=rendered_prompt).strip()
 
-        # Parse the output for the final answer and reasoning, respectively
-        final_answer: str = "Unknown"
+        final_answer = "Unknown"
         reasoning_lines: List[str] = []
-        for line in raw_output.split("\n"):
+
+        for line in raw_output.splitlines():
+            line = line.strip()
             if line.startswith("Final Answer:"):
                 final_answer = line.replace("Final Answer:", "").strip()
                 break
             reasoning_lines.append(line)
-        reasoning: str = "\n".join(reasoning_lines)
-        return {"final_answer": final_answer, "reasoning": reasoning}
+
+        reasoning = "\n".join(reasoning_lines)
+
+        return JudgeSynthesisOutputs(
+            final_answer=final_answer,
+            reasoning=reasoning,
+        )

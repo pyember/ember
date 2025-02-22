@@ -9,8 +9,8 @@ from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
-class MostCommonOperatorInputs(BaseModel):
-    """Input model for MostCommonOperator.
+class MostCommonAnswerSelectorOperatorInputs(BaseModel):
+    """Input model for MostCommonAnswerSelectorOperator.
 
     Attributes:
         responses (List[str]): A list of response strings.
@@ -19,12 +19,12 @@ class MostCommonOperatorInputs(BaseModel):
     responses: List[str]
 
 
-class MostCommonOperator(Operator[MostCommonOperatorInputs, Dict[str, Any]]):
+class MostCommonAnswerSelectorOperator(Operator[MostCommonAnswerSelectorOperatorInputs, Dict[str, Any]]):
     """Operator that selects the most common answer from provided responses."""
 
-    signature: Signature = Signature(input_model=MostCommonOperatorInputs)
+    signature: Signature = Signature(input_model=MostCommonAnswerSelectorOperatorInputs)
 
-    def forward(self, *, inputs: MostCommonOperatorInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: MostCommonAnswerSelectorOperatorInputs) -> Dict[str, Any]:
         if not inputs.responses:
             return {"final_answer": None}
         counts: Counter = Counter(inputs.responses)
