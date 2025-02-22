@@ -38,7 +38,8 @@ from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core.registry.model.services.model_service import ModelService
 from src.ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
 
-# Re-export types for backward compatibility with existing clients/tests.
+# Alias re-export types for backward compatibility with clients/tests from before our
+# registry refactor.
 EnsembleInputs = EnsembleOperatorInputs
 MostCommonInputs = MostCommonAnswerSelectorOperatorInputs
 VerifierInputs = VerifierOperatorInputs
