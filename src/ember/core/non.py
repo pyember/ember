@@ -1,18 +1,17 @@
 """
-non.py: NON wrapper module
+NON wrapper module
 
 This module provides strongly typed wrappers for Ember's built-in operators.
 Since the base classes (EmberModule/Operator) already enforce immutability and
-tree registration (akin to eqx.Module in Equinox), these wrappers simply subclass
-Operator and initialize their sub-operators in __post_init__. The metadata field is
-declared with init=False so that each instance always uses the class's intended metadata.
+tree registration, these wrappers simply subclass Operator and initialize their
+sub-operators in __post_init__.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Type
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 # Ember package imports
 from src.ember.core.registry.operator.base._module import ember_field
@@ -35,8 +34,7 @@ from src.ember.core.registry.operator.core.verifier import (
     VerifierSignature,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.services.model_service import ModelService
-from src.ember.core.registry.model.modules.lm import LMModuleConfig, LMModule
+from src.ember.core.registry.model.model_modules.lm import LMModuleConfig, LMModule
 
 # Alias re-export types for backward compatibility with clients/tests from before our
 # registry refactor.
@@ -66,7 +64,6 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
     model_name: str
     temperature: float
     max_tokens: Optional[int]
-    model_service: Optional[ModelService]
 
     signature: Signature = EnsembleOperator.signature
 
@@ -79,14 +76,12 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
         model_name: str,
         temperature: float,
         max_tokens: Optional[int] = None,
-        model_service: Optional[ModelService] = None,
     ) -> None:
         # Normal, conventional __init__ assignments:
         self.num_units = num_units
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.model_service = model_service
 
         # Construct LM modules based on the provided parameters.
         lm_modules: List[LMModule] = [
@@ -95,8 +90,7 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
                     model_name=self.model_name,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
-                ),
-                model_service=self.model_service,
+                )
             )
             for _ in range(self.num_units)
         ]
@@ -148,7 +142,6 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     model_name: str
     temperature: float
     max_tokens: Optional[int]
-    model_service: Optional[ModelService]
     judge_synthesis_op: JudgeSynthesisOperator = ember_field(init=False)
 
     def __init__(
@@ -157,21 +150,18 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         model_name: str = "gpt-4o",
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
-        model_service: Optional[ModelService] = None,
     ) -> None:
         super().__init__()
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
-        self.model_service = model_service
 
         lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
                 temperature=temperature,
                 max_tokens=max_tokens,
-            ),
-            model_service=model_service,
+            )
         )
         self._init_field(
             field_name="judge_synthesis_op",
@@ -199,7 +189,6 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     model_name: str
     temperature: float
     max_tokens: Optional[int]
-    model_service: Optional[ModelService]
     verifier_op: VerifierOperator = ember_field(init=False)
 
     def __init__(
@@ -208,15 +197,13 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         model_name: str,
         temperature: float,
         max_tokens: Optional[int] = None,
-        model_service: Optional[ModelService] = None,
     ) -> None:
         lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
                 temperature=temperature,
                 max_tokens=max_tokens,
-            ),
-            model_service=model_service,
+            )
         )
         self.verifier_op = VerifierOperator(lm_module=lm_module)
 

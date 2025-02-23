@@ -7,7 +7,7 @@ from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.core.exceptions import MissingLMModuleError
 
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.modules.lm import LMModule
+from src.ember.core.registry.model.model_modules.lm import LMModule
 from src.ember.core.registry.operator.base._module import ember_field
 
 

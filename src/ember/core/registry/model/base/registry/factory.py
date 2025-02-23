@@ -10,12 +10,10 @@ import logging
 import pkgutil
 from typing import Any, Dict, Optional, Type
 
-from src.ember.core.registry.model.utils.model_registry_exceptions import (
-    ProviderConfigError,
-)
+from src.ember.core.registry.model.base.utils.model_registry_exceptions import ProviderConfigError
 from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.registry.model_enum import parse_model_str
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.registry.model_enum import parse_model_str
 
 logger: logging.Logger = logging.getLogger(__name__)
 

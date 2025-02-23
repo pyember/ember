@@ -1,6 +1,3 @@
-import pytest
-from typing import Dict, Any
-
 from src.ember.core.registry.operator.core.verifier import (
     VerifierOperator,
     VerifierOperatorInputs,
@@ -12,6 +9,8 @@ class CustomVerifierLM:
     """Mimics a verifier that outputs verdict, explanation, optional revised answer lines."""
 
     def __call__(self, *, prompt: str) -> str:
+        """Dummy LM __call__ that returns a verification output."""
+        del prompt
         return (
             "Verdict: 1\n"
             "Explanation: The answer is correct because...\n"

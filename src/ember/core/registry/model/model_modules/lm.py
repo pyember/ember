@@ -2,8 +2,8 @@ import logging
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
-from src.ember.core.registry.model.services.model_service import ModelService
-from src.ember.core.registry.model.services.usage_service import UsageService
+from src.ember.core.registry.model.base.services.model_service import ModelService
+from src.ember.core.registry.model.base.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
 

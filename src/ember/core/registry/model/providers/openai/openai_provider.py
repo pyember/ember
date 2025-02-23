@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from requests.exceptions import HTTPError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from src.ember.core.registry.model.utils.model_registry_exceptions import (
+from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
@@ -14,9 +14,9 @@ from src.ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from src.ember.core.registry.model.schemas.chat_schemas import ChatRequest, ChatResponse
-from src.ember.core.registry.model.schemas.usage import UsageStats
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.base.schemas.usage import UsageStats
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.plugin_system import provider
 
 logger: logging.Logger = logging.getLogger(__name__)

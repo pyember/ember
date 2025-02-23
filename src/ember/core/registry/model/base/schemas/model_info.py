@@ -1,8 +1,8 @@
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
 
-from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 
 
 class ModelInfo(BaseModel):

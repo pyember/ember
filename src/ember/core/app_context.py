@@ -1,9 +1,9 @@
 import logging
 from typing import Optional, Any, Dict
 
-from src.ember.core.registry.model.services.model_service import ModelService
-from src.ember.core.registry.model.services.usage_service import UsageService
-from src.ember.core.registry.model.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.base.services.model_service import ModelService
+from src.ember.core.registry.model.base.services.usage_service import UsageService
+from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 
 class EmberAppContext:

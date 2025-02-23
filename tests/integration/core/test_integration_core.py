@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="AnswerX",
 )
 def test_multi_stage_pipeline_integration(mock_invoke_model) -> None:

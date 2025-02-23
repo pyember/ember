@@ -117,7 +117,7 @@ registry/
    In your Python code (e.g., `main.py`):
    ```python
    from src.ember.registry.model.config import initialize_global_registry, GLOBAL_MODEL_REGISTRY
-   from src.ember.registry.model.services.model_service import ModelService
+   from src.ember.registry.model.base.services.model_service import ModelService
 
    def main():
        # 1) Initialize the global registry
@@ -153,7 +153,7 @@ print(response.data)
 Below is a simplified usage example (see `example.py` in the `examples/` folder for a more detailed version):
 
 ```python
-from src.ember.registry.model.services.model_service import ModelService
+from src.ember.registry.model.base.services.model_service import ModelService
 ....
 svc = ModelService()
 response = svc(model_id="openai:gpt-4o", prompt="Hello world!")

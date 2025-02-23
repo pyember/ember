@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Tests for NON wrappers.
 
@@ -25,7 +24,6 @@ from src.ember.core.non import (
     EnsembleInputs,
     MostCommonInputs,
     JudgeSynthesisInputs,
-    JudgeSynthesisOutputs,
     VerifierInputs,
     VerifierOutputs,
     VariedEnsembleInputs,
@@ -73,7 +71,7 @@ def failing_lm(*, prompt: str) -> str:
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="response",
 )
 def test_uniform_ensemble_operator_normal(mock_invoke):
@@ -116,7 +114,7 @@ def test_most_common_operator_normal() -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="Reasoning: Some reasoning\nFinal Answer: Synthesized",
 )
 def test_judge_synthesis_operator_normal(mock_invoke) -> None:
@@ -139,7 +137,7 @@ def test_judge_synthesis_operator_normal(mock_invoke) -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="Verdict: 1\nExplanation: All good\nRevised Answer: AnswerY",
 )
 def test_verifier_operator_normal(mock_invoke) -> None:
@@ -161,12 +159,12 @@ def test_verifier_operator_normal(mock_invoke) -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="varied response",
 )
 def test_varied_ensemble_operator_normal(mock_invoke) -> None:
     """Test that VariedEnsemble aggregates responses from multiple LM configurations."""
-    from src.ember.core.registry.model.modules.lm import LMModuleConfig
+    from src.ember.core.registry.model.model_modules.lm import LMModuleConfig
 
     dummy_config: LMModuleConfig = LMModuleConfig(model_id="dummy", temperature=1.0)
     varied_ensemble = VariedEnsemble(model_configs=[dummy_config, dummy_config])
@@ -215,7 +213,7 @@ def test_sequential_pipeline_operator_normal() -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.services.model_service.ModelService.invoke_model",
+    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     side_effect=Exception("Simulated LM failure"),
 )
 def test_uniform_ensemble_operator_failure_propagation(mock_invoke) -> None:

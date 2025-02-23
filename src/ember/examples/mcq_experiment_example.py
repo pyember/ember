@@ -28,9 +28,9 @@ from prettytable import PrettyTable
 
 # ember imports: use only the typed pipeline definitions (avoid direct registry references).
 from src.ember.core.non import Ensemble, JudgeSynthesis
-from src.ember.core.registry.model.registry.model_registry import get_model_registry
+from src.ember.core.registry.model.base.registry.model_registry import get_model_registry
 from src.ember.core import non
-from src.ember.core.registry.model.registry.model_registry import GLOBAL_MODEL_REGISTRY
+from src.ember.core.registry.model.base.registry.model_registry import GLOBAL_MODEL_REGISTRY
 from src.ember.core.configs.config import CONFIG, initialize_system
 
 # For dataset usage:
@@ -50,7 +50,7 @@ from src.ember.core.registry.operator.base.operator_base import (
     OperatorMetadata,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.modules.lm import LMModuleConfig
+from src.ember.core.registry.model.model_modules.lm import LMModuleConfig
 
 # ADD the execute_graph import:
 from src.ember.xcs.engine.xcs_engine import execute_graph

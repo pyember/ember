@@ -8,10 +8,10 @@ from typing import Any, Dict
 
 import pytest
 
-from src.ember.core.registry.model.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 def create_dummy_model_info(model_id: str = "dummy:1") -> ModelInfo:
@@ -45,7 +45,7 @@ def test_register_and_get_model(model_registry: ModelRegistry) -> None:
             return prompt.upper()
 
     # Monkey-patch ModelFactory.create_model_from_info to return our dummy provider.
-    from src.ember.core.registry.model.registry.factory import ModelFactory
+    from src.ember.core.registry.model.base.registry.factory import ModelFactory
 
     original_create = ModelFactory.create_model_from_info
     ModelFactory.create_model_from_info = staticmethod(
@@ -63,7 +63,7 @@ def test_register_and_get_model(model_registry: ModelRegistry) -> None:
 def test_register_duplicate_model(model_registry: ModelRegistry) -> None:
     """Test that attempting to register a duplicate model raises a ValueError."""
     dummy_info = create_dummy_model_info("dummy:dup")
-    from src.ember.core.registry.model.registry.factory import ModelFactory
+    from src.ember.core.registry.model.base.registry.factory import ModelFactory
 
     original_create = ModelFactory.create_model_from_info
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
@@ -85,7 +85,7 @@ def test_get_model_not_found(model_registry: ModelRegistry) -> None:
 def test_unregister_model(model_registry: ModelRegistry) -> None:
     """Test that a registered model can be unregistered successfully."""
     dummy_info = create_dummy_model_info("dummy:unreg")
-    from src.ember.core.registry.model.registry.factory import ModelFactory
+    from src.ember.core.registry.model.base.registry.factory import ModelFactory
 
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
 

@@ -4,7 +4,7 @@
 
 import pytest
 
-from src.ember.core.registry.model.registry.model_enum import parse_model_str
+from src.ember.core.registry.model.base.registry.model_enum import parse_model_str
 
 
 def test_known_model_enum() -> None:

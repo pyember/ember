@@ -3,8 +3,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.schemas.chat_schemas import (
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )

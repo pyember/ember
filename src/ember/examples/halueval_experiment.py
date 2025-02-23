@@ -27,11 +27,11 @@ from prettytable import PrettyTable
 from src.ember.core import (
     non,
 )  # Provides operators such as Ensemble, GetAnswer, JudgeSynthesis, VariedEnsemble
-from src.ember.core.registry.model.registry.model_registry import (
+from src.ember.core.registry.model.base.registry.model_registry import (
     GLOBAL_MODEL_REGISTRY,
     initialize_system,
 )
-from src.ember.core.registry.model.modules.lm import LMModule, LMModuleConfig
+from src.ember.core.registry.model.model_modules.lm import LMModule, LMModuleConfig
 from src.ember.examples.mcq_experiment_example import (
     EnsureValidChoiceOperator,
     SingleModelBaseline,

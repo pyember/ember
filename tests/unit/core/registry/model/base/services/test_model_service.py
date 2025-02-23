@@ -8,11 +8,11 @@ from typing import Any
 
 import pytest
 
-from src.ember.core.registry.model.services.model_service import ModelService
-from src.ember.core.registry.model.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.base.services.model_service import ModelService
+from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 # Dummy model that echoes the prompt.
@@ -44,7 +44,7 @@ def dummy_registry(monkeypatch: pytest.MonkeyPatch) -> ModelRegistry:
     """Fixture that returns a ModelRegistry with a dummy model registered."""
     registry = ModelRegistry()
     dummy_info = create_dummy_model_info("dummy:service")
-    from src.ember.core.registry.model.registry.factory import ModelFactory
+    from src.ember.core.registry.model.base.registry.factory import ModelFactory
 
     monkeypatch.setattr(
         ModelFactory,

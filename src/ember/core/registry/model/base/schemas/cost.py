@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, ValidationInfo, ConfigDict
+from pydantic import BaseModel, field_validator, ValidationInfo
 
 
 class ModelCost(BaseModel):

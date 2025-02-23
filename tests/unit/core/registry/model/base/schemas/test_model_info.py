@@ -6,9 +6,9 @@ Tests API key validation and the get_api_key method.
 
 import pytest
 
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 def create_model_info_with_key(model_id: str, api_key: str) -> ModelInfo:

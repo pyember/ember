@@ -7,11 +7,11 @@ Tests instantiation of provider models and error conditions.
 import pytest
 from typing import Any, Dict
 
-from src.ember.core.registry.model.registry.factory import ModelFactory
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.model.utils.model_registry_exceptions import (
+from src.ember.core.registry.model.base.registry.factory import ModelFactory
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
 
@@ -35,7 +35,7 @@ def dummy_discover_providers(*, package_path: str) -> Dict[str, type]:
 @pytest.fixture(autouse=True)
 def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "src.ember.core.registry.model.registry.factory.discover_providers_in_package",
+        "src.ember.core.registry.model.base.registry.factory.discover_providers_in_package",
         dummy_discover_providers,
     )
 
@@ -68,7 +68,7 @@ def test_create_model_from_info_invalid(monkeypatch: pytest.MonkeyPatch) -> None
         raise ValueError("Invalid model ID format")
 
     monkeypatch.setattr(
-        "src.ember.core.registry.model.registry.factory.parse_model_str",
+        "src.ember.core.registry.model.base.registry.factory.parse_model_str",
         mock_parse_model_str,
     )
 

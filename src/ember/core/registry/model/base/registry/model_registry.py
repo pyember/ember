@@ -2,12 +2,10 @@ import threading
 import logging
 from typing import Dict, List, Optional
 
-from src.ember.core.registry.model.registry.factory import ModelFactory
-from src.ember.core.registry.model.schemas.model_info import ModelInfo
+from src.ember.core.registry.model.base.registry.factory import ModelFactory
+from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
-from src.ember.core.registry.model.utils.model_registry_exceptions import (
-    ModelNotFoundError,
-)
+from src.ember.core.registry.model.base.utils.model_registry_exceptions import ModelNotFoundError
 
 logger: logging.Logger = logging.getLogger(__name__)
 

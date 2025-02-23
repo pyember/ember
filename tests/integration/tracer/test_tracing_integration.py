@@ -8,8 +8,7 @@ These tests verify:
   - Re-entrancy is properly handled (including nested JIT operators).
 """
 
-import pytest
-from src.ember.core.non import Operator
+from src.ember.core.registry.operator.base.operator_base import Operator
 from src.ember.xcs.tracer.xcs_tracing import TracerContext, convert_traced_graph_to_plan
 from src.ember.xcs.tracer.tracer_decorator import jit
 

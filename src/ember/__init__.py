@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 from typing import Optional
 
 from .core.registry.model import initialize_ember, ModelRegistry, ModelService
-from .core.registry.model.services.usage_service import UsageService
+from .core.registry.model.base.services.usage_service import UsageService
 
 __version__ = "0.1.0"
 __all__ = ["ModelRegistry", "ModelService", "initialize_ember"]
@@ -36,11 +36,11 @@ _PACKAGE_METADATA = {
 def __getattr__(name: str) -> object:
     """Lazy load main components using absolute imports."""
     if name == "ModelRegistry":
-        from src.ember.core.registry.model.registry.model_registry import ModelRegistry
+        from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
         return ModelRegistry
     if name == "ModelService":
-        from src.ember.core.registry.model.services.model_service import ModelService
+        from src.ember.core.registry.model.base.services.model_service import ModelService
 
         return ModelService
     if name == "initialize_ember":

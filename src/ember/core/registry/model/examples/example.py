@@ -3,7 +3,7 @@ from typing import List
 
 from ember import initialize_ember
 from src.ember.core.registry.model import load_model, ChatResponse
-from src.ember.core.registry.model.services.model_service import ModelService
+from src.ember.core.registry.model.base.services.model_service import ModelService
 
 logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)

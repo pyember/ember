@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from src.ember.core.registry.model.modules.lm import LMModule, LMModuleConfig
+from src.ember.core.registry.model.model_modules.lm import LMModule, LMModuleConfig
 
 
 class DummyModelService:

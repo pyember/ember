@@ -1,21 +1,16 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Unit tests for the EmberModule abstraction.
 
 This test suite provides comprehensive tests for the EmberModule abstraction,
 its associated field utilities, the temporary mutable initialization wrapper, tree
 flattening/unflattening functionality, bound method behavior, and metaclass registration.
-
-These tests adhere to the Google Python Style Guide and enforce strong type annotations.
 """
 
 from __future__ import annotations
 
-import abc
 import dataclasses
 import unittest
 from dataclasses import FrozenInstanceError
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Type
 
 from unittest.mock import patch
 
@@ -34,7 +29,7 @@ from src.ember.core.registry.operator.base import _module
 
 
 ###############################################################################
-# NOTE: EmberModuleMeta decorates subclasses as frozen dataclasses.
+# Quick note: EmberModuleMeta decorates subclasses as frozen dataclasses.
 # Due to dataclass inheritance subtleties, dummy test classes explicitly use
 # @dataclasses.dataclass(frozen=True, init=True) to ensure that __init__ accepts
 # keyword arguments.
