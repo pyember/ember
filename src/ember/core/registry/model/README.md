@@ -280,3 +280,29 @@ print("Got:", resp.data)
 ```
 
 That's it! Optionally set `auto_discover=False` if you don't want to fetch remote model lists, and skip usage tracking if you don't need usage logs.
+
+### API Reference
+
+#### ModelRegistry
+**Purpose:** Manages model instances and metadata.
+
+**Key Methods:**
+ - `register_model(model_info: ModelInfo)`: Registers a new model.
+ - `get_model(model_id: str) -> BaseProviderModel`: Retrieves a model instance.
+ - `list_models() -> List[str]`: Returns a list of registered model IDs.
+ - `unregister_model(model_id: str) -> None`: Unregisters a model.
+
+#### ModelService
+**Purpose:** Facade for model invocation.
+
+**Key Methods:**
+ - `invoke_model(model_id: str, prompt: str, **kwargs) -> ChatResponse`: Synchronous model invocation.
+ - `invoke_model_async(model_id: str, prompt: str, **kwargs) -> ChatResponse`: Asynchronous model invocation.
+ - `get_model(model_id: str) -> BaseProviderModel`: Retrieves a specific model.
+
+#### UsageService
+**Purpose:** Tracks and aggregates model usage statistics.
+
+**Key Methods:**
+ - `add_usage_record(model_id: str, usage_stats: UsageStats)`: Adds a usage record.
+ - `get_usage_summary(model_id: str) -> UsageSummary`: Retrieves aggregated usage information.

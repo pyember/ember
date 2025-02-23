@@ -13,6 +13,7 @@ def test_known_model_enum() -> None:
 
 
 def test_unknown_model_enum() -> None:
-    """Test that an unknown model string returns itself."""
-    value = parse_model_str("unknown:model")
-    assert value == "unknown:model"
+    """Test that an unknown model string raises ValueError."""
+    with pytest.raises(ValueError) as exc_info:
+        _ = parse_model_str("unknown:model")
+    assert "Invalid model ID 'unknown:model'" in str(exc_info.value)

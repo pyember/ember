@@ -9,6 +9,7 @@ initialize and configure the ModelRegistry.
 import logging
 import os
 import re
+import yaml
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -141,12 +142,12 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
     """Initialize a ModelRegistry using merged YAML and environment configuration.
 
     This function executes the following steps:
-      1. Loads the main configuration file along with any included configuration files.
-      2. Resolves environment variable placeholders within the merged configuration.
-      3. Constructs an EmberSettings instance based on the resolved configuration.
-      4. Instantiates a new ModelRegistry.
-      5. Optionally discovers remote models (if auto_discover is enabled) and merges them with local configuration.
-      6. Registers all models into the ModelRegistry.
+      1. Loads the config YAML from settings.model_config_path (if present).
+      2. Optionally merges included files, etc. (for now, we just load the single file).
+      3. Resolves environment variable placeholders within the config.
+      4. Instantiates our EmberSettings and ModelRegistry.
+      5. Optionally discovers remote models (if auto_discover is enabled) and merges them with local config.
+      6. Registers all models into the registry.
 
     Args:
         settings (EmberSettings): An instance specifying configuration paths and registry preferences.
@@ -159,13 +160,22 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
     """
     try:
         merged_config: Dict[str, Any] = {}
+        if os.path.isfile(settings.model_config_path):
+            with open(settings.model_config_path, "r") as f:
+                file_config = yaml.safe_load(f) or {}
+            merged_config = deep_merge(base=merged_config, override=file_config)
+            logger.debug("Loaded config from %s", settings.model_config_path)
+        else:
+            logger.debug(
+                "No file found at %s, using empty or custom config logic.",
+                settings.model_config_path
+            )
     except Exception as exc:
         logger.exception(
             "Failed to handle config for '%s'.", settings.model_config_path
         )
         raise EmberError("Configuration loading error") from exc
 
-    logger.debug("Skipping load_full_config; using empty or custom config logic.")
     merged_config = resolve_env_vars(data=merged_config)
     logger.debug("Final merged config keys: %s", list(merged_config.keys()))
 
@@ -183,7 +193,7 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
         discovered_models = discovery_service.merge_with_config(discovered=discovered)
 
     local_models: Dict[str, ModelInfo] = {
-        model.model_id: model for model in final_settings.registry.models
+        model.id: model for model in final_settings.registry.models
     }
     discovered_models.update(local_models)
 

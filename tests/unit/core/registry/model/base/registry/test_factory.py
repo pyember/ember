@@ -33,17 +33,17 @@ def dummy_discover_providers(*, package_path: str) -> Dict[str, type]:
 
 @pytest.fixture(autouse=True)
 def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+    # This ensures that 'DummyProvider' is recognized
     monkeypatch.setattr(
         "src.ember.core.registry.model.base.registry.factory.discover_providers_in_package",
         dummy_discover_providers,
     )
+    # Also reset the cached providers
     from src.ember.core.registry.model.base.registry.factory import ModelFactory
-
-    # Reset the cache to ensure consistent state for each test.
     ModelFactory._provider_cache = None
 
 
-def create_dummy_model_info(model_id: str = "dummy:factory") -> ModelInfo:
+def create_dummy_model_info(model_id: str = "openai:gpt-4o") -> ModelInfo:
     return ModelInfo(
         id=model_id,
         name="DummyFactoryModel",
@@ -56,10 +56,10 @@ def create_dummy_model_info(model_id: str = "dummy:factory") -> ModelInfo:
 
 def test_create_model_from_info_success() -> None:
     """Test that ModelFactory.create_model_from_info successfully creates a DummyProviderModel."""
-    dummy_info = create_dummy_model_info("dummy:factory")
+    dummy_info = create_dummy_model_info("openai:gpt-4o")
     model_instance = ModelFactory.create_model_from_info(model_info=dummy_info)
     assert isinstance(model_instance, DummyProviderModel)
-    assert model_instance.model_info.id == "dummy:factory"
+    assert model_instance.model_info.id == "openai:gpt-4o"
 
 
 def test_create_model_from_info_invalid(monkeypatch: pytest.MonkeyPatch) -> None:

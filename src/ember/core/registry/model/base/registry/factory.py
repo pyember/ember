@@ -100,7 +100,10 @@ class ModelFactory:
             provider_name
         )
         if provider_class is None:
-            raise ProviderConfigError(f"Unsupported provider '{provider_name}'.")
+            available_providers: str = ", ".join(discovered_providers.keys())
+            raise ProviderConfigError(
+                f"Unsupported provider '{provider_name}'. Available providers: {available_providers}"
+            )
 
         logger.debug(
             "Creating model '%s' using provider class '%s'.",

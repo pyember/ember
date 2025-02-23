@@ -103,15 +103,7 @@ class ModelRegistry:
                         model_id, available_models
                     )
                 )
-            try:
-                return self._models[model_id]
-            except KeyError as error:
-                self._logger.error(
-                    "Registry consistency error - missing model: %s", model_id
-                )
-                raise ModelNotFoundError(
-                    "Model '{}' registration corrupted".format(model_id)
-                ) from error
+            return self._models[model_id]
 
     def list_models(self) -> List[str]:
         """Lists all registered model IDs.

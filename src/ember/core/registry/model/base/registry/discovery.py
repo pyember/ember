@@ -144,5 +144,9 @@ class ModelDiscoveryService:
         """
         with self._lock:  # Protect cache invalidation and discovery refresh
             self._cache.clear()  # Invalidate cache
-            discovered: Dict[str, Dict[str, Any]] = self.discover_models()
-            return self.merge_with_config(discovered=discovered)
+            try:
+                discovered: Dict[str, Dict[str, Any]] = self.discover_models()
+                return self.merge_with_config(discovered=discovered)
+            except Exception as e:
+                self._logger.error("Failed to refresh model discovery: %s", e)
+                raise

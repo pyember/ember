@@ -21,6 +21,7 @@ from src.ember.core.registry.model.base.schemas.chat_schemas import (
 from src.ember.core.registry.model.base.schemas.usage import UsageStats
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.plugin_system import provider
+from src.ember.core.registry.model.base.utils.usage_calculator import DefaultUsageCalculator
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -110,6 +111,7 @@ class OpenAIModel(BaseProviderModel):
                 cost schema.
         """
         super().__init__(model_info)
+        self.usage_calculator = DefaultUsageCalculator()
 
     def create_client(self) -> Any:
         """Create and configure the OpenAI client.
@@ -204,7 +206,10 @@ class OpenAIModel(BaseProviderModel):
                 **openai_kwargs,
             )
             content: str = response.choices[0].message.content.strip()
-            usage_stats: UsageStats = self.calculate_usage(response)
+            usage_stats = self.usage_calculator.calculate(
+                raw_output=response,
+                model_info=self.model_info,
+            )
             return ChatResponse(data=content, raw_output=response, usage=usage_stats)
         except HTTPError as http_err:
             if 500 <= http_err.response.status_code < 600:
@@ -213,33 +218,3 @@ class OpenAIModel(BaseProviderModel):
         except Exception as exc:
             logger.exception("Unexpected error in OpenAIModel.forward()")
             raise ProviderAPIError(str(exc)) from exc
-
-    def calculate_usage(self, raw_output: Any) -> UsageStats:
-        """Compute token usage and cost from the API response.
-
-        Args:
-            raw_output (Any): The raw response object from the OpenAI API.
-
-        Returns:
-            UsageStats: An object encapsulating total tokens, prompt tokens,
-            completion tokens, and the cost in USD.
-        """
-        usage_obj: Any = raw_output.usage
-        total_tokens: int = usage_obj.total_tokens
-        prompt_tokens: int = usage_obj.prompt_tokens
-        completion_tokens: int = usage_obj.completion_tokens
-
-        cost_input: float = (
-            prompt_tokens / 1000.0
-        ) * self.model_info.cost.input_cost_per_thousand
-        cost_output: float = (
-            completion_tokens / 1000.0
-        ) * self.model_info.cost.output_cost_per_thousand
-        total_cost: float = round(cost_input + cost_output, 6)
-
-        return UsageStats(
-            total_tokens=total_tokens,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            cost_usd=total_cost,
-        )
