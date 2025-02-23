@@ -55,3 +55,23 @@ When a language model call is made, the following sequence of events occurs:
 | `ember.examples`              | Contains example scripts demonstrating various usage patterns of the library.                                                                                                                                                                                        |
 
 For a deeper dive into the model registry and the "network-of-networks" approach, see [model_readme.md](model_readme.md). 
+
+# Architecture Overview
+
+## Purpose
+The `models/` module provides a registry for AI models, handling discovery, registration, invocation, and usage tracking.
+
+## Components
+- **Registry**: Manages model registration (`model_registry.py`) and instantiation (`factory.py`).
+- **Providers**: Implements provider-specific logic (`openai_provider.py`, etc.).
+- **Schemas**: Defines data models using Pydantic (`model_info.py`, etc.).
+- **Services**: Provides high-level interfaces (`model_service.py`, `usage_service.py`).
+
+## Design Choices
+- **Thread Safety**: Uses locks in `ModelRegistry` and `ModelDiscoveryService`.
+- **Extensibility**: Factory pattern for provider instantiation.
+- **Configuration**: Uses Pydantic and YAML for settings management.
+
+## Scalability Considerations
+- **Lazy Loading**: Models are instantiated on demand to somewhat minimize memory footprint.
+- **Lightweight Caching**: Discovery service caches results to avoid redundant API calls. 

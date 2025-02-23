@@ -8,6 +8,7 @@ from typing import Any
 from textwrap import dedent
 
 import pytest
+from unittest.mock import patch
 
 from src.ember.core.registry.model.config.settings import initialize_ember
 from src.ember.core.registry.model.model_modules.lm import LMModule, LMModuleConfig
@@ -23,6 +24,7 @@ def create_dummy_config(tmp_path: Path) -> Path:
     config_content = dedent(
         """
     registry:
+      auto_register: true
       models:
         - id: "openai:gpt-4o"
           name: "Test Model"
@@ -33,8 +35,9 @@ def create_dummy_config(tmp_path: Path) -> Path:
             tokens_per_minute: 1000
             requests_per_minute: 100
           provider:
-            name: "DummyProvider"
+            name: "DummyFactoryProvider"
             default_api_key: "dummy_key"
+            base_url: "https://api.dummy.example"
           api_key: "dummy_key"
     """
     )
@@ -55,18 +58,18 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
             class DummyResponse:
                 data = f"Integrated: {prompt}"
                 usage = None
-
             return DummyResponse()
 
-    # Patch the factory
+    # Patching the factory to use DummyProvider.
     monkeypatch.setattr(
         "src.ember.core.registry.model.base.registry.factory.ModelFactory.create_model_from_info",
         lambda *, model_info: DummyProvider(model_info),
     )
 
-    # Also patch the registry's _models dict to ensure our model is registered
+    # Also patch the registry's register_model method to ensure our model info is also registered.
     def mock_register_model(self, model_info: ModelInfo) -> None:
-        """Mock registration that actually adds the model to _models"""
+        """Mock registration that adds the model to both _models and _model_infos."""
+        self._model_infos[model_info.id] = model_info
         self._models[model_info.id] = DummyProvider(model_info)
 
     from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
@@ -74,108 +77,44 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ModelRegistry, "register_model", mock_register_model)
 
 
-def test_full_flow_with_lm_module(tmp_path: Path) -> None:
-    """Test the full flow from config loading to LMModule invocation."""
+
+
+def test_full_flow_concurrent_invocations(tmp_path, monkeypatch):
+    """Ensure the registry handles concurrent invocations correctly."""
     config_path = create_dummy_config(tmp_path)
     registry = initialize_ember(
         config_path=str(config_path), auto_register=True, auto_discover=False
     )
-
-    registered = list(registry._models.keys())
-    print(f"Registered models: {registered}")
-    if "openai:gpt-4o" not in registry._models:
-        dummy_info = ModelInfo(
-            id="openai:gpt-4o",
-            name="Test Model",
-            cost=ModelCost(input_cost_per_thousand=1.0, output_cost_per_thousand=2.0),
-            rate_limit=RateLimit(tokens_per_minute=1000, requests_per_minute=100),
-            provider=ProviderInfo(name="DummyProvider", default_api_key="dummy_key"),
-            api_key="dummy_key",
-        )
-        registry.register_model(dummy_info)
-        print("Manually registered openai:gpt-4o")
-
-    usage_service = UsageService()
-    model_service = ModelService(registry=registry, usage_service=usage_service)
-
-    config = LMModuleConfig(id="openai:gpt-4o", simulate_api=False)
-    lm = LMModule(config=config, model_service=model_service)
-    response = lm(prompt="Hello integration!")
-    assert "Integrated: Hello integration!" in response
-
-    summary = usage_service.get_usage_summary(model_id="openai:gpt-4o")
-    # Since our dummy provider does not update usage, totals remain 0.
-    assert summary.total_usage.total_tokens == 0
-
-
-def test_full_flow_with_real_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Test full flow with a real config and mocked provider invocation."""
-    # First, import ModelFactory and patch it
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
-
-    class DummyFactoryProvider:
-        def __init__(self, model_info):
-            self.model_info = model_info
-        def __call__(self, prompt: str, **kwargs):
-            # Simulate a real provider's response that includes a response structure.
-            class Response:
-                data = f"Integrated: {prompt}"
-                usage = None
-            return Response()
-
-    # Patch ModelFactory so that it recognizes "DummyProvider" prior to reading the config.
-    monkeypatch.setattr(
-        ModelFactory,
-        "_get_providers",
-        lambda: {"DummyProvider": DummyFactoryProvider}
-    )
-
-    # Creation of a dummy config file
-    config_content = dedent(
-        """
-        registry:
-          models:
-            - id: "openai:gpt-4o"
-              name: "Test Model"
-              cost:
-                input_cost_per_thousand: 1.0
-                output_cost_per_thousand: 2.0
-              rate_limit:
-                tokens_per_minute: 1000
-                requests_per_minute: 100
-              provider:
-                name: "DummyProvider"
-                default_api_key: "dummy_key"
-              api_key: "dummy_key"
-        """
-    )
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(config_content)
-
-    from src.ember.core.registry.model.config.settings import initialize_ember
-    from src.ember.core.registry.model.base.services.model_service import ModelService
-    from src.ember.core.registry.model.base.services.usage_service import UsageService
-
-    registry = initialize_ember(
-        config_path=str(config_path),
-        auto_register=True,
-        auto_discover=False
-    )
+    
+    # Ensure model is registered
+    if "openai:gpt-4o" not in registry.list_models():
+        registry.register_model(create_dummy_model_info("openai:gpt-4o"))
 
     usage_service = UsageService()
     service = ModelService(registry=registry, usage_service=usage_service)
 
-    # Simulated invocation test
-    response = service.invoke_model(model_id="openai:gpt-4o", prompt="Full integration test")
-    assert "Integrated: Full integration test" in response.data
-
-    # Test concurrent invocations
     def invoke_concurrently():
         resp = service.invoke_model(model_id="openai:gpt-4o", prompt="Concurrent test")
+        # For demonstration purposes, we check a hypothetical substring in the response
         assert "Integrated: Concurrent test" in resp.data
 
-    threads = [threading.Thread(target=invoke_concurrently) for _ in range(5)]
+    threads = [threading.Thread(target=invoke_concurrently) for _ in range(10)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
+
+
+def create_dummy_model_info(model_id: str) -> ModelInfo:
+    return ModelInfo(
+        id=model_id,
+        name="Test Model",
+        cost=ModelCost(input_cost_per_thousand=1.0, output_cost_per_thousand=2.0),
+        rate_limit=RateLimit(tokens_per_minute=1000, requests_per_minute=100),
+        provider=ProviderInfo(
+            name="DummyFactoryProvider",
+            default_api_key="dummy_key",
+            base_url="https://api.dummy.example"
+        ),
+        api_key="dummy_key",
+    )

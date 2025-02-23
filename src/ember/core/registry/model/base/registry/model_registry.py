@@ -33,8 +33,8 @@ class ModelRegistry:
             logger (Optional[logging.Logger]): Optional logger to use. If None, a default logger is created.
         """
         self._lock: threading.Lock = threading.Lock()
-        self._models: Dict[str, BaseProviderModel] = {}
         self._model_infos: Dict[str, ModelInfo] = {}
+        self._models: Dict[str, BaseProviderModel] = {}
         self._logger: logging.Logger = logger or logging.getLogger(
             self.__class__.__name__
         )
@@ -49,19 +49,13 @@ class ModelRegistry:
             model_info (ModelInfo): The configuration and metadata required to create the model.
 
         Raises:
-            ValueError: If a model with the provided model ID is already registered.
+            ValueError: If a model with the same ID is already registered.
         """
         with self._lock:
-            if model_info.id in self._models:
-                raise ValueError(
-                    "Model '{}' is already registered.".format(model_info.id)
-                )
-            model: BaseProviderModel = ModelFactory.create_model_from_info(
-                model_info=model_info
-            )
-            self._models[model_info.id] = model
+            if model_info.id in self._model_infos:
+                raise ValueError(f"Model '{model_info.id}' is already registered.")
             self._model_infos[model_info.id] = model_info
-            self._logger.info("Registered model: %s", model_info.id)
+            self._logger.info("Atomically registered model: %s", model_info.id)
 
     def register_or_update_model(self, model_info: ModelInfo) -> None:
         """Registers a new model or updates an existing model with provided metadata.
@@ -80,39 +74,31 @@ class ModelRegistry:
             self._model_infos[model_info.id] = model_info
 
     def get_model(self, model_id: str) -> BaseProviderModel:
-        """Retrieves a registered model instance by its model ID.
-
-        Args:
-            model_id (str): Unique identifier of the model.
-
-        Returns:
-            BaseProviderModel: The model instance corresponding to the given model_id.
-
-        Raises:
-            ValueError: If the model_id is empty.
-            ModelNotFoundError: If no model with the specified model_id is registered.
-        """
+        """Lazily instantiate the model when first requested."""
         if not model_id:
             raise ValueError("Model ID cannot be empty")
 
         with self._lock:
-            if model_id not in self._models:
-                available_models: str = "\n- ".join(self._models.keys())
+            if model_id not in self._model_infos:
+                available_models: str = "\n- ".join(self._model_infos.keys())
                 raise ModelNotFoundError(
-                    "Model '{}' not found. Available models:\n- {}".format(
-                        model_id, available_models
-                    )
+                    f"Model '{model_id}' not found. Available models:\n- {available_models}"
                 )
+            if model_id not in self._models:
+                model_info = self._model_infos[model_id]
+                model = ModelFactory.create_model_from_info(model_info=model_info)
+                self._models[model_id] = model
+                self._logger.info("Instantiated model: %s", model_id)
             return self._models[model_id]
 
     def list_models(self) -> List[str]:
         """Lists all registered model IDs.
 
         Returns:
-            List[str]: A list of model IDs currently registered.
+            List[str]: A list of *registered* model IDs (lazy loaded or not).
         """
         with self._lock:
-            return list(self._models.keys())
+            return list(self._model_infos.keys())
 
     def get_model_info(self, model_id: str) -> Optional[ModelInfo]:
         """Retrieves metadata for a registered model by its model ID.
@@ -133,8 +119,10 @@ class ModelRegistry:
             model_id (str): Unique identifier of the model to unregister.
         """
         with self._lock:
-            if model_id in self._models:
-                del self._models[model_id]
+            if model_id in self._model_infos:
+                del self._model_infos[model_id]
+                if model_id in self._models:
+                    del self._models[model_id]
                 self._logger.info("Unregistered model: %s", model_id)
             else:
                 self._logger.warning(

@@ -8,6 +8,7 @@ from typing import Any, Dict
 import pytest
 
 from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from src.ember.core.exceptions import ModelNotFoundError
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
@@ -75,12 +76,6 @@ def test_register_duplicate_model(model_registry: ModelRegistry) -> None:
         ModelFactory.create_model_from_info = original_create
 
 
-def test_get_model_not_found(model_registry: ModelRegistry) -> None:
-    """Test that requesting an unregistered model raises an exception."""
-    with pytest.raises(Exception):
-        model_registry.get_model("nonexistent:model")
-
-
 def test_unregister_model(model_registry: ModelRegistry) -> None:
     """Test that a registered model can be unregistered successfully."""
     dummy_info = create_dummy_model_info("dummy:unreg")
@@ -92,3 +87,5 @@ def test_unregister_model(model_registry: ModelRegistry) -> None:
     assert "dummy:unreg" in model_registry.list_models()
     model_registry.unregister_model("dummy:unreg")
     assert "dummy:unreg" not in model_registry.list_models()
+    with pytest.raises(ModelNotFoundError):
+        model_registry.get_model("dummy:unreg")

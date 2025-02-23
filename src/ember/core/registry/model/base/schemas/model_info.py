@@ -69,3 +69,13 @@ class ModelInfo(BaseModel):
             Optional[str]: The base URL specified by the provider, or None if not available.
         """
         return self.provider.base_url
+
+    def __str__(self) -> str:
+        # Avoid exposing API keys
+        return (
+            f"ModelInfo(id={self.id}, name={self.name}, provider={self.provider.name})"
+        )
+
+    def __repr__(self) -> str:
+        # Reuse the safe string representation
+        return self.__str__()

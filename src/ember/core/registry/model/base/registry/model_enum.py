@@ -14,6 +14,7 @@ class OpenAIModelEnum(str, Enum):
 class AnthropicModelEnum(str, Enum):
     CLAUDE_3_5_SONNET = "anthropic:claude-3.5-sonnet"
 
+
 class GoogleModelEnum(str, Enum):
     GEMINI_1_5_PRO = "deepmind:gemini-1.5-pro"
     GEMINI_2_0_FLASH = "deepmind:gemini-2.0-flash"
@@ -42,7 +43,7 @@ ModelEnum: Type[Enum] = create_model_enum()
 
 def parse_model_str(model_str: str) -> str:
     """Parse and validate a model string against the aggregated ModelEnum.
-    
+
     For unknown models, returns the original string to allow for dynamic/test models.
     """
     try:

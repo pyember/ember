@@ -53,17 +53,20 @@ class ModelDiscoveryService:
         Raises:
             ModelDiscoveryError: If no models can be discovered due to provider errors.
         """
-        with self._lock:
+        with self._lock:  # Protects access to the internal cache
             current_time: float = time.time()
+            # If the cached results are still valid (within TTL), return them
             if self._cache and (current_time - self._last_update) < self.ttl:
                 logger.info("Returning cached discovery results.")
-                return self._cache.copy()  # Return a copy to prevent external mutation
+                return self._cache.copy()  # Return a copy to avoid external mutation
 
             aggregated_models: Dict[str, Dict[str, Any]] = {}
             errors: List[str] = []
+
+            # Attempt to fetch models from each provider
             for provider in self.providers:
                 try:
-                    provider_models: Dict[str, Dict[str, Any]] = provider.fetch_models()
+                    provider_models = provider.fetch_models()
                     aggregated_models.update(provider_models)
                 except Exception as e:
                     errors.append(f"{provider.__class__.__name__}: {e}")
@@ -73,6 +76,7 @@ class ModelDiscoveryService:
                         e,
                     )
 
+            # If no models found and we had errors, raise exception
             if not aggregated_models and errors:
                 from src.ember.core.registry.model.providers.base_discovery import (
                     ModelDiscoveryError,
@@ -82,9 +86,8 @@ class ModelDiscoveryService:
                     f"No models discovered. Errors: {'; '.join(errors)}"
                 )
 
-            self._cache = (
-                aggregated_models.copy()
-            )  # Store a copy to protect internal state
+            # Store a copy of the new results in the cache
+            self._cache = aggregated_models.copy()
             self._last_update = current_time
             logger.info("Discovered models: %s", list(aggregated_models.keys()))
             return aggregated_models.copy()

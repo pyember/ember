@@ -40,6 +40,7 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     # Also reset the cached providers
     from src.ember.core.registry.model.base.registry.factory import ModelFactory
+
     ModelFactory._provider_cache = None
 
 

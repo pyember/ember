@@ -66,22 +66,34 @@ class DefaultUsageCalculator(UsageCalculator):
         Returns:
             UsageStats: The computed usage statistics including token counts and total cost in USD.
         """
-        usage: Any = getattr(raw_output, "usage", None) or getattr(raw_output, "usage_metadata", None)
+        usage: Any = getattr(raw_output, "usage", None) or getattr(
+            raw_output, "usage_metadata", None
+        )
         if usage is None:
             return UsageStats()
 
         total_tokens: int = self._get_token_count(
-            usage=usage, primary_field="total_tokens", fallback_field="total_token_count"
+            usage=usage,
+            primary_field="total_tokens",
+            fallback_field="total_token_count",
         )
         prompt_tokens: int = self._get_token_count(
-            usage=usage, primary_field="prompt_tokens", fallback_field="prompt_token_count"
+            usage=usage,
+            primary_field="prompt_tokens",
+            fallback_field="prompt_token_count",
         )
         completion_tokens: int = self._get_token_count(
-            usage=usage, primary_field="completion_tokens", fallback_field="candidates_token_count"
+            usage=usage,
+            primary_field="completion_tokens",
+            fallback_field="candidates_token_count",
         )
 
-        input_cost: float = (prompt_tokens / 1000.0) * model_info.cost.input_cost_per_thousand
-        output_cost: float = (completion_tokens / 1000.0) * model_info.cost.output_cost_per_thousand
+        input_cost: float = (
+            prompt_tokens / 1000.0
+        ) * model_info.cost.input_cost_per_thousand
+        output_cost: float = (
+            completion_tokens / 1000.0
+        ) * model_info.cost.output_cost_per_thousand
         total_cost: float = round(input_cost + output_cost, 6)
 
         return UsageStats(

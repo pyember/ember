@@ -46,7 +46,7 @@ def deep_merge(*, base: Any, override: Any) -> Any:
     if isinstance(base, dict) and isinstance(override, dict):
         merged: Dict[Any, Any] = base.copy()
         for key, value in override.items():
-            if key in merged:
+            if key in merged and isinstance(merged[key], (dict, list)):
                 merged[key] = deep_merge(base=merged[key], override=value)
             else:
                 merged[key] = value
@@ -168,7 +168,7 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
         else:
             logger.debug(
                 "No file found at %s, using empty or custom config logic.",
-                settings.model_config_path
+                settings.model_config_path,
             )
     except Exception as exc:
         logger.exception(

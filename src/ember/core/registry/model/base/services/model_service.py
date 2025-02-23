@@ -107,16 +107,16 @@ class ModelService:
             response: ChatResponse = model(prompt=prompt, **kwargs)
         except Exception as exc:
             self._logger.exception(
-                "Error invoking model '%s'.", model.model_info.model_id
+                "Error invoking model '%s'.", model.model_info.id
             )
             raise ProviderAPIError(
-                f"Error invoking model {model.model_info.model_id}"
+                f"Error invoking model {model.model_info.id}"
             ) from exc
 
         if self._usage_service is not None:
             if (usage := getattr(response, "usage", None)) is not None:
                 self._usage_service.add_usage_record(
-                    model_id=model.model_info.model_id, usage_stats=usage
+                    model_id=model.model_info.id, usage_stats=usage
                 )
         return response
 
@@ -157,7 +157,7 @@ class ModelService:
             and getattr(response, "usage", None) is not None
         ):
             self._usage_service.add_usage_record(
-                model_id=model.model_info.model_id, usage_stats=response.usage
+                model_id=model.model_info.id, usage_stats=response.usage
             )
         return response
 
