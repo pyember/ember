@@ -71,7 +71,7 @@ class ModelDiscoveryService:
 
         settings = EmberSettings()
         local_models: Dict[str, Dict[str, Any]] = {
-            model.model_id: model.dict() for model in settings.registry.models
+            model.id: model.model_dump() for model in settings.registry.models
         }
 
         merged_models: Dict[str, ModelInfo] = {}
@@ -85,8 +85,8 @@ class ModelDiscoveryService:
                     model_id,
                 )
                 merged_data = {
-                    "model_id": model_id,
-                    "model_name": api_metadata.get("model_name", model_id),
+                    "id": model_id,
+                    "name": api_metadata.get("name", model_id),
                     "cost": {
                         "input_cost_per_thousand": 0.0,
                         "output_cost_per_thousand": 0.0,

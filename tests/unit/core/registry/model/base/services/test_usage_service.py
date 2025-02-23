@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for the UsageService functionality.
 
 Tests recording and aggregation of usage statistics and thread safety.

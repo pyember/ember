@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for ModelEnum and parse_model_str functionality.
 """
 

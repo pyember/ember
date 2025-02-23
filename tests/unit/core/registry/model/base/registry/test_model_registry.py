@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for the ModelRegistry functionality.
 
 Tests model registration, retrieval, listing, and unregistration.

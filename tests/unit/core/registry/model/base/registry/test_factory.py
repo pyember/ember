@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for the ModelFactory.
 
 Tests instantiation of provider models and error conditions.

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for the ModelService.
 
 Tests model retrieval and invocation using a dummy model provider.

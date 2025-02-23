@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for configuration functions in settings.py.
 
 This module tests the deep_merge and resolve_env_vars functions.

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Unit tests for the ModelInfo schema.
 
 Tests API key validation and the get_api_key method.
