@@ -42,7 +42,7 @@ def main() -> None:
 
                 # Two usage styles are demonstrated below:
                 # 1. Service-based invocation: Recommended for automatic usage tracking.
-                service_response: ChatResponse = service.invoke(
+                service_response: ChatResponse = service.invoke_model(
                     model_id=model_id,
                     prompt="Explain quantum computing in 50 words",
                 )

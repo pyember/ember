@@ -3,7 +3,7 @@ from typing import Dict, List, Optional, Type
 
 import pkg_resources
 
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

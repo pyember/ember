@@ -54,6 +54,24 @@ from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
     ModelDiscoveryError,
 )
 
+# Add ModelRegistry import
+from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+
+
+# Add load_model function
+def load_model(model_id: str, registry: ModelRegistry) -> BaseProviderModel:
+    """Public helper to load model instances from registry.
+
+    Args:
+        model_id (str): Model identifier string
+        registry (ModelRegistry): ModelRegistry instance to query
+
+    Returns:
+        Instantiated provider model
+    """
+    return registry.get_model(model_id)
+
+
 __all__: List[str] = [
     # Schemas
     "ModelInfo",
@@ -81,19 +99,30 @@ __all__: List[str] = [
     "initialize_ember",
     "ModelRegistrationError",
     "ModelDiscoveryError",
+    "load_model",
 ]
 
 
 # Initialization function - defined here to avoid circular imports
-def initialize_ember(config_path: str | None = None) -> ModelRegistry:
+def initialize_ember(
+    config_path: str | None = None,
+    auto_register: bool = True,
+    auto_discover: bool = True,
+) -> ModelRegistry:
     """Initialize the Ember model registry.
 
     Args:
-        config_path: Optional path to config file. If None, uses default.
+        config_path (str | None): Optional path to config file
+        auto_register (bool): Automatically register models from config
+        auto_discover (bool): Enable provider model discovery
 
     Returns:
-        Initialized ModelRegistry instance.
+        Initialized ModelRegistry instance
     """
-    from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+    from src.ember.core.registry.model.config.settings import initialize_ember as _init
 
-    return ModelRegistry.initialize(config_path)
+    return _init(
+        config_path=config_path,
+        auto_register=auto_register,
+        auto_discover=auto_discover,
+    )

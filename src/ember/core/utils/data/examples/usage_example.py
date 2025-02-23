@@ -1,3 +1,13 @@
+"""
+Usage:
+    python -m ember.core.utils.data.examples.usage_example
+
+This example demonstrates the high-level dataset loading and preparation pipeline.
+It shows how to retrieve processed dataset entries using two different methods:
+  1. Loading MMLU dataset entries using a configuration dictionary.
+  2. Loading HaluEval dataset entries using a configuration instance.
+"""
+
 import logging
 from typing import Any, List
 
@@ -10,14 +20,7 @@ from src.ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
 
 
 def main() -> None:
-    """Demonstrate usage of the high-level dataset loading and preparation pipeline.
-
-    This example illustrates two methods for retrieving processed dataset entries:
-      1. Loading MMLU dataset entries using a configuration dictionary.
-      2. Loading HaluEval dataset entries using a configuration instance.
-
-    Both methods leverage the `load_dataset_entries` API function to streamline dataset
-    retrieval while minimizing boilerplate code.
+    """Demonstrate usage of the high-level dataset loading pipeline.
 
     Raises:
         Exception: Propagates any errors encountered during the dataset loading process.

@@ -20,7 +20,7 @@ class IDatasetValidator(ABC):
     """
 
     @abstractmethod
-    def validate_structure(*, dataset: DatasetInputType) -> DatasetOutputType:
+    def validate_structure(self, *, dataset: DatasetInputType) -> DatasetOutputType:
         """Validates the structure of the provided dataset.
 
         Args:
@@ -39,7 +39,7 @@ class IDatasetValidator(ABC):
 
     @abstractmethod
     def validate_required_keys(
-        *, item: Dict[str, Any], required_keys: List[str]
+        self, *, item: Dict[str, Any], required_keys: List[str]
     ) -> None:
         """Validates that the dataset item includes all required keys.
 
@@ -53,7 +53,7 @@ class IDatasetValidator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def validate_item(*, item: Dict[str, Any], required_keys: List[str]) -> None:
+    def validate_item(self, *, item: Dict[str, Any], required_keys: List[str]) -> None:
         """Validates that a dataset item is properly formed.
 
         Args:
@@ -74,7 +74,7 @@ class DatasetValidator(IDatasetValidator):
     requirements and that individual items contain all necessary keys.
     """
 
-    def validate_structure(*, dataset: DatasetInputType) -> DatasetOutputType:
+    def validate_structure(self, *, dataset: DatasetInputType) -> DatasetOutputType:
         """Validates and returns a well-formed dataset based on its type.
 
         For a 'Dataset', it ensures that it is not empty. For a 'DatasetDict',
@@ -120,7 +120,7 @@ class DatasetValidator(IDatasetValidator):
             )
 
     def validate_required_keys(
-        *, item: Dict[str, Any], required_keys: List[str]
+        self, *, item: Dict[str, Any], required_keys: List[str]
     ) -> None:
         """Checks that all required keys are present in the dataset item.
 
@@ -135,7 +135,7 @@ class DatasetValidator(IDatasetValidator):
         if missing_keys:
             raise ValueError(f"Dataset item is missing required keys: {missing_keys}")
 
-    def validate_item(*, item: Dict[str, Any], required_keys: List[str]) -> None:
+    def validate_item(self, *, item: Dict[str, Any], required_keys: List[str]) -> None:
         """Ensures both the presence and non-nullity of required keys in a dataset item.
 
         Args:

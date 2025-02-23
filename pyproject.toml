@@ -125,11 +125,11 @@ requires = ["poetry-core>=1.5.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.plugins."ember.dataset_preppers"]
-truthful_qa = "ember.registry.dataset.datasets.truthful_qa:TruthfulQAPrepper"
-short_answer = "ember.registry.dataset.datasets.short_answer:ShortAnswerPrepper"
-commonsense_qa = "ember.registry.dataset.datasets.commonsense_qa:CommonsenseQAPrepper"
-halueval = "ember.registry.dataset.datasets.halueval:HaluEvalPrepper"
-mmlu = "ember.registry.dataset.datasets.mmlu:MMLUPrepper"
+truthful_qa = "ember.core.utils.data.datasets_registry.truthful_qa:TruthfulQAPrepper"
+short_answer = "ember.core.utils.data.datasets_registry.short_answer:ShortAnswerPrepper"
+commonsense_qa = "ember.core.utils.data.datasets_registry.commonsense_qa:CommonsenseQAPrepper"
+halueval = "ember.core.utils.data.datasets_registry.halueval:HaluEvalPrepper"
+mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
