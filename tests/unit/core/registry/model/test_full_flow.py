@@ -11,7 +11,7 @@ import pytest
 from unittest.mock import patch
 
 from src.ember.core.registry.model.config.settings import initialize_ember
-from src.ember.core.registry.model.model_modules.lm import LMModule, LMModuleConfig
+from src.ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from src.ember.core.registry.model.base.services.model_service import ModelService
 from src.ember.core.registry.model.base.services.usage_service import UsageService
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo

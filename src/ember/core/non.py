@@ -37,7 +37,7 @@ from src.ember.core.registry.operator.core.verifier import (
     VerifierSignature,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.model_modules.lm import LMModuleConfig, LMModule
+from src.ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
 
 # Alias re-export types for backward compatibility with clients/tests from before our
 # registry refactor.

@@ -166,7 +166,7 @@ def test_verifier_operator_normal(mock_invoke) -> None:
 )
 def test_varied_ensemble_operator_normal(mock_invoke) -> None:
     """Test that VariedEnsemble aggregates responses from multiple LM configurations."""
-    from src.ember.core.registry.model.model_modules.lm import LMModuleConfig
+    from src.ember.core.registry.model.model_module.lm import LMModuleConfig
 
     dummy_config: LMModuleConfig = LMModuleConfig(model_id="dummy", temperature=1.0)
     varied_ensemble = VariedEnsemble(model_configs=[dummy_config, dummy_config])

@@ -31,7 +31,7 @@ from src.ember.core.registry.model.base.registry.model_registry import (
     GLOBAL_MODEL_REGISTRY,
     initialize_system,
 )
-from src.ember.core.registry.model.model_modules.lm import LMModule, LMModuleConfig
+from src.ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from src.ember.examples.mcq_experiment_example import (
     EnsureValidChoiceOperator,
     SingleModelBaseline,

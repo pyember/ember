@@ -54,7 +54,7 @@ from src.ember.core.registry.operator.base.operator_base import (
     OperatorMetadata,
 )
 from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.model_modules.lm import LMModuleConfig
+from src.ember.core.registry.model.model_module.lm import LMModuleConfig
 
 # ADD the execute_graph import:
 from src.ember.xcs.engine.xcs_engine import execute_graph

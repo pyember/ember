@@ -12,13 +12,13 @@ from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
 
 def test_model_registration_error() -> None:
     """Test that ModelRegistrationError contains correct error message."""
-    error = ModelRegistrationError("TestModel", "Some reason")
+    error = ModelRegistrationError(model_name="TestModel", reason="Some reason")
     assert "TestModel" in str(error)
     assert "Some reason" in str(error)
 
 
 def test_model_discovery_error() -> None:
     """Test that ModelDiscoveryError contains correct provider and reason."""
-    error = ModelDiscoveryError("TestProvider", "Discovery failed")
+    error = ModelDiscoveryError(provider="TestProvider", reason="Discovery failed")
     assert "TestProvider" in str(error)
     assert "Discovery failed" in str(error)
