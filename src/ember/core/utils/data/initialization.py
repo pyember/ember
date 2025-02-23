@@ -13,7 +13,6 @@ from src.ember.core.utils.data.datasets_registry.commonsense_qa import (
 )
 from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
 from src.ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
-from src.ember.core.utils.data.datasets_registry.code_prepper import CodePrepper
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,7 +73,6 @@ def initialize_dataset_registry(
         "commonsense_qa": CommonsenseQAPrepper,
         "halueval": HaluEvalPrepper,
         "my_shortanswer_ds": ShortAnswerPrepper,
-        "my_code_ds": CodePrepper,
     }
 
     # Register each dataset prepper using explicit keyword arguments.
