@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Unit tests for LMModule in the LM (language model) module.
 These tests check that LMModule:

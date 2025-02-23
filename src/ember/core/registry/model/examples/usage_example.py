@@ -1,5 +1,5 @@
 import logging
-from ember import init
+from src.ember.core.registry.model.config.settings import initialize_ember as init
 
 # Optional: import ModelEnum for safer, type-checked invocation if available.
 try:
