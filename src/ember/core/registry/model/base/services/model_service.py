@@ -12,14 +12,6 @@ from src.ember.core.registry.model.providers.base_provider import BaseProviderMo
 from src.ember.core.registry.model.base.services.usage_service import UsageService
 from src.ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 from src.ember.core.exceptions import ProviderAPIError
-from prometheus_client import Counter, Histogram
-
-model_invocations = Counter(
-    "model_invocations_total", "Total invocations", labelnames=["model_id"]
-)
-invocation_duration = Histogram(
-    "model_invocation_duration_seconds", "Invocation duration", labelnames=["model_id"]
-)
 
 
 class ModelService:
@@ -37,12 +29,15 @@ class ModelService:
 
     def __init__(
         self,
+        *,
         registry: ModelRegistry,
         usage_service: Optional[UsageService] = None,
         default_model_id: Optional[Union[str, Enum]] = None,
         logger: Optional[logging.Logger] = None,
+        metrics: Optional[dict[str, object]] = None,
     ) -> None:
-        """Initializes a ModelService instance.
+        """
+        Initializes the ModelService.
 
         Args:
             registry (ModelRegistry): The registry instance used to retrieve model objects.
@@ -50,6 +45,7 @@ class ModelService:
             default_model_id (Optional[Union[str, Enum]]): Default model identifier when none is provided.
             logger (Optional[logging.Logger]): Logger instance; if not supplied, a default logger
                 named after the class is created.
+            metrics (Optional[dict[str, object]]): A dictionary of metrics (e.g., Prometheus counters/histograms).
         """
         self._registry: ModelRegistry = registry
         self._usage_service: Optional[UsageService] = usage_service
@@ -57,6 +53,7 @@ class ModelService:
         self._logger: logging.Logger = logger or logging.getLogger(
             self.__class__.__name__
         )
+        self._metrics: dict[str, object] = metrics or {}
 
     def get_model(
         self, model_id: Optional[Union[str, Enum]] = None
@@ -94,25 +91,32 @@ class ModelService:
         return model
 
     def invoke_model(self, model_id: str, prompt: str, **kwargs: Any) -> ChatResponse:
-        with invocation_duration.labels(model_id=model_id).time():
-            model: BaseProviderModel = self.get_model(model_id=model_id)
-            response: ChatResponse
-            try:
-                response = model(prompt=prompt, **kwargs)
-            except Exception as exc:
-                self._logger.exception(
-                    "Error invoking model '%s'.", model.model_info.id
-                )
-                raise ProviderAPIError(
-                    f"Error invoking model {model.model_info.id}"
-                ) from exc
-            model_invocations.labels(model_id=model_id).inc()
+        metric_histogram = self._metrics.get("invocation_duration")
+        # Time the model invocation using the provided histogram.
+        if metric_histogram is not None:
+            with metric_histogram.labels(model_id=model_id).time():
+                response = self._invoke(model_id, prompt, **kwargs)
+        else:
+            response = self._invoke(model_id, prompt, **kwargs)
+        return response
 
-            if self._usage_service is not None and response.usage is not None:
-                self._usage_service.add_usage_record(
-                    model_id=model.model_info.id, usage_stats=response.usage
-                )
-            return response
+    def _invoke(self, model_id: str, prompt: str, **kwargs: Any) -> ChatResponse:
+        model = self.get_model(model_id=model_id)
+        try:
+            response = model(prompt=prompt, **kwargs)
+        except Exception as exc:
+            self._logger.exception("Error invoking model '%s'.", model_id)
+            raise ProviderAPIError(f"Error invoking model {model_id}") from exc
+
+        metric_counter = self._metrics.get("model_invocations")
+        if metric_counter is not None:
+            metric_counter.labels(model_id=model_id).inc()
+
+        if self._usage_service is not None and response.usage is not None:
+            self._usage_service.add_usage_record(
+                model_id=model.model_info.id, usage_stats=response.usage
+            )
+        return response
 
     async def invoke_model_async(
         self, model_id: str, prompt: str, **kwargs: Any
@@ -137,7 +141,7 @@ class ModelService:
         try:
             # Checking whether the model's __call__ is asynchronous.
             if asyncio.iscoroutinefunction(model.__call__):
-                response: ChatResponse = await model(prompt=prompt, **kwargs)
+                response = await model(prompt=prompt, **kwargs)
             else:
                 response: ChatResponse = await asyncio.to_thread(
                     model, prompt=prompt, **kwargs

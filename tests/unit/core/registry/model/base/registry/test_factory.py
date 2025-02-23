@@ -63,7 +63,9 @@ def create_dummy_model_info(model_id: str = "openai:gpt-4o") -> ModelInfo:
     )
 
 
-@patch.object(ModelFactory, "_get_providers", return_value={"DummyProvider": DummyProviderModel})
+@patch.object(
+    ModelFactory, "_get_providers", return_value={"DummyProvider": DummyProviderModel}
+)
 def test_create_model_from_info_success(mock_get_providers) -> None:
     """Test that ModelFactory.create_model_from_info successfully creates a DummyProviderModel."""
     dummy_info = create_dummy_model_info("openai:gpt-4o")
