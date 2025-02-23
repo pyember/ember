@@ -298,7 +298,7 @@ def _convert_ir_graph_to_xcs_graph(
     xcs_graph: XCSGraph = XCSGraph()
 
     def compiled_operator(*, inputs: Dict[str, Any]) -> Any:
-        validated_inputs = operator.signature.validate_inputs(inputs)
+        validated_inputs = operator.signature.validate_inputs(inputs=inputs)
         return operator.forward(inputs=validated_inputs)
 
     # Add a root with the traced operator
@@ -306,13 +306,23 @@ def _convert_ir_graph_to_xcs_graph(
         operator=compiled_operator, node_id="compiled_root"
     )
 
-    # Make each IRGraph input node (which should have a "value") feed into the root.
+    # Only process nodes that represent inputs. In our IRGraph,
+    # input nodes are created with operator=None and have a "value" attribute.
     for node_id, node in ir_graph.nodes.items():
-        if node.operator is None and "value" in node.attrs:
-            xcs_graph.add_node(
-                operator=lambda inputs, _val=node.attrs["value"]: _val,
-                node_id=node_id,
-            )
-            xcs_graph.add_edge(from_id=node_id, to_id=root_id)
+        if node.operator is None:
+            if "value" in node.attrs:
+                # Wrap the primitive value in a callable lambda.
+                xcs_graph.add_node(
+                    operator=lambda *, inputs, _val=node.attrs["value"]: _val,
+                    node_id=node_id,
+                )
+                xcs_graph.add_edge(from_id=node_id, to_id=root_id)
+            else:
+                # Warn if an input node is missing its expected "value".
+                _LOGGER.warning("IR node %s is missing a 'value' attribute; skipping.", node_id)
+        else:
+            # In this simplified conversion, we expect exactly one node with an operator,
+            # which is used as the compiled root. Other nodes with a callable operator are ignored.
+            _LOGGER.debug("Skipping non-input IR node: %s", node_id)
 
     return xcs_graph

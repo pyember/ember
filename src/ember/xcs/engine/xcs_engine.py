@@ -65,14 +65,16 @@ def compile_graph(*, graph: XCSGraph) -> XCSPlan:
         XCSPlan: The resulting execution plan.
     """
     tasks: Dict[str, XCSPlanTask] = {}
-    for node_id, node in graph.nodes.items():
+    for node in graph.nodes.values():
+        node_id: str = node.node_id
+        
+        if node_id in tasks:
+            raise ValueError(f"Task '{node_id}' already exists in the plan.")
         task = XCSPlanTask(
             node_id=node_id,
             operator=node.operator,
             inbound_nodes=node.inbound_edges,
         )
-        if node_id in tasks:
-            raise ValueError(f"Task '{node_id}' already exists in the plan.")
         tasks[node_id] = task
     return XCSPlan(tasks=tasks, original_graph=graph)
 

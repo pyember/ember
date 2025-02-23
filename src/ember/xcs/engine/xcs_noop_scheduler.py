@@ -1,17 +1,20 @@
 from typing import Any, Dict
 
+from src.ember.xcs.engine.xcs_engine import XCSPlan
+from src.ember.xcs.graph.xcs_graph import XCSGraph
+
 
 class XCSNoOpScheduler:
     """
     A single-thread (no concurrency) scheduler for XCS. It runs tasks sequentially.
     """
 
-    def run_plan(self, plan: Any, global_input: Dict[str, Any], graph: Any) -> Any:
-        results = {}
-        # If the plan has tasks in a known structure, iterate them in a single pass:
-        for task in plan.tasks:
-            # Each task is presumably a node in the plan with a 'node.operator' or similar
-            node = task.node
-            input_data = task.compute_inputs(global_input=global_input, graph=graph)
-            results[node] = node.operator(inputs=input_data)
+    def run_plan(
+        self, *, plan: XCSPlan, global_input: Dict[str, Any], graph: XCSGraph
+    ) -> Dict[str, Any]:
+        results: Dict[str, Any] = {}
+        # Iterate over tasks by node_id; call the operator directly with the provided global input.
+        for node_id, task in plan.tasks.items():
+            result = task.operator(inputs=global_input)
+            results[node_id] = result
         return results
