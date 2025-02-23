@@ -85,8 +85,7 @@ class ModelFactory:
         """
         # Validate the model ID.
         try:
-            validated_model_id: str = parse_model_str(model_info.id)
-            _ = validated_model_id  # The validated ID is not further used.
+            parse_model_str(model_info.id)
         except ValueError as value_error:
             raise ProviderConfigError(
                 f"Unrecognized model ID '{model_info.id}'."
