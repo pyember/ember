@@ -6,22 +6,25 @@ Tests model registration, retrieval, listing, and unregistration.
 from typing import Any, Dict
 
 import pytest
+import threading
 
 from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from src.ember.core.exceptions import ModelNotFoundError
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from src.ember.core.registry.model.base.schemas.model_info import (
+    ModelInfo,
+    ProviderInfo,
+)
 from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
-def create_dummy_model_info(model_id: str = "dummy:1") -> ModelInfo:
+def create_dummy_model_info(model_id: str) -> ModelInfo:
     """Helper function to create a dummy ModelInfo instance for testing."""
     return ModelInfo(
         id=model_id,
-        name="Dummy Model",
-        cost=ModelCost(input_cost_per_thousand=1.0, output_cost_per_thousand=2.0),
-        rate_limit=RateLimit(tokens_per_minute=1000, requests_per_minute=100),
-        provider=ProviderInfo(name="Dummy", default_api_key="dummy_key"),
+        name=model_id,
+        cost=ModelCost(),
+        rate_limit=RateLimit(),
+        provider=ProviderInfo(name="TestProvider"),
         api_key="dummy_key",
     )
 
@@ -89,3 +92,22 @@ def test_unregister_model(model_registry: ModelRegistry) -> None:
     assert "dummy:unreg" not in model_registry.list_models()
     with pytest.raises(ModelNotFoundError):
         model_registry.get_model("dummy:unreg")
+
+
+def test_concurrent_registration(model_registry):
+    """Test thread-safe concurrent model registrations."""
+
+    def register_model(model_id: str):
+        info = create_dummy_model_info(model_id)
+        model_registry.register_model(info)
+
+    threads = [
+        threading.Thread(target=register_model, args=(f"dummy:thread{i}",))
+        for i in range(10)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(model_registry.list_models()) == 10

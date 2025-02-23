@@ -15,7 +15,7 @@ class MockDiscoveryProvider(BaseDiscoveryProvider):
     """Mock provider for testing discovery service."""
 
     def fetch_models(self) -> Dict[str, Dict[str, Any]]:
-        return {"mock:model": {"id": "mock:model", "name": "Mock Model"}}
+        return {"mock:model": {"name": "Mock Model"}}
 
 
 def test_discovery_service_fetch_and_cache() -> None:
@@ -108,3 +108,12 @@ def test_discovery_service_error_propagation() -> None:
     service.providers = [FailingDiscoveryProvider()]
     with pytest.raises(ModelDiscoveryError, match="No models discovered. Errors:"):
         service.discover_models()
+
+
+@pytest.mark.asyncio
+async def test_discovery_service_async_fetch_and_cache():
+    """Test async discovery and caching."""
+    service = ModelDiscoveryService(ttl=2)
+    service.providers = [MockDiscoveryProvider()]
+    models = await service.discover_models_async()
+    assert "mock:model" in models

@@ -5,6 +5,7 @@ Tests instantiation of provider models and error conditions.
 
 import pytest
 from typing import Any, Dict
+from unittest.mock import patch
 
 from src.ember.core.registry.model.base.registry.factory import ModelFactory
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
@@ -13,10 +14,11 @@ from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
+from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 
 # Dummy provider class for testing
-class DummyProviderModel:
+class DummyProviderModel(BaseProviderModel):
     PROVIDER_NAME = "DummyProvider"
 
     def __init__(self, model_info: ModelInfo) -> None:
@@ -24,6 +26,12 @@ class DummyProviderModel:
 
     def __call__(self, prompt: str, **kwargs: Any) -> str:
         return f"Echo: {prompt}"
+
+    def create_client(self) -> None:
+        return None
+
+    def forward(self, request):
+        return None
 
 
 # Dummy discover function that returns our dummy provider.
@@ -55,7 +63,8 @@ def create_dummy_model_info(model_id: str = "openai:gpt-4o") -> ModelInfo:
     )
 
 
-def test_create_model_from_info_success() -> None:
+@patch.object(ModelFactory, "_get_providers", return_value={"DummyProvider": DummyProviderModel})
+def test_create_model_from_info_success(mock_get_providers) -> None:
     """Test that ModelFactory.create_model_from_info successfully creates a DummyProviderModel."""
     dummy_info = create_dummy_model_info("openai:gpt-4o")
     model_instance = ModelFactory.create_model_from_info(model_info=dummy_info)

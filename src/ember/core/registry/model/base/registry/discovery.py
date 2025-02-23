@@ -140,16 +140,69 @@ class ModelDiscoveryService:
         return merged_models
 
     def refresh(self) -> Dict[str, ModelInfo]:
-        """Force a refresh of model discovery and merge with local configuration.
-
-        Returns:
-            Dict[str, ModelInfo]: Updated mapping from model IDs to ModelInfo objects.
-        """
-        with self._lock:  # Protect cache invalidation and discovery refresh
-            self._cache.clear()  # Invalidate cache
+        """Force a refresh of model discovery and merge with local configuration."""
+        with self._lock:
             try:
                 discovered: Dict[str, Dict[str, Any]] = self.discover_models()
-                return self.merge_with_config(discovered=discovered)
+                merged = self.merge_with_config(discovered=discovered)
+                # Only update cache if discovery is successful
+                self._cache = discovered.copy()
+                self._last_update = time.time()
+                return merged
             except Exception as e:
-                self._logger.error("Failed to refresh model discovery: %s", e)
-                raise
+                logger.error("Failed to refresh model discovery: %s", e)
+                # Return last known good cache if available
+                return self._cache.copy() if self._cache else {}
+
+    def invalidate_cache(self) -> None:
+        """Manually invalidate the cache, forcing a refresh on next discovery."""
+        with self._lock:
+            self._cache.clear()
+            self._last_update = 0.0
+            logger.info("Cache invalidated; next discovery will fetch fresh data.")
+
+    async def discover_models_async(self) -> Dict[str, Dict[str, Any]]:
+        """Asynchronously discover models using registered providers, with caching based on TTL."""
+        import asyncio
+
+        current_time: float = time.time()
+        with self._lock:
+            if self._cache and (current_time - self._last_update) < self.ttl:
+                logger.info("Returning cached discovery results.")
+                return self._cache.copy()
+
+        aggregated_models: Dict[str, Dict[str, Any]] = {}
+        errors: List[str] = []
+
+        async def fetch_from_provider(provider: BaseDiscoveryProvider) -> None:
+            try:
+                # Each fetch is done in a thread; you could do direct async requests if the provider supports it.
+                provider_models = await asyncio.get_event_loop().run_in_executor(
+                    None, provider.fetch_models
+                )
+                with self._lock:
+                    aggregated_models.update(provider_models)
+            except Exception as e:
+                error_msg = f"{provider.__class__.__name__}: {e}"
+                errors.append(error_msg)
+                logger.error(
+                    "Failed to fetch models from %s: %s", provider.__class__.__name__, e
+                )
+
+        tasks = [fetch_from_provider(provider) for provider in self.providers]
+        await asyncio.gather(*tasks)
+
+        if not aggregated_models and errors:
+            from src.ember.core.registry.model.providers.base_discovery import (
+                ModelDiscoveryError,
+            )
+
+            raise ModelDiscoveryError(
+                f"No models discovered. Errors: {'; '.join(errors)}"
+            )
+
+        with self._lock:
+            self._cache = aggregated_models.copy()
+            self._last_update = current_time
+            logger.info("Discovered models: %s", list(aggregated_models.keys()))
+            return aggregated_models.copy()

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, ValidationInfo
+from pydantic import BaseModel, field_validator, ValidationInfo, model_validator
 
 
 class ModelCost(BaseModel):
@@ -12,27 +12,31 @@ class ModelCost(BaseModel):
     input_cost_per_thousand: float = 0.0
     output_cost_per_thousand: float = 0.0
 
-    @field_validator(
-        "input_cost_per_thousand", "output_cost_per_thousand", mode="after"
-    )
-    def validate_non_negative_cost(cls, value: float, info: ValidationInfo) -> float:
-        """Validates that a cost value is not negative.
+    @property
+    def input_cost(self) -> float:
+        """Normalized input cost per thousand tokens."""
+        # Example: if cost is set to a large number, treat it as cost per million or something
+        return (
+            self.input_cost_per_thousand
+            if self.input_cost_per_thousand < 100
+            else self.input_cost_per_thousand / 1000.0
+        )
 
-        Args:
-            value (float): The cost value to validate.
-            info (ValidationInfo): Additional context for the field being validated.
+    @property
+    def output_cost(self) -> float:
+        """Normalized output cost per thousand tokens."""
+        return (
+            self.output_cost_per_thousand
+            if self.output_cost_per_thousand < 100
+            else self.output_cost_per_thousand / 1000.0
+        )
 
-        Raises:
-            ValueError: If the cost value is negative.
-
-        Returns:
-            float: The validated non-negative cost value.
-        """
-        if value < 0:
-            raise ValueError(
-                f"{info.field_name} must be non-negative; received {value}."
-            )
-        return value
+    @model_validator(mode="after")
+    def validate_costs(self):
+        """Validate that costs are non-negative."""
+        if self.input_cost_per_thousand < 0 or self.output_cost_per_thousand < 0:
+            raise ValueError("Costs must be non-negative.")
+        return self
 
 
 class RateLimit(BaseModel):

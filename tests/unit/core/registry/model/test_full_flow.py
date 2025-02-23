@@ -58,6 +58,7 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
             class DummyResponse:
                 data = f"Integrated: {prompt}"
                 usage = None
+
             return DummyResponse()
 
     # Patching the factory to use DummyProvider.
@@ -77,15 +78,13 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(ModelRegistry, "register_model", mock_register_model)
 
 
-
-
 def test_full_flow_concurrent_invocations(tmp_path, monkeypatch):
     """Ensure the registry handles concurrent invocations correctly."""
     config_path = create_dummy_config(tmp_path)
     registry = initialize_ember(
         config_path=str(config_path), auto_register=True, auto_discover=False
     )
-    
+
     # Ensure model is registered
     if "openai:gpt-4o" not in registry.list_models():
         registry.register_model(create_dummy_model_info("openai:gpt-4o"))

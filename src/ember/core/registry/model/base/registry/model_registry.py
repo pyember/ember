@@ -15,9 +15,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 class ModelRegistry:
     """Thread-safe registry for managing model instances and metadata.
 
-    This registry is intended for explicit dependency injection. Rather than using global
-    singleton instances, pass an instance (typically via EmberAppContext) to components that
-    require registry functionality.
+    This registry stores ModelInfo structures and lazily instantiates provider
+    model objects. It also handles basic thread safety and concurrency.
 
     Attributes:
         _lock (threading.Lock): A lock ensuring thread-safe operations.
@@ -55,7 +54,11 @@ class ModelRegistry:
             if model_info.id in self._model_infos:
                 raise ValueError(f"Model '{model_info.id}' is already registered.")
             self._model_infos[model_info.id] = model_info
-            self._logger.info("Atomically registered model: %s", model_info.id)
+            self._logger.info(
+                "Successfully registered model: %s with provider %s",
+                model_info.id,
+                model_info.provider.name,
+            )
 
     def register_or_update_model(self, model_info: ModelInfo) -> None:
         """Registers a new model or updates an existing model with provided metadata.
@@ -91,6 +94,18 @@ class ModelRegistry:
                 self._logger.info("Instantiated model: %s", model_id)
             return self._models[model_id]
 
+    def is_registered(self, model_id: str) -> bool:
+        """Check if a model is registered without instantiating it.
+
+        Args:
+            model_id (str): Unique identifier of the model.
+
+        Returns:
+            bool: True if the model is registered, False otherwise.
+        """
+        with self._lock:
+            return model_id in self._model_infos
+
     def list_models(self) -> List[str]:
         """Lists all registered model IDs.
 
@@ -123,8 +138,8 @@ class ModelRegistry:
                 del self._model_infos[model_id]
                 if model_id in self._models:
                     del self._models[model_id]
-                self._logger.info("Unregistered model: %s", model_id)
+                self._logger.info("Successfully unregistered model: %s", model_id)
             else:
                 self._logger.warning(
-                    "Model '%s' not found for unregistration.", model_id
+                    "Attempted to unregister non-existent model '%s'.", model_id
                 )

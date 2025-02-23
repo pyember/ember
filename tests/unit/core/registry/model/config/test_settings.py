@@ -63,6 +63,13 @@ def test_resolve_env_vars_nested(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result == expected
 
 
+def test_ember_settings_load_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test environment variable loading."""
+    monkeypatch.setenv("OPENAI_API_KEY", "test_key_123")
+    settings = EmberSettings()
+    assert settings.openai_api_key == "test_key_123"
+
+
 # def test_ember_settings_load(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 #     """Tests that EmberSettings correctly loads from env vars and YAML files."""
 #     config_content = """
