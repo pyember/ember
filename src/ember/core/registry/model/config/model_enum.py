@@ -15,7 +15,7 @@ class AnthropicModelEnum(str, Enum):
     CLAUDE_3_5_SONNET = "anthropic:claude-3.5-sonnet"
 
 
-class GoogleModelEnum(str, Enum):
+class DeepmindModelEnum(str, Enum):
     GEMINI_1_5_PRO = "deepmind:gemini-1.5-pro"
     GEMINI_2_0_FLASH = "deepmind:gemini-2.0-flash"
     GEMINI_EXP_1206 = "deepmind:gemini-exp-1206"
@@ -24,7 +24,7 @@ class GoogleModelEnum(str, Enum):
 ALL_PROVIDER_ENUMS: List[Type[Enum]] = [
     OpenAIModelEnum,
     AnthropicModelEnum,
-    GoogleModelEnum,
+    DeepmindModelEnum,
 ]
 
 

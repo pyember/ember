@@ -3,7 +3,7 @@ from enum import Enum
 import asyncio
 from typing import Any, Optional, Union
 
-from src.ember.core.registry.model.base.registry.model_enum import (
+from src.ember.core.registry.model.config.model_enum import (
     ModelEnum,
     parse_model_str,
 )

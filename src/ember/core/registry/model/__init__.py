@@ -29,7 +29,7 @@ from src.ember.core.registry.model.providers.base_provider import (
 # Registry components
 from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from src.ember.core.registry.model.base.registry.factory import ModelFactory
-from src.ember.core.registry.model.base.registry.model_enum import (
+from src.ember.core.registry.model.config.model_enum import (
     ModelEnum,
     parse_model_str,
 )
