@@ -21,6 +21,7 @@ class DummyModel:
         class DummyResponse:
             data = f"Response from {self.model_id}: {prompt}"
             usage = None
+
         return DummyResponse()
 
 
@@ -37,7 +38,10 @@ class DummyModelService:
 
 class DummyInitService:
     """A dummy init() that accepts usage_tracking and returns a DummyModelService."""
-    def __call__(self, usage_tracking: bool = True, *args, **kwargs) -> DummyModelService:
+
+    def __call__(
+        self, usage_tracking: bool = True, *args, **kwargs
+    ) -> DummyModelService:
         return DummyModelService()
 
 
@@ -48,6 +52,7 @@ def patch_init(monkeypatch: pytest.MonkeyPatch) -> None:
     which accepts usage_tracking without raising a TypeError.
     """
     from src.ember.core.registry.model.examples import usage_example
+
     monkeypatch.setattr(usage_example, "init", DummyInitService())
 
 

@@ -26,5 +26,9 @@ def test_verifier_operator_forward() -> None:
     result: VerifierOperatorOutputs = op(inputs=inputs)
 
     # Verdict is numeric: 1 means correct.
-    assert result.verdict == 1, "VerifierOperator did not return the expected verdict (1 for correct)."
-    assert result.explanation == "The answer is correct because...", "VerifierOperator did not return the expected explanation."
+    assert (
+        result.verdict == 1
+    ), "VerifierOperator did not return the expected verdict (1 for correct)."
+    assert (
+        result.explanation == "The answer is correct because..."
+    ), "VerifierOperator did not return the expected explanation."

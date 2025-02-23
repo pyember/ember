@@ -79,8 +79,12 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
                 verdict_value = clean_line.replace("Verdict:", "").strip()
                 parsed_output["verdict"] = 1 if verdict_value == "1" else 0
             elif clean_line.startswith("Explanation:"):
-                parsed_output["explanation"] = clean_line.replace("Explanation:", "").strip()
+                parsed_output["explanation"] = clean_line.replace(
+                    "Explanation:", ""
+                ).strip()
             elif clean_line.startswith("Revised Answer:"):
-                parsed_output["revised_answer"] = clean_line.replace("Revised Answer:", "").strip()
+                parsed_output["revised_answer"] = clean_line.replace(
+                    "Revised Answer:", ""
+                ).strip()
 
         return VerifierOperatorOutputs(**parsed_output)

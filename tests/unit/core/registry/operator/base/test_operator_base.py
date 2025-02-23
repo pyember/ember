@@ -24,6 +24,7 @@ class DummyInput(BaseModel):
     Attributes:
         value (int): The numerical value provided as input.
     """
+
     value: int
 
 
@@ -33,6 +34,7 @@ class DummyOutput(BaseModel):
     Attributes:
         result (int): The resulting value computed by the operator.
     """
+
     result: int
 
 
@@ -45,6 +47,7 @@ class DummySignature(Signature):
         structured_output (Optional[Type[BaseModel]]): Expected output model class.
         check_all_placeholders (bool): Flag to enforce all placeholder checks.
     """
+
     prompt_template: str = "{value}"
     input_model: Optional[Type[BaseModel]] = DummyInput
     structured_output: Optional[Type[BaseModel]] = DummyOutput
@@ -77,6 +80,7 @@ class DummySignature(Signature):
 
 class AddOneOperator(Operator[DummyInput, DummyOutput]):
     """Operator that increments the input value by one."""
+
     signature: Signature = DummySignature()
 
     def forward(self, *, inputs: DummyInput) -> DummyOutput:
@@ -113,8 +117,10 @@ def test_missing_signature_error() -> None:
     Raises:
         OperatorSignatureNotDefinedError: If the operator signature is not defined.
     """
+
     class NoSignatureOperator(Operator):
         """Operator implementation without a defined signature."""
+
         signature = None  # type: ignore
 
         def forward(self, *, inputs: Any) -> Any:
@@ -124,9 +130,10 @@ def test_missing_signature_error() -> None:
     operator_instance = NoSignatureOperator()
     with pytest.raises(OperatorSignatureNotDefinedError) as exception_info:
         operator_instance(inputs={"value": "test"})
-    assert str(exception_info.value) == "[Error 2002] Operator signature must be defined.", (
-        "Expected error message for missing signature."
-    )
+    assert (
+        str(exception_info.value) == "[Error 2002] Operator signature must be defined."
+    ), "Expected error message for missing signature."
+
 
 def test_sub_operator_registration() -> None:
     """Tests that an operator with a sub-operator executes correctly and registers it.
@@ -138,6 +145,7 @@ def test_sub_operator_registration() -> None:
     Then:
         The result should be 11 (5 * 2 + 1).
     """
+
     class SubOperator(Operator[DummyInput, DummyOutput]):
         signature = DummySignature()
 

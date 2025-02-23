@@ -10,7 +10,10 @@ from typing import List
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.model.base.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
 from src.ember.core.registry.model.base.schemas.usage import (
     UsageStats,
     UsageRecord,
@@ -26,7 +29,10 @@ from src.ember.core.registry.model.providers.base_provider import (
 # Registry components
 from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from src.ember.core.registry.model.base.registry.factory import ModelFactory
-from src.ember.core.registry.model.base.registry.model_enum import ModelEnum, parse_model_str
+from src.ember.core.registry.model.base.registry.model_enum import (
+    ModelEnum,
+    parse_model_str,
+)
 
 # Services
 from src.ember.core.registry.model.base.services.model_service import ModelService
@@ -37,7 +43,10 @@ from src.ember.core.registry.model.config.settings import EmberSettings
 
 # Import key components
 from .base.services.model_service import ModelService
-from .base.utils.model_registry_exceptions import ModelRegistrationError, ModelDiscoveryError
+from .base.utils.model_registry_exceptions import (
+    ModelRegistrationError,
+    ModelDiscoveryError,
+)
 
 # Absolute imports for exceptions
 from src.ember.core.registry.model.base.utils.model_registry_exceptions import (

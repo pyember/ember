@@ -28,9 +28,13 @@ from prettytable import PrettyTable
 
 # ember imports: use only the typed pipeline definitions (avoid direct registry references).
 from src.ember.core.non import Ensemble, JudgeSynthesis
-from src.ember.core.registry.model.base.registry.model_registry import get_model_registry
+from src.ember.core.registry.model.base.registry.model_registry import (
+    get_model_registry,
+)
 from src.ember.core import non
-from src.ember.core.registry.model.base.registry.model_registry import GLOBAL_MODEL_REGISTRY
+from src.ember.core.registry.model.base.registry.model_registry import (
+    GLOBAL_MODEL_REGISTRY,
+)
 from src.ember.core.configs.config import CONFIG, initialize_system
 
 # For dataset usage:

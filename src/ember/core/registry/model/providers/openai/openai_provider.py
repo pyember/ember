@@ -14,7 +14,10 @@ from src.ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from src.ember.core.registry.model.base.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
 from src.ember.core.registry.model.base.schemas.usage import UsageStats
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.plugin_system import provider

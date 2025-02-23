@@ -7,7 +7,9 @@ from typing import Any, List, Dict
 
 import google.generativeai as genai
 
-from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import DeepmindDiscovery
+from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import (
+    DeepmindDiscovery,
+)
 
 
 class DummyModel:
@@ -33,7 +35,9 @@ def test_deepmind_discovery_fetch_models() -> None:
 
 def test_deepmind_discovery_fetch_models_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that if genai.list_models throws an error, fetch_models handles it gracefully."""
-    monkeypatch.setattr(genai, "list_models", lambda: (_ for _ in ()).throw(Exception("API error")))
+    monkeypatch.setattr(
+        genai, "list_models", lambda: (_ for _ in ()).throw(Exception("API error"))
+    )
     discovery = DeepmindDiscovery()
     models = discovery.fetch_models()
     assert models == {}

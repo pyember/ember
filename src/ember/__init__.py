@@ -36,11 +36,15 @@ _PACKAGE_METADATA = {
 def __getattr__(name: str) -> object:
     """Lazy load main components using absolute imports."""
     if name == "ModelRegistry":
-        from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+        from src.ember.core.registry.model.base.registry.model_registry import (
+            ModelRegistry,
+        )
 
         return ModelRegistry
     if name == "ModelService":
-        from src.ember.core.registry.model.base.services.model_service import ModelService
+        from src.ember.core.registry.model.base.services.model_service import (
+            ModelService,
+        )
 
         return ModelService
     if name == "initialize_ember":

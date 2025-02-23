@@ -16,7 +16,10 @@ from pydantic import BaseModel
 # Ember package imports
 from src.ember.core.registry.operator.base._module import ember_field
 from src.ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
-from src.ember.core.registry.operator.core.ensemble import EnsembleOperator, EnsembleOperatorInputs
+from src.ember.core.registry.operator.core.ensemble import (
+    EnsembleOperator,
+    EnsembleOperatorInputs,
+)
 from src.ember.core.registry.operator.core.most_common import (
     MostCommonAnswerSelectorOperator,
     MostCommonAnswerSelectorOperatorInputs,
@@ -106,6 +109,7 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
 # 2) MostCommon Operator Wrapper
 # ------------------------------------------------------------------------------
 
+
 class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     """Wrapper around MostCommonOperator for consensus selection.
 
@@ -129,6 +133,7 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 # ------------------------------------------------------------------------------
 # 4) JudgeSynthesis Operator Wrapper
 # ------------------------------------------------------------------------------
+
 
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Wrapper around JudgeSynthesisOperator for multi-response synthesis.
@@ -165,7 +170,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         )
         self._init_field(
             field_name="judge_synthesis_op",
-            value=JudgeSynthesisOperator(lm_module=lm_module)
+            value=JudgeSynthesisOperator(lm_module=lm_module),
         )
 
     def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
@@ -176,6 +181,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
 # ------------------------------------------------------------------------------
 # 5) Verifier Operator Wrapper
 # ------------------------------------------------------------------------------
+
 
 class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     """Wrapper around VerifierOperator to verify and potentially revise a candidate answer.
@@ -215,6 +221,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
 # ------------------------------------------------------------------------------
 # 6) VariedEnsemble Operator Wrapper and Sequential Pipeline
 # ------------------------------------------------------------------------------
+
 
 class VariedEnsembleInputs(BaseModel):
     """Typed input for the VariedEnsemble operator.

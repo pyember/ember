@@ -32,14 +32,18 @@ class OperatorError(EmberException):
 
 class FlattenError(OperatorError):
     """Raised when flattening an EmberModule fails due to inconsistent field states."""
+
     DEFAULT_ERROR_CODE = 2001
 
-    def __init__(self, message: str = "Failed to flatten EmberModule due to field inconsistency."):
+    def __init__(
+        self, message: str = "Failed to flatten EmberModule due to field inconsistency."
+    ):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
 
 
 class OperatorSignatureNotDefinedError(OperatorError):
     """Raised when an Operator's signature is not defined."""
+
     DEFAULT_ERROR_CODE = 2002
 
     def __init__(self, message: str = "Operator signature must be defined."):
@@ -48,6 +52,7 @@ class OperatorSignatureNotDefinedError(OperatorError):
 
 class SignatureValidationError(OperatorError):
     """Raised when input or output signature validation fails."""
+
     DEFAULT_ERROR_CODE = 2003
 
     def __init__(self, message: str = "Signature validation error occurred."):
@@ -56,11 +61,11 @@ class SignatureValidationError(OperatorError):
 
 class OperatorExecutionError(EmberException):
     """Raised when an error occurs during operator execution."""
+
     DEFAULT_ERROR_CODE = 2004
 
     def __init__(
-        self,
-        message: str = "An error occurred during operator execution."
+        self, message: str = "An error occurred during operator execution."
     ) -> None:
         super().__init__(message)
         self.error_code: Optional[int] = self.DEFAULT_ERROR_CODE
@@ -75,6 +80,7 @@ class OperatorExecutionError(EmberException):
 
 class BoundMethodNotInitializedError(EmberException):
     """Raised when a BoundMethod is not properly initialized with its function and self."""
+
     DEFAULT_ERROR_CODE = 2005
 
     def __init__(
@@ -94,6 +100,7 @@ class BoundMethodNotInitializedError(EmberException):
 
 class TreeTransformationError(EmberException):
     """Raised when an error occurs during tree transformation."""
+
     DEFAULT_ERROR_CODE = 2006
 
     def __init__(self, message: str = "Tree transformation error occurred."):

@@ -69,11 +69,15 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         signature: Signature = getattr(self.__class__, "signature", None)
         if signature is None or not hasattr(signature, "validate_inputs"):
-            raise OperatorSignatureNotDefinedError("Operator signature must be defined.")
+            raise OperatorSignatureNotDefinedError(
+                "Operator signature must be defined."
+            )
 
         # Validate inputs.
         validated_inputs: T_in = (
-            signature.validate_inputs(inputs=inputs) if isinstance(inputs, dict) else inputs
+            signature.validate_inputs(inputs=inputs)
+            if isinstance(inputs, dict)
+            else inputs
         )
 
         # Run the forward computation.
@@ -101,5 +105,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         subclass_sig = type(self).__dict__.get("signature", None)
         # If the subclass did not override the base 'signature' property, it's not defined.
         if subclass_sig is None or subclass_sig is Operator.__dict__.get("signature"):
-            raise OperatorSignatureNotDefinedError("Operator signature must be defined.")
+            raise OperatorSignatureNotDefinedError(
+                "Operator signature must be defined."
+            )
         return subclass_sig

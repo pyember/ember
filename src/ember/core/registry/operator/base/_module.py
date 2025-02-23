@@ -23,6 +23,7 @@ T = TypeVar("T")
 
 _thread_local = threading.local()
 
+
 def static_field(**kwargs: Any) -> Field:
     """Creates a dataclass field marked as static.
 
@@ -77,6 +78,7 @@ def _make_initable_wrapper(cls: Type[T]) -> Type[T]:
     Returns:
         Type[T]: A mutable subclass of the original class.
     """
+
     class Initable(cls):  # type: ignore
         def __setattr__(self, name: str, value: Any) -> None:
             object.__setattr__(self, name, value)
@@ -146,7 +148,9 @@ def _unflatten_ember_module(
         if not field_info.metadata.get("static", False)
     ]
     if len(field_names) != len(children):
-        raise ValueError("Mismatch between number of dynamic fields and provided children.")
+        raise ValueError(
+            "Mismatch between number of dynamic fields and provided children."
+        )
     init_kwargs: Dict[str, Any] = dict(zip(field_names, children))
     init_kwargs.update(aux)
     return cls(**init_kwargs)
@@ -221,8 +225,8 @@ class EmberModule(metaclass=EmberModuleMeta):
     Subclass EmberModule to create immutable, strongly-typed modules that integrate with
     the transformation tree system (e.g., for XCS `jit` or `grad` operations).
     Fields marked with `static_field` or `ember_field(static=True)` are excluded from
-    tree transformations, suitable for hyperparameters or fixed configurations, 
-    while dynamic fields (default `ember_field`) participate in transformations, 
+    tree transformations, suitable for hyperparameters or fixed configurations,
+    while dynamic fields (default `ember_field`) participate in transformations,
     such as model/router weights getting backpropped through.
 
     **Brief Performance Notes**:

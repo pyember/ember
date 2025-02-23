@@ -13,7 +13,7 @@ def test_provider_info_validation() -> None:
         name="TestProvider",
         default_api_key="test_key",
         base_url="https://api.test.com",
-        custom_args={"param": "value"}
+        custom_args={"param": "value"},
     )
     assert provider.name == "TestProvider"
     assert provider.default_api_key == "test_key"

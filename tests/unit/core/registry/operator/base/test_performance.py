@@ -83,7 +83,9 @@ class AddOneOperator(Operator[DummyInput, DummyOutput]):
         return DummyOutput(result=inputs.value + 1)
 
 
-def measure_sequential_performance(iterations: int, rounds: int = 5) -> Tuple[List[float], Dict[str, float]]:
+def measure_sequential_performance(
+    iterations: int, rounds: int = 5
+) -> Tuple[List[float], Dict[str, float]]:
     """Measures sequential per-call execution latency over multiple rounds.
 
     Args:
@@ -109,7 +111,9 @@ def measure_sequential_performance(iterations: int, rounds: int = 5) -> Tuple[Li
         for _ in range(iterations):
             result: DummyOutput = operator_instance(inputs=input_data)
             if result.result != 11:
-                raise AssertionError(f"Unexpected operator result: expected 11, got {result.result}")
+                raise AssertionError(
+                    f"Unexpected operator result: expected 11, got {result.result}"
+                )
         end_time: float = time.perf_counter()
         total_time: float = end_time - start_time
         avg_latency: float = total_time / iterations
@@ -148,11 +152,15 @@ def measure_concurrent_performance(iterations: int, max_workers: int = 8) -> flo
     def task() -> None:
         result: DummyOutput = operator_instance(inputs=input_data)
         if result.result != 11:
-            raise AssertionError(f"Unexpected operator result: expected 11, got {result.result}")
+            raise AssertionError(
+                f"Unexpected operator result: expected 11, got {result.result}"
+            )
 
     start_time: float = time.perf_counter()
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures: List[concurrent.futures.Future] = [executor.submit(task) for _ in range(iterations)]
+        futures: List[concurrent.futures.Future] = [
+            executor.submit(task) for _ in range(iterations)
+        ]
         concurrent.futures.wait(futures)
     end_time: float = time.perf_counter()
 
@@ -198,7 +206,9 @@ def main() -> None:
     iterations: int = 10000
 
     logger.info("Starting sequential performance benchmark...\n")
-    seq_latencies, seq_stats = measure_sequential_performance(iterations=iterations, rounds=rounds)
+    seq_latencies, seq_stats = measure_sequential_performance(
+        iterations=iterations, rounds=rounds
+    )
     percentile_results: Dict[str, float] = compute_percentiles(seq_latencies)
 
     logger.info("\nSequential Benchmark Statistics:")
@@ -217,16 +227,22 @@ def main() -> None:
     rel_std: float = std_dev / overall_avg if overall_avg > 0 else 0.0
 
     if overall_avg >= 1e-3:
-        raise AssertionError(f"Sequential average latency {overall_avg:.6e} is too high.")
+        raise AssertionError(
+            f"Sequential average latency {overall_avg:.6e} is too high."
+        )
     if rel_std >= 0.30:
-        raise AssertionError(f"Relative standard deviation {rel_std:.2f} is too high, indicating unstable measurements.")
+        raise AssertionError(
+            f"Relative standard deviation {rel_std:.2f} is too high, indicating unstable measurements."
+        )
     if seq_stats["max_latency"] >= 5 * overall_avg:
         raise AssertionError(
             f"Maximum sequential latency {seq_stats['max_latency']:.6e} is more than 5x the average {overall_avg:.6e}."
         )
 
     logger.info("\nStarting concurrent performance benchmark...\n")
-    concur_avg: float = measure_concurrent_performance(iterations=iterations, max_workers=8)
+    concur_avg: float = measure_concurrent_performance(
+        iterations=iterations, max_workers=8
+    )
 
     if (concur_avg / overall_avg) >= 2.0:
         raise AssertionError(

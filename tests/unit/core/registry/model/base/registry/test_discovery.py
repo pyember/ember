@@ -1,5 +1,5 @@
 """Unit tests for the ModelDiscoveryService.
-Tests caching, thread safety, and merging of discovered models with local config.
+Tests caching, thread safety, merging of discovered models with local config, and error propagation.
 """
 
 import threading
@@ -13,6 +13,7 @@ from src.ember.core.registry.model.providers.base_discovery import BaseDiscovery
 
 class MockDiscoveryProvider(BaseDiscoveryProvider):
     """Mock provider for testing discovery service."""
+
     def fetch_models(self) -> Dict[str, Dict[str, Any]]:
         return {"mock:model": {"id": "mock:model", "name": "Mock Model"}}
 
@@ -55,27 +56,31 @@ def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) ->
     from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 
     class MockEmberSettings:
-        registry = type("Registry", (), {
-            "models": [
-                ModelInfo(
-                    id="mock:model",
-                    name="Mock Model Override",
-                    cost={
-                        "input_cost_per_thousand": 1.0,
-                        "output_cost_per_thousand": 2.0
-                    },
-                    rate_limit={
-                        "tokens_per_minute": 1000,
-                        "requests_per_minute": 100
-                    },
-                    provider={
-                        "name": "MockProvider",
-                        "default_api_key": "mock_key"
-                    },
-                    api_key="mock_key",
-                )
-            ]
-        })()
+        registry = type(
+            "Registry",
+            (),
+            {
+                "models": [
+                    ModelInfo(
+                        id="mock:model",
+                        name="Mock Model Override",
+                        cost={
+                            "input_cost_per_thousand": 1.0,
+                            "output_cost_per_thousand": 2.0,
+                        },
+                        rate_limit={
+                            "tokens_per_minute": 1000,
+                            "requests_per_minute": 100,
+                        },
+                        provider={
+                            "name": "MockProvider",
+                            "default_api_key": "mock_key",
+                        },
+                        api_key="mock_key",
+                    )
+                ]
+            },
+        )()
 
     monkeypatch.setattr(
         "src.ember.core.registry.model.config.settings.EmberSettings",
@@ -87,3 +92,19 @@ def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) ->
     merged = service.merge_with_config(discovered=discovered)
     assert "mock:model" in merged
     assert merged["mock:model"].name == "Mock Model Override"
+
+
+def test_discovery_service_error_propagation() -> None:
+    """Test that discovery service raises a ModelDiscoveryError when all providers fail."""
+    from src.ember.core.registry.model.providers.base_discovery import (
+        ModelDiscoveryError,
+    )
+
+    class FailingDiscoveryProvider(BaseDiscoveryProvider):
+        def fetch_models(self) -> Dict[str, Dict[str, Any]]:
+            raise Exception("Intentional failure for testing.")
+
+    service = ModelDiscoveryService(ttl=3600)
+    service.providers = [FailingDiscoveryProvider()]
+    with pytest.raises(ModelDiscoveryError, match="No models discovered. Errors:"):
+        service.discover_models()

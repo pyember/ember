@@ -53,6 +53,17 @@ class ModelFactory:
     and instantiates the corresponding provider model using the provided model configuration.
     """
 
+    _provider_cache: Optional[Dict[str, Type[BaseProviderModel]]] = None
+
+    @classmethod
+    def _get_providers(cls) -> Dict[str, Type[BaseProviderModel]]:
+        if cls._provider_cache is None:
+            package_path: str = "ember.core.registry.model.providers"
+            cls._provider_cache = discover_providers_in_package(
+                package_path=package_path
+            )
+        return cls._provider_cache
+
     @staticmethod
     def create_model_from_info(*, model_info: ModelInfo) -> BaseProviderModel:
         """Instantiate and return a provider model using the supplied ModelInfo configuration.
@@ -82,11 +93,8 @@ class ModelFactory:
             ) from value_error
 
         provider_name: str = model_info.provider.name
-
-        # Define the package path where provider modules reside.
-        package_path: str = "ember.core.registry.model.providers"
         discovered_providers: Dict[str, Type[BaseProviderModel]] = (
-            discover_providers_in_package(package_path=package_path)
+            ModelFactory._get_providers()
         )
 
         provider_class: Optional[Type[BaseProviderModel]] = discovered_providers.get(

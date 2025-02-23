@@ -37,6 +37,10 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
         "src.ember.core.registry.model.base.registry.factory.discover_providers_in_package",
         dummy_discover_providers,
     )
+    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+
+    # Reset the cache to ensure consistent state for each test.
+    ModelFactory._provider_cache = None
 
 
 def create_dummy_model_info(model_id: str = "dummy:factory") -> ModelInfo:

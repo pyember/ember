@@ -64,7 +64,9 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutput
 
     def forward(self, *, inputs: JudgeSynthesisInputs) -> JudgeSynthesisOutputs:
         if not self.lm_module:
-            raise MissingLMModuleError("No LM module attached to JudgeSynthesisOperator.")
+            raise MissingLMModuleError(
+                "No LM module attached to JudgeSynthesisOperator."
+            )
 
         rendered_prompt: str = self.signature.render_prompt(inputs=inputs.model_dump())
         raw_output: str = self.lm_module(prompt=rendered_prompt).strip()

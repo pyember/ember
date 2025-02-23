@@ -128,7 +128,9 @@ def test_judge_synthesis_operator_normal(mock_invoke) -> None:
     )
     output = judge(inputs=inputs)
     assert output.final_answer == "Synthesized", "Final answer should be 'Synthesized'."
-    assert "Some reasoning" in output.reasoning, "Reasoning should contain 'Some reasoning'."
+    assert (
+        "Some reasoning" in output.reasoning
+    ), "Reasoning should contain 'Some reasoning'."
 
 
 # ------------------------------------------------------------------------------

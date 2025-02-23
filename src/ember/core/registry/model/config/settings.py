@@ -174,7 +174,9 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
 
     discovered_models: Dict[str, ModelInfo] = {}
     if final_settings.registry.auto_discover:
-        from src.ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
+        from src.ember.core.registry.model.base.registry.discovery import (
+            ModelDiscoveryService,
+        )
 
         discovery_service = ModelDiscoveryService(ttl=3600)
         discovered: Dict[str, Dict[str, Any]] = discovery_service.discover_models()

@@ -19,12 +19,16 @@ class MostCommonAnswerSelectorOperatorInputs(BaseModel):
     responses: List[str]
 
 
-class MostCommonAnswerSelectorOperator(Operator[MostCommonAnswerSelectorOperatorInputs, Dict[str, Any]]):
+class MostCommonAnswerSelectorOperator(
+    Operator[MostCommonAnswerSelectorOperatorInputs, Dict[str, Any]]
+):
     """Operator that selects the most common answer from provided responses."""
 
     signature: Signature = Signature(input_model=MostCommonAnswerSelectorOperatorInputs)
 
-    def forward(self, *, inputs: MostCommonAnswerSelectorOperatorInputs) -> Dict[str, Any]:
+    def forward(
+        self, *, inputs: MostCommonAnswerSelectorOperatorInputs
+    ) -> Dict[str, Any]:
         if not inputs.responses:
             return {"final_answer": None}
         counts: Counter = Counter(inputs.responses)

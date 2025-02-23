@@ -19,10 +19,10 @@ from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 
 
-
 def create_dummy_config(tmp_path: Path) -> Path:
     """Creates a dummy config file for integration testing."""
-    config_content = dedent("""
+    config_content = dedent(
+        """
     registry:
       models:
         - id: "dummy:test-model"
@@ -37,7 +37,8 @@ def create_dummy_config(tmp_path: Path) -> Path:
             name: "DummyProvider"
             default_api_key: "dummy_key"
           api_key: "dummy_key"
-    """)
+    """
+    )
     config_path = tmp_path / "config.yaml"
     config_path.write_text(config_content)
     return config_path
@@ -46,6 +47,7 @@ def create_dummy_config(tmp_path: Path) -> Path:
 @pytest.fixture(autouse=True)
 def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     """Patch ModelFactory to always return a dummy provider for integration testing."""
+
     class DummyProvider:
         def __init__(self, model_info: Any) -> None:
             self.model_info = model_info
@@ -54,6 +56,7 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
             class DummyResponse:
                 data = f"Integrated: {prompt}"
                 usage = None
+
             return DummyResponse()
 
     # Patch the factory
@@ -68,14 +71,17 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
         self._models[model_info.id] = DummyProvider(model_info)
 
     from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+
     monkeypatch.setattr(ModelRegistry, "register_model", mock_register_model)
 
 
 def test_full_flow_with_lm_module(tmp_path: Path) -> None:
     """Test the full flow from config loading to LMModule invocation."""
     config_path = create_dummy_config(tmp_path)
-    registry = initialize_ember(config_path=str(config_path), auto_register=True, auto_discover=False)
-    
+    registry = initialize_ember(
+        config_path=str(config_path), auto_register=True, auto_discover=False
+    )
+
     registered = list(registry._models.keys())
     print(f"Registered models: {registered}")
     if "dummy:test-model" not in registry._models:

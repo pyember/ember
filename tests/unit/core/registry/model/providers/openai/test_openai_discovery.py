@@ -7,12 +7,15 @@ from typing import Any, Dict
 
 import openai
 
-from src.ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
+from src.ember.core.registry.model.providers.openai.openai_discovery import (
+    OpenAIDiscovery,
+)
 
 
 @pytest.fixture(autouse=True)
 def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     """Patch openai.Model.list to return a dummy response."""
+
     def mock_model_list() -> Dict[str, Any]:
         return {
             "data": [
@@ -20,6 +23,7 @@ def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
                 {"id": "gpt-4o-mini", "name": "gpt-4o-mini"},
             ]
         }
+
     monkeypatch.setattr(openai.Model, "list", mock_model_list)
 
 

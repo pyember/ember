@@ -1,12 +1,19 @@
 import time
 import logging
+import threading
 from typing import Any, Dict, List
 
 from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
 from src.ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
-from src.ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
-from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import AnthropicDiscovery
-from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import DeepmindDiscovery
+from src.ember.core.registry.model.providers.openai.openai_discovery import (
+    OpenAIDiscovery,
+)
+from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import (
+    AnthropicDiscovery,
+)
+from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import (
+    DeepmindDiscovery,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -15,7 +22,8 @@ class ModelDiscoveryService:
     """Service for aggregating and merging model metadata from various discovery providers.
 
     This service collects model information from different providers and merges the data
-    with local configuration overrides. Results are cached to reduce redundant network calls.
+    with local configuration overrides. Results are cached (with thread-safe access) to
+    reduce redundant network calls.
     """
 
     def __init__(self, ttl: int = 3600) -> None:
@@ -32,27 +40,54 @@ class ModelDiscoveryService:
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: float = 0.0
         self.ttl: int = ttl
+        self._lock: threading.RLock = (
+            threading.RLock()
+        )  # Added reentrant lock for thread safety
 
     def discover_models(self) -> Dict[str, Dict[str, Any]]:
         """Discover models using registered providers, with caching based on TTL.
 
         Returns:
             Dict[str, Dict[str, Any]]: Mapping from model ID to its metadata.
+
+        Raises:
+            ModelDiscoveryError: If no models can be discovered due to provider errors.
         """
-        current_time: float = time.time()
-        if self._cache and (current_time - self._last_update) < self.ttl:
-            logger.info("Returning cached discovery results.")
-            return self._cache
+        with self._lock:
+            current_time: float = time.time()
+            if self._cache and (current_time - self._last_update) < self.ttl:
+                logger.info("Returning cached discovery results.")
+                return self._cache.copy()  # Return a copy to prevent external mutation
 
-        aggregated_models: Dict[str, Dict[str, Any]] = {}
-        for provider in self.providers:
-            provider_models: Dict[str, Dict[str, Any]] = provider.fetch_models()
-            aggregated_models.update(provider_models)
+            aggregated_models: Dict[str, Dict[str, Any]] = {}
+            errors: List[str] = []
+            for provider in self.providers:
+                try:
+                    provider_models: Dict[str, Dict[str, Any]] = provider.fetch_models()
+                    aggregated_models.update(provider_models)
+                except Exception as e:
+                    errors.append(f"{provider.__class__.__name__}: {e}")
+                    logger.error(
+                        "Failed to fetch models from %s: %s",
+                        provider.__class__.__name__,
+                        e,
+                    )
 
-        self._cache = aggregated_models
-        self._last_update = current_time
-        logger.info("Discovered models: %s", list(aggregated_models.keys()))
-        return aggregated_models
+            if not aggregated_models and errors:
+                from src.ember.core.registry.model.providers.base_discovery import (
+                    ModelDiscoveryError,
+                )
+
+                raise ModelDiscoveryError(
+                    f"No models discovered. Errors: {'; '.join(errors)}"
+                )
+
+            self._cache = (
+                aggregated_models.copy()
+            )  # Store a copy to protect internal state
+            self._last_update = current_time
+            logger.info("Discovered models: %s", list(aggregated_models.keys()))
+            return aggregated_models.copy()
 
     def merge_with_config(
         self, discovered: Dict[str, Dict[str, Any]]
@@ -107,6 +142,7 @@ class ModelDiscoveryService:
         Returns:
             Dict[str, ModelInfo]: Updated mapping from model IDs to ModelInfo objects.
         """
-        self._cache.clear()  # Invalidate cache
-        discovered: Dict[str, Dict[str, Any]] = self.discover_models()
-        return self.merge_with_config(discovered=discovered)
+        with self._lock:  # Protect cache invalidation and discovery refresh
+            self._cache.clear()  # Invalidate cache
+            discovered: Dict[str, Dict[str, Any]] = self.discover_models()
+            return self.merge_with_config(discovered=discovered)

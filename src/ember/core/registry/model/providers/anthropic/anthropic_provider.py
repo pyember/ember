@@ -17,7 +17,10 @@ from src.ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from src.ember.core.registry.model.base.schemas.chat_schemas import ChatRequest, ChatResponse
+from src.ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
 from src.ember.core.registry.model.base.schemas.usage import UsageStats
 
 logger: logging.Logger = logging.getLogger(__name__)

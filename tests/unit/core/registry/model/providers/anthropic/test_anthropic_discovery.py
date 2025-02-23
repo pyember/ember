@@ -5,7 +5,9 @@ Since AnthropicDiscovery.fetch_models returns simulated data, we just verify its
 import pytest
 from typing import Dict, Any
 
-from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import AnthropicDiscovery
+from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import (
+    AnthropicDiscovery,
+)
 
 
 def test_anthropic_discovery_fetch_models() -> None:
@@ -19,10 +21,14 @@ def test_anthropic_discovery_fetch_models() -> None:
     assert entry.get("model_name") == "claude-3.5-sonnet-latest"
 
 
-def test_anthropic_discovery_fetch_models_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_anthropic_discovery_fetch_models_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Test that if fetch_models raises an error, it is handled gracefully."""
+
     def mock_fetch_models_error() -> Dict[str, Any]:
         raise Exception("Discovery error")
+
     monkeypatch.setattr(AnthropicDiscovery, "fetch_models", mock_fetch_models_error)
     discovery = AnthropicDiscovery()
     with pytest.raises(Exception):
