@@ -1,5 +1,5 @@
 """
-New Tracer Decorator for XCS Operators.
+Tracer Decorator for XCS Operators.
 
 This module provides a decorator that instruments an Operator
 subclass so that on its first invocation the operator's execution is traced
@@ -19,9 +19,6 @@ import logging
 from contextlib import ContextDecorator
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, cast
-
-# Third-party modules
-from pydantic import BaseModel
 
 # Import necessary modules from our codebase.
 from src.ember.core.registry.operator.base.operator_base import Operator
