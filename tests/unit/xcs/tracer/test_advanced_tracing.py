@@ -3,7 +3,7 @@
 This module defines dummy operator implementations to simulate wide ensembles,
 nested operator structures, parallel execution, and failure scenarios. It verifies
 that the new tracer and JIT systems record operator invocations correctly, that a
-JIT-decorated operator can be “converted” into an XCS graph, and that running that graph
+JIT-decorated operator can be "converted" into an XCS graph, and that running that graph
 with the XCS engine in parallel is significantly faster than sequential execution.
 """
 
@@ -25,6 +25,7 @@ from src.ember.xcs.engine.xcs_engine import compile_graph, TopologicalSchedulerW
 from src.ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
 from src.ember.xcs.graph.xcs_graph import XCSGraph
 from src.ember.xcs.tracer.xcs_tracing import TracerContext
+from src.ember.core.registry.operator.exceptions import OperatorExecutionError
 
 # -----------------------------------------------------------------------------
 # Dummy Models and Signature
@@ -369,10 +370,10 @@ def test_jit_caching() -> None:
 
 
 def test_error_handling() -> None:
-    """Tests that errors in sub-operators are correctly propagated.
+    """Tests that errors in sub-operators are correctly wrapped and propagated.
 
     Constructs a wide ensemble where one member is a faulty operator and asserts that
-    a ValueError with the expected message is raised.
+    OperatorExecutionError is raised with the original error message preserved.
     """
     class FaultyWideEnsembleOperator(WideEnsembleOperator):
         """Wide ensemble operator that replaces one member with a faulty operator."""
@@ -384,8 +385,13 @@ def test_error_handling() -> None:
 
     ensemble: WideEnsembleOperator = FaultyWideEnsembleOperator(num_members=3)
     input_data: DummyInputs = DummyInputs(query="error test")
-    with pytest.raises(ValueError, match="Test error"):
+    with pytest.raises(OperatorExecutionError) as exception_info:
         _ = ensemble(inputs=input_data)
+    
+    error_message = str(exception_info.value)
+    assert "FaultyWideEnsembleOperator" in error_message
+    assert "FaultyOperator" in error_message
+    assert "Test error" in error_message
 
 
 def test_jit_produces_xcs_graph_and_parallel_speedup() -> None:

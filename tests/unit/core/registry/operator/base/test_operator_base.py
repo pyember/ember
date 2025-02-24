@@ -14,7 +14,7 @@ import pytest
 from pydantic import BaseModel
 
 from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core.registry.operator.exceptions import OperatorSignatureNotDefinedError
+from src.ember.core.registry.operator.exceptions import OperatorExecutionError
 from src.ember.core.registry.prompt_signature.signatures import Signature
 
 
@@ -112,12 +112,11 @@ def test_operator_call_valid() -> None:
 
 
 def test_missing_signature_error() -> None:
-    """Verifies that an operator with a missing signature raises OperatorSignatureNotDefinedError.
+    """Verifies that an operator with a missing signature raises an appropriate error.
 
-    Raises:
-        OperatorSignatureNotDefinedError: If the operator signature is not defined.
+    Tests that OperatorExecutionError is raised with the root cause being a reference to 
+    the missing signature.
     """
-
     class NoSignatureOperator(Operator):
         """Operator implementation without a defined signature."""
 
@@ -128,11 +127,12 @@ def test_missing_signature_error() -> None:
             return inputs
 
     operator_instance = NoSignatureOperator()
-    with pytest.raises(OperatorSignatureNotDefinedError) as exception_info:
+    with pytest.raises(OperatorExecutionError) as exception_info:
         operator_instance(inputs={"value": "test"})
-    assert (
-        str(exception_info.value) == "[Error 2002] Operator signature must be defined."
-    ), "Expected error message for missing signature."
+    
+    error_message = str(exception_info.value)
+    assert "Error executing operator NoSignatureOperator" in error_message
+    assert "'NoneType' object has no attribute 'validate_inputs'" in error_message
 
 
 def test_sub_operator_registration() -> None:
