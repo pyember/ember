@@ -5,7 +5,10 @@ This module tests parallel execution using the TopologicalSchedulerWithParallelD
 
 from typing import Any, Dict
 
-from src.ember.xcs.engine.xcs_engine import TopologicalSchedulerWithParallelDispatch, compile_graph
+from src.ember.xcs.engine.xcs_engine import (
+    TopologicalSchedulerWithParallelDispatch,
+    compile_graph,
+)
 from src.ember.xcs.graph.xcs_graph import XCSGraph
 
 

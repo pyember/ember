@@ -17,12 +17,14 @@ from src.ember.xcs.tracer.tracer_decorator import jit
 # Dummy Models and Signature for Testing
 # ----------------------------------------------------------------------------
 
+
 class DummyInput(BaseModel):
     """Input model for testing the operators.
 
     Attributes:
         x (int): An integer value representing the input.
     """
+
     x: int
 
 
@@ -32,6 +34,7 @@ class DummyOutput(BaseModel):
     Attributes:
         y (int): An integer value representing the output.
     """
+
     y: int
 
 
@@ -83,7 +86,8 @@ class DummySignature:
 # Dummy Operator decorated with JIT
 # ----------------------------------------------------------------------------
 
-@jit(sample_input={"x": 0}, force_trace_forward=False)
+
+@jit()
 class DummyOperator(Operator[DummyInput, DummyOutput]):
     """Dummy operator that increments an internal counter upon execution.
 
@@ -110,54 +114,39 @@ class DummyOperator(Operator[DummyInput, DummyOutput]):
         return DummyOutput(y=self.counter)
 
 
-def test_jit_decorator_caches_plan() -> None:
-    """Tests that the JIT-decorated operator caches its execution plan.
-
-    This test instantiates a DummyOperator and verifies that repeated invocations with identical input
-    result in a single execution of the forward method (i.e., the counter remains 1), and that
-    both outputs are identical, confirming the caching behavior.
-
-    Returns:
-        None
-    """
+def test_jit_decorator_always_executes() -> None:
+    """Tests that the JIT-decorated operator executes forward for every call (no caching)."""
     operator_instance: DummyOperator = DummyOperator()
     output_first: DummyOutput = operator_instance(inputs={"x": 5})
     output_second: DummyOutput = operator_instance(inputs={"x": 5})
-    assert operator_instance.counter == 2, (
-        f"Expected counter to be 2, got {operator_instance.counter}"
-    )
-    assert output_first == output_second, "Expected cached output to match the initial output."
+    # If forward increments self.counter, we expect it to be 2 now.
+    assert (
+        operator_instance.counter == 2
+    ), f"Expected counter to be 2, got {operator_instance.counter}"
+    # The new design does NOT cache outputs, so they differ by the updated counter.
+    assert output_first != output_second, "Expected different outputs with each call (no caching)."
 
 
 # ----------------------------------------------------------------------------
 # Dummy Operator with Forced Tracing Enabled
 # ----------------------------------------------------------------------------
 
-@jit(sample_input={"x": 0}, force_trace_forward=True)
-class ForceTraceOperator(DummyOperator):
-    """Operator subclass that bypasses caching by forcing tracing on every call.
 
-    With force_trace_forward enabled, the forward method is executed on each invocation,
-    incrementing the counter for every call regardless of input caching.
-    """
+@jit(force_trace=True)
+class ForceTraceOperator(DummyOperator):
+    """Operator that is forced to create a trace record on every call."""
     pass
 
 
 def test_jit_decorator_force_trace() -> None:
-    """Tests that the JIT decorator with force_trace_forward=True bypasses caching.
-
-    This test confirms that each call to a ForceTraceOperator executes the forward method,
-    thereby incrementing the internal counter on every invocation, and produces distinct outputs.
-
-    Returns:
-        None
-    """
+    """Tests that the JIT decorator with force_trace=True executes forward each time."""
     operator_instance: ForceTraceOperator = ForceTraceOperator()
     output_first: DummyOutput = operator_instance(inputs={"x": 10})
     output_second: DummyOutput = operator_instance(inputs={"x": 10})
-    assert operator_instance.counter == 4, (
-        f"Expected counter to be 4, got {operator_instance.counter}"
-    )
-    assert output_first != output_second, (
-        "Expected outputs to differ when forced tracing is enabled."
-    )
+    # With no caching, the counter increments on each invocation.
+    assert (
+        operator_instance.counter == 2
+    ), f"Expected counter to be 2, but got {operator_instance.counter}"
+    assert (
+        output_first != output_second
+    ), "Expected distinct output due to forced trace."

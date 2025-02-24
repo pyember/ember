@@ -85,7 +85,7 @@ def _unflatten_sequence(
     result: List[Any] = []
     start: int = 0
     for aux_item, leaf_count in aux_list:
-        child_leaves: List[Any] = children[start:start + leaf_count]
+        child_leaves: List[Any] = children[start : start + leaf_count]
         start += leaf_count
         result.append(tree_unflatten(aux=aux_item, children=child_leaves))
     if start != len(children):
@@ -111,7 +111,7 @@ def _unflatten_dict(
     result: Dict[Any, Any] = {}
     start: int = 0
     for key, aux_item, leaf_count in aux_list:
-        child_leaves: List[Any] = children[start:start + leaf_count]
+        child_leaves: List[Any] = children[start : start + leaf_count]
         start += leaf_count
         result[key] = tree_unflatten(aux=aux_item, children=child_leaves)
     if start != len(children):

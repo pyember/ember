@@ -5,7 +5,10 @@ This module verifies parallel execution using the TopologicalSchedulerWithParall
 
 from typing import Any, Dict
 
-from src.ember.xcs.engine.xcs_engine import TopologicalSchedulerWithParallelDispatch, compile_graph
+from src.ember.xcs.engine.xcs_engine import (
+    TopologicalSchedulerWithParallelDispatch,
+    compile_graph,
+)
 from src.ember.xcs.graph.xcs_graph import XCSGraph
 
 
@@ -35,6 +38,10 @@ def test_parallel_scheduler() -> None:
     graph: XCSGraph = XCSGraph()
     graph.add_node(operator=dummy_operator, node_id="node1")
     plan = compile_graph(graph=graph)
-    scheduler: TopologicalSchedulerWithParallelDispatch = TopologicalSchedulerWithParallelDispatch(max_workers=2)
-    results: Dict[str, Any] = scheduler.run_plan(plan=plan, global_input={"value": 3}, graph=graph)
+    scheduler: TopologicalSchedulerWithParallelDispatch = (
+        TopologicalSchedulerWithParallelDispatch(max_workers=2)
+    )
+    results: Dict[str, Any] = scheduler.run_plan(
+        plan=plan, global_input={"value": 3}, graph=graph
+    )
     assert results["node1"] == {"out": 6}

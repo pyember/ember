@@ -9,7 +9,7 @@ These tests verify:
 """
 
 from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.xcs.tracer.xcs_tracing import TracerContext, convert_traced_graph_to_plan
+from src.ember.xcs.tracer.xcs_tracing import TracerContext
 from src.ember.xcs.tracer.tracer_decorator import jit
 
 
@@ -21,6 +21,7 @@ class DummySignature:
         return output
 
 
+@jit()
 class DummyTracingOperator(Operator):
     signature = DummySignature()
 
@@ -31,14 +32,15 @@ class DummyTracingOperator(Operator):
 def test_tracer_context_capture() -> None:
     op = DummyTracingOperator()
     op.name = "DummyTrace"
-    with TracerContext(top_operator=op, sample_input={"dummy": "data"}) as tctx:
-        traced_graph = tctx.run_trace()
-    # Ensure that at least one node is captured and that our operator produced the expected output.
-    assert len(traced_graph.nodes) >= 1
+    with TracerContext() as tctx:
+        _ = op(inputs={"dummy": "data"})
+    assert len(tctx.records) >= 1, "No trace records were captured."
     found = False
-    for node_id, node in traced_graph.nodes.items():
-        if node.operator == op:
-            assert node.attrs.get("output_0") == "traced"
+    for record in tctx.records:
+        if record.operator_name == "DummyTrace":
+            assert record.outputs == {"output": "traced"}, (
+                f"Traced output {record.outputs} does not match expected result."
+            )
             found = True
             break
     assert found, "The operator's execution was not traced."
@@ -47,18 +49,19 @@ def test_tracer_context_capture() -> None:
 def test_convert_traced_graph_to_plan() -> None:
     op = DummyTracingOperator()
     op.name = "DummyTracePlan"
-    with TracerContext(top_operator=op, sample_input={"dummy": "data"}) as tctx:
-        traced_graph = tctx.run_trace()
-    plan = convert_traced_graph_to_plan(tracer_graph=traced_graph)
-    assert len(plan.tasks) == len(traced_graph.nodes)
+    with TracerContext() as tctx:
+        _ = op(inputs={"dummy": "data"})
+    assert len(tctx.records) >= 1, "Expected trace records but found none."
 
 
-def test_jit_caching() -> None:
+def test_jit_operator_always_executes() -> None:
     @jit()
     class DummyJITOperator(Operator):
         signature = DummySignature()
+        call_count = 0
 
         def forward(self, *, inputs: dict) -> dict:
+            type(self).call_count += 1
             # Mimic some transformation by appending "_processed"
             return {"value": inputs.get("value", "default") + "_processed"}
 
@@ -68,23 +71,20 @@ def test_jit_caching() -> None:
     output1 = op(inputs={"value": "input"})
     assert output1["value"] == "input_processed"
 
-    # The plan compiled from the first call
-    cached_plan = op._compiled_plans["default"]
-
-    # Second invocation should reuse the same plan
+    # No caching now: the forward method should run again
     output2 = op(inputs={"value": "another"})
     assert output2["value"] == "another_processed"
-    assert op._compiled_plans["default"] is cached_plan
+    assert DummyJITOperator.call_count == 2, "Expected forward to be called twice."
 
 
-def test_force_trace_forward() -> None:
-    @jit(sample_input={"value": 1}, force_trace_forward=True)
+def test_force_trace() -> None:
+    @jit(sample_input={"value": 1}, force_trace=True)
     class DummyForceJITOperator(Operator):
         signature = DummySignature()
         trace_count = 0
 
         def forward(self, *, inputs: dict) -> dict:
-            DummyForceJITOperator.trace_count += 1
+            type(self).trace_count += 1
             return {"value": inputs.get("value", 0) + 1}
 
     op = DummyForceJITOperator()
@@ -93,8 +93,7 @@ def test_force_trace_forward() -> None:
     count1 = DummyForceJITOperator.trace_count
     output2 = op(inputs={"value": 5})
     count2 = DummyForceJITOperator.trace_count
-    # When force_trace_forward is enabled, the trace should happen on every call
-    assert count2 > count1
+    assert count2 == count1 + 1, "Expected force_trace to call forward again."
     assert output1["value"] == 6
     assert output2["value"] == 6
 

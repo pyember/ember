@@ -47,15 +47,25 @@ def test_compile_graph() -> None:
 
     plan: XCSPlan = compile_graph(graph=graph)
     assert isinstance(plan, XCSPlan), "Compiled plan is not an instance of XCSPlan."
-    assert len(plan.tasks) == 2, "Expected 2 tasks in the plan, got {}.".format(len(plan.tasks))
+    assert len(plan.tasks) == 2, "Expected 2 tasks in the plan, got {}.".format(
+        len(plan.tasks)
+    )
 
     task1 = plan.tasks["node1"]
     task2 = plan.tasks["node2"]
-    assert task1.node_id == "node1", f"Task node_id is '{task1.node_id}', expected 'node1'."
-    assert task1.operator == dummy_operator, "Task operator does not match the expected dummy_operator."
+    assert (
+        task1.node_id == "node1"
+    ), f"Task node_id is '{task1.node_id}', expected 'node1'."
+    assert (
+        task1.operator == dummy_operator
+    ), "Task operator does not match the expected dummy_operator."
     assert task1.inbound_nodes == [], "Task 'node1' should have no inbound nodes."
-    assert task2.inbound_nodes == ["node1"], f"Task 'node2' inbound_nodes are {task2.inbound_nodes}, expected ['node1']."
-    assert plan.original_graph is graph, "The original graph in the plan does not match the input graph."
+    assert task2.inbound_nodes == [
+        "node1"
+    ], f"Task 'node2' inbound_nodes are {task2.inbound_nodes}, expected ['node1']."
+    assert (
+        plan.original_graph is graph
+    ), "The original graph in the plan does not match the input graph."
 
 
 def test_compile_graph_duplicate_task() -> None:

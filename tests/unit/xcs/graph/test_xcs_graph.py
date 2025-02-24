@@ -39,12 +39,12 @@ def test_add_node_and_edge() -> None:
     graph.add_edge(from_id="node1", to_id="node2")
     assert "node1" in graph.nodes, "Expected 'node1' to be present in the graph."
     assert "node2" in graph.nodes, "Expected 'node2' to be present in the graph."
-    assert graph.nodes["node1"].outbound_edges == ["node2"], (
-        "Expected 'node1' to have an outbound edge to 'node2'."
-    )
-    assert graph.nodes["node2"].inbound_edges == ["node1"], (
-        "Expected 'node2' to have an inbound edge from 'node1'."
-    )
+    assert graph.nodes["node1"].outbound_edges == [
+        "node2"
+    ], "Expected 'node1' to have an outbound edge to 'node2'."
+    assert graph.nodes["node2"].inbound_edges == [
+        "node1"
+    ], "Expected 'node2' to have an inbound edge from 'node1'."
 
 
 def test_duplicate_node_id_error() -> None:
@@ -75,9 +75,11 @@ def test_topological_sort_linear() -> None:
     graph.add_edge(from_id="A", to_id="B")
     graph.add_edge(from_id="B", to_id="C")
     order: List[str] = graph.topological_sort()
-    assert order == ["A", "B", "C"], (
-        "Topological sort should yield ['A', 'B', 'C'] for a linear graph."
-    )
+    assert order == [
+        "A",
+        "B",
+        "C",
+    ], "Topological sort should yield ['A', 'B', 'C'] for a linear graph."
 
 
 def test_topological_sort_diamond() -> None:
@@ -140,12 +142,12 @@ def test_merge_xcs_graphs_namespace() -> None:
     merged_graph: XCSGraph = merge_xcs_graphs(
         base=base_graph, additional=additional_graph, namespace="Test"
     )
-    assert "base1" in merged_graph.nodes, (
-        "Merged graph must contain 'base1' from the base graph."
-    )
-    assert "Test_add1" in merged_graph.nodes, (
-        "Merged graph must contain 'Test_add1' from the namespaced additional graph."
-    )
+    assert (
+        "base1" in merged_graph.nodes
+    ), "Merged graph must contain 'base1' from the base graph."
+    assert (
+        "Test_add1" in merged_graph.nodes
+    ), "Merged graph must contain 'Test_add1' from the namespaced additional graph."
 
 
 def test_merge_with_duplicates() -> None:
@@ -164,9 +166,9 @@ def test_merge_with_duplicates() -> None:
     merged_graph: XCSGraph = merge_xcs_graphs(
         base=base_graph, additional=additional_graph, namespace="Ns"
     )
-    assert "shared" in merged_graph.nodes, "Merged graph should contain 'shared' from the base graph."
+    assert (
+        "shared" in merged_graph.nodes
+    ), "Merged graph should contain 'shared' from the base graph."
     assert any(
         node_id.startswith("Ns_shared") for node_id in merged_graph.nodes
-    ), (
-        "Merged graph must include a namespaced version of the duplicate node from the additional graph."
-    )
+    ), "Merged graph must include a namespaced version of the duplicate node from the additional graph."

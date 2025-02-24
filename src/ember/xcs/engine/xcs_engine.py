@@ -67,7 +67,7 @@ def compile_graph(*, graph: XCSGraph) -> XCSPlan:
     tasks: Dict[str, XCSPlanTask] = {}
     for node in graph.nodes.values():
         node_id: str = node.node_id
-        
+
         if node_id in tasks:
             raise ValueError(f"Task '{node_id}' already exists in the plan.")
         task = XCSPlanTask(
@@ -242,10 +242,10 @@ def execute_graph(
         return results
     else:
         results = {}
-        for task in plan.tasks:
-            node = task.node
-            input_data = task.compute_inputs(
-                global_input=global_input, graph=orig_graph
+        # Iterate over task values instead of keys; use node_id and operator.
+        for task in plan.tasks.values():
+            input_data = scheduler._gather_inputs(
+                node_id=task.node_id, results=results, global_input=global_input, graph=orig_graph
             )
-            results[node] = node.operator(inputs=input_data)
+            results[task.node_id] = task.operator(inputs=input_data)
         return results
