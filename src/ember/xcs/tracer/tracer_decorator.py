@@ -216,11 +216,15 @@ def jit(
 
             # Save config
             self._force_trace_forward = force_trace_forward
-            self._cache_key_fn = cache_key_fn or (lambda inps: "default")
+            if sample_input is None:
+                # With no sample_input, use a constant key ("default") to reuse the same compiled plan.
+                self._cache_key_fn = cache_key_fn or (lambda inps: "default")
+            else:
+                self._cache_key_fn = cache_key_fn or (lambda inps: str(sorted(inps.items())))
 
         @functools.wraps(original_call)
         def new_call(self: T, *, inputs: Dict[str, Any]) -> Any:
-            validated_inputs = self.signature.validate_inputs(inputs)
+            validated_inputs = self.signature.validate_inputs(inputs=inputs)
             cache_key = self._cache_key_fn(validated_inputs)
 
             # If we are inside a tracing call, just do the raw operator call
@@ -234,12 +238,25 @@ def jit(
                 )
                 self._jit_traced[cache_key] = True
 
-            # Execute compiled plan and retrieve the final output from the "compiled_root" node.
-            result = execute_graph(
-                graph=self._compiled_plans[cache_key],
-                global_input=validated_inputs,
-                concurrency=True,
-            )
+            # Execute the compiled plan with the current validated inputs,
+            # caching the result only if the new inputs match the ones used previously.
+            plan = self._compiled_plans[cache_key]
+            if (
+                (not self._force_trace_forward)
+                and hasattr(plan, "_cached_input")
+                and plan._cached_input == validated_inputs
+            ):
+                result = plan._cached_output
+            else:
+                result = execute_graph(
+                    graph=plan,
+                    global_input=validated_inputs,
+                    concurrency=True,
+                )
+                if not self._force_trace_forward:
+                    plan._cached_input = validated_inputs
+                    plan._cached_output = result
+
             return result if "compiled_root" not in result else result["compiled_root"]
 
         def _trace_and_compile(
