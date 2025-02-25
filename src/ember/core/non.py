@@ -122,7 +122,8 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
     signature: Signature = MostCommonAnswerSelectorOperator.signature
     most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
-    def __init__(self):
+    def __init__(self) -> None:
+        super().__init__()
         self.most_common_op = MostCommonAnswerSelectorOperator()
 
     def forward(self, *, inputs: MostCommonInputs) -> Dict[str, Any]:
@@ -131,7 +132,7 @@ class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
 
 
 # ------------------------------------------------------------------------------
-# 4) JudgeSynthesis Operator Wrapper
+# 3) Judge Synthesis Operator Wrapper
 # ------------------------------------------------------------------------------
 
 
@@ -173,13 +174,13 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
             value=JudgeSynthesisOperator(lm_module=lm_module),
         )
 
-    def forward(self, *, inputs: JudgeSynthesisInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: JudgeSynthesisInputs) -> JudgeSynthesisOutputs:
         """Delegates execution to the underlying JudgeSynthesisOperator."""
         return self.judge_synthesis_op.forward(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
-# 5) Verifier Operator Wrapper
+# 4) Verifier Operator Wrapper
 # ------------------------------------------------------------------------------
 
 
@@ -195,7 +196,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     model_name: str
     temperature: float
     max_tokens: Optional[int]
-    verifier_op: VerifierOperator = ember_field(init=False)
+    verifier_op: VerifierOperator
 
     def __init__(
         self,
@@ -204,6 +205,11 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         temperature: float,
         max_tokens: Optional[int] = None,
     ) -> None:
+        super().__init__()
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
         lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
@@ -219,7 +225,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
 
 
 # ------------------------------------------------------------------------------
-# 6) VariedEnsemble Operator Wrapper and Sequential Pipeline
+# 5) VariedEnsemble Operator Wrapper and Sequential Pipeline
 # ------------------------------------------------------------------------------
 
 

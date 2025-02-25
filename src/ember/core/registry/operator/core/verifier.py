@@ -45,7 +45,7 @@ class VerifierSignature(Signature):
         "Please decide if this is correct. Provide:\n"
         "Verdict: <1 for correct, 0 for incorrect>\n"
         "Explanation: <Your reasoning>\n"
-        "Revised Answer (optional): <If you want to provide a corrected version>\n"
+        "Revised Answer (optional): <If you can and want to provide a corrected version>\n"
     )
 
 
