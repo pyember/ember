@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 from pydantic import BaseModel, Field
 
 from src.ember.core.registry.operator.base.operator_base import Operator
@@ -47,15 +47,14 @@ class VerifierSignature(Signature):
         "Explanation: <Your reasoning>\n"
         "Revised Answer (optional): <If you can and want to provide a corrected version>\n"
     )
+    input_model: Type[VerifierOperatorInputs] = VerifierOperatorInputs
+    output_model: Type[VerifierOperatorOutputs] = VerifierOperatorOutputs
 
 
 class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]):
     """Operator to verify a candidate answer and optionally suggest revisions."""
 
-    signature: Signature = Signature(
-        input_model=VerifierOperatorInputs,
-        prompt_template=VerifierSignature().prompt_template,
-    )
+    signature: Signature = VerifierSignature()
     lm_module: LMModule
 
     def __init__(self, *, lm_module: LMModule) -> None:
