@@ -114,9 +114,10 @@ def test_operator_call_valid() -> None:
 def test_missing_signature_error() -> None:
     """Verifies that an operator with a missing signature raises an appropriate error.
 
-    Tests that OperatorExecutionError is raised with the root cause being a reference to 
+    Tests that OperatorExecutionError is raised with the root cause being a reference to
     the missing signature.
     """
+
     class NoSignatureOperator(Operator):
         """Operator implementation without a defined signature."""
 
@@ -129,10 +130,32 @@ def test_missing_signature_error() -> None:
     operator_instance = NoSignatureOperator()
     with pytest.raises(OperatorExecutionError) as exception_info:
         operator_instance(inputs={"value": "test"})
-    
+
     error_message = str(exception_info.value)
     assert "Error executing operator NoSignatureOperator" in error_message
     assert "'NoneType' object has no attribute 'validate_inputs'" in error_message
+
+
+def test_input_validation_error() -> None:
+    """Tests that invalid inputs result in an OperatorExecutionError.
+
+    Given:
+        An instance of AddOneOperator and invalid input (string instead of int).
+    When:
+        The operator is invoked.
+    Then:
+        An OperatorExecutionError should be raised containing validation details.
+    """
+    operator_instance = AddOneOperator()
+    invalid_input = {"value": "not_an_integer"}
+    
+    with pytest.raises(OperatorExecutionError) as exception_info:
+        operator_instance(inputs=invalid_input)
+    
+    error_message = str(exception_info.value)
+    assert "Error executing operator AddOneOperator" in error_message
+    assert "validation error for DummyInput" in error_message
+    assert "Input should be a valid integer" in error_message
 
 
 def test_sub_operator_registration() -> None:

@@ -50,9 +50,9 @@ def test_tracer_context_basic() -> None:
         _ = operator(inputs=sample_input)
     assert len(tracer.records) >= 1, "Expected at least one trace record."
     first_record = tracer.records[0]
-    assert first_record.outputs == {"result": 10}, (
-        f"Traced output {first_record.outputs} does not match expected {{'result': 10}}."
-    )
+    assert first_record.outputs == {
+        "result": 10
+    }, f"Traced output {first_record.outputs} does not match expected {{'result': 10}}."
 
 
 def test_tracer_context_patch_restore() -> None:

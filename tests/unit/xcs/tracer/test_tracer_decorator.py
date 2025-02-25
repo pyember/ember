@@ -124,7 +124,9 @@ def test_jit_decorator_always_executes() -> None:
         operator_instance.counter == 2
     ), f"Expected counter to be 2, got {operator_instance.counter}"
     # The new design does NOT cache outputs, so they differ by the updated counter.
-    assert output_first != output_second, "Expected different outputs with each call (no caching)."
+    assert (
+        output_first != output_second
+    ), "Expected different outputs with each call (no caching)."
 
 
 # ----------------------------------------------------------------------------
@@ -135,6 +137,7 @@ def test_jit_decorator_always_executes() -> None:
 @jit(force_trace=True)
 class ForceTraceOperator(DummyOperator):
     """Operator that is forced to create a trace record on every call."""
+
     pass
 
 

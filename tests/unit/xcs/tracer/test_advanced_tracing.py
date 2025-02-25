@@ -21,11 +21,15 @@ from src.ember.xcs.tracer.tracer_decorator import jit
 import time
 from typing import Dict
 
-from src.ember.xcs.engine.xcs_engine import compile_graph, TopologicalSchedulerWithParallelDispatch
+from src.ember.xcs.engine.xcs_engine import (
+    compile_graph,
+    TopologicalSchedulerWithParallelDispatch,
+)
 from src.ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
 from src.ember.xcs.graph.xcs_graph import XCSGraph
 from src.ember.xcs.tracer.xcs_tracing import TracerContext
 from src.ember.core.registry.operator.exceptions import OperatorExecutionError
+
 
 # -----------------------------------------------------------------------------
 # Dummy Models and Signature
@@ -36,6 +40,7 @@ class DummyInputs(BaseModel):
     Attributes:
         query (str): Query string to process.
     """
+
     query: str
 
 
@@ -45,6 +50,7 @@ class DummyOutputs(BaseModel):
     Attributes:
         answer (str): Answer produced by the operator.
     """
+
     answer: str
 
 
@@ -206,7 +212,9 @@ class NestedOperator(Operator[DummyInputs, Dict[str, Any]]):
         """
         a: Dict[str, Any] = self.ensemble1(inputs=inputs)
         b: Dict[str, Any] = self.ensemble2(inputs=inputs)
-        c: DummyOutputs = self.judge(inputs={"responses": [a["responses"][0], b["responses"][0]]})
+        c: DummyOutputs = self.judge(
+            inputs={"responses": [a["responses"][0], b["responses"][0]]}
+        )
         return {"answer": c.answer}
 
 
@@ -219,6 +227,7 @@ class DelayOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     Attributes:
         delay (float): The number of seconds to sleep.
     """
+
     # Use a minimal dummy signature.
     signature = DummySignature(dict)
 
@@ -237,10 +246,13 @@ class DelayEnsembleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     Each sub-operator sleeps for a fixed delay. This operator is used to test that
     JIT tracing produces trace records and that execution via the XCS engine can run in parallel.
     """
+
     signature = DummySignature(dict)
 
     def __init__(self, *, num_members: int, delay: float) -> None:
-        self.members: List[DelayOperator] = [DelayOperator(delay=delay) for _ in range(num_members)]
+        self.members: List[DelayOperator] = [
+            DelayOperator(delay=delay) for _ in range(num_members)
+        ]
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         results = [member(inputs=inputs) for member in self.members]
@@ -250,6 +262,7 @@ class DelayEnsembleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
 # For parallel execution testing, define a raw operator for use in a parallel ensemble.
 class RawParallelDummyOperator(Operator[DummyInputs, DummyOutputs]):
     """A raw parallel operator that waits on a barrier before returning a response."""
+
     signature: DummySignature = DummySignature(DummyInputs)
 
     def __init__(self, *, barrier: threading.Barrier) -> None:
@@ -263,6 +276,7 @@ class RawParallelDummyOperator(Operator[DummyInputs, DummyOutputs]):
 @jit(sample_input={"query": "parallel"}, force_trace=False)
 class ParallelWideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
     """Operator that executes a wide ensemble in parallel using barrier synchronization."""
+
     signature: DummySignature = DummySignature(DummyInputs)
 
     def __init__(self, *, num_members: int, barrier: threading.Barrier) -> None:
@@ -283,6 +297,7 @@ class ParallelWideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
 
 class FaultyOperator(Operator[DummyInputs, DummyOutputs]):
     """Operator that raises an error to test error propagation."""
+
     signature: DummySignature = DummySignature(DummyInputs)
 
     def forward(self, *, inputs: DummyInputs) -> DummyOutputs:
@@ -302,7 +317,9 @@ def test_wide_ensemble_tracing() -> None:
     input_data: DummyInputs = DummyInputs(query="test wide")
     output: Dict[str, Any] = ensemble(inputs=input_data)
     responses: List[str] = output.get("responses", [])
-    assert len(responses) == num_members, f"Expected {num_members} responses, got {len(responses)}"
+    assert (
+        len(responses) == num_members
+    ), f"Expected {num_members} responses, got {len(responses)}"
     for i, resp in enumerate(responses):
         expected: str = f"dummy-test wide {i}"
         assert resp == expected, f"Expected response '{expected}', got '{resp}'"
@@ -317,7 +334,9 @@ def test_nested_operator_tracing() -> None:
     nested: NestedOperator = NestedOperator()
     input_data: DummyInputs = DummyInputs(query="nested test")
     output: Dict[str, Any] = nested(inputs=input_data)
-    assert output["answer"].startswith("dummy-nested test"), f"Unexpected judge output: {output['answer']}"
+    assert output["answer"].startswith(
+        "dummy-nested test"
+    ), f"Unexpected judge output: {output['answer']}"
 
 
 def test_parallel_execution_wide_ensemble() -> None:
@@ -335,9 +354,13 @@ def test_parallel_execution_wide_ensemble() -> None:
     output: Dict[str, Any] = operator_instance(inputs=DummyInputs(query="parallel"))
     duration: float = time.time() - start
     # Sequentially, 50 members each waiting 0.1 sec would take ~5 sec.
-    assert duration < 1.0, f"Expected parallel execution to complete in <1.0s, but took {duration:.2f}s"
+    assert (
+        duration < 1.0
+    ), f"Expected parallel execution to complete in <1.0s, but took {duration:.2f}s"
     responses: List[str] = output.get("responses", [])
-    assert len(responses) == num_members, f"Expected {num_members} responses, got {len(responses)}"
+    assert (
+        len(responses) == num_members
+    ), f"Expected {num_members} responses, got {len(responses)}"
 
 
 def test_jit_caching() -> None:
@@ -345,6 +368,7 @@ def test_jit_caching() -> None:
 
     Since caching is not implemented, each call should invoke the forward method.
     """
+
     @jit(sample_input={"x": 0}, force_trace=False)
     class CachingOperator(Operator[DummyInputs, Dict[str, Any]]):
         signature: DummySignature = DummySignature(DummyInputs)
@@ -357,7 +381,9 @@ def test_jit_caching() -> None:
 
         def forward(self, *, inputs: DummyInputs) -> Dict[str, Any]:
             self.call_count += 1
-            responses: List[str] = [member(inputs=inputs).answer for member in self.members]
+            responses: List[str] = [
+                member(inputs=inputs).answer for member in self.members
+            ]
             return {"responses": responses}
 
     op: CachingOperator = CachingOperator(num_members=5)
@@ -366,7 +392,9 @@ def test_jit_caching() -> None:
     first_count: int = op.call_count
     _ = op(inputs=input_data)
     second_count: int = op.call_count
-    assert second_count == first_count + 1, "Expected forward to be called again (no caching)."
+    assert (
+        second_count == first_count + 1
+    ), "Expected forward to be called again (no caching)."
 
 
 def test_error_handling() -> None:
@@ -375,6 +403,7 @@ def test_error_handling() -> None:
     Constructs a wide ensemble where one member is a faulty operator and asserts that
     OperatorExecutionError is raised with the original error message preserved.
     """
+
     class FaultyWideEnsembleOperator(WideEnsembleOperator):
         """Wide ensemble operator that replaces one member with a faulty operator."""
 
@@ -387,7 +416,7 @@ def test_error_handling() -> None:
     input_data: DummyInputs = DummyInputs(query="error test")
     with pytest.raises(OperatorExecutionError) as exception_info:
         _ = ensemble(inputs=input_data)
-    
+
     error_message = str(exception_info.value)
     assert "FaultyWideEnsembleOperator" in error_message
     assert "FaultyOperator" in error_message
@@ -412,8 +441,10 @@ def test_jit_produces_xcs_graph_and_parallel_speedup() -> None:
     # Confirm JIT tracing: run inside a TracerContext to verify trace records are produced.
     with TracerContext() as tracer:
         _ = ensemble(inputs={})
-    logging.info(f'tracer.records: {tracer.records}')
-    assert len(tracer.records) >= 1, "Expected at least one trace record from DelayEnsembleOperator."
+    logging.info(f"tracer.records: {tracer.records}")
+    assert (
+        len(tracer.records) >= 1
+    ), "Expected at least one trace record from DelayEnsembleOperator."
 
     # Instead of using the ensemble node as a whole, build an XCSGraph with one node per DelayOperator.
     graph: XCSGraph = XCSGraph()
@@ -445,6 +476,6 @@ def test_jit_produces_xcs_graph_and_parallel_speedup() -> None:
     # For 20 members at ~0.1s each, sequential execution should take around 2.0 seconds.
     # In parallel, we of course expect the total time to be close to 0.1 seconds.
     # Assert that parallel execution time is less than one-third of sequential time.
-    assert time_par < time_seq * 0.33, (
-        f"Parallel execution ({time_par:.2f}s) did not speed up compared to sequential ({time_seq:.2f}s)."
-    )
+    assert (
+        time_par < time_seq * 0.33
+    ), f"Parallel execution ({time_par:.2f}s) did not speed up compared to sequential ({time_seq:.2f}s)."

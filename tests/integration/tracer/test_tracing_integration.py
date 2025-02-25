@@ -38,9 +38,9 @@ def test_tracer_context_capture() -> None:
     found = False
     for record in tctx.records:
         if record.operator_name == "DummyTrace":
-            assert record.outputs == {"output": "traced"}, (
-                f"Traced output {record.outputs} does not match expected result."
-            )
+            assert record.outputs == {
+                "output": "traced"
+            }, f"Traced output {record.outputs} does not match expected result."
             found = True
             break
     assert found, "The operator's execution was not traced."

@@ -22,6 +22,7 @@ from src.ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
 # Type variable for Operator subclasses.
 T = TypeVar("T", bound=Operator)
 
+
 def jit(
     *,
     sample_input: Optional[Dict[str, Any]] = None,
@@ -43,9 +44,12 @@ def jit(
     Returns:
         Callable[[Type[T]], Type[T]]: The decorated Operator subclass.
     """
+
     def decorator(cls: Type[T]) -> Type[T]:
         if not issubclass(cls, Operator):
-            raise TypeError("@jit_trace decorator can only be applied to an Operator subclass.")
+            raise TypeError(
+                "@jit_trace decorator can only be applied to an Operator subclass."
+            )
 
         original_call = cls.__call__
 

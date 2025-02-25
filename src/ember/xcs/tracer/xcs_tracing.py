@@ -13,6 +13,7 @@ from contextlib import ContextDecorator
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type
 
+
 @dataclass(frozen=True)
 class TraceRecord:
     """Immutable trace record for an operator invocation.
@@ -24,11 +25,13 @@ class TraceRecord:
         outputs (Any): The outputs returned by the operator.
         timestamp (float): The time at which the operator finished execution.
     """
+
     operator_name: str
     node_id: str
     inputs: Dict[str, Any]
     outputs: Any
     timestamp: float = field(default_factory=time.time)
+
 
 class TracerContext(ContextDecorator):
     """Context manager for capturing operator execution traces.
@@ -39,6 +42,7 @@ class TracerContext(ContextDecorator):
     Attributes:
         records (List[TraceRecord]): List of recorded operator invocation traces.
     """
+
     _local = threading.local()
 
     def __init__(self) -> None:

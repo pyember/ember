@@ -43,8 +43,8 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
     An Operator is an immutable, functional component that transforms inputs to outputs
     according to its *signature*.
 
-    Operators also implement a `forward` method. 
-    This design is intended to adhere to functional programming 
+    Operators also implement a `forward` method.
+    This design is intended to adhere to functional programming
     style, emphasizing immutability, explicit interfaces, and composability.
 
     Attributes:
@@ -115,7 +115,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             # Validate output
             validated_output: T_out = signature.validate_output(output=operator_output)
             return validated_output
-            
+
         except Exception as e:
             # Catch any errors during execution and wrap them
             if not isinstance(e, OperatorSignatureNotDefinedError):
@@ -136,7 +136,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         # Look up the 'signature' in the subclass's dict
         subclass_sig = type(self).__dict__.get("signature", None)
-        
+
         # Validate that the signature is properly defined
         if subclass_sig is None or subclass_sig is Operator.__dict__.get("signature"):
             raise OperatorSignatureNotDefinedError(

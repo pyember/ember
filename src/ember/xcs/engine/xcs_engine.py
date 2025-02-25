@@ -245,7 +245,10 @@ def execute_graph(
         # Iterate over task values instead of keys; use node_id and operator.
         for task in plan.tasks.values():
             input_data = scheduler._gather_inputs(
-                node_id=task.node_id, results=results, global_input=global_input, graph=orig_graph
+                node_id=task.node_id,
+                results=results,
+                global_input=global_input,
+                graph=orig_graph,
             )
             results[task.node_id] = task.operator(inputs=input_data)
         return results

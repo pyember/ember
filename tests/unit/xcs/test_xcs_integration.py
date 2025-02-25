@@ -55,15 +55,17 @@ def test_tracer_to_execution() -> None:
         _ = mock_operator(inputs=sample_input)
 
     # Verify that a trace record was captured
-    assert len(tctx.records) >= 1, "No trace records captured during mock operator execution."
+    assert (
+        len(tctx.records) >= 1
+    ), "No trace records captured during mock operator execution."
 
     # Check that the recorded output matches the expected doubled value
     found = False
     for record in tctx.records:
         if "result" in record.outputs:
-            assert record.outputs["result"] == 10, (
-                f"Expected {{'result': 10}}, got {record.outputs}"
-            )
+            assert (
+                record.outputs["result"] == 10
+            ), f"Expected {{'result': 10}}, got {record.outputs}"
             found = True
             break
     assert found, "No trace record contained the expected doubled value."

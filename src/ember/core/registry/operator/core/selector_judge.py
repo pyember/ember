@@ -8,7 +8,6 @@ from src.ember.core.exceptions import MissingLMModuleError
 
 from src.ember.core.registry.prompt_signature.signatures import Signature
 from src.ember.core.registry.model.model_module.lm import LMModule
-from src.ember.core.registry.operator.base._module import ember_field
 
 
 class SelectorJudgeInputs(BaseModel):
@@ -34,7 +33,7 @@ class SelectorJudgeSignature(Signature):
         "{query}\n"
         "Explain your reasoning concisely, then provide the single best final answer.\n"
         "Format:\n"
-        "Reasoning: <some text>\n"
+        "Reasoning: <your reasoning for selecting this answer>\n"
         "Final Answer: <the single best answer>\n"
     )
     structured_output: Optional[Type[BaseModel]] = SelectorJudgeOutputs

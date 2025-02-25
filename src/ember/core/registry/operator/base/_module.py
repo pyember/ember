@@ -21,7 +21,17 @@ import abc
 import dataclasses
 import threading
 from dataclasses import field, Field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Type, TypeVar, cast, Generic, ClassVar
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    Generic,
+)
 
 from src.ember.xcs.utils.tree_util import register_tree, tree_flatten
 from src.ember.core.registry.operator.exceptions import (
@@ -50,7 +60,7 @@ def static_field(*, default: Any = dataclasses.MISSING, **kwargs: Any) -> Field:
     Returns:
         Field: A dataclass field configured as static.
     """
-    metadata: Dict[str, Any] = kwargs.pop("metadata", {}) 
+    metadata: Dict[str, Any] = kwargs.pop("metadata", {})
     metadata["static"] = True
     return field(default=default, metadata=metadata, **kwargs)
 
@@ -85,11 +95,13 @@ def ember_field(
         metadata["converter"] = converter
     if static:
         metadata["static"] = True
-    
+
     if default is not dataclasses.MISSING:
         return field(default=default, metadata=metadata, init=init, **kwargs)
     elif default_factory is not dataclasses.MISSING:
-        return field(default_factory=default_factory, metadata=metadata, init=init, **kwargs)
+        return field(
+            default_factory=default_factory, metadata=metadata, init=init, **kwargs
+        )
     else:
         return field(metadata=metadata, init=init, **kwargs)
 
@@ -106,11 +118,13 @@ def _make_initable_wrapper(cls: Type[T]) -> Type[T]:
     Returns:
         Type[T]: A mutable subclass of the original class.
     """
+
     class Initable(cls):  # type: ignore
         """Temporary mutable wrapper class for initialization."""
+
         def __setattr__(self, name: str, value: Any) -> None:
             """Override to allow mutation during initialization phase.
-            
+
             Args:
                 name: The attribute name to set.
                 value: The value to assign to the attribute.
@@ -153,14 +167,14 @@ def _flatten_ember_module(instance: EmberModule) -> Tuple[List[Any], Dict[str, A
 
     dynamic_fields: List[Any] = []
     static_fields: Dict[str, Any] = {}
-    
+
     # Process each field according to its metadata
     for field_info in dataclasses.fields(instance):
         try:
             value: Any = getattr(instance, field_info.name)
         except AttributeError:
             raise FlattenError(f"Field '{field_info.name}' missing in instance")
-        
+
         # Sort fields into dynamic (transformable) or static (preserved)
         if field_info.metadata.get("static", False):
             static_fields[field_info.name] = value
@@ -177,6 +191,8 @@ def _unflatten_ember_module(
     *, cls: Type[EmberT], aux: Dict[str, Any], children: List[Any]
 ) -> EmberT:
     """Reconstructs an EmberModule instance from flattened components.
+
+    This bypasses normal initialization to create an instance directly from components.
 
     Args:
         cls: The EmberModule class to instantiate.
@@ -195,18 +211,26 @@ def _unflatten_ember_module(
         for field_info in dataclasses.fields(cls)
         if not field_info.metadata.get("static", False)
     ]
-    
+
     # Validate that we have the correct number of dynamic fields
     if len(field_names) != len(children):
         raise ValueError(
             f"Mismatch between number of dynamic fields ({len(field_names)}) and "
             f"provided children ({len(children)})."
         )
+
+    # Create a new instance directly
+    instance = object.__new__(cls)
     
-    # Combine dynamic and static fields for initialization
-    init_kwargs: Dict[str, Any] = dict(zip(field_names, children))
-    init_kwargs.update(aux)
-    return cls(**init_kwargs)
+    # Set dynamic fields
+    for name, value in zip(field_names, children):
+        object.__setattr__(instance, name, value)
+    
+    # Set static fields
+    for name, value in aux.items():
+        object.__setattr__(instance, name, value)
+    
+    return instance
 
 
 class EmberModuleMeta(abc.ABCMeta):
@@ -227,20 +251,20 @@ class EmberModuleMeta(abc.ABCMeta):
         **kwargs: Any,
     ) -> Type:
         """Creates a new EmberModule subclass with automatic registration.
-        
+
         Args:
             mcs: The metaclass itself.
             name: The name of the class being created.
             bases: The base classes of the class being created.
             namespace: The attribute dictionary of the class being created.
             **kwargs: Additional keyword arguments for class creation.
-            
+
         Returns:
             Type: The newly created class.
         """
         # Create the new class
         new_class: Type = super().__new__(mcs, name, bases, namespace, **kwargs)
-        
+
         # Ensure it's a frozen dataclass if not already
         if not dataclasses.is_dataclass(new_class):
             new_class = dataclasses.dataclass(frozen=True, init=True)(new_class)
@@ -248,10 +272,10 @@ class EmberModuleMeta(abc.ABCMeta):
         # Define wrapper functions for tree operations
         def flatten(inst: Any) -> Tuple[List[Any], Dict[str, Any]]:
             """Wrapper for flattening an EmberModule instance.
-            
+
             Args:
                 inst: The instance to flatten.
-                
+
             Returns:
                 Tuple[List[Any], Dict[str, Any]]: The flattened representation.
             """
@@ -259,11 +283,11 @@ class EmberModuleMeta(abc.ABCMeta):
 
         def unflatten(*, aux: Dict[str, Any], children: List[Any]) -> Any:
             """Wrapper for unflattening into an EmberModule instance.
-            
+
             Args:
                 aux: Static field values.
                 children: Dynamic field values.
-                
+
             Returns:
                 Any: The reconstructed instance.
             """
@@ -278,10 +302,9 @@ class EmberModuleMeta(abc.ABCMeta):
         return new_class
 
     def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
-        """Creates an instance with a temporary mutable phase for initialization.
+        """Creates an instance with appropriate initialization.
 
-        A mutable wrapper is used for __init__ and __post_init__ to set fields, after which
-        the instance is frozen by resetting its class.
+        This method supports both dataclass-style initialization and traditional __init__ methods,.
 
         Args:
             cls: The class being instantiated.
@@ -291,14 +314,45 @@ class EmberModuleMeta(abc.ABCMeta):
         Returns:
             T: An instance of the EmberModule subclass.
         """
-        # Wrap in a mutable class for initialization
+        # Create a mutable wrapper for initialization
         mutable_cls: Type[T] = _make_initable_wrapper(cls)
-        instance: T = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
-
-        # Apply field converters after init but before freezing
+        
+        # Check if the class has a custom __init__ method
+        has_custom_init = hasattr(cls, "__init__") and cls.__init__ is not object.__init__
+        
+        # If there's a custom __init__, use the standard initialization path
+        if has_custom_init:
+            # Create an instance using the mutable wrapper
+            instance: T = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
+        else:
+            # No custom __init__, use direct field initialization
+            instance = object.__new__(mutable_cls)
+            
+            # Get field definitions
+            fields_dict = {f.name: f for f in dataclasses.fields(cls)}
+            
+            # Set default values for fields
+            for field_name, field_def in fields_dict.items():
+                if field_name not in kwargs:
+                    if field_def.default is not dataclasses.MISSING:
+                        object.__setattr__(instance, field_name, field_def.default)
+                    elif field_def.default_factory is not dataclasses.MISSING:
+                        object.__setattr__(instance, field_name, field_def.default_factory())
+            
+            # Set fields from kwargs
+            for field_name, value in kwargs.items():
+                if field_name in fields_dict:
+                    object.__setattr__(instance, field_name, value)
+            
+            # Call __post_init__ if it exists
+            post_init = getattr(instance, "__post_init__", None)
+            if callable(post_init):
+                post_init()
+        
+        # Apply field converters
         for field_info in dataclasses.fields(cls):
             converter = field_info.metadata.get("converter", None)
-            if converter is not None:
+            if converter is not None and hasattr(instance, field_info.name):
                 current_value = getattr(instance, field_info.name)
                 converted_value = converter(current_value)
                 object.__setattr__(instance, field_info.name, converted_value)
@@ -313,14 +367,14 @@ class EmberModule(metaclass=EmberModuleMeta):
 
     Subclass EmberModule to create immutable, strongly-typed modules that integrate with
     the transformation tree system (e.g., for XCS `jit` or `grad` operations).
-    
+
     Key features:
     - Immutable by default (frozen dataclasses)
     - Automatic registration with tree transformation system
     - Support for static fields (excluded from transformations)
     - Support for field converters (executed during initialization)
     - Thread-safe caching for improved performance
-    
+
     Field types:
     - Fields marked with `static_field` or `ember_field(static=True)` are excluded from
       tree transformations, suitable for hyperparameters or fixed configurations.
@@ -402,10 +456,10 @@ class EmberModule(metaclass=EmberModuleMeta):
 
 class BoundMethod(EmberModule, Generic[EmberT, FuncT]):
     """Encapsulates a function bound to an EmberModule instance.
-    
+
     Enables method-like invocation while participating in the transformation tree system.
     This facilitates tracking and transformation of methods bound to module instances.
-    
+
     Attributes:
         __func__: The function to be bound.
         __self__: The EmberModule instance to which the function is bound.

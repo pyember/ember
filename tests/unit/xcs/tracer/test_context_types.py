@@ -24,4 +24,3 @@ def test_trace_context_data_storage() -> None:
     assert (
         context_data.extra_info == extra_info
     ), "TraceContextData did not correctly store and expose the extra context information."
-
