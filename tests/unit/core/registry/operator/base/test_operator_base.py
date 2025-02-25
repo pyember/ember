@@ -148,10 +148,10 @@ def test_input_validation_error() -> None:
     """
     operator_instance = AddOneOperator()
     invalid_input = {"value": "not_an_integer"}
-    
+
     with pytest.raises(OperatorExecutionError) as exception_info:
         operator_instance(inputs=invalid_input)
-    
+
     error_message = str(exception_info.value)
     assert "Error executing operator AddOneOperator" in error_message
     assert "validation error for DummyInput" in error_message
