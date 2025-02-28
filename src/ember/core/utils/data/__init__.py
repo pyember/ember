@@ -3,7 +3,7 @@ from typing import List, Optional, Type, Union
 from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
 from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
 from src.ember.core.utils.data.initialization import initialize_dataset_registry
-from src.ember.core.utils.data.base.models import DatasetEntry, DatasetInfo
+from src.ember.core.utils.data.base.models import DatasetEntry, DatasetInfo, TaskType
 from src.ember.core.utils.data.base.config import BaseDatasetConfig
 from src.ember.core.utils.data.base.loaders import (
     HuggingFaceDatasetLoader,
@@ -19,6 +19,7 @@ from src.ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 def load_dataset_entries(
+    *,
     dataset_name: str,
     config: Union[str, BaseDatasetConfig, None] = None,
     num_samples: Optional[int] = None,
@@ -54,6 +55,7 @@ def load_dataset_entries(
 
     Raises:
         ValueError: If the dataset metadata or its corresponding prepper cannot be found.
+        TypeError: If arguments are not provided as named parameters.
     """
     # Initialize the metadata registry and loader factory.
     metadata_registry: DatasetMetadataRegistry = DatasetMetadataRegistry()

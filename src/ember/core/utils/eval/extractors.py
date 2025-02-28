@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import abc
 from typing import Any, Optional, TypeVar, Generic
 
 # We no longer have ExtractionResult here.
@@ -8,14 +9,24 @@ T_out = TypeVar("T_out")
 T_truth = TypeVar("T_truth")
 
 
-class IOutputExtractor(Generic[T_out, T_truth]):
+class IOutputExtractor(Generic[T_out, T_truth], metaclass=abc.ABCMeta):
     """
     Interface for extracting or converting raw system output into a refined form.
 
     Implementers should provide an `extract` method.
     """
 
+    @abc.abstractmethod
     def extract(self, system_output: T_out, **kwargs: Any) -> T_truth:
+        """Extract or convert the system output into a different form.
+        
+        Args:
+            system_output (T_out): The raw output from the system.
+            **kwargs: Additional keyword arguments.
+            
+        Returns:
+            T_truth: The extracted or converted output.
+        """
         raise NotImplementedError
 
 

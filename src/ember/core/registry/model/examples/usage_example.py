@@ -3,7 +3,7 @@ from src.ember.core.registry.model.config.settings import initialize_ember as in
 
 # Optional: import ModelEnum for safer, type-checked invocation if available.
 try:
-    from ember.core.registry.model.config.model_enum import ModelEnum
+    from src.ember.core.registry.model.config.model_enum import ModelEnum
 except ImportError:
     ModelEnum = None
 

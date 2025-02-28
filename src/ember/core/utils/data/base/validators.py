@@ -97,7 +97,7 @@ class DatasetValidator(IDatasetValidator):
                 raise ValueError("The provided Dataset is empty.")
             return dataset
         elif isinstance(dataset, DatasetDict):
-            if not dataset:
+            if len(list(dataset.keys())) == 0:
                 raise ValueError("The provided DatasetDict is empty.")
             split_name: str = (
                 "validation"

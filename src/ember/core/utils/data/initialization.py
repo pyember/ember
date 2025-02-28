@@ -19,6 +19,7 @@ logger.setLevel(logging.INFO)
 
 
 def initialize_dataset_registry(
+    *,
     metadata_registry: DatasetMetadataRegistry,
     loader_factory: DatasetLoaderFactory,
 ) -> None:

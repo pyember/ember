@@ -1,3 +1,5 @@
+"""Configure pytest environment for all tests."""
+
 import pytest
 from unittest.mock import patch
 import sys
@@ -16,6 +18,12 @@ for path in (str(PROJECT_ROOT), str(SRC_PATH)):
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 )
+
+# Add the src directory to the Python path
+root_dir = Path(__file__).parent.parent.absolute()
+src_dir = os.path.join(root_dir, "src")
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
 
 
 @pytest.fixture(scope="session", autouse=True)

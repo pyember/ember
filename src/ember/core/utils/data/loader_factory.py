@@ -1,9 +1,8 @@
 import logging
 from typing import Dict, List, Optional, Type
+from importlib.metadata import entry_points
 
-import pkg_resources
-
-from ember.core.utils.data.base.preppers import IDatasetPrepper
+from src.ember.core.utils.data.base.preppers import IDatasetPrepper
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -27,7 +26,8 @@ def discover_preppers(
             dataset prepper classes.
     """
     discovered: Dict[str, Type[IDatasetPrepper]] = {}
-    for entry_point in pkg_resources.iter_entry_points(group=entry_point_group):
+    entry_points_obj = entry_points()
+    for entry_point in entry_points_obj.select(group=entry_point_group):
         try:
             prepper_cls: Type[IDatasetPrepper] = entry_point.load()
             dataset_name: str = entry_point.name

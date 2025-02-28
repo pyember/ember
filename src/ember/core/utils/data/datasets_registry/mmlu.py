@@ -23,14 +23,18 @@ class MMLUPrepper(IDatasetPrepper):
     Transforms raw MMLU data into a standardized DatasetEntry.
     """
 
-    def __init__(self, config: Optional[MMLUConfig] = None) -> None:
+    def __init__(self, config: Optional[Any] = None) -> None:
         """Initializes the MMLUPrepper with the provided configuration.
 
         Args:
-            config (Optional[MMLUConfig]): Configuration instance for MMLU.
+            config (Optional[Any]): Configuration for MMLU.
+                Can be a string (treated as config_name), MMLUConfig instance, or None.
                 If None, a default MMLUConfig is created.
         """
-        if config is None:
+        # Handle string configs by converting to MMLUConfig
+        if isinstance(config, str):
+            config = MMLUConfig(config_name=config)
+        elif config is None:
             config = MMLUConfig()
         super().__init__(config)
         self.config_name: Optional[str] = self._config.config_name
@@ -47,7 +51,11 @@ class MMLUPrepper(IDatasetPrepper):
         """
         return ["question", "choices", "answer"]
 
-    def create_dataset_entries(self, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(
+        self,
+        *,
+        item: Dict[str, Any]
+    ) -> List[DatasetEntry]:
         """Creates a list containing a single DatasetEntry from a raw MMLU dataset item.
 
         This method converts the raw input into a standardized format with strong type

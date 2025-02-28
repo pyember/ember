@@ -23,6 +23,23 @@ class HaluEvalPrepper(IDatasetPrepper):
     Transforms a raw HaluEval dataset item into structured DatasetEntry objects.
     """
 
+    def __init__(self, config: Optional[Any] = None) -> None:
+        """Initializes the HaluEvalPrepper with the provided configuration.
+
+        Args:
+            config (Optional[Any]): Configuration for HaluEval.
+                Can be a string (treated as config_name), HaluEvalConfig instance, or None.
+                If None, a default HaluEvalConfig is created.
+        """
+        # Handle string configs by converting to HaluEvalConfig
+        if isinstance(config, str):
+            config = HaluEvalConfig(config_name=config)
+        elif config is None:
+            config = HaluEvalConfig()
+        super().__init__(config)
+        self.config_name: Optional[str] = self._config.config_name
+        self.split: Optional[str] = self._config.split
+
     def get_required_keys(self) -> List[str]:
         """Retrieves the required keys for a HaluEval dataset item.
 
@@ -32,7 +49,7 @@ class HaluEvalPrepper(IDatasetPrepper):
         """
         return ["knowledge", "question", "right_answer", "hallucinated_answer"]
 
-    def create_dataset_entries(self, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
         """Creates dataset entries from a raw HaluEval item.
 
         Converts the candidate answers into two separate entries for evaluation:
@@ -68,6 +85,7 @@ class HaluEvalPrepper(IDatasetPrepper):
 
     def _build_dataset_entry(
         self,
+        *,
         knowledge: str,
         question: str,
         candidate_answer: str,

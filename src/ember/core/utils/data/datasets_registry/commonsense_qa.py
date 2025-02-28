@@ -17,7 +17,7 @@ class CommonsenseQAPrepper(IDatasetPrepper):
         """
         return ["question", "choices", "answerKey"]
 
-    def create_dataset_entries(self, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
         """Create dataset entries from a raw Commonsense QA dictionary item.
 
         Extracts the question, choices, and correct answer from the input dictionary
@@ -31,7 +31,7 @@ class CommonsenseQAPrepper(IDatasetPrepper):
             List[DatasetEntry]: A list with one DatasetEntry constructed from the provided item.
         """
         question: str = str(item["question"])
-        choices: Dict[str, str] = self._parse_choices(item["choices"])
+        choices: Dict[str, str] = self._parse_choices(choices_data=item["choices"])
         correct_answer: str = str(item["answerKey"])
 
         return [
@@ -42,7 +42,7 @@ class CommonsenseQAPrepper(IDatasetPrepper):
             )
         ]
 
-    def _parse_choices(self, choices_data: Any) -> Dict[str, str]:
+    def _parse_choices(self, *, choices_data: Any) -> Dict[str, str]:
         """Parse the raw choices into a dictionary mapping labels to texts.
 
         Each choice is expected to be a dictionary containing the keys 'label' and 'text'.

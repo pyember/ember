@@ -22,7 +22,7 @@ class ShortAnswerPrepper(IDatasetPrepper):
         """
         return ["question", "answer"]
 
-    def create_dataset_entries(self, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
         """Creates a list with a single standardized DatasetEntry from the provided item.
 
         This method extracts the question and the answer from the dataset item,

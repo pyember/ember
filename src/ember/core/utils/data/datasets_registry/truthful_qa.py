@@ -17,7 +17,7 @@ class TruthfulQAPrepper(IDatasetPrepper):
         """
         return ["question", "mc1_targets"]
 
-    def create_dataset_entries(self, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
         """Create a list of DatasetEntry objects from a raw TruthfulQA dataset item.
 
         This method extracts the question and multiple-choice targets from the input item,

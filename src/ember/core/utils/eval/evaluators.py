@@ -11,7 +11,7 @@ T_out = TypeVar("T_out")
 T_truth = TypeVar("T_truth")
 
 
-class ComposedEvaluator(IEvaluator[T_out, Any], Generic[T_out, Any]):
+class ComposedEvaluator(IEvaluator[T_out, T_truth], Generic[T_out, T_truth]):
     """Combines an output extractor with an evaluator for the extracted data.
 
     This evaluator first transforms the system output using the provided extractor,
@@ -61,9 +61,28 @@ class ExactMatchEvaluator(IEvaluator[str, str]):
         evaluator = ExactMatchEvaluator()
         result = evaluator.evaluate("Hello World", "hello   world")
 
+    Args:
+        compare_fn (Optional[Callable[[str, str], bool]]): Optional custom comparison function.
+            If not provided, strings are normalized (whitespace removed, lowercase) before comparison.
+
     Returns:
         EvaluationResult: The result containing a correctness flag and a score.
     """
+
+    def __init__(self, compare_fn: Optional[Callable[[str, str], bool]] = None) -> None:
+        self.compare_fn = compare_fn or self._default_compare
+
+    def _default_compare(self, str1: str, str2: str) -> bool:
+        """Default string comparison function that ignores case and whitespace.
+        
+        Args:
+            str1 (str): First string to compare
+            str2 (str): Second string to compare
+            
+        Returns:
+            bool: True if strings match after normalization
+        """
+        return str1.strip().lower() == str2.strip().lower()
 
     def evaluate(
         self, system_output: str, correct_answer: str, **kwargs: Any
@@ -79,9 +98,7 @@ class ExactMatchEvaluator(IEvaluator[str, str]):
             EvaluationResult: An object with `is_correct` set to True if the normalized strings match,
                               along with a corresponding score.
         """
-        normalized_output = system_output.strip().lower()
-        normalized_answer = correct_answer.strip().lower()
-        is_correct = normalized_output == normalized_answer
+        is_correct = self.compare_fn(system_output, correct_answer)
         score = 1.0 if is_correct else 0.0
         return EvaluationResult(is_correct=is_correct, score=score)
 
@@ -114,11 +131,13 @@ class NumericToleranceEvaluator(IEvaluator[float, float]):
             EvaluationResult: The result including a correctness flag, score, and metadata about the difference.
         """
         difference = abs(system_output - correct_answer)
-        is_correct = difference <= self.tolerance
+        # Round to handle floating point precision issues
+        rounded_diff = round(difference, 8)
+        is_correct = rounded_diff <= self.tolerance
         base = abs(correct_answer) if correct_answer != 0 else 1.0
-        score = max(0.0, 1.0 - difference / base)
+        score = max(0.0, 1.0 - rounded_diff / base)
         return EvaluationResult(
-            is_correct=is_correct, score=score, metadata={"diff": difference}
+            is_correct=is_correct, score=score, metadata={"diff": rounded_diff}
         )
 
 
@@ -167,11 +186,17 @@ class CodeExecutionEvaluator(IEvaluator[str, str]):
                     "exit_code": process_result.returncode,
                 },
             )
+        except subprocess.TimeoutExpired as timeout_error:
+            return EvaluationResult(
+                is_correct=False,
+                score=0.0,
+                metadata={"error": f"TimeoutExpired: {str(timeout_error)}"},
+            )
         except Exception as error:
             return EvaluationResult(
                 is_correct=False,
                 score=0.0,
-                metadata={"error": str(error)},
+                metadata={"error": f"{type(error).__name__}: {str(error)}"},
             )
 
 
