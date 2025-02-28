@@ -86,7 +86,7 @@ def jit(
             if tracer is not None or force_trace:
                 # Get operator name, preferring the 'name' attribute if available
                 operator_name = getattr(self, "name", self.__class__.__name__)
-                
+
                 record = TraceRecord(
                     operator_name=operator_name,
                     node_id=str(id(self)),
@@ -94,10 +94,10 @@ def jit(
                     outputs=output,
                     timestamp=end_time,
                 )
-                
+
                 if tracer is not None:
                     tracer.add_record(record=record)
-                    
+
             return output
 
         # Replace the original __call__ method with our traced version

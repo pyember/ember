@@ -90,16 +90,16 @@ def evaluate_batch(
 
     Returns:
         List[EvaluationResult]: A list of individual evaluation results.
-        
+
     Raises:
         ValueError: If system_outputs and correct_answers have different lengths.
     """
     if len(system_outputs) != len(correct_answers):
         raise ValueError(
-            f"Mismatched list lengths: system_outputs ({len(system_outputs)}) and " 
+            f"Mismatched list lengths: system_outputs ({len(system_outputs)}) and "
             f"correct_answers ({len(correct_answers)}) must have the same length."
         )
-    
+
     results = []
     for output, answer in zip(system_outputs, correct_answers):
         results.append(evaluator.evaluate(output, answer, **kwargs))
@@ -124,9 +124,9 @@ def evaluate_batch_with_summary(
         BatchEvaluationSummary: Aggregated summary containing mean score and accuracy.
     """
     results = evaluate_batch(
-        evaluator=evaluator, 
-        system_outputs=system_outputs, 
-        correct_answers=correct_answers, 
-        **kwargs
+        evaluator=evaluator,
+        system_outputs=system_outputs,
+        correct_answers=correct_answers,
+        **kwargs,
     )
     return summarize_batch(results)

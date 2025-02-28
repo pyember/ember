@@ -55,7 +55,7 @@ class TestEvaluationResult(unittest.TestCase):
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
         self.assertEqual(metadata, result.metadata)
-        
+
     def test_metadata_is_optional(self) -> None:
         """Test that the metadata field is optional and defaults to None."""
         # Arrange & Act
@@ -99,7 +99,7 @@ class TestIEvaluator(unittest.TestCase):
         # Assert
         self.assertTrue(result1.is_correct)
         self.assertEqual(1.0, result1.score)
-        
+
         self.assertFalse(result2.is_correct)
         self.assertEqual(0.0, result2.score)
 
@@ -112,9 +112,7 @@ class ConcreteStatefulEvaluator(IStatefulEvaluator[str, str]):
         self.total_correct = 0
         self.total_evaluated = 0
 
-    def update(
-        self, system_output: str, correct_answer: str, **kwargs: Any
-    ) -> None:
+    def update(self, system_output: str, correct_answer: str, **kwargs: Any) -> None:
         """Update the state based on the evaluation."""
         self.total_evaluated += 1
         if system_output == correct_answer:
@@ -124,7 +122,7 @@ class ConcreteStatefulEvaluator(IStatefulEvaluator[str, str]):
         """Compute the final result based on accumulated state."""
         if self.total_evaluated == 0:
             return EvaluationResult(is_correct=False, score=0.0)
-        
+
         accuracy = self.total_correct / self.total_evaluated
         return EvaluationResult(
             is_correct=accuracy == 1.0,
@@ -154,7 +152,7 @@ class TestIStatefulEvaluator(unittest.TestCase):
 
         # Assert
         self.assertFalse(result.is_correct)  # Not all are correct
-        self.assertAlmostEqual(2/3, result.score)
+        self.assertAlmostEqual(2 / 3, result.score)
         self.assertEqual({"total_evaluated": 3}, result.metadata)
 
     def test_concrete_implementation_evaluate(self) -> None:

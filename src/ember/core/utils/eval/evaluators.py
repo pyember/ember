@@ -74,11 +74,11 @@ class ExactMatchEvaluator(IEvaluator[str, str]):
 
     def _default_compare(self, str1: str, str2: str) -> bool:
         """Default string comparison function that ignores case and whitespace.
-        
+
         Args:
             str1 (str): First string to compare
             str2 (str): Second string to compare
-            
+
         Returns:
             bool: True if strings match after normalization
         """

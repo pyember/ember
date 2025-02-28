@@ -18,7 +18,6 @@ except ImportError:
     from src.ember.core.utils.eval.extractors import IOutputExtractor, RegexExtractor
 
 
-
 class TestIOutputExtractor(unittest.TestCase):
     """Tests for the IOutputExtractor interface."""
 
@@ -29,6 +28,7 @@ class TestIOutputExtractor(unittest.TestCase):
 
     def test_must_implement_extract(self) -> None:
         """Test that concrete subclasses must implement extract method."""
+
         # Arrange - Create a class that inherits but doesn't implement extract
         class IncompleteExtractor(IOutputExtractor[str, str]):
             pass
@@ -39,6 +39,7 @@ class TestIOutputExtractor(unittest.TestCase):
 
     def test_concrete_implementation(self) -> None:
         """Test a concrete implementation with the extract method."""
+
         # Arrange - Create a simple concrete implementation
         class SimpleExtractor(IOutputExtractor[str, int]):
             def extract(self, system_output: str, **kwargs: Any) -> int:
@@ -138,7 +139,9 @@ class TestRegexExtractor(unittest.TestCase):
     def test_case_insensitive_matching(self) -> None:
         """Test case-insensitive pattern matching."""
         # Arrange
-        extractor = RegexExtractor(pattern=r"(?i)answer is (\w+)")  # Case-insensitive flag
+        extractor = RegexExtractor(
+            pattern=r"(?i)answer is (\w+)"
+        )  # Case-insensitive flag
 
         # Act
         result1 = extractor.extract("The Answer is Paris")

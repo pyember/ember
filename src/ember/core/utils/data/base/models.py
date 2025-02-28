@@ -18,13 +18,13 @@ class TaskType(str, Enum):
     BINARY_CLASSIFICATION: str = "binary_classification"
     SHORT_ANSWER: str = "short_answer"
     CODE_COMPLETION: str = "code_completion"
-    
+
     def __str__(self) -> str:
         """Return the string value of the enum."""
         return self.value
 
 
-class DatasetInfo(BaseModel): 
+class DatasetInfo(BaseModel):
     """Model representing essential dataset information.
 
     Attributes:
@@ -38,7 +38,7 @@ class DatasetInfo(BaseModel):
     description: str
     source: str
     task_type: TaskType
-    
+
     @field_validator("name")
     @classmethod
     def validate_name(cls, value: str) -> str:
@@ -62,7 +62,7 @@ class DatasetEntry(BaseModel):
     query: str
     choices: Dict[str, str] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    
+
     @field_validator("query")
     @classmethod
     def validate_query(cls, value: str) -> str:

@@ -43,13 +43,13 @@ class TestPipelineEvaluator(unittest.TestCase):
         # Create transforms
         self.transform1 = mock.MagicMock(return_value="transformed1")
         self.transform2 = mock.MagicMock(return_value="transformed2")
-        
+
         # Create mock evaluator
         self.mock_evaluator = mock.MagicMock(spec=IEvaluator)
         self.mock_evaluator.evaluate.return_value = EvaluationResult(
             is_correct=True, score=1.0
         )
-        
+
         # Create pipeline evaluator
         self.pipeline = PipelineEvaluator(
             transforms=[self.transform1, self.transform2],
@@ -63,7 +63,7 @@ class TestPipelineEvaluator(unittest.TestCase):
             system_output="raw_output",
             correct_answer="expected_answer",
         )
-        
+
         # Assert
         self.transform1.assert_called_once_with("raw_output")
         self.transform2.assert_called_once_with("transformed1")
@@ -79,7 +79,7 @@ class TestPipelineEvaluator(unittest.TestCase):
             correct_answer="expected_answer",
             custom_param=True,
         )
-        
+
         # Assert
         self.mock_evaluator.evaluate.assert_called_once_with(
             "transformed2", "expected_answer", custom_param=True
@@ -92,13 +92,13 @@ class TestPipelineEvaluator(unittest.TestCase):
             transforms=[],
             evaluator=self.mock_evaluator,
         )
-        
+
         # Act
         result = pipeline.evaluate(
             system_output="raw_output",
             correct_answer="expected_answer",
         )
-        
+
         # Assert
         self.mock_evaluator.evaluate.assert_called_once_with(
             "raw_output", "expected_answer"
@@ -107,33 +107,32 @@ class TestPipelineEvaluator(unittest.TestCase):
 
     def test_real_transforms(self) -> None:
         """Test with actual transformation functions."""
+
         # Arrange
         def to_upper(s: str) -> str:
             return s.upper()
-            
+
         def reverse_string(s: str) -> str:
             return s[::-1]
-            
+
         exact_match_evaluator = mock.MagicMock(spec=IEvaluator)
         exact_match_evaluator.evaluate.return_value = EvaluationResult(
             is_correct=True, score=1.0
         )
-        
+
         pipeline = PipelineEvaluator(
             transforms=[to_upper, reverse_string],
             evaluator=exact_match_evaluator,
         )
-        
+
         # Act
         pipeline.evaluate(
             system_output="hello",
             correct_answer="OLLEH",  # Expected result after to_upper and reverse
         )
-        
+
         # Assert
-        exact_match_evaluator.evaluate.assert_called_once_with(
-            "OLLEH", "OLLEH"
-        )
+        exact_match_evaluator.evaluate.assert_called_once_with("OLLEH", "OLLEH")
 
 
 class TestSummarizeBatch(unittest.TestCase):
@@ -143,7 +142,7 @@ class TestSummarizeBatch(unittest.TestCase):
         """Test summarizing an empty batch."""
         # Act
         summary = summarize_batch([])
-        
+
         # Assert
         self.assertEqual([], summary.results)
         self.assertEqual(0.0, summary.mean_score)
@@ -157,10 +156,10 @@ class TestSummarizeBatch(unittest.TestCase):
             EvaluationResult(is_correct=True, score=0.8),
             EvaluationResult(is_correct=True, score=0.9),
         ]
-        
+
         # Act
         summary = summarize_batch(results)
-        
+
         # Assert
         self.assertEqual(results, summary.results)
         self.assertAlmostEqual(0.9, summary.mean_score)
@@ -174,14 +173,14 @@ class TestSummarizeBatch(unittest.TestCase):
             EvaluationResult(is_correct=False, score=0.0),
             EvaluationResult(is_correct=True, score=0.8),
         ]
-        
+
         # Act
         summary = summarize_batch(results)
-        
+
         # Assert
         self.assertEqual(results, summary.results)
         self.assertAlmostEqual(0.6, summary.mean_score)
-        self.assertAlmostEqual(2/3, summary.accuracy)
+        self.assertAlmostEqual(2 / 3, summary.accuracy)
 
     def test_all_incorrect(self) -> None:
         """Test summarizing a batch where all results are incorrect."""
@@ -191,10 +190,10 @@ class TestSummarizeBatch(unittest.TestCase):
             EvaluationResult(is_correct=False, score=0.4),
             EvaluationResult(is_correct=False, score=0.0),
         ]
-        
+
         # Act
         summary = summarize_batch(results)
-        
+
         # Assert
         self.assertEqual(results, summary.results)
         self.assertAlmostEqual(0.2, summary.mean_score)
@@ -221,7 +220,7 @@ class TestEvaluateBatch(unittest.TestCase):
             system_outputs=[],
             correct_answers=[],
         )
-        
+
         # Assert
         self.assertEqual([], results)
         self.mock_evaluator.evaluate.assert_not_called()
@@ -231,7 +230,7 @@ class TestEvaluateBatch(unittest.TestCase):
         # Arrange
         system_outputs = ["output1", "output2", "output3"]
         correct_answers = ["answer1", "answer2", "answer3"]
-        
+
         # Act
         results = evaluate_batch(
             evaluator=self.mock_evaluator,
@@ -239,27 +238,29 @@ class TestEvaluateBatch(unittest.TestCase):
             correct_answers=correct_answers,
             custom_param=True,
         )
-        
+
         # Assert
         self.assertEqual(3, len(results))
         self.assertTrue(results[0].is_correct)
         self.assertFalse(results[1].is_correct)
         self.assertTrue(results[2].is_correct)
-        
+
         # Check that evaluate was called for each item with the correct parameters
         self.assertEqual(3, self.mock_evaluator.evaluate.call_count)
-        self.mock_evaluator.evaluate.assert_has_calls([
-            mock.call("output1", "answer1", custom_param=True),
-            mock.call("output2", "answer2", custom_param=True),
-            mock.call("output3", "answer3", custom_param=True),
-        ])
+        self.mock_evaluator.evaluate.assert_has_calls(
+            [
+                mock.call("output1", "answer1", custom_param=True),
+                mock.call("output2", "answer2", custom_param=True),
+                mock.call("output3", "answer3", custom_param=True),
+            ]
+        )
 
     def test_mismatched_lengths(self) -> None:
         """Test behavior with mismatched input lists."""
         # Arrange
         system_outputs = ["output1", "output2"]
         correct_answers = ["answer1", "answer2", "answer3"]
-        
+
         # Act & Assert
         with self.assertRaises(ValueError):
             evaluate_batch(
@@ -290,7 +291,7 @@ class TestEvaluateBatchWithSummary(unittest.TestCase):
         # Arrange
         system_outputs = ["output1", "output2", "output3"]
         correct_answers = ["answer1", "answer2", "answer3"]
-        
+
         # Mock return values
         mock_results = [
             EvaluationResult(is_correct=True, score=1.0),
@@ -301,10 +302,10 @@ class TestEvaluateBatchWithSummary(unittest.TestCase):
             mean_score=0.5,
             accuracy=0.5,
         )
-        
+
         mock_evaluate.return_value = mock_results
         mock_summarize.return_value = mock_summary
-        
+
         # Act
         result = evaluate_batch_with_summary(
             evaluator=self.mock_evaluator,
@@ -312,7 +313,7 @@ class TestEvaluateBatchWithSummary(unittest.TestCase):
             correct_answers=correct_answers,
             custom_param=True,
         )
-        
+
         # Assert
         mock_evaluate.assert_called_once_with(
             evaluator=self.mock_evaluator,
@@ -328,18 +329,18 @@ class TestEvaluateBatchWithSummary(unittest.TestCase):
         # Arrange
         system_outputs = ["output1", "output2", "output3"]
         correct_answers = ["answer1", "answer2", "answer3"]
-        
+
         # Act
         summary = evaluate_batch_with_summary(
             evaluator=self.mock_evaluator,
             system_outputs=system_outputs,
             correct_answers=correct_answers,
         )
-        
+
         # Assert
         self.assertEqual(3, len(summary.results))
         self.assertAlmostEqual(0.6, summary.mean_score)
-        self.assertAlmostEqual(2/3, summary.accuracy)
+        self.assertAlmostEqual(2 / 3, summary.accuracy)
 
 
 if __name__ == "__main__":

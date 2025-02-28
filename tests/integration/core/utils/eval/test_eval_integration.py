@@ -15,7 +15,10 @@ try:
 except ImportError:
     print("Trying alternative import path...")
     try:
-        from src.ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
+        from src.ember.core.utils.eval.base_evaluator import (
+            EvaluationResult,
+            IEvaluator,
+        )
     except ImportError as e:
         print(f"Import error: {e}")
         raise
@@ -70,30 +73,31 @@ class TestComponentIntegration(unittest.TestCase):
 
     def test_pipeline_with_regex_extract(self) -> None:
         """Test a pipeline that extracts values using regex and performs numeric evaluation."""
+
         # Arrange - Set up a pipeline to extract numbers from text and compare with tolerance
         def extract_number(text: str) -> float:
             """Extract a numeric value from text using regex."""
             pattern = r"value is (\d+\.?\d*)"
             match = RegexExtractor(pattern=pattern).extract(text)
             return float(match) if match else 0.0
-            
+
         pipeline = PipelineEvaluator(
             transforms=[extract_number],
             evaluator=NumericToleranceEvaluator(tolerance=0.1),
         )
-        
+
         # Act
         result1 = pipeline.evaluate("The value is 42.5", 42.5)
         result2 = pipeline.evaluate("The value is 42.55", 42.5)
         result3 = pipeline.evaluate("The value is 42.7", 42.5)
-        
+
         # Assert
         self.assertTrue(result1.is_correct)
         self.assertEqual(1.0, result1.score)
-        
+
         self.assertTrue(result2.is_correct)
         self.assertAlmostEqual(0.999, result2.score, places=2)
-        
+
         self.assertFalse(result3.is_correct)
         self.assertAlmostEqual(0.995, result3.score, places=3)
 
@@ -101,31 +105,33 @@ class TestComponentIntegration(unittest.TestCase):
         """Test using the registry to create composed evaluators."""
         # Arrange - Create a registry with factory methods
         registry = EvaluatorRegistry()
-        
+
         def create_exact_match() -> IEvaluator[str, str]:
             return ExactMatchEvaluator()
-            
+
         def create_regex_evaluator(pattern: str) -> IEvaluator[str, str]:
             return PartialRegexEvaluator(pattern=pattern)
-            
-        def create_numeric_evaluator(tolerance: float = 0.01) -> IEvaluator[float, float]:
+
+        def create_numeric_evaluator(
+            tolerance: float = 0.01,
+        ) -> IEvaluator[float, float]:
             return NumericToleranceEvaluator(tolerance=tolerance)
-        
+
         # Register the factories
         registry.register("exact_match", create_exact_match)
         registry.register("regex", create_regex_evaluator)
         registry.register("numeric", create_numeric_evaluator)
-        
+
         # Act - Create evaluators from the registry
         exact_evaluator = registry.create("exact_match")
         regex_evaluator = registry.create("regex", pattern=r"answer is (\w+)")
         numeric_evaluator = registry.create("numeric", tolerance=0.05)
-        
+
         # Evaluate some inputs
         exact_result = exact_evaluator.evaluate("Hello", "hello")
         regex_result = regex_evaluator.evaluate("The answer is Paris", "Paris")
         numeric_result = numeric_evaluator.evaluate(10.03, 10.0)
-        
+
         # Assert
         self.assertTrue(exact_result.is_correct)
         self.assertTrue(regex_result.is_correct)
@@ -133,28 +139,29 @@ class TestComponentIntegration(unittest.TestCase):
 
     def test_stateful_with_pipeline(self) -> None:
         """Test using a stateful evaluator with a pipeline evaluator."""
+
         # Arrange - Create a pipeline evaluator and wrap in stateful evaluator
         def extract_number(text: str) -> float:
             """Extract a numeric value from text using regex."""
             pattern = r"value is (\d+\.?\d*)"
             match = RegexExtractor(pattern=pattern).extract(text)
             return float(match) if match else 0.0
-            
+
         pipeline = PipelineEvaluator(
             transforms=[extract_number],
             evaluator=NumericToleranceEvaluator(tolerance=0.1),
         )
-        
+
         stateful = AggregatorEvaluator(evaluator=pipeline)
-        
+
         # Act - Accumulate multiple evaluations
         stateful.update("The value is 42.5", 42.5)
         stateful.update("The value is 42.55", 42.5)
         stateful.update("The value is 42.7", 42.5)
         stateful.update("value is invalid", 42.5)  # This should fail extraction
-        
+
         result = stateful.compute()
-        
+
         # Assert
         self.assertFalse(result.is_correct)  # Not all evaluations were correct
         self.assertLess(result.score, 1.0)
@@ -169,30 +176,24 @@ class TestComponentIntegration(unittest.TestCase):
             "regex": PartialRegexEvaluator(pattern=r"Capital of \w+ is (\w+)"),
             "numeric": NumericToleranceEvaluator(tolerance=0.1),
         }
-        
+
         # Prepare test data for each evaluator type
         test_cases: Dict[str, Tuple[List[Any], List[Any]]] = {
-            "exact": (
-                ["Paris", "London", "Berlin"],
-                ["Paris", "London", "Rome"]
-            ),
+            "exact": (["Paris", "London", "Berlin"], ["Paris", "London", "Rome"]),
             "regex": (
                 [
-                    "Capital of France is Paris", 
-                    "Capital of UK is London", 
-                    "Capital of Italy is Rome"
+                    "Capital of France is Paris",
+                    "Capital of UK is London",
+                    "Capital of Italy is Rome",
                 ],
-                ["Paris", "London", "Rome"]
+                ["Paris", "London", "Rome"],
             ),
-            "numeric": (
-                [10.0, 20.05, 30.2],
-                [10.0, 20.0, 30.0]
-            ),
+            "numeric": ([10.0, 20.05, 30.2], [10.0, 20.0, 30.0]),
         }
-        
+
         # Act - Run batch evaluations for each evaluator type
         results: Dict[str, Dict[str, float]] = {}
-        
+
         for eval_type, evaluator in evaluators.items():
             system_outputs, correct_answers = test_cases[eval_type]
             summary = evaluate_batch_with_summary(
@@ -204,11 +205,11 @@ class TestComponentIntegration(unittest.TestCase):
                 "mean_score": summary.mean_score,
                 "accuracy": summary.accuracy,
             }
-        
+
         # Assert
-        self.assertEqual(2/3, results["exact"]["accuracy"])
+        self.assertEqual(2 / 3, results["exact"]["accuracy"])
         self.assertEqual(1.0, results["regex"]["accuracy"])
-        self.assertEqual(2/3, results["numeric"]["accuracy"])
+        self.assertEqual(2 / 3, results["numeric"]["accuracy"])
 
 
 class TestRealWorldScenarios(unittest.TestCase):
@@ -244,7 +245,7 @@ class TestRealWorldScenarios(unittest.TestCase):
                 "answer": "1776",
             },
         ]
-        
+
         # Create patterns to extract answers from responses
         answer_patterns = {
             "capital": r"capital of \w+ is (\w+)",
@@ -253,7 +254,7 @@ class TestRealWorldScenarios(unittest.TestCase):
             "number": r"approximately ([\d,]+)",
             "year": r"(\d{4})",
         }
-        
+
         # Create evaluators for different question types
         evaluators: Dict[str, IEvaluator[str, str]] = {
             "capital": PartialRegexEvaluator(pattern=answer_patterns["capital"]),
@@ -261,14 +262,16 @@ class TestRealWorldScenarios(unittest.TestCase):
             "math": PartialRegexEvaluator(pattern=answer_patterns["math"]),
             "number": ComposedEvaluator(
                 extractor=RegexExtractor(pattern=answer_patterns["number"]),
-                base_evaluator=ExactMatchEvaluator(compare_fn=lambda x, y: x.replace(",", "") == y),
+                base_evaluator=ExactMatchEvaluator(
+                    compare_fn=lambda x, y: x.replace(",", "") == y
+                ),
             ),
             "year": PartialRegexEvaluator(pattern=answer_patterns["year"]),
         }
-        
+
         # Map questions to evaluator types
         question_types = ["capital", "author", "math", "number", "year"]
-        
+
         # Act - Evaluate each response with the appropriate evaluator
         results = []
         for i, item in enumerate(qa_data):
@@ -276,11 +279,11 @@ class TestRealWorldScenarios(unittest.TestCase):
             evaluator = evaluators[question_type]
             result = evaluator.evaluate(item["response"], item["answer"])
             results.append(result)
-        
+
         # Create a summary
         correct_count = sum(1 for r in results if r.is_correct)
         accuracy = correct_count / len(results)
-        
+
         # Assert
         self.assertEqual(5, len(results))
         self.assertTrue(results[0].is_correct)  # capital
@@ -292,76 +295,84 @@ class TestRealWorldScenarios(unittest.TestCase):
 
     def test_registry_with_custom_evaluators(self) -> None:
         """Test creating and using custom evaluators through the registry."""
+
         # Arrange - Create custom evaluators for specific tasks
         class MultipleChoiceEvaluator(IEvaluator[str, str]):
             """Evaluator for multiple choice answers (A, B, C, D)."""
-            
+
             def evaluate(
                 self, system_output: str, correct_answer: str, **kwargs: Any
             ) -> EvaluationResult:
                 # Extract first letter that matches A, B, C, or D
                 import re
+
                 # Look for choices in the format of "A) ", "B.", "answer is B", etc.
-                match = re.search(r"(?:^|\s+|answer\s+is\s+)([ABCD])(?:$|\s+|\)|\.)", system_output.upper())
+                match = re.search(
+                    r"(?:^|\s+|answer\s+is\s+)([ABCD])(?:$|\s+|\)|\.)",
+                    system_output.upper(),
+                )
                 extracted = match.group(1) if match else ""
                 is_correct = extracted == correct_answer.upper()
-                return EvaluationResult(is_correct=is_correct, score=1.0 if is_correct else 0.0)
-        
+                return EvaluationResult(
+                    is_correct=is_correct, score=1.0 if is_correct else 0.0
+                )
+
         class SemanticSimilarityEvaluator(IEvaluator[str, str]):
             """Simulated evaluator for semantic similarity."""
-            
+
             def __init__(self, threshold: float = 0.7) -> None:
                 self.threshold = threshold
-                
+
             def evaluate(
                 self, system_output: str, correct_answer: str, **kwargs: Any
             ) -> EvaluationResult:
                 # For this test, simulate similarity based on word overlap
                 output_words = set(system_output.lower().split())
                 answer_words = set(correct_answer.lower().split())
-                
+
                 if not output_words or not answer_words:
                     return EvaluationResult(is_correct=False, score=0.0)
-                
+
                 common_words = output_words.intersection(answer_words)
-                similarity = len(common_words) / max(len(output_words), len(answer_words))
-                
+                similarity = len(common_words) / max(
+                    len(output_words), len(answer_words)
+                )
+
                 is_correct = similarity >= self.threshold
                 return EvaluationResult(
                     is_correct=is_correct,
                     score=similarity,
                     metadata={"similarity": similarity},
                 )
-        
+
         # Create a registry
         registry = EvaluatorRegistry()
-        
+
         # Register custom evaluator factories
         def create_multiple_choice() -> IEvaluator[str, str]:
             return MultipleChoiceEvaluator()
-            
+
         def create_semantic_similarity(threshold: float = 0.7) -> IEvaluator[str, str]:
             return SemanticSimilarityEvaluator(threshold=threshold)
-            
+
         def create_exact_match() -> IEvaluator[str, str]:
             return ExactMatchEvaluator()
-        
+
         registry.register("multiple_choice", create_multiple_choice)
         registry.register("semantic", create_semantic_similarity)
         registry.register("exact", create_exact_match)
-        
+
         # Act - Create and use evaluators for different question types
         mc_evaluator = registry.create("multiple_choice")
         semantic_evaluator = registry.create("semantic", threshold=0.5)
         exact_evaluator = registry.create("exact")
-        
+
         mc_result = mc_evaluator.evaluate("I think the answer is B.", "B")
         semantic_result = semantic_evaluator.evaluate(
-            "The speed of light is very fast", 
-            "Light speed is extremely fast"
+            "The speed of light is very fast", "Light speed is extremely fast"
         )
         exact_result = exact_evaluator.evaluate("Paris", "Paris")
-        
+
         # Assert
         self.assertTrue(mc_result.is_correct)
         self.assertTrue(semantic_result.is_correct)
@@ -370,20 +381,32 @@ class TestRealWorldScenarios(unittest.TestCase):
         # Test accuracy with batch evaluation
         test_data = [
             {"output": "The answer is A", "answer": "A", "type": "multiple_choice"},
-            {"output": "Birds can fly in the sky", "answer": "Birds fly in sky", "type": "semantic"},
+            {
+                "output": "Birds can fly in the sky",
+                "answer": "Birds fly in sky",
+                "type": "semantic",
+            },
             {"output": "42", "answer": "42", "type": "exact"},
-            {"output": "I believe C is correct", "answer": "B", "type": "multiple_choice"},
-            {"output": "The Earth orbits the sun", "answer": "The moon orbits the Earth", "type": "semantic"},
+            {
+                "output": "I believe C is correct",
+                "answer": "B",
+                "type": "multiple_choice",
+            },
+            {
+                "output": "The Earth orbits the sun",
+                "answer": "The moon orbits the Earth",
+                "type": "semantic",
+            },
         ]
-        
+
         results = []
         for item in test_data:
             evaluator = registry.create(item["type"])
             result = evaluator.evaluate(item["output"], item["answer"])
             results.append(result)
-        
+
         accuracy = sum(1 for r in results if r.is_correct) / len(results)
-        self.assertEqual(3/5, accuracy)
+        self.assertEqual(3 / 5, accuracy)
 
 
 if __name__ == "__main__":

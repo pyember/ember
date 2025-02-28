@@ -16,20 +16,23 @@ try:
 except ImportError:
     print("Trying alternative import path in unit tests...")
     try:
-        from src.ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
+        from src.ember.core.utils.eval.base_evaluator import (
+            EvaluationResult,
+            IEvaluator,
+        )
     except ImportError as e:
         print(f"Unit test import error: {e}")
         raise
 
 try:
     from ember.core.utils.eval.evaluators import (
-        ExactMatchEvaluator, 
+        ExactMatchEvaluator,
         NumericToleranceEvaluator,
         PartialRegexEvaluator,
     )
 except ImportError:
     from src.ember.core.utils.eval.evaluators import (
-        ExactMatchEvaluator, 
+        ExactMatchEvaluator,
         NumericToleranceEvaluator,
         PartialRegexEvaluator,
     )
@@ -92,12 +95,12 @@ def sample_qa_dataset() -> List[Dict[str, str]]:
 
 class MockExtractor:
     """Mock extractor for testing."""
-    
+
     def __init__(self, return_value: str) -> None:
         """Initialize with a fixed return value."""
         self.return_value = return_value
         self.extract_called = False
-    
+
     def extract(self, system_output: str, **kwargs: Any) -> str:
         """Return the fixed value regardless of input."""
         self.extract_called = True
@@ -108,12 +111,12 @@ class MockExtractor:
 
 class MockEvaluator(IEvaluator[Any, Any]):
     """Mock evaluator for testing."""
-    
+
     def __init__(self, result: EvaluationResult) -> None:
         """Initialize with a fixed result to return."""
         self.result = result
         self.evaluate_called = False
-    
+
     def evaluate(
         self, system_output: Any, correct_answer: Any, **kwargs: Any
     ) -> EvaluationResult:

@@ -49,10 +49,10 @@ class TestComposedEvaluator(unittest.TestCase):
         """Set up test fixtures."""
         # Create a mock extractor
         self.mock_extractor = mock.MagicMock()
-        
+
         # Create a mock base evaluator
         self.mock_base_evaluator = mock.MagicMock(spec=IEvaluator)
-        
+
         # Create the composed evaluator with the mocks
         self.evaluator = ComposedEvaluator(
             extractor=self.mock_extractor,
@@ -65,14 +65,14 @@ class TestComposedEvaluator(unittest.TestCase):
         self.mock_extractor.extract.return_value = "extracted_value"
         expected_result = EvaluationResult(is_correct=True, score=1.0)
         self.mock_base_evaluator.evaluate.return_value = expected_result
-        
+
         # Act
         result = self.evaluator.evaluate(
             system_output="raw_output",
             correct_answer="expected_answer",
             custom_param=True,
         )
-        
+
         # Assert
         self.mock_extractor.extract.assert_called_once_with(
             "raw_output", custom_param=True
@@ -84,22 +84,23 @@ class TestComposedEvaluator(unittest.TestCase):
 
     def test_with_real_components(self) -> None:
         """Test ComposedEvaluator with real components."""
+
         # Arrange - A regex extractor and exact match evaluator
         class SimpleExtractor:
             def extract(self, text: str, **kwargs: Any) -> str:
                 """Extract the first word from the text."""
                 match = re.search(r"\b(\w+)\b", text)
                 return match.group(1) if match else ""
-        
+
         exact_evaluator = ExactMatchEvaluator()
         composed = ComposedEvaluator(
             extractor=SimpleExtractor(),
             base_evaluator=exact_evaluator,
         )
-        
+
         # Act
         result = composed.evaluate("Hello world", "Hello")
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -116,7 +117,7 @@ class TestExactMatchEvaluator(unittest.TestCase):
         """Test exact string matches."""
         # Act
         result = self.evaluator.evaluate("hello", "hello")
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -125,7 +126,7 @@ class TestExactMatchEvaluator(unittest.TestCase):
         """Test case-insensitive matches."""
         # Act
         result = self.evaluator.evaluate("Hello", "hello")
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -134,7 +135,7 @@ class TestExactMatchEvaluator(unittest.TestCase):
         """Test whitespace-insensitive matches."""
         # Act
         result = self.evaluator.evaluate("  hello  ", "hello")
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -143,7 +144,7 @@ class TestExactMatchEvaluator(unittest.TestCase):
         """Test non-matching strings."""
         # Act
         result = self.evaluator.evaluate("hello", "world")
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
@@ -151,35 +152,21 @@ class TestExactMatchEvaluator(unittest.TestCase):
     def test_empty_strings(self) -> None:
         """Test with empty strings."""
         # Act & Assert
-        self.assertTrue(
-            self.evaluator.evaluate("", "").is_correct
-        )
-        self.assertFalse(
-            self.evaluator.evaluate("hello", "").is_correct
-        )
-        self.assertFalse(
-            self.evaluator.evaluate("", "hello").is_correct
-        )
+        self.assertTrue(self.evaluator.evaluate("", "").is_correct)
+        self.assertFalse(self.evaluator.evaluate("hello", "").is_correct)
+        self.assertFalse(self.evaluator.evaluate("", "hello").is_correct)
 
     def test_special_characters(self) -> None:
         """Test with strings containing special characters."""
         # Act & Assert
-        self.assertTrue(
-            self.evaluator.evaluate("!@#$%^&*()", "!@#$%^&*()").is_correct
-        )
-        self.assertFalse(
-            self.evaluator.evaluate("!@#$%^&*()", "!@#$%^&*").is_correct
-        )
+        self.assertTrue(self.evaluator.evaluate("!@#$%^&*()", "!@#$%^&*()").is_correct)
+        self.assertFalse(self.evaluator.evaluate("!@#$%^&*()", "!@#$%^&*").is_correct)
 
     def test_unicode_characters(self) -> None:
         """Test with strings containing Unicode characters."""
         # Act & Assert
-        self.assertTrue(
-            self.evaluator.evaluate("こんにちは", "こんにちは").is_correct
-        )
-        self.assertFalse(
-            self.evaluator.evaluate("こんにちは", "さようなら").is_correct
-        )
+        self.assertTrue(self.evaluator.evaluate("こんにちは", "こんにちは").is_correct)
+        self.assertFalse(self.evaluator.evaluate("こんにちは", "さようなら").is_correct)
 
 
 class TestNumericToleranceEvaluator(unittest.TestCase):
@@ -189,10 +176,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test exact numeric matches."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.01)
-        
+
         # Act
         result = evaluator.evaluate(system_output=10.0, correct_answer=10.0)
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -202,10 +189,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test values within the specified tolerance."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.1)
-        
+
         # Act
         result = evaluator.evaluate(system_output=10.05, correct_answer=10.0)
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertAlmostEqual(0.995, result.score, places=6)
@@ -215,10 +202,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test values outside the specified tolerance."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.01)
-        
+
         # Act
         result = evaluator.evaluate(system_output=10.05, correct_answer=10.0)
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertAlmostEqual(0.995, result.score, places=6)
@@ -228,10 +215,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test with negative values."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.1)
-        
+
         # Act
         result = evaluator.evaluate(system_output=-10.05, correct_answer=-10.0)
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertAlmostEqual(0.995, result.score, places=6)
@@ -241,10 +228,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test with zero as the correct answer to avoid division by zero."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.1)
-        
+
         # Act
         result = evaluator.evaluate(system_output=0.05, correct_answer=0.0)
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertAlmostEqual(0.95, result.score, places=6)
@@ -254,10 +241,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test with a large difference between values."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=0.1)
-        
+
         # Act
         result = evaluator.evaluate(system_output=20.0, correct_answer=10.0)
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)  # Max clamped at 0.0
@@ -267,10 +254,10 @@ class TestNumericToleranceEvaluator(unittest.TestCase):
         """Test with a custom tolerance value."""
         # Arrange
         evaluator = NumericToleranceEvaluator(tolerance=5.0)
-        
+
         # Act
         result = evaluator.evaluate(system_output=14.0, correct_answer=10.0)
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertAlmostEqual(0.6, result.score, places=6)
@@ -295,29 +282,23 @@ class TestCodeExecutionEvaluator(unittest.TestCase):
         mock_process.stderr = ""
         mock_process.returncode = 0
         mock_run.return_value = mock_process
-        
+
         # Act
         result = self.evaluator.evaluate(
-            system_output='print("Hello, World!")',
-            correct_answer="Hello, World!"
+            system_output='print("Hello, World!")', correct_answer="Hello, World!"
         )
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
         self.assertEqual(
-            {
-                "stdout": "Hello, World!\n",
-                "stderr": "",
-                "exit_code": 0
-            },
-            result.metadata
+            {"stdout": "Hello, World!\n", "stderr": "", "exit_code": 0}, result.metadata
         )
         mock_run.assert_called_once_with(
             args=["python", "-c", 'print("Hello, World!")'],
             capture_output=True,
             text=True,
-            timeout=5.0
+            timeout=5.0,
         )
 
     @mock.patch("subprocess.run")
@@ -331,23 +312,18 @@ class TestCodeExecutionEvaluator(unittest.TestCase):
         mock_process.stderr = ""
         mock_process.returncode = 0
         mock_run.return_value = mock_process
-        
+
         # Act
         result = self.evaluator.evaluate(
-            system_output='print("Incorrect output")',
-            correct_answer="Expected output"
+            system_output='print("Incorrect output")', correct_answer="Expected output"
         )
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
         self.assertEqual(
-            {
-                "stdout": "Incorrect output\n",
-                "stderr": "",
-                "exit_code": 0
-            },
-            result.metadata
+            {"stdout": "Incorrect output\n", "stderr": "", "exit_code": 0},
+            result.metadata,
         )
 
     @mock.patch("subprocess.run")
@@ -359,23 +335,19 @@ class TestCodeExecutionEvaluator(unittest.TestCase):
         mock_process.stderr = "SyntaxError: invalid syntax\n"
         mock_process.returncode = 1
         mock_run.return_value = mock_process
-        
+
         # Act
         result = self.evaluator.evaluate(
             system_output='print("Hello, World!"',  # Missing closing parenthesis
-            correct_answer="Hello, World!"
+            correct_answer="Hello, World!",
         )
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
         self.assertEqual(
-            {
-                "stdout": "",
-                "stderr": "SyntaxError: invalid syntax\n",
-                "exit_code": 1
-            },
-            result.metadata
+            {"stdout": "", "stderr": "SyntaxError: invalid syntax\n", "exit_code": 1},
+            result.metadata,
         )
 
     @mock.patch("subprocess.run")
@@ -383,13 +355,13 @@ class TestCodeExecutionEvaluator(unittest.TestCase):
         """Test execution that times out."""
         # Arrange - Mock a timeout exception
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="", timeout=5.0)
-        
+
         # Act
         result = self.evaluator.evaluate(
-            system_output='import time; time.sleep(10)',
-            correct_answer="This will never happen"
+            system_output="import time; time.sleep(10)",
+            correct_answer="This will never happen",
         )
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
@@ -406,19 +378,18 @@ class TestCodeExecutionEvaluator(unittest.TestCase):
         mock_process.stderr = ""
         mock_process.returncode = 0
         mock_run.return_value = mock_process
-        
+
         # Act
         evaluator.evaluate(
-            system_output='print("Hello, World!")',
-            correct_answer="Hello, World!"
+            system_output='print("Hello, World!")', correct_answer="Hello, World!"
         )
-        
+
         # Assert - Check timeout was passed correctly
         mock_run.assert_called_once_with(
             args=["python", "-c", 'print("Hello, World!")'],
             capture_output=True,
             text=True,
-            timeout=10.0
+            timeout=10.0,
         )
 
 
@@ -429,13 +400,12 @@ class TestPartialRegexEvaluator(unittest.TestCase):
         """Test with a regex that matches the input."""
         # Arrange
         evaluator = PartialRegexEvaluator(pattern=r"answer is (\w+)")
-        
+
         # Act
         result = evaluator.evaluate(
-            system_output="The answer is Paris",
-            correct_answer="Paris"
+            system_output="The answer is Paris", correct_answer="Paris"
         )
-        
+
         # Assert
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)
@@ -444,13 +414,12 @@ class TestPartialRegexEvaluator(unittest.TestCase):
         """Test with a regex that doesn't match the input."""
         # Arrange
         evaluator = PartialRegexEvaluator(pattern=r"answer is (\w+)")
-        
+
         # Act
         result = evaluator.evaluate(
-            system_output="The response is Paris",
-            correct_answer="Paris"
+            system_output="The response is Paris", correct_answer="Paris"
         )
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
@@ -459,13 +428,12 @@ class TestPartialRegexEvaluator(unittest.TestCase):
         """Test with a regex that matches but extracts the wrong answer."""
         # Arrange
         evaluator = PartialRegexEvaluator(pattern=r"answer is (\w+)")
-        
+
         # Act
         result = evaluator.evaluate(
-            system_output="The answer is London",
-            correct_answer="Paris"
+            system_output="The answer is London", correct_answer="Paris"
         )
-        
+
         # Assert
         self.assertFalse(result.is_correct)
         self.assertEqual(0.0, result.score)
@@ -474,13 +442,12 @@ class TestPartialRegexEvaluator(unittest.TestCase):
         """Test case sensitivity in the extracted value."""
         # Arrange
         evaluator = PartialRegexEvaluator(pattern=r"answer is (\w+)")
-        
+
         # Act
         result = evaluator.evaluate(
-            system_output="The answer is PARIS",
-            correct_answer="paris"
+            system_output="The answer is PARIS", correct_answer="paris"
         )
-        
+
         # Assert - The ExactMatchEvaluator is case-insensitive
         self.assertTrue(result.is_correct)
         self.assertEqual(1.0, result.score)

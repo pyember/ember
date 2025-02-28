@@ -51,11 +51,7 @@ class MMLUPrepper(IDatasetPrepper):
         """
         return ["question", "choices", "answer"]
 
-    def create_dataset_entries(
-        self,
-        *,
-        item: Dict[str, Any]
-    ) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
         """Creates a list containing a single DatasetEntry from a raw MMLU dataset item.
 
         This method converts the raw input into a standardized format with strong type
