@@ -2,7 +2,7 @@
 Verifies that all fields validate and that JSON serialization works.
 """
 
-from src.ember.core.registry.model.base.schemas.chat_schemas import (
+from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )

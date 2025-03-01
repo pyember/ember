@@ -9,8 +9,8 @@ from typing import Any, Dict, Type
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.xcs.tracer.tracer_decorator import jit
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.xcs.tracer.tracer_decorator import jit
 
 
 # ----------------------------------------------------------------------------

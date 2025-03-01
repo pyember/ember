@@ -2,11 +2,10 @@
 
 import unittest
 from typing import Dict, List, Any, Optional
-from unittest import mock
 
-from src.ember.core.utils.data.base.config import BaseDatasetConfig
-from src.ember.core.utils.data.base.models import DatasetEntry
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.config import BaseDatasetConfig
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 class ConcreteDatasetPrepper(IDatasetPrepper):

@@ -7,8 +7,8 @@ import time
 import pytest
 from typing import Any, Dict
 
-from src.ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
-from src.ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
+from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
+from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
 
 
 class MockDiscoveryProvider(BaseDiscoveryProvider):
@@ -53,7 +53,7 @@ def test_discovery_service_thread_safety() -> None:
 
 def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test merging discovered models with local configuration overrides."""
-    from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+    from ember.core.registry.model.base.schemas.model_info import ModelInfo
 
     class MockEmberSettings:
         registry = type(
@@ -96,7 +96,7 @@ def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_discovery_service_error_propagation() -> None:
     """Test that discovery service raises a ModelDiscoveryError when all providers fail."""
-    from src.ember.core.registry.model.providers.base_discovery import (
+    from ember.core.registry.model.providers.base_discovery import (
         ModelDiscoveryError,
     )
 

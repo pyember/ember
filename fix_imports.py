@@ -1,74 +1,77 @@
 #!/usr/bin/env python3
 """
-Script to fix imports in test files by adding try/except blocks for both import paths.
+Fix imports in test files to use the 'ember' package instead of 'src.ember'.
+
+This script replaces all instances of 'from src.ember' or 'import src.ember' with
+'from ember' or 'import ember' in Python files under the tests directory.
 """
 
 import os
 import re
 import glob
-
-# Pattern to match ember.core imports
-IMPORT_PATTERN = r"from ember\.core\.utils\.eval\.([\w\.]+) import ([\w\s,\(\)\n]+)"
-
-# Replacement template
-REPLACEMENT_TEMPLATE = """try:
-    from ember.core.utils.eval.{module} import {imports}
-except ImportError:
-    from src.ember.core.utils.eval.{module} import {imports}"""
+from pathlib import Path
 
 
-def fix_imports_in_file(file_path):
-    """Fix imports in a single file."""
-    with open(file_path, "r") as f:
+def fix_imports_in_file(filepath: str) -> bool:
+    """
+    Fix imports in a single file by replacing 'src.ember' with 'ember'.
+
+    Args:
+        filepath: Path to the file to fix
+
+    Returns:
+        bool: True if file was modified, False otherwise
+    """
+    with open(filepath, "r") as f:
         content = f.read()
 
-    # Add debug imports at the top if not already present
-    if "import sys" not in content and "import os" not in content:
-        debug_imports = """import sys
-import os
-"""
-        # Find the first import statement
-        first_import = re.search(r"^import .*$", content, re.MULTILINE)
-        if first_import:
-            pos = first_import.start()
-            content = content[:pos] + debug_imports + content[pos:]
+    # Replace imports
+    new_content = re.sub(r"from src\.ember", "from ember", content)
+    new_content = re.sub(r"import src\.ember", "import ember", new_content)
 
-    # Add debug print statements if not already present
-    if 'print(f"Python path:' not in content:
-        debug_prints = """
-# Print current path for debugging
-print(f"Python path: {sys.path}")
-print(f"Current directory: {os.getcwd()}")
-"""
-        # Find the position after imports
-        imports_end = 0
-        for match in re.finditer(r"^(?:import|from) .*$", content, re.MULTILINE):
-            imports_end = max(imports_end, match.end())
+    # Also fix patch paths
+    new_content = re.sub(r'@patch\(\s*"src\.ember', '@patch(\n    "ember', new_content)
 
-        if imports_end > 0:
-            content = content[:imports_end] + debug_prints + content[imports_end:]
+    if new_content != content:
+        with open(filepath, "w") as f:
+            f.write(new_content)
+        print(f"Fixed imports in {filepath}")
+        return True
+    return False
 
-    # Replace ember.core imports with try/except blocks
-    def replace_import(match):
-        module = match.group(1)
-        imports = match.group(2)
-        return REPLACEMENT_TEMPLATE.format(module=module, imports=imports)
 
-    modified_content = re.sub(IMPORT_PATTERN, replace_import, content)
+def fix_imports_recursively(directory: str) -> int:
+    """
+    Recursively fix imports in all Python files in a directory.
 
-    if content != modified_content:
-        with open(file_path, "w") as f:
-            f.write(modified_content)
-        print(f"Fixed imports in {file_path}")
-    else:
-        print(f"No changes needed in {file_path}")
+    Args:
+        directory: Directory to search for Python files
+
+    Returns:
+        int: Number of files modified
+    """
+    count = 0
+    for root, _, files in os.walk(directory):
+        for file in files:
+            if file.endswith(".py"):
+                filepath = os.path.join(root, file)
+                if fix_imports_in_file(filepath):
+                    count += 1
+    return count
 
 
 def main():
-    """Find and fix imports in all test files."""
-    test_files = glob.glob("tests/unit/core/utils/eval/test_*.py")
-    for file_path in test_files:
-        fix_imports_in_file(file_path)
+    """Main function."""
+    # Get the project root directory
+    project_root = Path(__file__).parent.absolute()
+    tests_dir = project_root / "tests"
+
+    if not tests_dir.exists():
+        print(f"Tests directory not found: {tests_dir}")
+        return
+
+    count = fix_imports_recursively(str(tests_dir))
+    print(f"Fixed imports in {count} files")
 
 
 if __name__ == "__main__":

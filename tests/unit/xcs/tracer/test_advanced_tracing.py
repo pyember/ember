@@ -16,19 +16,19 @@ from typing import Any, Dict, List, Type
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.xcs.tracer.tracer_decorator import jit
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.xcs.tracer.tracer_decorator import jit
 import time
 from typing import Dict
 
-from src.ember.xcs.engine.xcs_engine import (
+from ember.xcs.engine.xcs_engine import (
     compile_graph,
     TopologicalSchedulerWithParallelDispatch,
 )
-from src.ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
-from src.ember.xcs.graph.xcs_graph import XCSGraph
-from src.ember.xcs.tracer.xcs_tracing import TracerContext
-from src.ember.core.registry.operator.exceptions import OperatorExecutionError
+from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
+from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.tracer.xcs_tracing import TracerContext
+from ember.core.registry.operator.exceptions import OperatorExecutionError
 
 
 # -----------------------------------------------------------------------------

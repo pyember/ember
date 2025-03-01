@@ -7,8 +7,8 @@ import threading
 
 import pytest
 
-from src.ember.core.registry.model.base.services.usage_service import UsageService
-from src.ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.services.usage_service import UsageService
+from ember.core.registry.model.base.schemas.usage import UsageStats
 
 
 def test_add_and_get_usage() -> None:

@@ -7,7 +7,7 @@ accurately stored and that the stub implementation of get_current_trace_context 
 
 from typing import Any, Dict
 
-from src.ember.xcs.tracer._context_types import TraceContextData
+from ember.xcs.tracer._context_types import TraceContextData
 
 
 def test_trace_context_data_storage() -> None:

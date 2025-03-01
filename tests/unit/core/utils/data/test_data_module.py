@@ -1,10 +1,9 @@
 """Unit tests for the data module's high-level API."""
 
 import unittest
-from typing import Any, Dict, List, Optional, Type, Union
 from unittest import mock
 
-from src.ember.core.utils.data import (
+from ember.core.utils.data import (
     load_dataset_entries,
     DatasetMetadataRegistry,
     DatasetLoaderFactory,
@@ -17,7 +16,6 @@ from src.ember.core.utils.data import (
     DatasetService,
     IDatasetPrepper,
 )
-from src.ember.core.utils.data.initialization import initialize_dataset_registry
 
 
 class TestLoadDatasetEntries(unittest.TestCase):

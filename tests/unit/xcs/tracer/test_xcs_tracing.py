@@ -8,9 +8,9 @@ from typing import Any, Dict
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.xcs.tracer.xcs_tracing import TracerContext
-from src.ember.xcs.tracer.tracer_decorator import jit
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.xcs.tracer.xcs_tracing import TracerContext
+from ember.xcs.tracer.tracer_decorator import jit
 
 
 class MockInput(BaseModel):

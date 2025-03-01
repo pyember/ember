@@ -15,8 +15,8 @@ import logging
 from typing import Any, Dict, List, Tuple, Type
 
 from pydantic import BaseModel
-from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.operator.base.operator_base import Operator
 
 logger: logging.Logger = logging.getLogger(__name__)
 

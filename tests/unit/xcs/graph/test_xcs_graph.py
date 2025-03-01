@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 
 import pytest
 
-from src.ember.xcs.graph.xcs_graph import XCSGraph, merge_xcs_graphs
+from ember.xcs.graph.xcs_graph import XCSGraph, merge_xcs_graphs
 
 
 def dummy_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:

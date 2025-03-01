@@ -4,7 +4,7 @@ Verifies that usage statistics are aggregated correctly.
 
 import pytest
 
-from src.ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.schemas.usage import UsageStats
 
 
 def test_usage_stats_addition() -> None:

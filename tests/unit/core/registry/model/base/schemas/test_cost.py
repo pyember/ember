@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 def test_model_cost_non_negative() -> None:

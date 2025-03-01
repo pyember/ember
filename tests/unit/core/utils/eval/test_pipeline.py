@@ -1,6 +1,5 @@
 """Tests for pipeline module."""
 
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
 import sys
 import os
 import unittest
@@ -15,7 +14,7 @@ print(f"Current directory: {os.getcwd()}")
 try:
     from ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
 except ImportError:
-    from src.ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
+    from ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
 
 try:
     from ember.core.utils.eval.pipeline import (
@@ -26,7 +25,7 @@ try:
         summarize_batch,
     )
 except ImportError:
-    from src.ember.core.utils.eval.pipeline import (
+    from ember.core.utils.eval.pipeline import (
         PipelineEvaluator,
         BatchEvaluationSummary,
         evaluate_batch,

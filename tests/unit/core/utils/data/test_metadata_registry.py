@@ -1,12 +1,12 @@
 """Unit tests for dataset metadata registry."""
 
 import unittest
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 from unittest import mock
 
-from src.ember.core.utils.data.base.models import DatasetInfo, TaskType
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
-from src.ember.core.utils.data.metadata_registry import (
+from ember.core.utils.data.base.models import DatasetInfo, TaskType
+from ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.metadata_registry import (
     DatasetRegistry,
     register_dataset,
     DatasetRegistryManager,

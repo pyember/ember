@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 import openai
 
-from src.ember.core.registry.model.providers.openai.openai_discovery import (
+from ember.core.registry.model.providers.openai.openai_discovery import (
     OpenAIDiscovery,
 )
 

@@ -1,11 +1,10 @@
 import pytest
-from typing import Dict, Any, List
 
-from src.ember.core.registry.operator.core.ensemble import (
+from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
 )
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class DummyLMModule:

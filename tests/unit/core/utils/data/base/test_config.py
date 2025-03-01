@@ -1,9 +1,8 @@
 """Unit tests for the BaseDatasetConfig class."""
 
 import unittest
-from typing import Optional
 
-from src.ember.core.utils.data.base.config import BaseDatasetConfig
+from ember.core.utils.data.base.config import BaseDatasetConfig
 
 
 class TestBaseDatasetConfig(unittest.TestCase):

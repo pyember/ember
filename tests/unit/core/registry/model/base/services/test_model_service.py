@@ -8,12 +8,12 @@ from typing import Any
 import pytest
 import asyncio
 
-from src.ember.core.registry.model.base.services.model_service import ModelService
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from src.ember.core.exceptions import ProviderAPIError, ModelNotFoundError
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.exceptions import ProviderAPIError, ModelNotFoundError
 
 
 # Dummy model that echoes the prompt.
@@ -45,7 +45,7 @@ def dummy_registry(monkeypatch: pytest.MonkeyPatch) -> ModelRegistry:
     """Fixture that returns a ModelRegistry with a dummy model registered."""
     registry = ModelRegistry()
     dummy_info = create_dummy_model_info("dummy:service")
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     monkeypatch.setattr(
         ModelFactory,
@@ -106,7 +106,7 @@ def dummy_async_registry(monkeypatch: pytest.MonkeyPatch) -> ModelRegistry:
     """Fixture to provide a registry with an async dummy model."""
     registry = ModelRegistry()
     async_info = create_dummy_model_info("dummy:async")
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     monkeypatch.setattr(
         ModelFactory,
@@ -122,7 +122,7 @@ def dummy_error_registry(monkeypatch: pytest.MonkeyPatch) -> ModelRegistry:
     """Fixture that returns a ModelRegistry with a dummy error model registered."""
     registry = ModelRegistry()
     error_info = create_dummy_model_info("dummy:error")
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     monkeypatch.setattr(
         ModelFactory,

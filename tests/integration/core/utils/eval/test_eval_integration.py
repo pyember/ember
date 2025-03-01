@@ -3,7 +3,7 @@
 import unittest
 import sys
 import os
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple
 
 # Print current path for debugging
 print(f"Python path: {sys.path}")
@@ -15,7 +15,7 @@ try:
 except ImportError:
     print("Trying alternative import path...")
     try:
-        from src.ember.core.utils.eval.base_evaluator import (
+        from ember.core.utils.eval.base_evaluator import (
             EvaluationResult,
             IEvaluator,
         )
@@ -34,7 +34,7 @@ try:
         PartialRegexEvaluator,
     )
 except ImportError:
-    from src.ember.core.utils.eval.evaluators import (
+    from ember.core.utils.eval.evaluators import (
         ComposedEvaluator,
         ExactMatchEvaluator,
         NumericToleranceEvaluator,
@@ -44,7 +44,7 @@ except ImportError:
 try:
     from ember.core.utils.eval.extractors import RegexExtractor
 except ImportError:
-    from src.ember.core.utils.eval.extractors import RegexExtractor
+    from ember.core.utils.eval.extractors import RegexExtractor
 
 try:
     from ember.core.utils.eval.pipeline import (
@@ -52,7 +52,7 @@ try:
         evaluate_batch_with_summary,
     )
 except ImportError:
-    from src.ember.core.utils.eval.pipeline import (
+    from ember.core.utils.eval.pipeline import (
         PipelineEvaluator,
         evaluate_batch_with_summary,
     )
@@ -60,12 +60,12 @@ except ImportError:
 try:
     from ember.core.utils.eval.registry import EvaluatorRegistry
 except ImportError:
-    from src.ember.core.utils.eval.registry import EvaluatorRegistry
+    from ember.core.utils.eval.registry import EvaluatorRegistry
 
 try:
     from ember.core.utils.eval.stateful_evaluators import AggregatorEvaluator
 except ImportError:
-    from src.ember.core.utils.eval.stateful_evaluators import AggregatorEvaluator
+    from ember.core.utils.eval.stateful_evaluators import AggregatorEvaluator
 
 
 class TestComponentIntegration(unittest.TestCase):

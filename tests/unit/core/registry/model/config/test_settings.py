@@ -4,18 +4,16 @@ This module tests the deep_merge and resolve_env_vars functions.
 """
 
 from typing import Any, Dict
-from pathlib import Path
 
 import os
 import pytest
 
-from src.ember.core.registry.model.config.settings import (
+from ember.core.registry.model.config.settings import (
     deep_merge,
     resolve_env_vars,
     EmberSettings,
     initialize_ember,
 )
-from src.ember.core.exceptions import EmberError
 
 
 def test_deep_merge_dicts() -> None:

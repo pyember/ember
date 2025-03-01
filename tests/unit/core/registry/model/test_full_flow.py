@@ -8,15 +8,13 @@ from typing import Any
 from textwrap import dedent
 
 import pytest
-from unittest.mock import patch
 
-from src.ember.core.registry.model.config.settings import initialize_ember
-from src.ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from src.ember.core.registry.model.base.services.model_service import ModelService
-from src.ember.core.registry.model.base.services.usage_service import UsageService
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.config.settings import initialize_ember
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.services.usage_service import UsageService
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 
 
 def create_dummy_config(tmp_path: Path) -> Path:
@@ -73,7 +71,7 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
         self._model_infos[model_info.id] = model_info
         self._models[model_info.id] = DummyProvider(model_info)
 
-    from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+    from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
     monkeypatch.setattr(ModelRegistry, "register_model", mock_register_model)
 

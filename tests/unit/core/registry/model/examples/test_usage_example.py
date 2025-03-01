@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 # Assume the usage_example script's main() is importable:
-from src.ember.core.registry.model.examples.usage_example import main
+from ember.core.registry.model.examples.usage_example import main
 
 
 class DummyModel:
@@ -51,7 +51,7 @@ def patch_init(monkeypatch: pytest.MonkeyPatch) -> None:
     Patch usage_example.py so that 'init(...)' is replaced by DummyInitService(),
     which accepts usage_tracking without raising a TypeError.
     """
-    from src.ember.core.registry.model.examples import usage_example
+    from ember.core.registry.model.examples import usage_example
 
     monkeypatch.setattr(usage_example, "init", DummyInitService())
 

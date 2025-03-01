@@ -3,11 +3,11 @@ This test mocks google.generativeai.list_models to return a dummy model.
 """
 
 import pytest
-from typing import Any, List, Dict
+from typing import Any, Dict
 
 import google.generativeai as genai
 
-from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import (
+from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,
 )
 

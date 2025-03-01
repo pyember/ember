@@ -4,12 +4,12 @@ from typing import Dict, Type
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.registry.prompt_signature.exceptions import (
+from ember.core.registry.prompt_signature.exceptions import (
     InvalidInputTypeError,
     MismatchedModelError,
     PlaceholderMissingError,
 )
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class DummyInput(BaseModel):

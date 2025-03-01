@@ -6,17 +6,17 @@ import pytest
 from typing import Any
 import anthropic
 
-from src.ember.core.registry.model.providers.anthropic.anthropic_provider import (
+from ember.core.registry.model.providers.anthropic.anthropic_provider import (
     AnthropicModel,
     AnthropicChatParameters,
 )
-from src.ember.core.registry.model.base.schemas.chat_schemas import (
+from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatResponse,
     ChatRequest,
 )
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 class DummyAnthropicResponse:

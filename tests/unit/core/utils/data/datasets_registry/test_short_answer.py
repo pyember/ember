@@ -1,10 +1,8 @@
 """Unit tests for the ShortAnswer dataset prepper."""
 
 import unittest
-from typing import Dict, List, Any, Optional
 
-from src.ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
-from src.ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
 
 
 class TestShortAnswerPrepper(unittest.TestCase):

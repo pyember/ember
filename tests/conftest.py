@@ -1,7 +1,6 @@
 """Configure pytest environment for all tests."""
 
 import pytest
-from unittest.mock import patch
 import sys
 import os
 from pathlib import Path

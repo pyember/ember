@@ -10,11 +10,11 @@ This file is production grade, strongly typed, and follows the Google Python Sty
 """
 
 from typing import Any, Dict
-import pytest
 from unittest.mock import patch
+import pytest
 
 # Import the wrappers and their input/output types from non.py.
-from src.ember.core.non import (
+from ember.core.non import (
     UniformEnsemble,
     MostCommon,
     JudgeSynthesis,
@@ -31,8 +31,8 @@ from src.ember.core.non import (
 )
 
 # For dummy operator in sequential test.
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 # ------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ def failing_lm(*, prompt: str) -> str:
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="response",
 )
 def test_uniform_ensemble_operator_normal(mock_invoke):
@@ -114,7 +114,7 @@ def test_most_common_operator_normal() -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="Reasoning: Some reasoning\nFinal Answer: Synthesized",
 )
 def test_judge_synthesis_operator_normal(mock_invoke) -> None:
@@ -139,7 +139,7 @@ def test_judge_synthesis_operator_normal(mock_invoke) -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="Verdict: 1\nExplanation: All good\nRevised Answer: AnswerY",
 )
 def test_verifier_operator_normal(mock_invoke) -> None:
@@ -161,12 +161,12 @@ def test_verifier_operator_normal(mock_invoke) -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="varied response",
 )
 def test_varied_ensemble_operator_normal(mock_invoke) -> None:
     """Test that VariedEnsemble aggregates responses from multiple LM configurations."""
-    from src.ember.core.registry.model.model_module.lm import LMModuleConfig
+    from ember.core.registry.model.model_module.lm import LMModuleConfig
 
     dummy_config: LMModuleConfig = LMModuleConfig(model_id="dummy", temperature=1.0)
     varied_ensemble = VariedEnsemble(model_configs=[dummy_config, dummy_config])
@@ -215,7 +215,7 @@ def test_sequential_pipeline_operator_normal() -> None:
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     side_effect=Exception("Simulated LM failure"),
 )
 def test_uniform_ensemble_operator_failure_propagation(mock_invoke) -> None:

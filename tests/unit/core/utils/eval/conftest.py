@@ -16,7 +16,7 @@ try:
 except ImportError:
     print("Trying alternative import path in unit tests...")
     try:
-        from src.ember.core.utils.eval.base_evaluator import (
+        from ember.core.utils.eval.base_evaluator import (
             EvaluationResult,
             IEvaluator,
         )
@@ -31,7 +31,7 @@ try:
         PartialRegexEvaluator,
     )
 except ImportError:
-    from src.ember.core.utils.eval.evaluators import (
+    from ember.core.utils.eval.evaluators import (
         ExactMatchEvaluator,
         NumericToleranceEvaluator,
         PartialRegexEvaluator,

@@ -13,9 +13,9 @@ from typing import Any, Dict, Optional, Type
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core.registry.operator.exceptions import OperatorExecutionError
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.operator.exceptions import OperatorExecutionError
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class DummyInput(BaseModel):

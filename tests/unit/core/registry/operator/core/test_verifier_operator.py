@@ -1,4 +1,4 @@
-from src.ember.core.registry.operator.core.verifier import (
+from ember.core.registry.operator.core.verifier import (
     VerifierOperator,
     VerifierOperatorInputs,
     VerifierOperatorOutputs,

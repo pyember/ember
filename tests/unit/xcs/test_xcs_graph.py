@@ -6,7 +6,7 @@ These tests now also check that merging graphs using namespace prefixes works as
 """
 
 import pytest
-from src.ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 
 def dummy_operator(*, inputs: dict) -> dict:
@@ -55,7 +55,7 @@ def test_cycle_detection() -> None:
 
 # (Optional) Test merging of two graphs with namespace prefixes.
 def test_merge_xcs_graphs_namespace() -> None:
-    from src.ember.xcs.graph.xcs_graph import merge_xcs_graphs
+    from ember.xcs.graph.xcs_graph import merge_xcs_graphs
 
     base = XCSGraph()
     additional = XCSGraph()

@@ -3,7 +3,7 @@ import unittest
 import dataclasses
 from typing import List
 
-from src.ember.core.registry.operator.base._module import EmberModule, ember_field
+from ember.core.registry.operator.base._module import EmberModule, ember_field
 
 
 @dataclasses.dataclass(frozen=True, init=True)

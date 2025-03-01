@@ -1,12 +1,10 @@
 """Unit tests for the CommonsenseQA dataset prepper."""
 
 import unittest
-from typing import Dict, List, Any, Optional
 
-from src.ember.core.utils.data.datasets_registry.commonsense_qa import (
+from ember.core.utils.data.datasets_registry.commonsense_qa import (
     CommonsenseQAPrepper,
 )
-from src.ember.core.utils.data.base.models import DatasetEntry
 
 
 class TestCommonsenseQAPrepper(unittest.TestCase):

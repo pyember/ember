@@ -1,10 +1,9 @@
 """Tests for extractors module."""
 
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import Any
 import sys
 import os
 import unittest
-from unittest import mock
 
 import pytest
 
@@ -15,7 +14,7 @@ print(f"Current directory: {os.getcwd()}")
 try:
     from ember.core.utils.eval.extractors import IOutputExtractor, RegexExtractor
 except ImportError:
-    from src.ember.core.utils.eval.extractors import IOutputExtractor, RegexExtractor
+    from ember.core.utils.eval.extractors import IOutputExtractor, RegexExtractor
 
 
 class TestIOutputExtractor(unittest.TestCase):

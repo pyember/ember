@@ -7,7 +7,7 @@ process.
 
 from typing import Any, Dict, List
 
-from src.ember.xcs.utils.tree_util import tree_flatten, tree_unflatten
+from ember.xcs.utils.tree_util import tree_flatten, tree_unflatten
 
 
 def test_tree_flatten_unflatten_list() -> None:

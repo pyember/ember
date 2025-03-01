@@ -6,8 +6,8 @@ These tests ensure that tasks execute in dependency order, errors in tasks are r
 """
 
 import pytest
-from src.ember.xcs.graph.xcs_graph import XCSGraph
-from src.ember.xcs.engine.xcs_engine import (
+from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.engine.xcs_engine import (
     compile_graph,
     TopologicalSchedulerWithParallelDispatch as XCSScheduler,
 )

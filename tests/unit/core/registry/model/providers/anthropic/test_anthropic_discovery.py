@@ -5,7 +5,7 @@ Since AnthropicDiscovery.fetch_models returns simulated data, we just verify its
 import pytest
 from typing import Dict, Any
 
-from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import (
+from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
     AnthropicDiscovery,
 )
 

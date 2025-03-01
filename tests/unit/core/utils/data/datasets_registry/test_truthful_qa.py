@@ -1,10 +1,8 @@
 """Unit tests for the TruthfulQA dataset prepper."""
 
 import unittest
-from typing import Dict, List, Any, Optional
 
-from src.ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
-from src.ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
 
 
 class TestTruthfulQAPrepper(unittest.TestCase):

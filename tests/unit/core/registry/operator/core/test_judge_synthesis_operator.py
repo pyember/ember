@@ -1,7 +1,7 @@
 import pytest
 from typing import Dict, Any
 
-from src.ember.core.registry.operator.core.synthesis_judge import (
+from ember.core.registry.operator.core.synthesis_judge import (
     JudgeSynthesisOperator,
     JudgeSynthesisInputs,
 )

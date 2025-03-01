@@ -5,15 +5,14 @@ These tests verify that the major components of the data module work together co
 
 import os
 import unittest
-from typing import Any, Dict, List, Optional, Type, Union
 from unittest import mock
 
 from datasets import Dataset, DatasetDict
 
-from src.ember.core.utils.data import load_dataset_entries, BaseDatasetConfig
-from src.ember.core.utils.data.base.models import DatasetEntry, DatasetInfo, TaskType
-from src.ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
-from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
+from ember.core.utils.data import load_dataset_entries
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
 
 
 # Skip unless environment variable is set to run integration tests

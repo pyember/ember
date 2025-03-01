@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from src.ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 
 
 class DummyModelService:

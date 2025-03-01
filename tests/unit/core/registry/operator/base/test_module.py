@@ -17,11 +17,11 @@ import dataclasses
 import inspect
 import threading
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, ClassVar, cast
+from typing import Any, List, Tuple
 
 import pytest
 
-from src.ember.core.registry.operator.base._module import (
+from ember.core.registry.operator.base._module import (
     EmberModule,
     BoundMethod,
     static_field,
@@ -32,11 +32,11 @@ from src.ember.core.registry.operator.base._module import (
     _thread_local,
     EmberModuleMeta,
 )
-from src.ember.core.registry.operator.exceptions import (
+from ember.core.registry.operator.exceptions import (
     BoundMethodNotInitializedError,
     FlattenError,
 )
-from src.ember.xcs.utils.tree_util import (
+from ember.xcs.utils.tree_util import (
     tree_flatten,
     tree_unflatten,
     _pytree_registry,
@@ -214,7 +214,7 @@ def test_registration_idempotence() -> None:
     original_flatten, original_unflatten = _pytree_registry[IdempotentModule]
 
     # Import the register_tree function directly
-    from src.ember.xcs.utils.tree_util import register_tree
+    from ember.xcs.utils.tree_util import register_tree
 
     # Try to register again with dummy functions
     def dummy_flatten(x: Any) -> Tuple[List[Any], Any]:

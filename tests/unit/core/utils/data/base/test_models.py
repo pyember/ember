@@ -1,9 +1,8 @@
 """Unit tests for data model classes."""
 
 import unittest
-from typing import Any, Dict, Optional
 
-from src.ember.core.utils.data.base.models import TaskType, DatasetInfo, DatasetEntry
+from ember.core.utils.data.base.models import TaskType, DatasetInfo, DatasetEntry
 
 
 class TestTaskType(unittest.TestCase):

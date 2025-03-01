@@ -5,9 +5,9 @@ This module tests sequential execution using the XCSNoOpScheduler.
 
 from typing import Any, Dict
 
-from src.ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
-from src.ember.xcs.engine.xcs_engine import compile_graph
-from src.ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
+from ember.xcs.engine.xcs_engine import compile_graph
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 
 def dummy_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:

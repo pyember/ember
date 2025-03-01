@@ -2,7 +2,7 @@
 
 import re
 import subprocess
-from typing import Any, Dict, List, Optional, Tuple, TypeVar
+from typing import Any
 import sys
 import os
 import unittest
@@ -17,7 +17,7 @@ print(f"Current directory: {os.getcwd()}")
 try:
     from ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
 except ImportError:
-    from src.ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
+    from ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
 
 try:
     from ember.core.utils.eval.evaluators import (
@@ -28,7 +28,7 @@ try:
         CodeExecutionEvaluator,
     )
 except ImportError:
-    from src.ember.core.utils.eval.evaluators import (
+    from ember.core.utils.eval.evaluators import (
         ComposedEvaluator,
         ExactMatchEvaluator,
         NumericToleranceEvaluator,
@@ -39,7 +39,7 @@ except ImportError:
 try:
     from ember.core.utils.eval.extractors import RegexExtractor
 except ImportError:
-    from src.ember.core.utils.eval.extractors import RegexExtractor
+    from ember.core.utils.eval.extractors import RegexExtractor
 
 
 class TestComposedEvaluator(unittest.TestCase):

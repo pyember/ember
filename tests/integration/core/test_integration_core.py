@@ -6,7 +6,7 @@ and verifies that inputs propagate correctly, prompts are rendered, and the fina
 output contains expected verification details.
 """
 
-from src.ember.core.non import (
+from ember.core.non import (
     UniformEnsemble,
     MostCommon,
     Verifier,
@@ -15,16 +15,16 @@ from src.ember.core.non import (
 )
 from unittest.mock import patch
 import pytest
-from src.ember.core.registry.model.base.services.model_service import ModelService
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from src.ember.core.exceptions import ProviderAPIError, ModelNotFoundError
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.exceptions import ProviderAPIError, ModelNotFoundError
 
 
 @patch(
-    "src.ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
+    "ember.core.registry.model.base.services.model_service.ModelService.invoke_model",
     return_value="AnswerX",
 )
 def test_multi_stage_pipeline_integration(mock_invoke_model) -> None:
@@ -71,7 +71,7 @@ def create_dummy_model_info(model_id: str) -> ModelInfo:
 
 @pytest.fixture
 def failing_registry(monkeypatch):
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     # Patch the factory to always return our failing provider
     def mock_create_model_from_info(*, model_info):

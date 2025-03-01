@@ -4,7 +4,7 @@
 
 import pytest
 
-from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ModelRegistrationError,
     ModelDiscoveryError,
 )

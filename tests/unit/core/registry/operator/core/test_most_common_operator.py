@@ -1,7 +1,7 @@
 import pytest
 from typing import Dict
 
-from src.ember.core.registry.operator.core.most_common import (
+from ember.core.registry.operator.core.most_common import (
     MostCommonAnswerSelectorOperator,
     MostCommonAnswerSelectorOperatorInputs,
 )

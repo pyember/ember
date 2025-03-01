@@ -1,6 +1,6 @@
 """Tests for base_evaluator module."""
 
-from typing import Any, Dict, Optional, TypeVar
+from typing import Any, Dict, TypeVar
 import sys
 import os
 import unittest
@@ -19,7 +19,7 @@ try:
         IStatefulEvaluator,
     )
 except ImportError:
-    from src.ember.core.utils.eval.base_evaluator import (
+    from ember.core.utils.eval.base_evaluator import (
         EvaluationResult,
         IEvaluator,
         IStatefulEvaluator,

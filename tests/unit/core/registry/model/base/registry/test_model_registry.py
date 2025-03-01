@@ -3,18 +3,18 @@
 Tests model registration, retrieval, listing, and unregistration.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 import threading
 
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from src.ember.core.exceptions import ModelNotFoundError
-from src.ember.core.registry.model.base.schemas.model_info import (
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.exceptions import ModelNotFoundError
+from ember.core.registry.model.base.schemas.model_info import (
     ModelInfo,
     ProviderInfo,
 )
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 
 def create_dummy_model_info(model_id: str) -> ModelInfo:
@@ -48,7 +48,7 @@ def test_register_and_get_model(model_registry: ModelRegistry) -> None:
             return prompt.upper()
 
     # Monkey-patch ModelFactory.create_model_from_info to return our dummy provider.
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     original_create = ModelFactory.create_model_from_info
     ModelFactory.create_model_from_info = staticmethod(
@@ -66,7 +66,7 @@ def test_register_and_get_model(model_registry: ModelRegistry) -> None:
 def test_register_duplicate_model(model_registry: ModelRegistry) -> None:
     """Test that attempting to register a duplicate model raises a ValueError."""
     dummy_info = create_dummy_model_info("dummy:dup")
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     original_create = ModelFactory.create_model_from_info
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
@@ -82,7 +82,7 @@ def test_register_duplicate_model(model_registry: ModelRegistry) -> None:
 def test_unregister_model(model_registry: ModelRegistry) -> None:
     """Test that a registered model can be unregistered successfully."""
     dummy_info = create_dummy_model_info("dummy:unreg")
-    from src.ember.core.registry.model.base.registry.factory import ModelFactory
+    from ember.core.registry.model.base.registry.factory import ModelFactory
 
     ModelFactory.create_model_from_info = staticmethod(lambda *, model_info: object())
 

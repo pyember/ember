@@ -9,8 +9,8 @@ from typing import Any, Dict
 
 import pytest
 
-from src.ember.xcs.engine.xcs_engine import XCSPlan, compile_graph
-from src.ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.engine.xcs_engine import XCSPlan, compile_graph
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 
 def dummy_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:

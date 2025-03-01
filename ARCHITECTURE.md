@@ -1,77 +1,211 @@
-# Ember Core Architecture
+# Ember Architecture
 
-This document provides a high-level overview of the Ember core architecture, its main components, extension points, and how dependency injection has been employed to improve testability and flexibility.
+This document provides a comprehensive overview of Ember's architecture, its core components, and the design principles that guide the project.
 
-## High-Level Components
+## System Overview
 
-- **EmberAppContext:**  
-  The central application context responsible for aggregating and providing:
-  - `ConfigManager` (for config, environment variable resolution)
-  - `ModelRegistry` (handles discovery and registration of models)
-  - `UsageService` (tracks API usage across calls)
-  - A common `logger` instance
+Ember is organized around a modular, extensible architecture that emphasizes:
 
-- **ConfigCore:**  
-  Centralized logic for merging configuration files, reading from environment variables, and validating settings. All configuration-related modules should delegate to this core.
+1. **Composability**: Components can be combined and nested to create complex AI systems
+2. **Extensibility**: All major subsystems support custom extensions via registries
+3. **Testability**: Dependency injection enables comprehensive testing
+4. **Performance**: Optional graph-based execution for parallel operations
 
-- **ModelService & Registry:**  
-  `ModelService` acts as a high-level facade that pulls a model from the `ModelRegistry`, delegates API calls, and logs usage via `UsageService`. The registry itself is populated during application initialization using auto-discovery routines.
+The diagram below illustrates the high-level architecture:
 
-- **Provider Extensions & Discovery:**  
-  New providers should subclass `BaseProviderModel` and be registered via a unified ModelFactory. See the EXTENDING.md guide for step-by-step instructions.
+```
+┌────────────────────────────────────────────┐
+│               Application                  │
+├────────────────────────────────────────────┤
+│                                            │
+│  ┌────────────┐    ┌────────────────────┐  │
+│  │            │    │                    │  │
+│  │ EmberApp   │◄───┤ ConfigManager      │  │
+│  │ Context    │    │                    │  │
+│  │            │    └────────────────────┘  │
+│  │            │                            │
+│  │            │    ┌────────────────────┐  │
+│  │            │◄───┤ ModelRegistry      │  │
+│  │            │    │                    │  │
+│  │            │    └────────────────────┘  │
+│  │            │                            │
+│  │            │    ┌────────────────────┐  │
+│  │            │◄───┤ OperatorRegistry   │  │
+│  │            │    │                    │  │
+│  │            │    └────────────────────┘  │
+│  │            │                            │
+│  └────────────┘    ┌────────────────────┐  │
+│                    │                    │  │
+│                    │ UsageService       │  │
+│                    │                    │  │
+│                    └────────────────────┘  │
+│                                            │
+└────────────────────────────────────────────┘
 
-## Data Flow Diagram
+┌────────────────────────────────────────────┐
+│                Execution                    │
+├────────────────────────────────────────────┤
+│                                            │
+│  ┌────────────┐    ┌────────────────────┐  │
+│  │            │    │                    │  │
+│  │ XCSGraph   │◄───┤ Operators          │  │
+│  │            │    │                    │  │
+│  └─────┬──────┘    └────────────────────┘  │
+│        │                                    │
+│        ▼                                    │
+│  ┌────────────┐    ┌────────────────────┐  │
+│  │            │    │                    │  │
+│  │ Execution  │◄───┤ Schedulers         │  │
+│  │ Plan       │    │                    │  │
+│  │            │    └────────────────────┘  │
+│  └────────────┘                            │
+│                                            │
+└────────────────────────────────────────────┘
+```
 
 ## Core Components
 
-*   **`ember.core.app_context`**: Contains the `EmberAppContext` class, which holds references to core services like `ConfigManager`, `ModelRegistry`, and `UsageService`.  This is the central point of access for the application.
-*   **`ember.core.configs`**: Manages configuration loading and access. The `ConfigManager` class handles reading configuration files, merging settings, and providing access to configuration values.
-*   **`ember.core.registry`**:  Handles the registration and instantiation of models.
-    *   `model`: Contains the core logic for model management, including the `ModelRegistry`, `ModelService`, `ModelFactory`, and provider-specific implementations.
-    *   `provider_registry`:  Contains base classes and specific implementations for different model providers (e.g., OpenAI, Anthropic, Deepmind).
-*   **`ember.core.exceptions`**: Defines custom exception classes used throughout the library for consistent error handling.
-*   **`ember.core.non`**: 
+### EmberAppContext
 
-## Model Invocation Flow
+The `EmberAppContext` serves as the central access point and dependency injection container for Ember applications. It:
 
-When a language model call is made, the following sequence of events occurs:
+- Manages configuration and provides access to services
+- Instantiates and configures registries
+- Creates consistent logger instances
+- Enables easy testing through dependency injection
 
-1.  The user interacts with the `ModelService`, either directly or through a higher-level operator.
-2.  `ModelService` uses the provided model ID to retrieve the corresponding `BaseProviderModel` instance from the `ModelRegistry`.
-3.  `ModelService` calls the `__call__` method of the `BaseProviderModel` instance, passing the prompt and any additional parameters.
-4.  The `BaseProviderModel` implementation handles the provider-specific API call and returns a `ChatResponse`.
-5.  If a `UsageService` is configured, `ModelService` logs usage statistics from the `ChatResponse`.
+```python
+# Example of accessing the application context
+from ember.core.app_context import get_app_context
+
+context = get_app_context()
+model_service = context.model_service
+config = context.config_manager.get_config("model_registry")
+```
+
+### Configuration System
+
+The configuration system provides a unified approach to managing settings across Ember:
+
+- **ConfigManager**: Loads, merges, and caches configuration files
+- **Environment Variable Resolution**: Automatically resolves `${ENV_VAR}` placeholders
+- **Configuration Hierarchy**: Supports base configs with specific overrides
+
+Configuration files are YAML-based and located in the relevant component's directory structure.
+
+### Registry System
+
+Ember uses registries to manage the various components that can be plugged into the system:
+
+#### ModelRegistry
+
+The `ModelRegistry` provides a centralized repository for accessing language models:
+
+- **Discovery**: Auto-discovers model configurations from YAML files
+- **Registration**: Allows dynamic registration of model metadata
+- **Instantiation**: Creates provider-specific model instances through the `ModelFactory`
+- **Lookup**: Retrieves models by ID or enum
+
+#### OperatorRegistry
+
+The `OperatorRegistry` manages the collection of available operators:
+
+- **Standard Operators**: Built-in operators for common tasks (ensemble, judge, etc.)
+- **Custom Operators**: User-defined operators can be registered
+- **Lookup**: Provides access to operator implementations
+
+### Model System
+
+The model system handles the integration with various AI model providers:
+
+- **Provider Implementations**: Support for OpenAI, Anthropic, DeepMind, etc.
+- **BaseProviderModel**: Common interface across all providers
+- **ModelService**: High-level facade for model invocation
+- **UsageService**: Tracks API usage, cost, and rate limits
+
+### Operator System
+
+Operators are the core computational units in Ember:
+
+- **Base Operator**: Abstract base class with forward() method
+- **Signature**: Type definitions for inputs and outputs
+- **Composition**: Operators can contain and invoke other operators
+- **Concurrency**: Operators can specify execution plans for parallel processing
+
+### Execution Engine (XCS)
+
+The XCS (eXecution Control System) handles graph-based execution:
+
+- **XCSGraph**: Directed acyclic graph representing operator dependencies
+- **XCSNode**: Individual nodes in the graph, containing operators
+- **Scheduler**: Manages execution order and parallelization
+- **Tracer**: Records execution details for debugging and optimization
 
 ## Package Structure
 
-| Directory                     | Description                                                                                                                                                                                                                                                           |
-| :---------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ember.core.configs`          | Handles configuration loading, merging, and environment variable resolution.                                                                                                                                                                                        |
-| `ember.core.registry.model`   | Manages the registration, instantiation, and invocation of models. Includes core schemas, services (ModelService, UsageService), the ModelRegistry, ModelFactory, and provider-specific implementations.                                                       |
-| `ember.core.registry.operator`| (Further description needed)                                                                                                                                                                                                                                        |
-| `ember.core.exceptions`       | Defines custom exception classes for consistent error handling.                                                                                                                                                                                                     |
-| `ember.core.utils`            | (Further description needed - contains data and eval base classes)                                                                                                                                                                                |
-| `ember.core.non`              | (Further description needed - this seems to be a set of higher-level operators, potentially a "non-differentiable" module, but clarification is needed on the name and purpose)                                                                                     |
-| `ember.examples`              | Contains example scripts demonstrating various usage patterns of the library.                                                                                                                                                                                        |
+| Package | Description |
+|---------|-------------|
+| `ember.core` | Core framework components |
+| `ember.core.app_context` | Application context and dependency injection |
+| `ember.core.configs` | Configuration management |
+| `ember.core.registry.model` | Model registry and provider implementations |
+| `ember.core.registry.operator` | Operator registry and base classes |
+| `ember.core.registry.prompt_signature` | Signature definitions for typed I/O |
+| `ember.core.utils` | Utility functions and classes |
+| `ember.core.non` | High-level Network of Networks operators |
+| `ember.xcs` | Execution engine components |
+| `ember.xcs.graph` | Graph definition and manipulation |
+| `ember.xcs.engine` | Execution scheduling and optimization |
+| `ember.xcs.tracer` | Execution tracing and profiling |
+| `ember.examples` | Example applications and usage patterns |
 
-For a deeper dive into the model registry and the "network-of-networks" approach, see [model_readme.md](model_readme.md). 
+## Design Patterns
 
-# Architecture Overview
+Ember employs several design patterns to maintain a clean and extensible architecture:
 
-## Purpose
-The `models/` module provides a registry for AI models, handling discovery, registration, invocation, and usage tracking.
+1. **Registry Pattern**: Central repositories for discoverable components
+2. **Factory Pattern**: Creation of provider-specific instances
+3. **Dependency Injection**: Services provided through the application context
+4. **Decorator Pattern**: For augmenting operators with additional behavior (e.g., tracing)
+5. **Strategy Pattern**: Pluggable implementations for core functionality
 
-## Components
-- **Registry**: Manages model registration (`model_registry.py`) and instantiation (`factory.py`).
-- **Providers**: Implements provider-specific logic (`openai_provider.py`, etc.).
-- **Schemas**: Defines data models using Pydantic (`model_info.py`, etc.).
-- **Services**: Provides high-level interfaces (`model_service.py`, `usage_service.py`).
+## Execution Flow
 
-## Design Choices
-- **Thread Safety**: Uses locks in `ModelRegistry` and `ModelDiscoveryService`.
-- **Extensibility**: Factory pattern for provider instantiation.
-- **Configuration**: Uses Pydantic and YAML for settings management.
+When executing a typical operation through Ember, the flow is:
 
-## Scalability Considerations
-- **Lazy Loading**: Models are instantiated on demand to somewhat minimize memory footprint.
-- **Lightweight Caching**: Discovery service caches results to avoid redundant API calls. 
+1. **Operator Creation**: Instantiate operators with their required configuration
+2. **Graph Creation** (optional): Define the execution graph with operators as nodes
+3. **Input Preparation**: Prepare the input data for the operators
+4. **Execution**:
+   - **Eager Mode**: Directly invoke `operator(inputs=...)` for immediate execution
+   - **Graph Mode**: Compile the graph into an execution plan and run through a scheduler
+5. **Result Processing**: Process and return the execution results
+
+## Extension Points
+
+Ember is designed for extensibility at multiple levels:
+
+1. **New Model Providers**: Implement `BaseProviderModel` and register via discovery
+2. **Custom Operators**: Extend the `Operator` base class and implement forward()
+3. **Specialized Signatures**: Create custom signatures for typed I/O
+4. **Custom Schedulers**: Implement specialized execution strategies
+5. **Evaluation Metrics**: Add new metrics to the evaluation system
+
+## Performance Considerations
+
+Ember balances ease of use with performance:
+
+- **Lazy Loading**: Models are instantiated only when needed
+- **Parallel Execution**: Graph-based execution can parallelize independent operations
+- **Caching**: Discovery results and configurations are cached
+- **Thread Safety**: Core components are designed for concurrent access
+
+## Scalability
+
+For large-scale deployments, consider:
+
+1. **Model Caching**: Use the caching mechanisms in ModelService
+2. **Rate Limiting**: Configure appropriate rate limits for each provider
+3. **Cost Management**: Leverage the UsageService to monitor and control costs
+4. **Workload Distribution**: For very large workloads, consider distributing across multiple processes/machines
+5. **Memory Management**: Be aware of in-memory data size, especially for large datasets

@@ -1,22 +1,19 @@
 """Unit tests for the dataset initialization module."""
 
 import unittest
-from typing import Dict, List, Optional, Type
 from unittest import mock
 
-from src.ember.core.utils.data.initialization import initialize_dataset_registry
-from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from src.ember.core.utils.data.base.models import TaskType, DatasetInfo
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.initialization import initialize_dataset_registry
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
 
-from src.ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
-from src.ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper
-from src.ember.core.utils.data.datasets_registry.commonsense_qa import (
+from ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
+from ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper
+from ember.core.utils.data.datasets_registry.commonsense_qa import (
     CommonsenseQAPrepper,
 )
-from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
-from src.ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
+from ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
+from ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
 
 
 class TestInitializeDatasetRegistry(unittest.TestCase):

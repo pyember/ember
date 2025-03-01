@@ -3,7 +3,7 @@
 
 import pytest
 
-from src.ember.core.registry.model.config.model_enum import parse_model_str
+from ember.core.registry.model.config.model_enum import parse_model_str
 
 
 def test_known_model_enum() -> None:

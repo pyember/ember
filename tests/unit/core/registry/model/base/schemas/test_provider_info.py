@@ -4,7 +4,7 @@ Ensures that ProviderInfo initializes correctly and that optional fields default
 
 import pytest
 
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 
 
 def test_provider_info_validation() -> None:
