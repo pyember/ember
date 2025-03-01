@@ -27,7 +27,9 @@ from ember.xcs.tracer.tracer_decorator import jit
 
 # Existing 'Ensemble' and its input type from non.py.
 from ember.core.non import Ensemble
-from ember.core.registry.operator.core.ensemble import EnsembleOperatorInputs as EnsembleInputs
+from ember.core.registry.operator.core.ensemble import (
+    EnsembleOperatorInputs as EnsembleInputs,
+)
 
 
 ###############################################################################
@@ -36,10 +38,10 @@ from ember.core.registry.operator.core.ensemble import EnsembleOperatorInputs as
 class BaselineEnsemble(Ensemble):
     """Ensemble implementation that forces fully eager (serial) execution.
 
-    This subclass disables concurrency by configuring the execution to 
+    This subclass disables concurrency by configuring the execution to
     run serially rather than in parallel.
     """
-    
+
     # BaselineEnsemble forces serial execution by configuration
     # The metaclass-based EmberModule system handles execution details
 

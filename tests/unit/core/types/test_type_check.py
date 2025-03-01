@@ -5,7 +5,11 @@ Tests for the type checking utilities.
 import pytest
 from typing import Dict, List, Optional, Union, Any, TypeVar, Generic, Tuple
 
-from ember.core.types.type_check import validate_type, validate_instance_attrs, type_check
+from ember.core.types.type_check import (
+    validate_type,
+    validate_instance_attrs,
+    type_check,
+)
 from ember.core.types.ember_model import EmberModel
 from ember.core.types.protocols import EmberTyped, TypeInfo
 
@@ -45,6 +49,7 @@ def test_validate_type_containers():
 
 class SimpleClass:
     """A simple class for testing attribute validation."""
+
     def __init__(self, a: int, b: str):
         self.a = a
         self.b = b
@@ -54,7 +59,7 @@ def test_validate_instance_attrs():
     """Test validation of object attributes."""
     obj = SimpleClass(a=42, b="hello")
     assert validate_instance_attrs(obj, SimpleClass) == {}
-    
+
     # Test with invalid attributes
     obj.a = "42"  # type: ignore
     errors = validate_instance_attrs(obj, SimpleClass)
@@ -63,6 +68,7 @@ def test_validate_instance_attrs():
 
 class ModelWithTypes(EmberModel):
     """A model with type annotations for testing."""
+
     a: int
     b: str
     c: Optional[List[Dict[str, Any]]] = None
@@ -72,11 +78,11 @@ def test_type_check():
     """Test the combined type_check function."""
     model = ModelWithTypes(a=42, b="hello")
     assert type_check(model, ModelWithTypes)
-    
+
     # Test with invalid model
     model.a = "42"  # type: ignore
     assert not type_check(model, ModelWithTypes)
-    
+
     # Test with simple types
     assert type_check(42, int)
     assert not type_check("42", int)
@@ -84,19 +90,21 @@ def test_type_check():
 
 def test_protocol_checking():
     """Test checking against protocols."""
+
     class MyClass:
         def get_type_info(self) -> TypeInfo:
             return TypeInfo(origin_type=type(self))
-    
+
     obj = MyClass()
     assert validate_type(obj, EmberTyped)
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class GenericContainer(Generic[T]):
     """A generic container for testing."""
+
     def __init__(self, value: T):
         self.value = value
 
@@ -105,7 +113,7 @@ def test_generic_types():
     """Test validation with generic types."""
     int_container = GenericContainer[int](42)
     str_container = GenericContainer[str]("hello")
-    
+
     # This is a limitation of runtime type checking - we can't validate
     # the type parameter T at runtime without additional machinery
     assert validate_type(int_container, GenericContainer)

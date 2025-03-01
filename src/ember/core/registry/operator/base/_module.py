@@ -303,25 +303,25 @@ class EmberModuleMeta(abc.ABCMeta):
 
     def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
         """Creates an instance with complete initialization, regardless of whether super().__init__() is called.
-        
+
         This implementation entirely sidesteps the need for users to call super().__init__()
         by handling all field initialization before and after the custom __init__ method.
-        
+
         Args:
             cls: The class being instantiated.
             *args: Positional arguments for initialization.
             **kwargs: Keyword arguments for initialization.
-            
+
         Returns:
             T: A fully initialized, immutable instance of the EmberModule subclass.
         """
         # Create a mutable wrapper for initialization
         mutable_cls: Type[T] = _make_initable_wrapper(cls)
-        
+
         # Create an instance directly without calling __init__
         instance = object.__new__(mutable_cls)
-        
-        # First set defaults for all fields - this ensures all fields exist 
+
+        # First set defaults for all fields - this ensures all fields exist
         # even if a custom __init__ doesn't set them
         fields_dict = {f.name: f for f in dataclasses.fields(cls)}
         for field_name, field_def in fields_dict.items():
@@ -329,10 +329,14 @@ class EmberModuleMeta(abc.ABCMeta):
                 if field_def.default is not dataclasses.MISSING:
                     object.__setattr__(instance, field_name, field_def.default)
                 elif field_def.default_factory is not dataclasses.MISSING:
-                    object.__setattr__(instance, field_name, field_def.default_factory())
+                    object.__setattr__(
+                        instance, field_name, field_def.default_factory()
+                    )
 
         # Call the class's __init__ method if it exists
-        has_custom_init = hasattr(cls, "__init__") and cls.__init__ is not object.__init__
+        has_custom_init = (
+            hasattr(cls, "__init__") and cls.__init__ is not object.__init__
+        )
         if has_custom_init:
             try:
                 mutable_cls.__init__(instance, *args, **kwargs)
@@ -346,24 +350,27 @@ class EmberModuleMeta(abc.ABCMeta):
             for field_name, value in kwargs.items():
                 if field_name in fields_dict:
                     object.__setattr__(instance, field_name, value)
-            
+
             # Call __post_init__ if it exists
             post_init = getattr(instance, "__post_init__", None)
             if callable(post_init):
                 post_init()
-        
+
         # Check for missing fields
         missing_fields = []
         for field_name, field_def in fields_dict.items():
             if field_name not in dir(instance):
-                if field_def.default is dataclasses.MISSING and field_def.default_factory is dataclasses.MISSING:
+                if (
+                    field_def.default is dataclasses.MISSING
+                    and field_def.default_factory is dataclasses.MISSING
+                ):
                     missing_fields.append(field_name)
-        
+
         if missing_fields:
             raise ValueError(
                 f"The following fields were not initialized: {missing_fields}"
             )
-        
+
         # Apply field converters
         for field_info in dataclasses.fields(cls):
             converter = field_info.metadata.get("converter", None)
@@ -371,7 +378,7 @@ class EmberModuleMeta(abc.ABCMeta):
                 current_value = getattr(instance, field_info.name)
                 converted_value = converter(current_value)
                 object.__setattr__(instance, field_info.name, converted_value)
-        
+
         # Revert to the original frozen class
         object.__setattr__(instance, "__class__", cls)
         return instance

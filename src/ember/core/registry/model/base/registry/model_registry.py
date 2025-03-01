@@ -10,7 +10,7 @@ from ember.core.registry.model.base.utils.model_registry_exceptions import (
 )
 
 # Type variable for model implementation
-M = TypeVar('M', bound=BaseProviderModel)
+M = TypeVar("M", bound=BaseProviderModel)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -80,22 +80,20 @@ class ModelRegistry(Generic[M]):
             model_info (ModelInfo): The configuration and metadata for model instantiation or update.
         """
         with self._lock:
-            model = ModelFactory.create_model_from_info(
-                model_info=model_info
-            )
+            model = ModelFactory.create_model_from_info(model_info=model_info)
             self._models[model_info.id] = model
             self._model_infos[model_info.id] = model_info
 
     def get_model(self, model_id: str) -> M:
         """
         Lazily instantiate the model when first requested.
-        
+
         Args:
             model_id: Unique identifier of the model
-            
+
         Returns:
             The model instance of type M
-            
+
         Raises:
             ValueError: If model_id is empty
             ModelNotFoundError: If the model is not registered

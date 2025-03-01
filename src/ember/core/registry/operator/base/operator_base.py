@@ -73,7 +73,9 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         raise NotImplementedError("Subclasses must implement forward()")
 
-    def __call__(self, *, inputs: Union[T_in, Dict[str, Any]] = None, **kwargs) -> T_out:
+    def __call__(
+        self, *, inputs: Union[T_in, Dict[str, Any]] = None, **kwargs
+    ) -> T_out:
         """Executes the operator with automatic input and output validation.
 
         This method orchestrates the execution flow:
@@ -129,9 +131,13 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
 
             # Ensure we have a proper model instance for the output
             # If we got a dict, convert it to the appropriate model
-            if isinstance(operator_output, dict) and hasattr(signature, 'output_model') and signature.output_model:
+            if (
+                isinstance(operator_output, dict)
+                and hasattr(signature, "output_model")
+                and signature.output_model
+            ):
                 operator_output = signature.output_model.model_validate(operator_output)
-                
+
             # Final validation to ensure type consistency
             validated_output: T_out = signature.validate_output(output=operator_output)
             return validated_output

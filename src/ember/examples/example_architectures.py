@@ -10,16 +10,22 @@ from ember.core.registry.prompt_signature.signatures import Signature
 
 class NetworkInput(EmberModel):
     """Input model for network operators."""
+
     query: str = Field(description="The query to process")
-    
+
+
 class NetworkOutput(EmberModel):
     """Output model for network operators."""
+
     final_answer: str = Field(description="The final processed answer")
-    
+
+
 class SubNetworkSignature(Signature):
     """Signature for SubNetwork operator."""
+
     input_model: Type[EmberModel] = NetworkInput
     output_model: Type[EmberModel] = NetworkOutput
+
 
 class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     """SubNetwork that composes an ensemble with verification.
@@ -39,7 +45,9 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     def __init__(self) -> None:
         """Initializes the SubNetwork with a specified ensemble and verification components."""
         super().__init__()
-        self.ensemble = non.UniformEnsemble(num_units=2, model_name="gpt-4o", temperature=0.0)
+        self.ensemble = non.UniformEnsemble(
+            num_units=2, model_name="gpt-4o", temperature=0.0
+        )
         self.verifier = non.Verifier(model_name="gpt-4o", temperature=0.0)
 
     def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
@@ -54,36 +62,44 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
         # Process through ensemble
         ensemble_input = {"query": inputs.query}
         ensemble_result = self.ensemble(inputs=ensemble_input)
-        
+
         # Extract ensemble result explicitly
-        if not isinstance(ensemble_result, dict) or "final_answer" not in ensemble_result:
+        if (
+            not isinstance(ensemble_result, dict)
+            or "final_answer" not in ensemble_result
+        ):
             candidate_answer = ""
         else:
             candidate_answer = ensemble_result["final_answer"]
-        
+
         # Prepare verification input
         verification_input = {
             "query": inputs.query,
             "candidate_answer": candidate_answer,
         }
-        
+
         # Verify the ensemble's output
         verified_result = self.verifier(inputs=verification_input)
-        
+
         # Extract result explicitly - no hidden error handling
-        if not isinstance(verified_result, dict) or "final_answer" not in verified_result:
+        if (
+            not isinstance(verified_result, dict)
+            or "final_answer" not in verified_result
+        ):
             final_answer = ""
         else:
             final_answer = verified_result["final_answer"]
-            
+
         # Return structured output
         return NetworkOutput(final_answer=final_answer)
 
 
 class NestedNetworkSignature(Signature):
     """Signature for NestedNetwork operator."""
+
     input_model: Type[EmberModel] = NetworkInput
     output_model: Type[EmberModel] = NetworkOutput
+
 
 class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
     """Nested network that aggregates results from multiple sub-networks and applies a final judgment.
@@ -120,19 +136,15 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
         # Process through parallel sub-networks
         s1_out = self.sub1(inputs=inputs)
         s2_out = self.sub2(inputs=inputs)
-        
+
         # Synthesize results using the judge
         judged_result = self.judge(
-            query=inputs.query,
-            responses=[
-                s1_out.final_answer,
-                s2_out.final_answer
-            ]
+            query=inputs.query, responses=[s1_out.final_answer, s2_out.final_answer]
         )
-        
+
         # Extract the final answer
         final_answer = judged_result.final_answer
-            
+
         # Return structured output
         return NetworkOutput(final_answer=final_answer)
 
@@ -149,7 +161,7 @@ def nested_module_graph() -> Operator[NetworkInput, NetworkOutput]:
 if __name__ == "__main__":
     # Initialize the ember context first
     context = get_ember_context()
-    
+
     # Quick test invocation using explicit method calls with named parameters.
     network = nested_module_graph()
     test_input = NetworkInput(query="Hello from the new approach")

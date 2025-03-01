@@ -11,7 +11,10 @@ import threading
 from contextlib import ContextDecorator
 from typing import Any, Dict, Optional, Type, Union
 
-from ember.xcs.engine.xcs_engine import IScheduler, TopologicalSchedulerWithParallelDispatch
+from ember.xcs.engine.xcs_engine import (
+    IScheduler,
+    TopologicalSchedulerWithParallelDispatch,
+)
 
 
 class ExecutionOptions(ContextDecorator):
@@ -29,10 +32,10 @@ class ExecutionOptions(ContextDecorator):
     _local = threading.local()
 
     def __init__(
-        self, 
-        *, 
+        self,
+        *,
         scheduler: Union[str, IScheduler] = "parallel",
-        max_workers: Optional[int] = None
+        max_workers: Optional[int] = None,
     ) -> None:
         """Initialize execution options.
 
@@ -93,9 +96,12 @@ class ExecutionOptions(ContextDecorator):
         if self.scheduler == "sequential":
             # Import here to avoid circular imports
             from ember.xcs.engine.xcs_noop_scheduler import NoopScheduler
+
             return NoopScheduler()
         else:  # Default to parallel
-            return TopologicalSchedulerWithParallelDispatch(max_workers=self.max_workers)
+            return TopologicalSchedulerWithParallelDispatch(
+                max_workers=self.max_workers
+            )
 
     def _set_current(self, ctx: ExecutionOptions) -> None:
         """Set the current execution options context.
@@ -112,9 +118,7 @@ class ExecutionOptions(ContextDecorator):
 
 # Convenience function for use as context manager
 def execution_options(
-    *, 
-    scheduler: Union[str, IScheduler] = "parallel",
-    max_workers: Optional[int] = None
+    *, scheduler: Union[str, IScheduler] = "parallel", max_workers: Optional[int] = None
 ) -> ExecutionOptions:
     """Create an execution options context.
 

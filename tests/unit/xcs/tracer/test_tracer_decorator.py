@@ -117,19 +117,19 @@ class DummyOperator(Operator[DummyInput, DummyOutput]):
 def test_jit_decorator_execution() -> None:
     """Tests that the JIT-decorated operator executes its forward method on each call."""
     operator_instance: DummyOperator = DummyOperator()
-    
+
     # First call
     output_first: DummyOutput = operator_instance(inputs={"x": 5})
     assert output_first.y == 1, "Expected first counter value to be 1"
-    
+
     # Second call with different input
     output_second: DummyOutput = operator_instance(inputs={"x": 6})
     assert output_second.y == 2, "Expected second counter value to be 2"
-    
+
     # Third call with first input again
     output_third: DummyOutput = operator_instance(inputs={"x": 5})
     assert output_third.y == 3, "Expected third counter value to be 3"
-    
+
     # Verify final counter state
     assert (
         operator_instance.counter == 3
@@ -160,7 +160,7 @@ def test_jit_decorator_force_trace() -> None:
     assert (
         output_first != output_second
     ), "Expected distinct output due to forced trace."
-    
+
     # Third call with same input should still increment the counter
     output_third: DummyOutput = operator_instance(inputs={"x": 10})
     assert (

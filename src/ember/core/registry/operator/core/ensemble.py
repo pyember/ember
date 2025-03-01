@@ -21,10 +21,11 @@ class EnsembleOperatorInputs(EmberModel):
 
 class EnsembleOperatorOutputs(EmberModel):
     """Output model for EnsembleOperator.
-    
+
     Attributes:
         responses (List[str]): List of LM responses to the prompt.
     """
+
     responses: List[str]
 
 
@@ -32,8 +33,7 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]
     """Operator that executes parallel calls to multiple LMModules concurrently."""
 
     signature: Signature = Signature(
-        input_model=EnsembleOperatorInputs,
-        output_model=EnsembleOperatorOutputs
+        input_model=EnsembleOperatorInputs, output_model=EnsembleOperatorOutputs
     )
     lm_modules: List[LMModule]
 

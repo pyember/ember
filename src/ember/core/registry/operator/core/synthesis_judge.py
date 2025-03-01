@@ -75,10 +75,10 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutput
         final_answer = "Unknown"
         reasoning_lines: List[str] = []
         in_reasoning_section = False
-        
+
         for line in raw_output.splitlines():
             line = line.strip()
-            
+
             if line.startswith("Final Answer:"):
                 final_answer = line.replace("Final Answer:", "").strip()
                 break
@@ -89,10 +89,7 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutput
                     reasoning_lines.append(reasoning_part)
             elif in_reasoning_section:
                 reasoning_lines.append(line)
-                
+
         reasoning = "\n".join(reasoning_lines)
 
-        return {
-            "final_answer": final_answer,
-            "reasoning": reasoning
-        }
+        return {"final_answer": final_answer, "reasoning": reasoning}

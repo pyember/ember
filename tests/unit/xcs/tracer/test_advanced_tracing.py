@@ -365,7 +365,7 @@ def test_parallel_execution_wide_ensemble() -> None:
 
 def test_jit_tracing() -> None:
     """Tests that the JIT-decorated operator traces execution.
-    
+
     Note: This test was previously called test_jit_caching but has been updated to match
     the current implementation which focuses on tracing rather than caching.
     """
@@ -388,27 +388,29 @@ def test_jit_tracing() -> None:
             return {"responses": responses}
 
     op: TracedOperator = TracedOperator(num_members=5)
-    
+
     # First call with a unique input
     input_data_1: DummyInputs = DummyInputs(query="test_1")
     _ = op(inputs=input_data_1)
     first_count: int = op.call_count
-    
+
     # Second call with same input
     _ = op(inputs=input_data_1)
     second_count: int = op.call_count
     assert second_count > first_count, "Expected call_count to increase with each call"
-    
+
     # Third call with different input
     input_data_2: DummyInputs = DummyInputs(query="test_2")
     _ = op(inputs=input_data_2)
     third_count: int = op.call_count
     assert third_count > second_count, "Expected call_count to continue increasing"
-    
+
     # Verify operation with a tracer context
     with TracerContext() as tracer:
         _ = op(inputs=input_data_1)
-        assert len(tracer.records) >= 1, "Expected trace records when within a TracerContext"
+        assert (
+            len(tracer.records) >= 1
+        ), "Expected trace records when within a TracerContext"
 
 
 def test_error_handling() -> None:
@@ -454,7 +456,7 @@ def test_jit_produces_xcs_graph_and_parallel_speedup() -> None:
     @jit(force_trace=True)
     class TestDelayEnsembleOperator(DelayEnsembleOperator):
         pass
-    
+
     ensemble = TestDelayEnsembleOperator(num_members=num_members, delay=delay)
 
     # Confirm JIT tracing: run inside a TracerContext to verify trace records are produced.

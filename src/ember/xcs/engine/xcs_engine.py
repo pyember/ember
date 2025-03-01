@@ -16,7 +16,7 @@ from ..graph.xcs_graph import XCSGraph
 from ember.core.types.xcs_types import XCSNode, XCSGraph, XCSPlan as XCSPlanProtocol
 
 # Type for results from node execution
-XCSResult = TypeVar('XCSResult')
+XCSResult = TypeVar("XCSResult")
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class XCSPlan:
     def __init__(self, tasks: Dict[str, XCSPlanTask], original_graph: XCSGraph) -> None:
         """
         Initialize an execution plan.
-        
+
         Args:
             tasks: Dictionary mapping node IDs to plan tasks
             original_graph: The original graph this plan was compiled from
@@ -62,7 +62,7 @@ class XCSPlan:
     def tasks(self) -> Dict[str, XCSPlanTask]:
         """
         Get all tasks in this plan.
-        
+
         Returns:
             Dictionary mapping node IDs to tasks
         """
@@ -114,12 +114,12 @@ class IScheduler(ABC):
     ) -> Dict[str, Any]:
         """
         Execute the given plan concurrently and return a mapping of node outputs.
-        
+
         Args:
             plan: Execution plan to run
             global_input: Input data available to all nodes
             graph: Original graph containing node definitions
-            
+
         Returns:
             Dictionary mapping node IDs to execution results
         """
@@ -134,7 +134,7 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     def __init__(self, *, max_workers: Optional[int] = None) -> None:
         """
         Initialize the scheduler.
-        
+
         Args:
             max_workers: Maximum number of concurrent workers. None means auto.
         """
@@ -210,13 +210,13 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     ) -> Dict[str, Any]:
         """
         Gathers inputs for a node by merging global input with outputs from upstream tasks.
-        
+
         Args:
             node_id: ID of the node to gather inputs for
             results: Results from previously executed nodes
             global_input: Input data available to all nodes
             graph: Original graph containing node definitions
-            
+
         Returns:
             Dictionary of input data for the node
         """
@@ -239,12 +239,12 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     ) -> Any:
         """
         Executes the operator for a given node.
-        
+
         Args:
             node_id: ID of the node to execute
             input_data: Input data for the node
             graph: Original graph containing node definitions
-            
+
         Returns:
             Result of the operator execution
         """
@@ -272,13 +272,13 @@ def execute_graph(
 
     If 'graph' has a 'nodes' attribute, it is assumed to be an XCSGraph and is compiled.
     Otherwise, it is assumed to be an XCSPlan, in which case we use its original_graph.
-    
+
     Args:
         graph: Graph or plan to execute
         global_input: Input data available to all nodes
         scheduler: Optional custom scheduler implementation
         concurrency: Whether to execute nodes concurrently
-        
+
     Returns:
         Dictionary mapping node IDs to execution results
     """

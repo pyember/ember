@@ -18,9 +18,10 @@ from ember.xcs.graph.xcs_graph import XCSGraph
 # Mock Execution Setup
 ###############################################################################
 
+
 def build_graph_example() -> None:
     """Demonstrate graph building from trace records with nested operators."""
-    
+
     # Create trace records that represent a nested execution pattern:
     # Top level pipeline contains nested operators
     records = [
@@ -71,36 +72,36 @@ def build_graph_example() -> None:
             node_id="next1",
             inputs={
                 "previous_result": "Machine learning is...",
-                "answer": "Answer 1"  # This creates a data dependency with Generator1's output
+                "answer": "Answer 1",  # This creates a data dependency with Generator1's output
             },
             outputs={"new_query": "Tell me more about supervised learning"},
             timestamp=2.0,  # Executed after pipeline
         ),
     ]
-    
+
     # Build graph with standard dependency analysis (no hierarchy awareness)
     basic_builder = AutoGraphBuilder()
     # Disable hierarchy analysis by providing empty map
     basic_builder._build_hierarchy_map = lambda records: {}
     basic_graph = basic_builder.build_graph(records)
-    
+
     # Build graph with hierarchical dependency analysis
     enhanced_builder = AutoGraphBuilder()
     # Explicitly define hierarchy to demonstrate the point more clearly
     hierarchy_map = {
         "pipeline1": ["refiner1", "ensemble1", "agg1"],
-        "ensemble1": ["gen1", "gen2"]
+        "ensemble1": ["gen1", "gen2"],
     }
     enhanced_builder._build_hierarchy_map = lambda records: hierarchy_map
     enhanced_graph = enhanced_builder.build_graph(records)
-    
+
     # Print the results
     print("\n--- BASIC GRAPH (without hierarchical analysis) ---")
     print_graph_dependencies(basic_graph)
-    
+
     print("\n--- ENHANCED GRAPH (with hierarchical analysis) ---")
     print_graph_dependencies(enhanced_graph)
-    
+
     # Print the key differences
     print("\n--- KEY DIFFERENCES (EXPECTED) ---")
     print("In a correctly implemented hierarchical analysis:")
@@ -108,21 +109,30 @@ def build_graph_example() -> None:
     print("   (since they are nested inside Ensemble)")
     print("2. Aggregator should NOT depend on Generator1 and Generator2 directly")
     print("   (should depend only on Ensemble)")
-    
+
     # Check if the outputs match our expectations
     has_expected_difference = False
     for node_id, node in enhanced_graph.nodes.items():
         if node_id == "NextQuery_6":
-            if "Generator1_3" not in node.inbound_edges and "Generator2_4" not in node.inbound_edges:
+            if (
+                "Generator1_3" not in node.inbound_edges
+                and "Generator2_4" not in node.inbound_edges
+            ):
                 has_expected_difference = True
-                
+
     print("\n--- ACTUAL RESULTS ---")
     if has_expected_difference:
-        print("SUCCESS: The hierarchical analysis correctly eliminated false dependencies!")
+        print(
+            "SUCCESS: The hierarchical analysis correctly eliminated false dependencies!"
+        )
     else:
         print("NOTE: In this example run, both graphs show similar dependencies.")
-        print("This happens because the automatic hierarchy detection in _build_hierarchy_map")
-        print("depends on execution patterns that may not be perfectly captured in our mocked example.")
+        print(
+            "This happens because the automatic hierarchy detection in _build_hierarchy_map"
+        )
+        print(
+            "depends on execution patterns that may not be perfectly captured in our mocked example."
+        )
 
 
 def print_graph_dependencies(graph: XCSGraph) -> None:
@@ -140,10 +150,12 @@ def print_graph_dependencies(graph: XCSGraph) -> None:
 def main() -> None:
     """Run the nested operator analysis demonstration."""
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    
+
     print("Enhanced JIT Example - Testing Hierarchical Dependency Analysis")
-    print("This demonstrates how the enhanced JIT system correctly handles nested operators.\n")
-    
+    print(
+        "This demonstrates how the enhanced JIT system correctly handles nested operators.\n"
+    )
+
     build_graph_example()
 
 

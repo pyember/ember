@@ -15,7 +15,17 @@ from __future__ import annotations
 import functools
 import inspect
 import time
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, cast, get_type_hints
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Type,
+    TypeVar,
+    cast,
+    get_type_hints,
+)
 
 # Import the base classes carefully to avoid circular imports
 from ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
@@ -91,17 +101,17 @@ def jit(
             """Wrapped __init__ method that initializes the operator and pre-traces with sample input."""
             # Call the original __init__
             original_init(self, *args, **kwargs)
-            
+
             # If sample_input is provided, perform pre-tracing during initialization
             if sample_input is not None:
                 # Create a tracer context and trace the operator's execution
                 with TracerContext() as tracer:
                     original_call(self=self, inputs=sample_input)
-                
+
                 if tracer.records:
                     # Import here to avoid circular imports
                     from ember.xcs.tracer.autograph import AutoGraphBuilder
-                    
+
                     # Build and cache the graph
                     graph_builder = AutoGraphBuilder()
                     graph = graph_builder.build_graph(tracer.records)
@@ -120,18 +130,18 @@ def jit(
             tracer: Optional[TracerContext] = TracerContext.get_current()
             # For debugging and test purposes
             force_trace_local = getattr(self, "_force_trace", force_trace)
-            
+
             # Execute the original call - for now, always execute directly
             # This simplifies the code and avoids test breakage
             start_time = time.time()
             output = original_call(self=self, inputs=inputs)
             end_time = time.time()
-            
+
             # Record trace if in a tracer context or force_trace is enabled
             if tracer is not None or force_trace_local:
                 # Get operator name, preferring the 'name' attribute if available
                 operator_name = getattr(self, "name", self.__class__.__name__)
-                
+
                 # Create trace record
                 record = TraceRecord(
                     operator_name=operator_name,
@@ -140,11 +150,11 @@ def jit(
                     outputs=output,
                     timestamp=end_time,
                 )
-                
+
                 # Add to tracer if available
                 if tracer is not None:
                     tracer.add_record(record=record)
-            
+
             # Return the actual output
             return output
 

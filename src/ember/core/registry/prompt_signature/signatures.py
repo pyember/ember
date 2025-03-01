@@ -78,7 +78,9 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
                 )
         return self
 
-    def render_prompt(self, *, inputs: Union[Dict[str, Any], BaseModel, EmberModel]) -> str:
+    def render_prompt(
+        self, *, inputs: Union[Dict[str, Any], BaseModel, EmberModel]
+    ) -> str:
         """Render a prompt using the provided inputs.
 
         If a prompt_template is specified, formats it using the given inputs.
@@ -120,7 +122,9 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
 
         if self.input_model is not None:
             required_fields: List[str] = self._get_required_fields()
-            return "\n".join(str(input_dict.get(field, "")) for field in required_fields)
+            return "\n".join(
+                str(input_dict.get(field, "")) for field in required_fields
+            )
 
         error_msg: str = (
             "No prompt_template or input_model defined for rendering prompt."

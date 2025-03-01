@@ -70,7 +70,9 @@ except ImportError:
 # Alias re-export types for backward compatibility with clients/tests from before our
 # registry refactor.
 from ember.core.registry.operator.core.ensemble import EnsembleOperatorOutputs
-from ember.core.registry.operator.core.most_common import MostCommonAnswerSelectorOutputs
+from ember.core.registry.operator.core.most_common import (
+    MostCommonAnswerSelectorOutputs,
+)
 
 EnsembleInputs = EnsembleOperatorInputs
 MostCommonInputs = MostCommonAnswerSelectorOperatorInputs

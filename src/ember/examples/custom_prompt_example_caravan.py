@@ -102,7 +102,7 @@ def register_custom_model() -> ModelInfo:
     # Get the registry from the global context
     context = get_ember_context()
     registry = context.registry
-    
+
     model_info = ModelInfo(
         model_id=custom_model,
         model_name=custom_model,
@@ -162,7 +162,7 @@ CARAVAN_PROMPT_FULL = (
 # ------------------------------------------------------------------------------------
 class CaravanLabelingInputs(EmberModel):
     """Input model for network traffic flow labeling.
-    
+
     Attributes:
         question: The unlabeled flows to be classified.
     """
@@ -172,21 +172,23 @@ class CaravanLabelingInputs(EmberModel):
 
 class CaravanLabelingOutput(EmberModel):
     """Output model for network traffic flow labeling.
-    
+
     Attributes:
         final_answer: The labeled flow classifications.
     """
-    
-    final_answer: str = Field(description="Labeled flow classifications (0=benign, 1=malicious)")
+
+    final_answer: str = Field(
+        description="Labeled flow classifications (0=benign, 1=malicious)"
+    )
 
 
 class CaravanLabelingSignature(Signature):
     """Signature for the CaravanLabelingOperator.
-    
+
     Defines input/output models and the multi-part prompt template
     for network traffic flow labeling.
     """
-    
+
     input_model: Type[EmberModel] = CaravanLabelingInputs
     output_model: Type[EmberModel] = CaravanLabelingOutput
     prompt_template: str = CARAVAN_PROMPT_FULL
@@ -197,7 +199,7 @@ class CaravanLabelingSignature(Signature):
 # ------------------------------------------------------------------------------------
 class SimplePromptInputs(EmberModel):
     """The request for a simple question like "What is the capital of India?"
-    
+
     Attributes:
         question: The question to be answered.
     """
@@ -207,20 +209,20 @@ class SimplePromptInputs(EmberModel):
 
 class SimplePromptOutput(EmberModel):
     """Output model for simple question answering.
-    
+
     Attributes:
         final_answer: The concise answer to the question.
     """
-    
+
     final_answer: str = Field(description="Concise answer to the question")
 
 
 class SimplePromptSignature(Signature):
     """Signature for the SimplePromptOperator.
-    
+
     Defines input/output models and prompt template for single-sentence Q&A.
     """
-    
+
     input_model: Type[EmberModel] = SimplePromptInputs
     output_model: Type[EmberModel] = SimplePromptOutput
     prompt_template: str = (
@@ -238,10 +240,10 @@ from ember.core import non
 
 class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
     """Single-step operator for simple question answering.
-    
+
     This operator uses a single-instance ensemble to process a question
     and produce a concise answer.
-    
+
     Attributes:
         signature: The signature defining input/output models and prompt template.
         ensemble: The UniformEnsemble operator with a single LM instance.
@@ -252,45 +254,42 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
 
     def __init__(self, model_name: str) -> None:
         """Initialize with a specific model name.
-        
+
         Args:
             model_name: Name of the model to use for answering.
         """
         self.ensemble = non.UniformEnsemble(
-            num_units=1, 
-            model_name=model_name, 
-            temperature=0.2, 
-            max_tokens=64
+            num_units=1, model_name=model_name, temperature=0.2, max_tokens=64
         )
 
     def forward(self, *, inputs: SimplePromptInputs) -> SimplePromptOutput:
         """Process the input question and produce a concise answer.
-        
+
         Args:
             inputs: The validated input containing the question.
-            
+
         Returns:
             A SimplePromptOutput with the final answer.
         """
         # Construct prompt from input
         prompt = self.signature.render_prompt(inputs=inputs)
-        
+
         # Process through ensemble
         ensemble_result = self.ensemble(query=prompt)
-        
+
         # Extract the final_answer from the ensemble result
         final_answer = ensemble_result.final_answer
-            
+
         # Return structured output
         return SimplePromptOutput(final_answer=final_answer)
 
 
 class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOutput]):
     """Operator that labels network flows as benign (0) or malicious (1).
-    
+
     This operator uses a multi-part prompt with domain-specific context
     and aggregates results from multiple LMs via a judge synthesis step.
-    
+
     Attributes:
         signature: The signature defining input/output models and prompt template.
         ensemble: The ensemble operator for generating multiple candidate labels.
@@ -303,49 +302,41 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
 
     def __init__(self, model_name: str) -> None:
         """Initialize with a specific model name.
-        
+
         Args:
             model_name: Name of the model to use for labeling.
         """
         self.ensemble = non.UniformEnsemble(
-            num_units=3, 
-            model_name=model_name, 
-            temperature=0.0, 
-            max_tokens=256
+            num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
         )
         self.judge = non.JudgeSynthesis(
-            model_name=model_name, 
-            temperature=0.0, 
-            max_tokens=256
+            model_name=model_name, temperature=0.0, max_tokens=256
         )
 
     def forward(self, *, inputs: CaravanLabelingInputs) -> CaravanLabelingOutput:
         """Process network flows and produce labeled classifications.
-        
+
         Args:
             inputs: The validated input containing unlabeled flows.
-            
+
         Returns:
             A CaravanLabelingOutput with the classified flows.
         """
         # Construct prompt from input
         prompt = self.signature.render_prompt(inputs=inputs)
-        
+
         # Process through ensemble to get multiple labeling attempts
         ensemble_output = self.ensemble(query=prompt)
-        
+
         # Extract the responses from the ensemble output
         responses = ensemble_output.responses
-        
+
         # Synthesize results using judge
-        judge_output = self.judge(
-            query=prompt, 
-            responses=responses
-        )
-        
+        judge_output = self.judge(query=prompt, responses=responses)
+
         # Extract the final answer from the judge output
         final_labels = judge_output.final_answer
-            
+
         # Return structured output
         return CaravanLabelingOutput(final_answer=final_labels)
 
@@ -353,24 +344,28 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
 # ------------------------------------------------------------------------------------
 # Graph/Pipeline Constructors
 # ------------------------------------------------------------------------------------
-def create_simple_pipeline(model_name: str) -> Operator[SimplePromptInputs, SimplePromptOutput]:
+def create_simple_pipeline(
+    model_name: str,
+) -> Operator[SimplePromptInputs, SimplePromptOutput]:
     """Create a single-step operator for simple question answering.
-    
+
     Args:
         model_name: Name of the model to use.
-        
+
     Returns:
         A strongly-typed SimplePromptOperator instance.
     """
     return SimplePromptOperator(model_name)
 
 
-def create_caravan_pipeline(model_name: str) -> Operator[CaravanLabelingInputs, CaravanLabelingOutput]:
+def create_caravan_pipeline(
+    model_name: str,
+) -> Operator[CaravanLabelingInputs, CaravanLabelingOutput]:
     """Create a single-step operator for network flow labeling.
-    
+
     Args:
         model_name: Name of the model to use.
-        
+
     Returns:
         A strongly-typed CaravanLabelingOperator instance.
     """

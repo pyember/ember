@@ -171,7 +171,6 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
         )
 
 
-
 ###############################################################################
 # 1) SingleModelBaseline pipeline
 ###############################################################################
@@ -211,13 +210,13 @@ class SingleModelBaseline(
         description="One-LM baseline with EnsureValidChoice.",
         signature=signature,
     )
-    
+
     # Declare instance variables
     model_name: str
     temperature: float
     ensemble: non.UniformEnsemble
     ensure_valid_choice: EnsureValidChoiceOperator
-    
+
     def __init__(
         self,
         *,
@@ -233,12 +232,10 @@ class SingleModelBaseline(
         # Store instance configuration
         self.model_name = model_name
         self.temperature = temperature
-        
+
         # Create component operators
         self.ensemble = non.UniformEnsemble(
-            num_units=1, 
-            model_name=model_name, 
-            temperature=temperature
+            num_units=1, model_name=model_name, temperature=temperature
         )
         self.ensure_valid_choice = EnsureValidChoiceOperator(
             model_name=model_name,
@@ -247,7 +244,9 @@ class SingleModelBaseline(
             max_retries=1,
         )
 
-    def forward(self, *, inputs: SingleModelBaselineInputs) -> SingleModelBaselineOutputs:
+    def forward(
+        self, *, inputs: SingleModelBaselineInputs
+    ) -> SingleModelBaselineOutputs:
         """Executes the SingleModelBaseline pipeline.
 
         Args:
@@ -259,7 +258,7 @@ class SingleModelBaseline(
         # Step 1: Generate responses using the ensemble
         ensemble_output = self.ensemble(query=inputs.query)
         responses = ensemble_output.responses
-        
+
         # If we have a response, use the first one as our answer
         intermediate_answer = responses[0] if responses else ""
 
@@ -269,7 +268,7 @@ class SingleModelBaseline(
             partial_answer=intermediate_answer,
             choices=inputs.choices,
         )
-        
+
         # Return the final answer
         return SingleModelBaselineOutputs(
             final_answer=valid_choice_output.get("final_answer", "")
@@ -316,7 +315,7 @@ class MultiModelEnsemble(
         description="Multi-model ensemble aggregator with judge step.",
         signature=signature,
     )
-    
+
     # Declare instance variables
     model_name: str
     temperature: float
@@ -339,22 +338,14 @@ class MultiModelEnsemble(
         # Store instance configuration
         self.model_name = model_name
         self.temperature = temperature
-        
+
         # Create component operators
         self.ensemble = non.UniformEnsemble(
-            num_units=3, 
-            model_name=model_name, 
-            temperature=temperature
+            num_units=3, model_name=model_name, temperature=temperature
         )
-        self.judge = non.JudgeSynthesis(
-            model_name=model_name, 
-            temperature=temperature
-        )
+        self.judge = non.JudgeSynthesis(model_name=model_name, temperature=temperature)
         self.ensure_answer_format_validity = EnsureValidChoiceOperator(
-            model_name=model_name, 
-            temperature=0.1, 
-            max_tokens=16, 
-            max_retries=1
+            model_name=model_name, temperature=0.1, max_tokens=16, max_retries=1
         )
 
     def forward(self, *, inputs: MultiModelEnsembleInputs) -> MultiModelEnsembleOutputs:
@@ -371,19 +362,14 @@ class MultiModelEnsemble(
         responses = ensemble_output.responses
 
         # Step 2: Synthesize responses using judge
-        judge_output = self.judge(
-            query=inputs.query, 
-            responses=responses
-        )
+        judge_output = self.judge(query=inputs.query, responses=responses)
         judge_answer = judge_output.final_answer
 
         # Step 3: Ensure the answer is valid
         valid_choice_output = self.ensure_answer_format_validity(
-            query=inputs.query,
-            partial_answer=judge_answer,
-            choices=inputs.choices
+            query=inputs.query, partial_answer=judge_answer, choices=inputs.choices
         )
-        
+
         # Return the final answer
         return MultiModelEnsembleOutputs(
             final_answer=valid_choice_output.get("final_answer", "")
@@ -432,7 +418,7 @@ class VariedModelEnsemble(
         ),
         signature=signature,
     )
-    
+
     # Declare instance variables
     model_configs: List[LMModuleConfig]
     ensemble: non.VariedEnsemble
@@ -449,16 +435,15 @@ class VariedModelEnsemble(
         """
         # Store instance configuration
         self.model_configs = model_configs
-        
+
         # Configure aggregator model parameters
         self.aggregator_model_name = "openai:o1"
         self.aggregator_temp = 0.7
-        
+
         # Create component operators
         self.ensemble = non.VariedEnsemble(model_configs=model_configs)
         self.judge = non.JudgeSynthesis(
-            model_name=self.aggregator_model_name, 
-            temperature=self.aggregator_temp
+            model_name=self.aggregator_model_name, temperature=self.aggregator_temp
         )
         self.ensure_answer_format_validity = EnsureValidChoiceOperator(
             model_name=self.aggregator_model_name,
@@ -467,7 +452,9 @@ class VariedModelEnsemble(
             max_retries=1,
         )
 
-    def forward(self, *, inputs: VariedModelEnsembleInputs) -> VariedModelEnsembleOutputs:
+    def forward(
+        self, *, inputs: VariedModelEnsembleInputs
+    ) -> VariedModelEnsembleOutputs:
         """Executes the VariedModelEnsemble pipeline.
 
         Args:
@@ -481,10 +468,7 @@ class VariedModelEnsemble(
         responses = ensemble_output.responses
 
         # Step 2: Synthesize responses using judge
-        judge_output = self.judge(
-            query=inputs.query, 
-            responses=responses
-        )
+        judge_output = self.judge(query=inputs.query, responses=responses)
         judge_answer = judge_output.final_answer
 
         # Step 3: Ensure the answer is valid
@@ -493,7 +477,7 @@ class VariedModelEnsemble(
             partial_answer=judge_answer,
             choices=inputs.choices,
         )
-        
+
         # Return the final answer
         return VariedModelEnsembleOutputs(
             final_answer=valid_choice_output.get("final_answer", "")

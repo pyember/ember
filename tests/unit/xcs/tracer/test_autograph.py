@@ -14,7 +14,7 @@ from ember.xcs.tracer.xcs_tracing import TraceRecord
 
 class TestAutoGraphBuilder(unittest.TestCase):
     """Tests for the AutoGraphBuilder class."""
-    
+
     def test_build_simple_graph(self) -> None:
         """Test building a simple graph with sequential dependencies."""
         # Create a series of trace records that form a linear chain
@@ -41,21 +41,21 @@ class TestAutoGraphBuilder(unittest.TestCase):
                 timestamp=3.0,
             ),
         ]
-        
+
         # Build the graph
         builder = AutoGraphBuilder()
         graph = builder.build_graph(records)
-        
+
         # Verify the graph structure
         self.assertEqual(len(graph.nodes), 3)
         self.assertIn("Op1_0", graph.nodes)
         self.assertIn("Op2_1", graph.nodes)
         self.assertIn("Op3_2", graph.nodes)
-        
+
         # Check dependencies - Op2 should depend on Op1, Op3 should depend on Op2
         self.assertIn("Op1_0", graph.nodes["Op2_1"].inbound_edges)
         self.assertIn("Op2_1", graph.nodes["Op3_2"].inbound_edges)
-    
+
     def test_build_graph_with_branches(self) -> None:
         """Test building a graph with branching dependencies."""
         # Create trace records that form a diamond pattern:
@@ -91,23 +91,23 @@ class TestAutoGraphBuilder(unittest.TestCase):
                 timestamp=3.0,
             ),
         ]
-        
+
         # Build the graph
         builder = AutoGraphBuilder()
         graph = builder.build_graph(records)
-        
+
         # Verify the graph structure
         self.assertEqual(len(graph.nodes), 4)
-        
+
         # Check dependencies
         self.assertIn("Op1_0", graph.nodes["Op2a_1"].inbound_edges)
         self.assertIn("Op1_0", graph.nodes["Op2b_2"].inbound_edges)
         self.assertIn("Op2a_1", graph.nodes["Op3_3"].inbound_edges)
         self.assertIn("Op2b_2", graph.nodes["Op3_3"].inbound_edges)
-        
+
     def test_build_graph_with_nested_operators(self) -> None:
         """Test building a graph with nested operator calls.
-        
+
         This scenario simulates a parent operator that calls child operators,
         where the child operators should not be directly dependent on the parent.
         """
@@ -143,29 +143,29 @@ class TestAutoGraphBuilder(unittest.TestCase):
                 timestamp=2.0,  # Executed after ParentOp
             ),
         ]
-        
+
         # Build the graph
         builder = AutoGraphBuilder()
-        
+
         # Create a manual hierarchy map to simulate nested execution
         hierarchy_map = {"parent1": ["child1", "child2"]}
         builder._build_hierarchy_map = lambda records: hierarchy_map
-        
+
         graph = builder.build_graph(records)
-        
+
         # Verify the graph structure
         self.assertEqual(len(graph.nodes), 4)
-        
+
         # Check dependencies - NextOp should depend on ParentOp, not on the child ops
         self.assertIn("ParentOp_0", graph.nodes["NextOp_3"].inbound_edges)
-        
+
         # Verify that NextOp does not directly depend on children
         self.assertNotIn("ChildOp1_1", graph.nodes["NextOp_3"].inbound_edges)
         self.assertNotIn("ChildOp2_2", graph.nodes["NextOp_3"].inbound_edges)
-        
+
     def test_complex_execution_flow(self) -> None:
         """Test building a graph with a complex execution flow.
-        
+
         This test simulates a complex execution with multiple paths and
         nested operators, to verify that the dependency analysis correctly
         handles complex flows.
@@ -176,7 +176,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # Main -> BranchA -> SubA1 -> MergePoint
         #     \-> BranchB -> SubB1 -/
         #                \-> SubB2
-        
+
         records = [
             # Main operator
             TraceRecord(
@@ -230,48 +230,45 @@ class TestAutoGraphBuilder(unittest.TestCase):
             TraceRecord(
                 operator_name="MergePoint",
                 node_id="merge",
-                inputs={
-                    "branch_a_out": "branch_a_result", 
-                    "subB1_out": "subB1_result"
-                },
+                inputs={"branch_a_out": "branch_a_result", "subB1_out": "subB1_result"},
                 outputs={"final": "merged_result"},
                 timestamp=4.0,
             ),
         ]
-        
+
         # Create a manual hierarchy map to simulate nested execution
         hierarchy_map = {
             "branchA": ["subA1"],
             "branchB": ["subB1", "subB2"],
         }
-        
+
         # Build the graph
         builder = AutoGraphBuilder()
         builder._build_hierarchy_map = lambda records: hierarchy_map
         graph = builder.build_graph(records)
-        
+
         # Verify correct dependencies
         self.assertIn("Main_0", graph.nodes["BranchA_1"].inbound_edges)
         self.assertIn("Main_0", graph.nodes["BranchB_3"].inbound_edges)
         self.assertIn("BranchA_1", graph.nodes["MergePoint_6"].inbound_edges)
-        
+
         # MergePoint should depend on SubB1, but not on SubB2 since it doesn't use its output
         self.assertIn("SubB1_4", graph.nodes["MergePoint_6"].inbound_edges)
-    
+
     def test_dependency_detection(self) -> None:
         """Test the dependency detection logic."""
         builder = AutoGraphBuilder()
-        
+
         # Test dictionary value dependency
         inputs = {"x": 1, "y": "output_from_previous"}
         outputs = {"result": "output_from_previous"}
         self.assertTrue(builder._has_dependency(inputs, outputs))
-        
+
         # Test no dependency
         inputs = {"x": 1, "y": "no_match"}
         outputs = {"result": "output_from_previous"}
         self.assertFalse(builder._has_dependency(inputs, outputs))
-        
+
         # Test direct value dependency
         inputs = {"x": 1, "y": "output_value"}
         outputs = "output_value"

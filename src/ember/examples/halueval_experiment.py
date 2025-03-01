@@ -193,7 +193,7 @@ def main() -> None:
         baseline_out = execute_graph(
             graph=baseline_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
         )
         base_pred: str = baseline_out.final_answer.upper()
         baseline_correct: int = 1 if base_pred == correct_answer else 0
@@ -202,7 +202,7 @@ def main() -> None:
         ensemble_out = execute_graph(
             graph=ensemble_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
         )
         ens_pred: str = ensemble_out.final_answer.upper()
         ensemble_correct: int = 1 if ens_pred == correct_answer else 0
@@ -211,7 +211,7 @@ def main() -> None:
         varied_out = execute_graph(
             graph=varied_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers
+            max_workers=args.max_workers,
         )
         varied_pred: str = varied_out.final_answer.upper()
         varied_correct: int = 1 if varied_pred == correct_answer else 0

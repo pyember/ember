@@ -41,13 +41,13 @@ print(f"Is dict: {isinstance(result, dict)}")
 print(f"Is EmberModel: {hasattr(result, 'model_dump')}")
 print(f"Has results attribute: {hasattr(result, 'results')}")
 
-if hasattr(result, 'results'):
+if hasattr(result, "results"):
     print(f"Results: {result.results}")
 
 # Print all attributes
 print("\nAll attributes:")
 for attr in dir(result):
-    if not attr.startswith('__') and not callable(getattr(result, attr)):
+    if not attr.startswith("__") and not callable(getattr(result, attr)):
         try:
             value = getattr(result, attr)
             print(f"  {attr}: {value}")

@@ -24,17 +24,18 @@ def usage_example() -> None:
     """
     # Initialize ember context
     context = get_ember_context()
-    
+
     # Define example prefixes
     example_prefixes: List[str] = ["PrefixA", "PrefixB", "PrefixC"]
-    
+
     # Create LM modules through the context
     lm_modules = [
-        LMModule(config=LMModuleConfig(
-            model_name="anthropic:claude-3-opus",
-            temperature=0.5,
-            max_tokens=256
-        )) for _ in range(3)
+        LMModule(
+            config=LMModuleConfig(
+                model_name="anthropic:claude-3-opus", temperature=0.5, max_tokens=256
+            )
+        )
+        for _ in range(3)
     ]
 
     # Instantiate the operator with named parameters.
@@ -51,7 +52,7 @@ def usage_example() -> None:
 
     # Execute the operator using __call__ with named parameters
     result = operator(inputs=inputs)
-    
+
     # Display structured results
     print(f"Number of responses: {len(result.responses)}")
     for i, response in enumerate(result.responses, 1):
@@ -70,24 +71,26 @@ class MultiPrefixOperatorInputs(EmberModel):
 
 class MultiPrefixOperatorOutputs(EmberModel):
     """Output model for MultiPrefixEnsembleOperator.
-    
+
     Attributes:
         responses: The list of responses from different LM modules.
     """
-    
+
     responses: List[str] = Field(description="Responses from different LM modules")
 
 
 class MultiPrefixEnsembleSignature(Signature):
     """Signature for MultiPrefixEnsembleOperator."""
-    
+
     input_model: Type[EmberModel] = MultiPrefixOperatorInputs
     output_model: Type[EmberModel] = MultiPrefixOperatorOutputs
 
 
-class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, MultiPrefixOperatorOutputs]):
+class MultiPrefixEnsembleOperator(
+    Operator[MultiPrefixOperatorInputs, MultiPrefixOperatorOutputs]
+):
     """Operator that applies different prefixes using multiple LM modules.
-    
+
     This operator randomly selects prefixes from a predefined list and applies them
     to the user query before sending to different language model modules.
     """
@@ -112,33 +115,35 @@ class MultiPrefixEnsembleOperator(Operator[MultiPrefixOperatorInputs, MultiPrefi
         self.prefixes = prefixes
         self.lm_modules = lm_modules
 
-    def forward(self, *, inputs: MultiPrefixOperatorInputs) -> MultiPrefixOperatorOutputs:
+    def forward(
+        self, *, inputs: MultiPrefixOperatorInputs
+    ) -> MultiPrefixOperatorOutputs:
         """Apply different prefixes to the query and process through LM modules.
-        
+
         Args:
             inputs: Validated input data containing the query.
-            
+
         Returns:
             Structured output containing responses from all LM modules.
         """
         # Randomly select prefixes to match the number of LM modules
         chosen_prefixes = sample(self.prefixes, len(self.lm_modules))
-        
+
         # Process each query with a different prefix through its LM module
         responses = []
         for prefix, lm in zip(chosen_prefixes, self.lm_modules):
             # Generate prompt with prefix
             prompt = f"{prefix}\n{inputs.query}"
-            
+
             # Call LM module
             response = lm(prompt=prompt)
-            
+
             # Guard against None responses
             if response is None:
                 response = ""
-                
+
             responses.append(response)
-            
+
         # Return structured output
         return MultiPrefixOperatorOutputs(responses=responses)
 

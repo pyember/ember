@@ -38,6 +38,10 @@ def test_ensemble_operator_forward() -> None:
         dummy_lm2(prompt=rendered_prompt),
     ]
 
-    assert isinstance(result, dict), "Result should be a dict (which will be converted to EnsembleOperatorOutputs by the framework)"
+    assert isinstance(
+        result, dict
+    ), "Result should be a dict (which will be converted to EnsembleOperatorOutputs by the framework)"
     assert "responses" in result, "Result should contain 'responses' key"
-    assert result["responses"] == expected_responses, "Responses should match expected responses"
+    assert (
+        result["responses"] == expected_responses
+    ), "Responses should match expected responses"

@@ -71,16 +71,16 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
         verdict = 0
         explanation = ""
         revised_answer = None
-        
+
         # Process each line with more robust parsing
         in_explanation_section = False
         in_revised_answer_section = False
         explanation_lines = []
         revised_answer_lines = []
-        
+
         for line in raw_output.split("\n"):
             clean_line = line.strip()
-            
+
             # Parse verdict
             if clean_line.startswith("Verdict:"):
                 verdict_value = clean_line.replace("Verdict:", "").strip()
@@ -90,7 +90,7 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
                 except ValueError:
                     # Handle text verdicts like "correct" or "incorrect"
                     verdict = 1 if "correct" in verdict_value.lower() else 0
-                    
+
             # Parse explanation
             elif clean_line.startswith("Explanation:"):
                 in_explanation_section = True
@@ -98,21 +98,21 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
                 explanation_part = clean_line.replace("Explanation:", "").strip()
                 if explanation_part:
                     explanation_lines.append(explanation_part)
-                    
-            # Parse revised answer    
+
+            # Parse revised answer
             elif clean_line.startswith("Revised Answer:"):
                 in_explanation_section = False
                 in_revised_answer_section = True
                 revised_part = clean_line.replace("Revised Answer:", "").strip()
                 if revised_part:
                     revised_answer_lines.append(revised_part)
-                    
+
             # Continue parsing multi-line sections
             elif in_explanation_section:
                 explanation_lines.append(clean_line)
             elif in_revised_answer_section:
                 revised_answer_lines.append(clean_line)
-        
+
         # Finalize parsing
         if explanation_lines:
             explanation = "\n".join(explanation_lines)
@@ -122,5 +122,5 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
         return {
             "verdict": verdict,
             "explanation": explanation,
-            "revised_answer": revised_answer
+            "revised_answer": revised_answer,
         }

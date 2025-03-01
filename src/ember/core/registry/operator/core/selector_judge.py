@@ -26,11 +26,12 @@ class SelectorJudgeOutputs(EmberModel):
 
 class SelectorJudgeOperatorOutputs(EmberModel):
     """Output model for SelectorJudgeOperator.
-    
+
     Attributes:
         final_answer (str): The selected best final answer.
         reasoning (str): Reasoning behind the selection.
     """
+
     final_answer: str
     reasoning: str
 
@@ -52,7 +53,9 @@ class SelectorJudgeSignature(Signature):
     input_model: Type[EmberModel] = SelectorJudgeInputs
 
 
-class SelectorJudgeOperator(Operator[SelectorJudgeInputs, SelectorJudgeOperatorOutputs]):
+class SelectorJudgeOperator(
+    Operator[SelectorJudgeInputs, SelectorJudgeOperatorOutputs]
+):
     """Operator to select the best, final answer from multiple responses."""
 
     signature: Signature = SelectorJudgeSignature()

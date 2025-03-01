@@ -17,7 +17,7 @@ from ember.core.registry.model.providers.base_provider import (
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
-    OpenAIProviderParams
+    OpenAIProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
@@ -91,7 +91,7 @@ class OpenAIChatParameters(BaseChatParameters):
 # NOTE: This class is deprecated and replaced by OpenAIProviderParams TypedDict
 # class OpenAIExtraParams(BaseModel):
 #     """Extra provider parameters for OpenAI that may be safely overridden by users."""
-# 
+#
 #     stream: Optional[bool] = None
 #     stop: Optional[List[str]] = None
 #     # Additional overrideable parameters can be defined here as needed.
@@ -190,7 +190,9 @@ class OpenAIModel(BaseProviderModel):
         # Cast the provider_params to OpenAIProviderParams for type safety
         provider_params = cast(OpenAIProviderParams, request.provider_params)
         # Only include non-None values
-        openai_kwargs.update({k: v for k, v in provider_params.items() if v is not None})
+        openai_kwargs.update(
+            {k: v for k, v in provider_params.items() if v is not None}
+        )
 
         # Adjust naming: convert "max_tokens" to "max_completion_tokens" if not already set.
         if (
