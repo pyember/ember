@@ -43,6 +43,12 @@ class MostCommonAnswerSelectorOperator(
     ) -> MostCommonAnswerSelectorOutputs:
         if not inputs.responses:
             return {"final_answer": None}
+            
         counts: Counter = Counter(inputs.responses)
+        
+        # Handle potential empty responses
+        if not counts:
+            return {"final_answer": None}
+            
         most_common_answer: str = counts.most_common(1)[0][0]
         return {"final_answer": most_common_answer}

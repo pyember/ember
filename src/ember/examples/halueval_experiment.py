@@ -27,10 +27,8 @@ from prettytable import PrettyTable
 from ember.core import (
     non,
 )  # Provides operators such as Ensemble, GetAnswer, JudgeSynthesis, VariedEnsemble
-from ember.core.registry.model.base.registry.model_registry import (
-    GLOBAL_MODEL_REGISTRY,
-    initialize_system,
-)
+from ember.core.app_context import get_ember_context
+from ember.core.configs.config import initialize_system
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.examples.mcq_experiment_example import (
     EnsureValidChoiceOperator,
@@ -102,9 +100,10 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     args = parse_arguments()
 
-    # Initialize the global model registry from our system config.
-    initialize_system(registry=GLOBAL_MODEL_REGISTRY)
-    logging.info("Initialized global model registry.")
+    # Initialize the system using the context's registry.
+    context = get_ember_context()
+    initialize_system(registry=context.registry)
+    logging.info("Initialized model registry from context.")
 
     # (Optional) Setup API keys from environment if needed.
     # e.g. for OpenAI: os.environ.get("OPENAI_API_KEY")
@@ -194,27 +193,27 @@ def main() -> None:
         baseline_out = execute_graph(
             graph=baseline_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
+            max_workers=args.max_workers
         )
-        base_pred: str = getattr(baseline_out, "final_answer", "").upper()
+        base_pred: str = baseline_out.final_answer.upper()
         baseline_correct: int = 1 if base_pred == correct_answer else 0
 
         # Run ensemble pipeline with execute_graph:
         ensemble_out = execute_graph(
             graph=ensemble_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
+            max_workers=args.max_workers
         )
-        ens_pred: str = getattr(ensemble_out, "final_answer", "").upper()
+        ens_pred: str = ensemble_out.final_answer.upper()
         ensemble_correct: int = 1 if ens_pred == correct_answer else 0
 
         # Run varied pipeline with execute_graph:
         varied_out = execute_graph(
             graph=varied_graph,
             global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
+            max_workers=args.max_workers
         )
-        varied_pred: str = getattr(varied_out, "final_answer", "").upper()
+        varied_pred: str = varied_out.final_answer.upper()
         varied_correct: int = 1 if varied_pred == correct_answer else 0
 
         return (baseline_correct, ensemble_correct, varied_correct)

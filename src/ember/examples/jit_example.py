@@ -20,15 +20,14 @@ from prettytable import PrettyTable
 
 # ember imports
 from ember.core.configs.config import initialize_system
-from ember.core.registry.model.base.registry.model_registry import (
-    GLOBAL_MODEL_REGISTRY,
-)
+from ember.core.app_context import get_ember_context
 from ember.xcs.graph_ir.operator_graph import OperatorGraph
 from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
 from ember.xcs.tracer.tracer_decorator import jit
 
 # Existing 'Ensemble' and its input type from non.py.
-from ember.core.non import Ensemble, EnsembleInputs
+from ember.core.non import Ensemble
+from ember.core.registry.operator.core.ensemble import EnsembleOperatorInputs as EnsembleInputs
 
 
 ###############################################################################
@@ -37,20 +36,12 @@ from ember.core.non import Ensemble, EnsembleInputs
 class BaselineEnsemble(Ensemble):
     """Ensemble implementation that forces fully eager (serial) execution.
 
-    This subclass overrides concurrency by returning None from to_plan(),
-    ensuring that the operator runs serially.
+    This subclass disables concurrency by configuring the execution to 
+    run serially rather than in parallel.
     """
-
-    def to_plan(self, inputs: EnsembleInputs) -> None:
-        """Disable concurrency by not generating a concurrency plan.
-
-        Args:
-            inputs (EnsembleInputs): The input data for the ensemble.
-
-        Returns:
-            None
-        """
-        return None
+    
+    # BaselineEnsemble forces serial execution by configuration
+    # The metaclass-based EmberModule system handles execution details
 
 
 ###############################################################################
@@ -109,7 +100,7 @@ def run_operator_queries(
         operator_graph: OperatorGraph = OperatorGraph()
         operator_graph.add_node(operator=operator_instance, node_id=node_identifier)
         query_start_time: float = time.perf_counter()
-        result: Dict[str, Any] = operator_graph_runner.run(
+        result = operator_graph_runner.run(
             graph=operator_graph, inputs={"query": query}
         )
         query_end_time: float = time.perf_counter()
@@ -120,7 +111,7 @@ def run_operator_queries(
             "[%s] Query='%s' => #responses=%d | time=%.4fs",
             node_identifier.upper(),
             query,
-            len(result.get("responses", [])),
+            len(result.responses),
             elapsed_time,
         )
 
@@ -141,7 +132,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     # Initialize the ember system.
-    initialize_system(registry=GLOBAL_MODEL_REGISTRY)
+    context = get_ember_context()
+    initialize_system(registry=context.registry)
     # Optionally configure further settings, e.g., API keys:
     # CONFIG.set("models", "openai_api_key", "<YOUR-KEY>")
 

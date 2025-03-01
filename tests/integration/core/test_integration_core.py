@@ -44,8 +44,9 @@ def test_multi_stage_pipeline_integration(mock_invoke_model) -> None:
     pipeline = Sequential(operators=[ensemble, most_common])
     input_data: EnsembleInputs = EnsembleInputs(query="What is the answer?")
     output = pipeline(inputs=input_data)
-    # Verify that the final output includes the expected verification details.
-    assert "final_answer" in output
+    # Verify that the final output has the expected final_answer key
+    assert isinstance(output, dict), "Output should be a dict"
+    assert "final_answer" in output, "Output should have 'final_answer' key"
     assert output["final_answer"] == "AnswerX"
 
 

@@ -19,9 +19,10 @@ import argparse
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import ClassVar, Dict, Optional, Union, List, Type
 
-from pydantic import BaseModel
+from pydantic import Field
+from ember.core.types.ember_model import EmberModel
 
 # ------------------------------------------------------------------------------------
 # Logging Setup
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 # ------------------------------------------------------------------------------------
 # Constants & Env
 # ------------------------------------------------------------------------------------
-req_env_vars = ["ember_CUSTOM_MODEL", "ember_API_KEY", "ember_BASE_URL"]
+req_env_vars = ["AVIOR_CUSTOM_MODEL", "AVIOR_API_KEY", "AVIOR_BASE_URL"]
 SIMPLE_NON = "simple"
 CARAVAN_NON = "caravan"
 
@@ -81,23 +82,27 @@ def check_env() -> None:
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.app_context import get_ember_context
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.types.ember_model import EmberModel
 
 
-def register_custom_model() -> None:
+def register_custom_model() -> ModelInfo:
     """
-    Registers the user-specified custom model with a local ModelRegistry instance.
-    This must be done before creating any LMModule referencing `ember_CUSTOM_MODEL`.
+    Registers the user-specified custom model with the global context's registry.
+    This must be done before creating any LMModule referencing `AVIOR_CUSTOM_MODEL`.
     """
-    custom_model = os.getenv("ember_CUSTOM_MODEL", "")
-    base_url = os.getenv("ember_BASE_URL", "")
-    api_key = os.getenv("ember_API_KEY", "")
+    custom_model = os.getenv("AVIOR_CUSTOM_MODEL", "")
+    base_url = os.getenv("AVIOR_BASE_URL", "")
+    api_key = os.getenv("AVIOR_API_KEY", "")
 
-    registry = ModelRegistry()
+    # Get the registry from the global context
+    context = get_ember_context()
+    registry = context.registry
+    
     model_info = ModelInfo(
         model_id=custom_model,
         model_name=custom_model,
@@ -113,6 +118,7 @@ def register_custom_model() -> None:
         f"Registered custom model '{custom_model}' with base_url='{base_url}'. "
         f"Models now in registry: {registry.list_models()}"
     )
+    return model_info
 
 
 # ------------------------------------------------------------------------------------
@@ -142,54 +148,85 @@ CARAVAN_PROMPT_INSTRUCTIONS = (
 )
 
 CARAVAN_PROMPT_FULL = (
-    f"{CARAVAN_PROMPT_INTRO}\n{CARAVAN_PROMPT_FEATURES}\n{CARAVAN_PROMPT_REFERENCES}\n"
+    f"{CARAVAN_PROMPT_INTRO}\n"
+    f"{CARAVAN_PROMPT_FEATURES}\n"
+    f"{CARAVAN_PROMPT_REFERENCES}\n"
     f"{CARAVAN_PROMPT_INSTRUCTIONS}\n"
-    "UNLABELED FLOWS:\n"
-    "{question}\n"
+    f"UNLABELED FLOWS:\n"
+    f"{{question}}\n"
 )
 
 
 # ------------------------------------------------------------------------------------
 # Minimal 'Signature' & 'Inputs' for Our Caravan Prompt
 # ------------------------------------------------------------------------------------
-class CaravanLabelingInputs(BaseModel):
-    """
-    The request object containing the unlabeled flows in 'question'.
-    """
-
-    question: str
-
-
-class CaravanLabelingSignature(BaseModel):
-    """
-    Minimal local signature container with prompt string.
+class CaravanLabelingInputs(EmberModel):
+    """Input model for network traffic flow labeling.
+    
+    Attributes:
+        question: The unlabeled flows to be classified.
     """
 
+    question: str = Field(description="Unlabeled network flows to be classified")
+
+
+class CaravanLabelingOutput(EmberModel):
+    """Output model for network traffic flow labeling.
+    
+    Attributes:
+        final_answer: The labeled flow classifications.
+    """
+    
+    final_answer: str = Field(description="Labeled flow classifications (0=benign, 1=malicious)")
+
+
+class CaravanLabelingSignature(Signature):
+    """Signature for the CaravanLabelingOperator.
+    
+    Defines input/output models and the multi-part prompt template
+    for network traffic flow labeling.
+    """
+    
+    input_model: Type[EmberModel] = CaravanLabelingInputs
+    output_model: Type[EmberModel] = CaravanLabelingOutput
     prompt_template: str = CARAVAN_PROMPT_FULL
-
-    def render_prompt(self, inputs: Dict[str, Any]) -> str:
-        return self.prompt_template.format(**inputs)
 
 
 # ------------------------------------------------------------------------------------
 # A Simple 'Signature' & 'Inputs' for the "simple" pipeline
 # ------------------------------------------------------------------------------------
-class SimplePromptInputs(BaseModel):
+class SimplePromptInputs(EmberModel):
+    """The request for a simple question like "What is the capital of India?"
+    
+    Attributes:
+        question: The question to be answered.
     """
-    The request for a simple question like "What is the capital of India?"
+
+    question: str = Field(description="Question to be answered")
+
+
+class SimplePromptOutput(EmberModel):
+    """Output model for simple question answering.
+    
+    Attributes:
+        final_answer: The concise answer to the question.
     """
+    
+    final_answer: str = Field(description="Concise answer to the question")
 
-    question: str
 
-
-class SimplePromptSignature(BaseModel):
+class SimplePromptSignature(Signature):
+    """Signature for the SimplePromptOperator.
+    
+    Defines input/output models and prompt template for single-sentence Q&A.
+    """
+    
+    input_model: Type[EmberModel] = SimplePromptInputs
+    output_model: Type[EmberModel] = SimplePromptOutput
     prompt_template: str = (
         "Provide a concise single-sentence answer to the following question:\n"
         "QUESTION: {question}\n"
     )
-
-    def render_prompt(self, inputs: Dict[str, Any]) -> str:
-        return self.prompt_template.format(**inputs)
 
 
 # ------------------------------------------------------------------------------------
@@ -199,69 +236,144 @@ from ember.core.registry.operator.base.operator_base import Operator
 from ember.core import non
 
 
-class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):
-    """
-    Single-step operator for 'simple' Q&A.
+class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
+    """Single-step operator for simple question answering.
+    
+    This operator uses a single-instance ensemble to process a question
+    and produce a concise answer.
+    
+    Attributes:
+        signature: The signature defining input/output models and prompt template.
+        ensemble: The UniformEnsemble operator with a single LM instance.
     """
 
-    signature: SimplePromptSignature
-    ensemble: non.Ensemble
+    signature: ClassVar[Signature] = SimplePromptSignature()
+    ensemble: non.UniformEnsemble
 
-    def __init__(self, model_name: str):
-        self.signature = SimplePromptSignature()
-        self.ensemble = non.Ensemble(
-            num_units=1, model_name=model_name, temperature=0.2, max_tokens=64
+    def __init__(self, model_name: str) -> None:
+        """Initialize with a specific model name.
+        
+        Args:
+            model_name: Name of the model to use for answering.
+        """
+        self.ensemble = non.UniformEnsemble(
+            num_units=1, 
+            model_name=model_name, 
+            temperature=0.2, 
+            max_tokens=64
         )
 
-    def forward(self, inputs: SimplePromptInputs) -> Dict[str, Any]:
-        # Validate input (in more advanced usage, you'd do thorough checks).
-        prompt = self.signature.render_prompt(inputs.dict())
-        # Single LM module for demonstration
-        ensemble_inputs = non.EnsembleInputs(query=prompt)
-        raw_answer = self.ensemble(ensemble_inputs).get("final_answer", "").strip()
-        return {"final_answer": raw_answer}
+    def forward(self, *, inputs: SimplePromptInputs) -> SimplePromptOutput:
+        """Process the input question and produce a concise answer.
+        
+        Args:
+            inputs: The validated input containing the question.
+            
+        Returns:
+            A SimplePromptOutput with the final answer.
+        """
+        # Construct prompt from input
+        prompt = self.signature.render_prompt(inputs=inputs)
+        
+        # Process through ensemble
+        ensemble_result = self.ensemble(query=prompt)
+        
+        # Extract the final_answer from the ensemble result
+        final_answer = ensemble_result.final_answer
+            
+        # Return structured output
+        return SimplePromptOutput(final_answer=final_answer)
 
 
-class CaravanLabelingOperator(Operator[CaravanLabelingInputs, Dict[str, Any]]):
+class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOutput]):
+    """Operator that labels network flows as benign (0) or malicious (1).
+    
+    This operator uses a multi-part prompt with domain-specific context
+    and aggregates results from multiple LMs via a judge synthesis step.
+    
+    Attributes:
+        signature: The signature defining input/output models and prompt template.
+        ensemble: The ensemble operator for generating multiple candidate labels.
+        judge: The synthesis operator for combining and refining ensemble results.
     """
-    Operator that uses a big, multi-part 'Caravan' prompt to label flows 0 or 1.
-    """
 
-    signature: Signature = CaravanLabelingSignature
+    signature: ClassVar[Signature] = CaravanLabelingSignature()
     ensemble: non.UniformEnsemble
     judge: non.JudgeSynthesis
 
-    def __init__(self, model_name: str):
-        self.signature = CaravanLabelingSignature()
+    def __init__(self, model_name: str) -> None:
+        """Initialize with a specific model name.
+        
+        Args:
+            model_name: Name of the model to use for labeling.
+        """
         self.ensemble = non.UniformEnsemble(
-            num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
+            num_units=3, 
+            model_name=model_name, 
+            temperature=0.0, 
+            max_tokens=256
         )
         self.judge = non.JudgeSynthesis(
-            model_name=model_name, temperature=0.0, max_tokens=256
+            model_name=model_name, 
+            temperature=0.0, 
+            max_tokens=256
         )
 
-    def forward(self, inputs: CaravanLabelingInputs) -> Dict[str, Any]:
-        prompt = self.signature.render_prompt(inputs=inputs.dict())
-        ensemble_inputs = non.EnsembleInputs(query=prompt)
-        ensemble_output = self.ensemble(inputs=ensemble_inputs)
-
-        judge_inputs = non.JudgeSynthesisInputs(
-            query=prompt, responses=ensemble_output.get("responses", [])
+    def forward(self, *, inputs: CaravanLabelingInputs) -> CaravanLabelingOutput:
+        """Process network flows and produce labeled classifications.
+        
+        Args:
+            inputs: The validated input containing unlabeled flows.
+            
+        Returns:
+            A CaravanLabelingOutput with the classified flows.
+        """
+        # Construct prompt from input
+        prompt = self.signature.render_prompt(inputs=inputs)
+        
+        # Process through ensemble to get multiple labeling attempts
+        ensemble_output = self.ensemble(query=prompt)
+        
+        # Extract the responses from the ensemble output
+        responses = ensemble_output.responses
+        
+        # Synthesize results using judge
+        judge_output = self.judge(
+            query=prompt, 
+            responses=responses
         )
-        judge_output = self.judge(inputs=judge_inputs)
-        return {"final_answer": judge_output.get("final_answer", "").strip()}
+        
+        # Extract the final answer from the judge output
+        final_labels = judge_output.final_answer
+            
+        # Return structured output
+        return CaravanLabelingOutput(final_answer=final_labels)
 
 
 # ------------------------------------------------------------------------------------
 # Graph/Pipeline Constructors
 # ------------------------------------------------------------------------------------
-def create_simple_pipeline(model_name: str) -> Operator:
-    """Returns a single-step operator for 'simple' usage."""
+def create_simple_pipeline(model_name: str) -> Operator[SimplePromptInputs, SimplePromptOutput]:
+    """Create a single-step operator for simple question answering.
+    
+    Args:
+        model_name: Name of the model to use.
+        
+    Returns:
+        A strongly-typed SimplePromptOperator instance.
+    """
     return SimplePromptOperator(model_name)
 
 
-def create_caravan_pipeline(model_name: str) -> Operator:
-    """Returns a single-step operator for 'caravan' labeling usage."""
+def create_caravan_pipeline(model_name: str) -> Operator[CaravanLabelingInputs, CaravanLabelingOutput]:
+    """Create a single-step operator for network flow labeling.
+    
+    Args:
+        model_name: Name of the model to use.
+        
+    Returns:
+        A strongly-typed CaravanLabelingOperator instance.
+    """
     return CaravanLabelingOperator(model_name)
 
 
@@ -288,21 +400,23 @@ def main():
 
     args = parse_arguments()
     chosen_non = args.non.lower().strip()
-    model_name = os.getenv("ember_CUSTOM_MODEL", "")
+    model_name = os.getenv("AVIOR_CUSTOM_MODEL", "")
 
     if chosen_non == SIMPLE_NON:
         operator = create_simple_pipeline(model_name)
         # Example question:
         question_data = "What is the capital of India?"
-        response = operator.forward(SimplePromptInputs(question=question_data))
-        print(f"[SIMPLE] Final Answer:\n{response['final_answer']}\n")
+        input_model = SimplePromptInputs(question=question_data)
+        response = operator(inputs=input_model)
+        print(f"[SIMPLE] Final Answer:\n{response.final_answer}\n")
 
     elif chosen_non == CARAVAN_NON:
         operator = create_caravan_pipeline(model_name)
         # We'll pass the flows into the 'question' field:
         flows = sample_flow_stream
-        response = operator.forward(CaravanLabelingInputs(question=flows))
-        print(f"[CARAVAN] Final Labeled Output:\n{response['final_answer']}\n")
+        input_model = CaravanLabelingInputs(question=flows)
+        response = operator(inputs=input_model)
+        print(f"[CARAVAN] Final Labeled Output:\n{response.final_answer}\n")
 
     else:
         logger.error(

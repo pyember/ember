@@ -73,17 +73,24 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         raise NotImplementedError("Subclasses must implement forward()")
 
-    def __call__(self, *, inputs: Union[T_in, Dict[str, Any]]) -> T_out:
+    def __call__(self, *, inputs: Union[T_in, Dict[str, Any]] = None, **kwargs) -> T_out:
         """Executes the operator with automatic input and output validation.
 
         This method orchestrates the execution flow:
         1. Validates inputs against the signature's input model
         2. Calls the forward method with validated inputs
-        3. Validates the output against the signature's output model
+        3. Validates the output against the signature's output model and ensures it's the proper type
+
+        The operator can be called in three ways:
+        1. With a model instance: op(inputs=my_model_instance)
+        2. With a dictionary: op(inputs={"key": "value"})
+        3. With keyword arguments: op(key="value", another="value")
 
         Args:
-            inputs (Union[T_in, Dict[str, Any]]): Either an already validated input model (T_in)
+            inputs (Union[T_in, Dict[str, Any]], optional): Either an already validated input model (T_in)
                 or a raw dictionary that will be validated against the input model.
+            **kwargs: Alternative to using 'inputs'. Key-value pairs that will be used to construct
+                     the input model. Only used if 'inputs' is None.
 
         Returns:
             T_out: The validated, computed output conforming to the output model.
@@ -102,17 +109,30 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             ) from e
 
         try:
-            # Validate inputs if necessary
-            validated_inputs: T_in = (
-                signature.validate_inputs(inputs=inputs)
-                if isinstance(inputs, dict)
-                else inputs
-            )
+            # Determine input format (model, dict, or kwargs)
+            if inputs is not None:
+                # Traditional 'inputs' parameter provided
+                validated_inputs: T_in = (
+                    signature.validate_inputs(inputs=inputs)
+                    if isinstance(inputs, dict)
+                    else inputs
+                )
+            elif kwargs and signature.input_model:
+                # Using kwargs directly as input fields
+                validated_inputs = signature.input_model(**kwargs)
+            else:
+                # Empty inputs or no input model defined
+                validated_inputs = kwargs if kwargs else {}
 
             # Execute the core computation
             operator_output: T_out = self.forward(inputs=validated_inputs)
 
-            # Validate output
+            # Ensure we have a proper model instance for the output
+            # If we got a dict, convert it to the appropriate model
+            if isinstance(operator_output, dict) and hasattr(signature, 'output_model') and signature.output_model:
+                operator_output = signature.output_model.model_validate(operator_output)
+                
+            # Final validation to ensure type consistency
             validated_output: T_out = signature.validate_output(output=operator_output)
             return validated_output
 

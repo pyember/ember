@@ -44,11 +44,20 @@ class MockOperator(Operator[MockInput, Dict[str, Any]]):
 
 def test_tracer_context_basic() -> None:
     """Tests basic tracing with TracerContext."""
+    # Create a new instance of the operator
     operator = MockOperator()
     sample_input = {"value": 5}
+    
+    # Force trace mode to ensure we get trace records regardless of caching
+    operator._force_trace = True
+    
     with TracerContext() as tracer:
-        _ = operator(inputs=sample_input)
+        result = operator(inputs=sample_input)
+    
+    # Verify we have at least one trace record
     assert len(tracer.records) >= 1, "Expected at least one trace record."
+    
+    # Verify the content of the first trace record
     first_record = tracer.records[0]
     assert first_record.outputs == {
         "result": 10

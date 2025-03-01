@@ -104,9 +104,9 @@ def test_uniform_ensemble_operator_normal(mock_call):
     for lm in uniform_ensemble.ensemble_op.lm_modules:
         lm.__call__ = dummy_response_lm  # type: ignore
     inputs: EnsembleInputs = EnsembleInputs(query="Test query")
-    output: Dict[str, Any] = uniform_ensemble.forward(inputs=inputs)
-    assert isinstance(output, dict), "Output should be a dict."
-    assert "responses" in output, "Output dict should contain 'responses'."
+    output = uniform_ensemble.forward(inputs=inputs)
+    # Our new code returns a dict that will be converted to an EmberModel instance
+    assert "responses" in output, "Output should have 'responses' key"
     responses = output["responses"]
     assert isinstance(responses, list), "'responses' should be a list."
     assert len(responses) == 3, "There should be 3 responses."
@@ -126,8 +126,8 @@ def test_most_common_operator_normal() -> None:
     inputs: MostCommonInputs = MostCommonInputs(
         query="Test", responses=["A", "B", "A", "C", "A"]
     )
-    output: Dict[str, Any] = aggregator.forward(inputs=inputs)
-    assert "final_answer" in output, "Output should include 'final_answer'."
+    output = aggregator.forward(inputs=inputs)
+    assert "final_answer" in output, "Output should have 'final_answer' key"
     assert output["final_answer"] == "A", "The most common answer should be 'A'."
 
 

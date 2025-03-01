@@ -148,6 +148,7 @@ The XCS (eXecution Control System) handles graph-based execution:
 | `ember.core` | Core framework components |
 | `ember.core.app_context` | Application context and dependency injection |
 | `ember.core.configs` | Configuration management |
+| `ember.core.types` | Type system and protocols |
 | `ember.core.registry.model` | Model registry and provider implementations |
 | `ember.core.registry.operator` | Operator registry and base classes |
 | `ember.core.registry.prompt_signature` | Signature definitions for typed I/O |
@@ -168,6 +169,69 @@ Ember employs several design patterns to maintain a clean and extensible archite
 3. **Dependency Injection**: Services provided through the application context
 4. **Decorator Pattern**: For augmenting operators with additional behavior (e.g., tracing)
 5. **Strategy Pattern**: Pluggable implementations for core functionality
+
+## Type System
+
+Ember employs a comprehensive type system that enhances code safety and developer experience:
+
+### Core Components
+
+1. **EmberModel**: The foundational model class
+   - Extends Pydantic's BaseModel for validation
+   - Implements serialization protocols
+   - Supports dictionary-like access for compatibility
+
+2. **Protocols**:
+   - **EmberTyped**: Interface for type introspection
+   - **EmberSerializable**: Interface for data conversion
+   - **ConfigManager**: Interface for configuration management
+   - **XCSGraph/XCSNode/XCSPlan**: Interfaces for execution components
+
+3. **Generic Types**:
+   - **ModelRegistry[ProviderT, ModelT]**: Type-safe model registration
+   - **Operator[InputT, OutputT]**: Type-safe operator definitions
+
+4. **Runtime Type Checking**:
+   - **validate_type**: Validation against expected types
+   - **type_check**: Comprehensive type validation
+
+### Benefits
+
+- **Early Error Detection**: Type errors caught at development time
+- **Self-Documenting Code**: Types clearly communicate expectations
+- **IDE Support**: Enhanced autocompletion and navigation
+- **Refactoring Safety**: Type changes reveal impacted code
+
+### Usage Example
+
+```python
+from ember.core.types import EmberModel, InputT, OutputT
+from ember.core.registry.operator.base import Operator
+
+class InputData(EmberModel):
+    prompt: str
+    temperature: float = 0.7
+
+class OutputData(EmberModel):
+    response: str
+    tokens_used: int
+
+class SimpleOperator(Operator[InputData, OutputData]):
+    def forward(self, inputs: InputData) -> OutputData:
+        # Type flexibility: Either format below works with the type system
+        # Option 1: Return as proper typed model (preferred for IDE support)
+        # return OutputData(response="Hello", tokens_used=5)
+        
+        # Option 2: Return as dictionary - automatically converted to OutputData
+        return {"response": "Hello", "tokens_used": 5}
+            
+# Both styles of input are supported too
+operator = SimpleOperator()
+# Using typed model
+result1 = operator(InputData(prompt="Hi", temperature=0.7))
+# Using dictionary (automatically converted to InputData)
+result2 = operator({"prompt": "Hi", "temperature": 0.3})
+```
 
 ## Execution Flow
 

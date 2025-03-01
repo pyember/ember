@@ -40,7 +40,7 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]
     def __init__(self, *, lm_modules: List[LMModule]) -> None:
         self.lm_modules = lm_modules
 
-    def forward(self, *, inputs: EnsembleOperatorInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: EnsembleOperatorInputs) -> EnsembleOperatorOutputs:
         rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
-        responses: List[Any] = [lm(prompt=rendered_prompt) for lm in self.lm_modules]
+        responses: List[str] = [lm(prompt=rendered_prompt) for lm in self.lm_modules]
         return {"responses": responses}

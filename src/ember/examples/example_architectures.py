@@ -1,49 +1,91 @@
-from typing import Dict, Any
+from typing import ClassVar, Dict, Optional, Union, cast, Type
+from pydantic import Field
+
+from ember.core.app_context import get_ember_context
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.types.ember_model import EmberModel
 from ember.core import non
 from ember.core.registry.prompt_signature.signatures import Signature
 
 
-class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
-    """SubNetwork that composes an ensemble with self-refinement.
+class NetworkInput(EmberModel):
+    """Input model for network operators."""
+    query: str = Field(description="The query to process")
+    
+class NetworkOutput(EmberModel):
+    """Output model for network operators."""
+    final_answer: str = Field(description="The final processed answer")
+    
+class SubNetworkSignature(Signature):
+    """Signature for SubNetwork operator."""
+    input_model: Type[EmberModel] = NetworkInput
+    output_model: Type[EmberModel] = NetworkOutput
 
-    This operator first processes inputs through an ensemble of models and subsequently refines
+class SubNetwork(Operator[NetworkInput, NetworkOutput]):
+    """SubNetwork that composes an ensemble with verification.
+
+    This operator first processes inputs through an ensemble of models and subsequently verifies
     the output based on the initial ensemble's response.
 
     Attributes:
-        ensemble (non.Ensemble): An ensemble operator with 2 units of "gpt-4o".
-        refine (non.SelfRefinement): A self-refinement operator using "gpt-4o".
+        ensemble (non.UniformEnsemble): An ensemble operator with 2 units of "gpt-4o".
+        verifier (non.Verifier): A verification operator using "gpt-4o".
     """
 
-    signature: Signature = Signature(input_model=None)
-    ensemble: non.Ensemble
-    refine: non.SelfRefinement
+    signature: ClassVar[Signature] = SubNetworkSignature()
+    ensemble: non.UniformEnsemble
+    verifier: non.Verifier
 
     def __init__(self) -> None:
-        """Initializes the SubNetwork with a specified ensemble and self-refinement components."""
+        """Initializes the SubNetwork with a specified ensemble and verification components."""
         super().__init__()
-        self.ensemble = non.Ensemble(num_units=2, model_name="gpt-4o")
-        self.refine = non.SelfRefinement(model_name="gpt-4o")
+        self.ensemble = non.UniformEnsemble(num_units=2, model_name="gpt-4o", temperature=0.0)
+        self.verifier = non.Verifier(model_name="gpt-4o", temperature=0.0)
 
-    def forward(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Processes the input through the ensemble and applies self-refinement.
+    def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
+        """Processes the input through the ensemble and applies verification.
 
         Args:
-            inputs (Dict[str, Any]): The input dictionary containing at least the key 'query'.
+            inputs: The validated input containing the query.
 
         Returns:
-            Dict[str, Any]: The refined output produced by the self-refinement process.
+            A NetworkOutput with the verified answer.
         """
-        ens_out: Dict[str, Any] = self.ensemble.forward(inputs=inputs)
-        refinement_input: Dict[str, Any] = {
-            "query": inputs.get("query", ""),
-            "responses": [ens_out],
+        # Process through ensemble
+        ensemble_input = {"query": inputs.query}
+        ensemble_result = self.ensemble(inputs=ensemble_input)
+        
+        # Extract ensemble result explicitly
+        if not isinstance(ensemble_result, dict) or "final_answer" not in ensemble_result:
+            candidate_answer = ""
+        else:
+            candidate_answer = ensemble_result["final_answer"]
+        
+        # Prepare verification input
+        verification_input = {
+            "query": inputs.query,
+            "candidate_answer": candidate_answer,
         }
-        ref_out: Dict[str, Any] = self.refine.forward(inputs=refinement_input)
-        return ref_out
+        
+        # Verify the ensemble's output
+        verified_result = self.verifier(inputs=verification_input)
+        
+        # Extract result explicitly - no hidden error handling
+        if not isinstance(verified_result, dict) or "final_answer" not in verified_result:
+            final_answer = ""
+        else:
+            final_answer = verified_result["final_answer"]
+            
+        # Return structured output
+        return NetworkOutput(final_answer=final_answer)
 
 
-class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
+class NestedNetworkSignature(Signature):
+    """Signature for NestedNetwork operator."""
+    input_model: Type[EmberModel] = NetworkInput
+    output_model: Type[EmberModel] = NetworkOutput
+
+class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
     """Nested network that aggregates results from multiple sub-networks and applies a final judgment.
 
     This operator executes two subnetwork branches and uses a judge operator to synthesize the outputs.
@@ -51,55 +93,65 @@ class NestedNetwork(Operator[Dict[str, Any], Dict[str, Any]]):
     Attributes:
         sub1 (SubNetwork): The first sub-network instance.
         sub2 (SubNetwork): The second sub-network instance.
-        judge (non.Judge): A judge operator using "gpt-4o".
+        judge (non.JudgeSynthesis): A judge synthesis operator using "gpt-4o".
     """
 
-    signature: Signature = Signature(input_model=None)
+    signature: ClassVar[Signature] = NestedNetworkSignature()
     sub1: SubNetwork
     sub2: SubNetwork
-    judge: non.Judge
+    judge: non.JudgeSynthesis
 
     def __init__(self) -> None:
         """Initializes the NestedNetwork with two SubNetwork instances and a final Judge operator."""
         super().__init__()
         self.sub1 = SubNetwork()
         self.sub2 = SubNetwork()
-        self.judge = non.Judge(model_name="gpt-4o")
+        self.judge = non.JudgeSynthesis(model_name="gpt-4o", temperature=0.0)
 
-    def forward(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
         """Executes the nested network by processing inputs through sub-networks and aggregating responses.
 
         Args:
-            inputs (Dict[str, Any]): The input data containing the query.
+            inputs: The validated input containing the query.
 
         Returns:
-            Dict[str, Any]: The final judged output after aggregating sub-network responses.
+            A NetworkOutput with the final judged answer.
         """
-        s1_out: Dict[str, Any] = self.sub1(inputs=inputs)
-        s2_out: Dict[str, Any] = self.sub2(inputs=inputs)
-        judge_input: Dict[str, Any] = {
-            "query": inputs.get("query", ""),
-            "responses": [
-                s1_out.get("final_answer", ""),
-                s2_out.get("final_answer", ""),
-            ],
-        }
-        judged: Dict[str, Any] = self.judge.forward(inputs=judge_input)
-        return judged
+        # Process through parallel sub-networks
+        s1_out = self.sub1(inputs=inputs)
+        s2_out = self.sub2(inputs=inputs)
+        
+        # Synthesize results using the judge
+        judged_result = self.judge(
+            query=inputs.query,
+            responses=[
+                s1_out.final_answer,
+                s2_out.final_answer
+            ]
+        )
+        
+        # Extract the final answer
+        final_answer = judged_result.final_answer
+            
+        # Return structured output
+        return NetworkOutput(final_answer=final_answer)
 
 
-def nested_module_graph() -> Operator:
+def nested_module_graph() -> Operator[NetworkInput, NetworkOutput]:
     """Creates an instance of the NestedNetwork operator representing a complex nested network structure.
 
     Returns:
-        Operator: An instance of NestedNetwork for pipeline execution.
+        A strongly-typed NestedNetwork operator instance for pipeline execution.
     """
     return NestedNetwork()
 
 
 if __name__ == "__main__":
+    # Initialize the ember context first
+    context = get_ember_context()
+    
     # Quick test invocation using explicit method calls with named parameters.
-    network: Operator = nested_module_graph()
-    test_input: Dict[str, Any] = {"query": "Hello from the new approach"}
-    test_result: Dict[str, Any] = network.forward(inputs=test_input)
-    print("NestedNetwork final output:", test_result)
+    network = nested_module_graph()
+    test_input = NetworkInput(query="Hello from the new approach")
+    test_result = network(inputs=test_input)
+    print(f"NestedNetwork final output: {test_result.final_answer}")

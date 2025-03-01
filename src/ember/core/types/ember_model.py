@@ -4,8 +4,11 @@ EmberModel - A unified type system for Ember that standardizes input/output mode
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Dict, Type, TypeVar, Optional, Union, List
+from typing import Any, ClassVar, Dict, Type, TypeVar, Optional, Union, List, get_type_hints
 from pydantic import BaseModel, create_model
+
+# Import locally to avoid circular imports
+from .protocols import TypeInfo, EmberTyped, EmberSerializable
 
 T = TypeVar('T', bound='EmberModel')
 
@@ -15,8 +18,11 @@ class EmberModel(BaseModel):
     A unified model for Ember input/output types that combines BaseModel validation
     with flexible serialization to dict, JSON, and potentially other formats.
     
-    This class can be configured to behave like a TypedDict when needed for
-    backward compatibility with existing code.
+    This class supports both attribute access (model.attr) and dictionary access (model["attr"])
+    patterns for maximum flexibility and backward compatibility.
+    
+    It implements EmberTyped and EmberSerializable protocols to provide consistent
+    type information and serialization capabilities.
     """
     
     # Class variable to store output format preference
@@ -43,6 +49,7 @@ class EmberModel(BaseModel):
         """Get the effective output format for this instance."""
         return self._instance_output_format or self.__output_format__
     
+    # EmberSerializable protocol implementation
     def as_dict(self) -> Dict[str, Any]:
         """Convert to a dictionary representation."""
         return self.model_dump()
@@ -51,53 +58,44 @@ class EmberModel(BaseModel):
         """Convert to a JSON string."""
         return self.model_dump_json()
     
-    def __call__(self) -> Union[Dict[str, Any], str, 'EmberModel']:
-        """
-        Return the model in the default format when called as a function.
-        This allows for backward compatibility with code that expects TypedDict.
-        """
-        if self.output_format == "dict":
-            return self.as_dict()
-        elif self.output_format == "json":
-            return self.as_json()
-        else:
-            return self
-            
-    def __getitem__(self, key: str) -> Any:
-        """
-        Enable dictionary-like access for backward compatibility with TypedDict.
-        This allows EmberModel to be used in places expecting a dict.
-        """
-        if key in self.model_fields_set:
-            return getattr(self, key)
-        raise KeyError(key)
-        
-    @classmethod
-    def __get_validators__(cls):
-        """
-        Return validators that allow dict-to-model conversion during validation.
-        This enables operators to return plain dictionaries that are compatible with EmberModel.
-        """
-        yield cls.validate
-        
-    @classmethod
-    def validate(cls, value):
-        """
-        Validate the value, converting dictionaries to EmberModel instances.
-        This allows operators to return simple dictionaries that are automatically
-        converted to EmberModel instances by the type system.
-        """
-        if isinstance(value, dict):
-            return cls(**value)
-        elif isinstance(value, cls):
-            return value
-        raise TypeError(f"Cannot convert {type(value)} to {cls.__name__}")
-    
     @classmethod
     def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
         """Create an instance from a dictionary."""
         return cls(**data)
     
+    # EmberTyped protocol implementation
+    def get_type_info(self) -> TypeInfo:
+        """Return type metadata for this object."""
+        type_hints = get_type_hints(self.__class__)
+        return TypeInfo(
+            origin_type=self.__class__,
+            type_args=tuple(type_hints.values()) if type_hints else None,
+            is_container=False,
+            is_optional=False
+        )
+    
+    # Compatibility operators
+    def __call__(self) -> Union[Dict[str, Any], str, 'EmberModel']:
+        """
+        Return the model in the configured format when called as a function.
+        Enables backward compatibility with code expecting different return types.
+        """
+        match self.output_format:
+            case "dict":
+                return self.as_dict()
+            case "json":
+                return self.as_json()
+            case _:
+                return self
+            
+    def __getitem__(self, key: str) -> Any:
+        """Enable dictionary-like access (model["attr"]) alongside attribute access (model.attr)."""
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(key)
+    
+    # Dynamic model creation
     @classmethod
     def create_type(
         cls, 
@@ -116,14 +114,11 @@ class EmberModel(BaseModel):
         Returns:
             A new EmberModel subclass
         """
-        # Create a new model class using Pydantic's create_model
         model_class = create_model(
             name,
             __base__=EmberModel,
             **{k: (v, ...) for k, v in fields.items()}
         )
         
-        # Set the default output format
         model_class.__output_format__ = output_format
-        
         return model_class

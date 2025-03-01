@@ -10,9 +10,13 @@ import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Final
+from typing import Any, Callable, Dict, List, Optional, Final, Union, TypeVar
 
 from ..graph.xcs_graph import XCSGraph
+from ember.core.types.xcs_types import XCSNode, XCSGraph, XCSPlan as XCSPlanProtocol
+
+# Type for results from node execution
+XCSResult = TypeVar('XCSResult')
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ class XCSPlanTask:
     """
 
     node_id: str
-    operator: Callable[..., Any]
+    operator: Callable[[Dict[str, Any]], Any]
     inbound_nodes: List[str] = field(default_factory=list)
 
 
@@ -43,14 +47,25 @@ class XCSPlan:
     Immutable execution plan compiled from an XCSGraph.
     """
 
-    def __init__(self, tasks: Dict[str, XCSPlanTask], original_graph: Any) -> None:
+    def __init__(self, tasks: Dict[str, XCSPlanTask], original_graph: XCSGraph) -> None:
+        """
+        Initialize an execution plan.
+        
+        Args:
+            tasks: Dictionary mapping node IDs to plan tasks
+            original_graph: The original graph this plan was compiled from
+        """
         self._tasks = tasks
-        self.original_graph = (
-            original_graph  # Store the original XCSGraph for later use.
-        )
+        self.original_graph = original_graph
 
     @property
     def tasks(self) -> Dict[str, XCSPlanTask]:
+        """
+        Get all tasks in this plan.
+        
+        Returns:
+            Dictionary mapping node IDs to tasks
+        """
         return self._tasks
 
 
@@ -59,10 +74,10 @@ def compile_graph(*, graph: XCSGraph) -> XCSPlan:
     Compiles an XCSGraph into an immutable XCSPlan.
 
     Args:
-        graph (XCSGraph): The XCSGraph to compile.
+        graph: The XCSGraph to compile.
 
     Returns:
-        XCSPlan: The resulting execution plan.
+        The resulting execution plan.
     """
     tasks: Dict[str, XCSPlanTask] = {}
     for node in graph.nodes.values():
@@ -99,6 +114,14 @@ class IScheduler(ABC):
     ) -> Dict[str, Any]:
         """
         Execute the given plan concurrently and return a mapping of node outputs.
+        
+        Args:
+            plan: Execution plan to run
+            global_input: Input data available to all nodes
+            graph: Original graph containing node definitions
+            
+        Returns:
+            Dictionary mapping node IDs to execution results
         """
         pass
 
@@ -109,6 +132,12 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     """
 
     def __init__(self, *, max_workers: Optional[int] = None) -> None:
+        """
+        Initialize the scheduler.
+        
+        Args:
+            max_workers: Maximum number of concurrent workers. None means auto.
+        """
         self._max_workers = max_workers
 
     def run_plan(
@@ -181,6 +210,15 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     ) -> Dict[str, Any]:
         """
         Gathers inputs for a node by merging global input with outputs from upstream tasks.
+        
+        Args:
+            node_id: ID of the node to gather inputs for
+            results: Results from previously executed nodes
+            global_input: Input data available to all nodes
+            graph: Original graph containing node definitions
+            
+        Returns:
+            Dictionary of input data for the node
         """
         inputs = dict(global_input)
         node = graph.get_node(node_id=node_id)
@@ -201,6 +239,14 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
     ) -> Any:
         """
         Executes the operator for a given node.
+        
+        Args:
+            node_id: ID of the node to execute
+            input_data: Input data for the node
+            graph: Original graph containing node definitions
+            
+        Returns:
+            Result of the operator execution
         """
         node = graph.get_node(node_id=node_id)
         result = node.operator(inputs=input_data)
@@ -216,16 +262,25 @@ class TopologicalSchedulerWithParallelDispatch(IScheduler):
 
 def execute_graph(
     *,
-    graph: Any,  # can be an XCSGraph or an XCSPlan
+    graph: Union[XCSGraph, XCSPlan],
     global_input: Dict[str, Any],
-    scheduler: Optional[Any] = None,
+    scheduler: Optional[IScheduler] = None,
     concurrency: bool = True,
-) -> Any:
+) -> Dict[str, Any]:
     """
     Executes an XCSGraph or XCSPlan.
 
     If 'graph' has a 'nodes' attribute, it is assumed to be an XCSGraph and is compiled.
     Otherwise, it is assumed to be an XCSPlan, in which case we use its original_graph.
+    
+    Args:
+        graph: Graph or plan to execute
+        global_input: Input data available to all nodes
+        scheduler: Optional custom scheduler implementation
+        concurrency: Whether to execute nodes concurrently
+        
+    Returns:
+        Dictionary mapping node IDs to execution results
     """
     if hasattr(graph, "nodes"):
         plan = compile_graph(graph=graph)
@@ -241,7 +296,7 @@ def execute_graph(
         )
         return results
     else:
-        results = {}
+        results: Dict[str, Any] = {}
         # Iterate over task values instead of keys; use node_id and operator.
         for task in plan.tasks.values():
             input_data = scheduler._gather_inputs(

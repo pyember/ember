@@ -48,16 +48,27 @@ class TestEmberModel(unittest.TestCase):
         model.set_output_format("json")
         self.assertIsInstance(model(), str)
     
-    def test_dict_access(self):
-        """Test dictionary-like access."""
+    def test_access_patterns(self):
+        """Test both attribute and dictionary access patterns."""
         class TestModel(EmberModel):
             name: str
             age: int
         
         model = TestModel(name="Test", age=30)
+        
+        # Test attribute access
+        self.assertEqual(model.name, "Test")
+        self.assertEqual(model.age, 30)
+        
+        # Test dictionary-like access
         self.assertEqual(model["name"], "Test")
         self.assertEqual(model["age"], 30)
         
+        # Test attribute errors
+        with self.assertRaises(AttributeError):
+            _ = model.nonexistent
+        
+        # Test dictionary key errors
         with self.assertRaises(KeyError):
             _ = model["nonexistent"]
     

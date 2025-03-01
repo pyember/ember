@@ -12,6 +12,7 @@ Ember is a powerful, extensible Python framework for building and orchestrating 
 - 🧩 **Composable Operators**: PyTorch-like modular components for reusability
 - 🔌 **Extensible Registry System**: Support for custom models, operators, and evaluators
 - ⚡ **Efficient Multi-Model Pipelines**: Optimized for complex AI system orchestration
+- 🧠 **Enhanced JIT System**: JAX-inspired tracing and optimized execution (see [documentation](#enhanced-jit-api))
 
 ## Quick Installation
 
@@ -198,3 +199,14 @@ Ember is released under the [Apache 2.0 License](LICENSE).
 ---
 
 Built with 🔥 by [Foundry Technologies](https://foundry.ai)
+## Enhanced JIT API
+
+The enhanced JIT API provides a cleaner, more JAX-like user experience for building and executing complex operator DAGs.
+
+### Basic Usage
+
+\\n
+### Execution Control
+
+\\n
+For more details, see the [enhanced_jit_design_doc.md](./enhanced_jit_design_doc.md).

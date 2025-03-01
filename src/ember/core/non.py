@@ -69,6 +69,9 @@ except ImportError:
 
 # Alias re-export types for backward compatibility with clients/tests from before our
 # registry refactor.
+from ember.core.registry.operator.core.ensemble import EnsembleOperatorOutputs
+from ember.core.registry.operator.core.most_common import MostCommonAnswerSelectorOutputs
+
 EnsembleInputs = EnsembleOperatorInputs
 MostCommonInputs = MostCommonAnswerSelectorOperatorInputs
 VerifierInputs = VerifierOperatorInputs
@@ -79,7 +82,7 @@ VerifierOutputs = VerifierOperatorOutputs
 # ------------------------------------------------------------------------------
 
 
-class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
+class UniformEnsemble(Operator[EnsembleInputs, EnsembleOperatorOutputs]):
     """Wrapper around EnsembleOperator for parallel LM module calls.
 
     Example:
@@ -89,6 +92,7 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
             temperature=1.0
         )
         output = ensemble(inputs=EnsembleInputs(query="What is the capital of France?"))
+        responses = output.responses
     """
 
     num_units: int
@@ -128,7 +132,7 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
         # Use our helper to set the computed field.
         self.ensemble_op = EnsembleOperator(lm_modules=lm_modules)
 
-    def forward(self, *, inputs: EnsembleInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: EnsembleInputs) -> EnsembleOperatorOutputs:
         """Delegates execution to the underlying EnsembleOperator."""
         return self.ensemble_op.forward(inputs=inputs)
 
@@ -138,25 +142,24 @@ class UniformEnsemble(Operator[EnsembleInputs, Dict[str, Any]]):
 # ------------------------------------------------------------------------------
 
 
-class MostCommon(Operator[MostCommonInputs, Dict[str, Any]]):
+class MostCommon(Operator[MostCommonInputs, MostCommonAnswerSelectorOutputs]):
     """Wrapper around MostCommonOperator for consensus selection.
 
     Example:
         aggregator = MostCommon()
         output = aggregator(inputs=MostCommonInputs(query="...", responses=["A", "B", "A"]))
-        # output: {"final_answer": "A"}
+        # output.final_answer will be "A"
     """
 
     signature: Signature = MostCommonAnswerSelectorOperator.signature
     most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
     def __init__(self) -> None:
-        super().__init__()
         self.most_common_op = MostCommonAnswerSelectorOperator()
 
-    def forward(self, *, inputs: MostCommonInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: MostCommonInputs) -> MostCommonAnswerSelectorOutputs:
         """Delegates execution to the underlying MostCommonOperator."""
-        return self.most_common_op(inputs=inputs.model_dump())
+        return self.most_common_op(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -185,7 +188,6 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
     ) -> None:
-        super().__init__()
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -218,6 +220,9 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     Example:
         verifier = Verifier(model_name="gpt-4o")
         output = verifier(inputs=VerifierInputs(query="What is 2+2?", candidate_answer="5"))
+        verdict = output.verdict
+        explanation = output.explanation
+        revised = output.revised_answer
     """
 
     signature: Signature = VerifierSignature()
@@ -233,7 +238,6 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         temperature: float,
         max_tokens: Optional[int] = None,
     ) -> None:
-        super().__init__()
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -247,9 +251,9 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         )
         self.verifier_op = VerifierOperator(lm_module=lm_module)
 
-    def forward(self, *, inputs: VerifierInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: VerifierInputs) -> VerifierOutputs:
         """Delegates execution to the underlying VerifierOperator."""
-        return self.verifier_op(inputs=inputs.model_dump())
+        return self.verifier_op(inputs=inputs)
 
 
 # ------------------------------------------------------------------------------
@@ -279,6 +283,7 @@ class VariedEnsembleOutputs(BaseModel):
 
 class VariedEnsembleSignature(Signature):
     input_model: Type[BaseModel] = VariedEnsembleInputs
+    output_model: Type[BaseModel] = VariedEnsembleOutputs
 
 
 class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
@@ -300,14 +305,14 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
             lm_modules=tuple(LMModule(config=config) for config in model_configs)
         )
 
-    def build_prompt(self, *, inputs: Dict[str, Any]) -> str:
-        """Builds a prompt from the input dictionary.
+    def build_prompt(self, *, inputs: VariedEnsembleInputs) -> str:
+        """Builds a prompt from the input model.
 
         If a prompt_template is defined in the signature, it is used; otherwise, defaults to the query.
         """
         if self.signature and self.signature.prompt_template:
             return self.signature.render_prompt(inputs=inputs)
-        return str(inputs.get("query", ""))
+        return str(inputs.query)
 
     def call_lm(self, *, prompt: str, lm: Any) -> str:
         """Call an LM module with a prompt.
@@ -323,8 +328,7 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 
     def forward(self, *, inputs: VariedEnsembleInputs) -> VariedEnsembleOutputs:
         """Executes the varied ensemble operation and aggregates responses."""
-        input_dict = inputs.model_dump()
-        prompt = self.build_prompt(inputs=input_dict)
+        prompt = self.build_prompt(inputs=inputs)
         responses: List[str] = []
         for lm in self.lm_modules:
             response_text = self.call_lm(prompt=prompt, lm=lm).strip()
@@ -341,10 +345,9 @@ class Sequential(Operator[T_in, T_out]):
     """
 
     operators: List[Operator[Any, Any]]
-    signature: Signature = Signature(input_model=None)
+    signature: Signature = Signature(input_model=None, output_model=None)
 
     def __init__(self, *, operators: List[Operator[Any, Any]]) -> None:
-        super().__init__()
         self.operators = operators
 
     def forward(self, *, inputs: T_in) -> T_out:

@@ -114,19 +114,26 @@ class DummyOperator(Operator[DummyInput, DummyOutput]):
         return DummyOutput(y=self.counter)
 
 
-def test_jit_decorator_always_executes() -> None:
-    """Tests that the JIT-decorated operator executes forward for every call (no caching)."""
+def test_jit_decorator_execution() -> None:
+    """Tests that the JIT-decorated operator executes its forward method on each call."""
     operator_instance: DummyOperator = DummyOperator()
+    
+    # First call
     output_first: DummyOutput = operator_instance(inputs={"x": 5})
-    output_second: DummyOutput = operator_instance(inputs={"x": 5})
-    # If forward increments self.counter, we expect it to be 2 now.
+    assert output_first.y == 1, "Expected first counter value to be 1"
+    
+    # Second call with different input
+    output_second: DummyOutput = operator_instance(inputs={"x": 6})
+    assert output_second.y == 2, "Expected second counter value to be 2"
+    
+    # Third call with first input again
+    output_third: DummyOutput = operator_instance(inputs={"x": 5})
+    assert output_third.y == 3, "Expected third counter value to be 3"
+    
+    # Verify final counter state
     assert (
-        operator_instance.counter == 2
-    ), f"Expected counter to be 2, got {operator_instance.counter}"
-    # The new design does NOT cache outputs, so they differ by the updated counter.
-    assert (
-        output_first != output_second
-    ), "Expected different outputs with each call (no caching)."
+        operator_instance.counter == 3
+    ), f"Expected counter to be 3, got {operator_instance.counter}"
 
 
 # ----------------------------------------------------------------------------
@@ -142,14 +149,20 @@ class ForceTraceOperator(DummyOperator):
 
 
 def test_jit_decorator_force_trace() -> None:
-    """Tests that the JIT decorator with force_trace=True executes forward each time."""
+    """Tests that the JIT decorator with force_trace=True bypasses caching."""
     operator_instance: ForceTraceOperator = ForceTraceOperator()
     output_first: DummyOutput = operator_instance(inputs={"x": 10})
     output_second: DummyOutput = operator_instance(inputs={"x": 10})
-    # With no caching, the counter increments on each invocation.
+    # With force_trace=True, the counter increments on each invocation.
     assert (
         operator_instance.counter == 2
     ), f"Expected counter to be 2, but got {operator_instance.counter}"
     assert (
         output_first != output_second
     ), "Expected distinct output due to forced trace."
+    
+    # Third call with same input should still increment the counter
+    output_third: DummyOutput = operator_instance(inputs={"x": 10})
+    assert (
+        operator_instance.counter == 3
+    ), f"Expected counter to be 3 with force_trace, but got {operator_instance.counter}"

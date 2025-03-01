@@ -1,12 +1,14 @@
 from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field, field_validator, ValidationInfo, ConfigDict
+from pydantic import Field, field_validator, ValidationInfo, ConfigDict
 
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.types.ember_model import EmberModel
 
 
-class ModelInfo(BaseModel):
-    """Metadata and configuration for instantiating a model.
+class ModelInfo(EmberModel):
+    """
+    Metadata and configuration for instantiating a model.
 
     Attributes:
         id (str): Unique identifier for the model.
@@ -28,19 +30,30 @@ class ModelInfo(BaseModel):
     provider: ProviderInfo
     api_key: Optional[str] = None
 
+    @property
+    def model_id(self) -> str:
+        """Alias for id, using a more descriptive name."""
+        return self.id
+
+    @property
+    def model_name(self) -> str:
+        """Alias for name, using a more descriptive name."""
+        return self.name
+
     @field_validator("api_key", mode="before")
     def validate_api_key(cls, api_key: Optional[str], info: ValidationInfo) -> str:
-        """Ensures an API key is provided, either explicitly or via the provider.
+        """
+        Ensures an API key is provided, either explicitly or via the provider.
 
         This validator checks if an API key is supplied. If not, it attempts to obtain a default
         API key from the associated provider. A ValueError is raised if neither is available.
 
         Args:
-            api_key (Optional[str]): The API key provided before validation.
-            info (ValidationInfo): Validation context containing additional field data.
+            api_key: The API key provided before validation.
+            info: Validation context containing additional field data.
 
         Returns:
-            str: A valid API key.
+            A valid API key.
 
         Raises:
             ValueError: If no API key is provided and the provider lacks a default.
@@ -51,10 +64,11 @@ class ModelInfo(BaseModel):
         return api_key or provider_obj.default_api_key
 
     def get_api_key(self) -> str:
-        """Retrieves the validated API key.
+        """
+        Retrieves the validated API key.
 
         Returns:
-            str: The API key to be used for authentication.
+            The API key to be used for authentication.
         """
         # Assert that the api_key is set following validation.
         assert (
@@ -63,10 +77,11 @@ class ModelInfo(BaseModel):
         return self.api_key
 
     def get_base_url(self) -> Optional[str]:
-        """Retrieves the base URL from the provider, if it exists.
+        """
+        Retrieves the base URL from the provider, if it exists.
 
         Returns:
-            Optional[str]: The base URL specified by the provider, or None if not available.
+            The base URL specified by the provider, or None if not available.
         """
         return self.provider.base_url
 

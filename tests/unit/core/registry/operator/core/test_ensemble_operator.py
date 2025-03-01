@@ -32,14 +32,12 @@ def test_ensemble_operator_forward() -> None:
     result: EnsembleOperatorOutputs = op(inputs=inputs)
 
     # Verify the aggregated responses:
-    rendered_prompt = custom_signature.render_prompt(inputs=inputs.model_dump())
-    expected: EnsembleOperatorOutputs = {
-        "responses": [
-            dummy_lm1(prompt=rendered_prompt),
-            dummy_lm2(prompt=rendered_prompt),
-        ]
-    }
+    rendered_prompt = custom_signature.render_prompt(inputs=inputs)
+    expected_responses = [
+        dummy_lm1(prompt=rendered_prompt),
+        dummy_lm2(prompt=rendered_prompt),
+    ]
 
-    assert (
-        result == expected
-    ), "EnsembleOperator forward did not return expected aggregated responses."
+    assert isinstance(result, dict), "Result should be a dict (which will be converted to EnsembleOperatorOutputs by the framework)"
+    assert "responses" in result, "Result should contain 'responses' key"
+    assert result["responses"] == expected_responses, "Responses should match expected responses"

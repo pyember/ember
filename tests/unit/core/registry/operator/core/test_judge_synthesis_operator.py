@@ -11,7 +11,7 @@ class CustomLMModule:
     """Returns reasoning plus a final answer line."""
 
     def __call__(self, *, prompt: str) -> str:
-        return "Some reasoning here.\nFinal Answer: Synthesized Answer"
+        return "Reasoning: Some reasoning here.\nFinal Answer: Synthesized Answer"
 
 
 def test_judge_synthesis_operator_forward() -> None:
