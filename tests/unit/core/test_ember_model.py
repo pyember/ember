@@ -88,7 +88,7 @@ class TestEmberModel(unittest.TestCase):
             return {"text": "Hello, world!", "score": 0.95}
 
         # The dict should be automatically converted to ResponseModel during validation
-        result = ResponseModel.validate(get_response())
+        result = ResponseModel.model_validate(get_response())
         self.assertIsInstance(result, ResponseModel)
         self.assertEqual(result.text, "Hello, world!")
         self.assertEqual(result.score, 0.95)
