@@ -25,39 +25,39 @@ class TestLoadDatasetEntries(unittest.TestCase):
         """Set up test fixtures."""
         # Create patches for the dependencies
         self.metadata_registry_patcher = mock.patch(
-            "src.ember.core.utils.data.DatasetMetadataRegistry"
+            "ember.core.utils.data.DatasetMetadataRegistry"
         )
         self.mock_metadata_registry_cls = self.metadata_registry_patcher.start()
         self.mock_metadata_registry = self.mock_metadata_registry_cls.return_value
 
         self.loader_factory_patcher = mock.patch(
-            "src.ember.core.utils.data.DatasetLoaderFactory"
+            "ember.core.utils.data.DatasetLoaderFactory"
         )
         self.mock_loader_factory_cls = self.loader_factory_patcher.start()
         self.mock_loader_factory = self.mock_loader_factory_cls.return_value
 
         self.initialize_registry_patcher = mock.patch(
-            "src.ember.core.utils.data.initialize_dataset_registry"
+            "ember.core.utils.data.initialize_dataset_registry"
         )
         self.mock_initialize_registry = self.initialize_registry_patcher.start()
 
         self.hf_loader_patcher = mock.patch(
-            "src.ember.core.utils.data.HuggingFaceDatasetLoader"
+            "ember.core.utils.data.HuggingFaceDatasetLoader"
         )
         self.mock_hf_loader_cls = self.hf_loader_patcher.start()
         self.mock_hf_loader = self.mock_hf_loader_cls.return_value
 
         self.validator_patcher = mock.patch(
-            "src.ember.core.utils.data.DatasetValidator"
+            "ember.core.utils.data.DatasetValidator"
         )
         self.mock_validator_cls = self.validator_patcher.start()
         self.mock_validator = self.mock_validator_cls.return_value
 
-        self.sampler_patcher = mock.patch("src.ember.core.utils.data.DatasetSampler")
+        self.sampler_patcher = mock.patch("ember.core.utils.data.DatasetSampler")
         self.mock_sampler_cls = self.sampler_patcher.start()
         self.mock_sampler = self.mock_sampler_cls.return_value
 
-        self.service_patcher = mock.patch("src.ember.core.utils.data.DatasetService")
+        self.service_patcher = mock.patch("ember.core.utils.data.DatasetService")
         self.mock_service_cls = self.service_patcher.start()
         self.mock_service = self.mock_service_cls.return_value
 

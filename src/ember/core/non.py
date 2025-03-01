@@ -14,30 +14,58 @@ from typing import Any, Dict, List, Optional, Type
 from pydantic import BaseModel
 
 # Ember package imports
-from src.ember.core.registry.operator.base._module import ember_field
-from src.ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
-from src.ember.core.registry.operator.core.ensemble import (
-    EnsembleOperator,
-    EnsembleOperatorInputs,
-)
-from src.ember.core.registry.operator.core.most_common import (
-    MostCommonAnswerSelectorOperator,
-    MostCommonAnswerSelectorOperatorInputs,
-)
-from src.ember.core.registry.operator.core.synthesis_judge import (
-    JudgeSynthesisOperator,
-    JudgeSynthesisInputs,
-    JudgeSynthesisOutputs,
-    JudgeSynthesisSignature,
-)
-from src.ember.core.registry.operator.core.verifier import (
-    VerifierOperator,
-    VerifierOperatorInputs,
-    VerifierOperatorOutputs,
-    VerifierSignature,
-)
-from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
+try:
+    # Try standard import path first (for installed package)
+    from ember.core.registry.operator.base._module import ember_field
+    from ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
+    from ember.core.registry.operator.core.ensemble import (
+        EnsembleOperator,
+        EnsembleOperatorInputs,
+    )
+    from ember.core.registry.operator.core.most_common import (
+        MostCommonAnswerSelectorOperator,
+        MostCommonAnswerSelectorOperatorInputs,
+    )
+    from ember.core.registry.operator.core.synthesis_judge import (
+        JudgeSynthesisOperator,
+        JudgeSynthesisInputs,
+        JudgeSynthesisOutputs,
+        JudgeSynthesisSignature,
+    )
+    from ember.core.registry.operator.core.verifier import (
+        VerifierOperator,
+        VerifierOperatorInputs,
+        VerifierOperatorOutputs,
+        VerifierSignature,
+    )
+    from ember.core.registry.prompt_signature.signatures import Signature
+    from ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
+except ImportError:
+    # Fall back to src.ember path (for development)
+    from ember.core.registry.operator.base._module import ember_field
+    from ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
+    from ember.core.registry.operator.core.ensemble import (
+        EnsembleOperator,
+        EnsembleOperatorInputs,
+    )
+    from ember.core.registry.operator.core.most_common import (
+        MostCommonAnswerSelectorOperator,
+        MostCommonAnswerSelectorOperatorInputs,
+    )
+    from ember.core.registry.operator.core.synthesis_judge import (
+        JudgeSynthesisOperator,
+        JudgeSynthesisInputs,
+        JudgeSynthesisOutputs,
+        JudgeSynthesisSignature,
+    )
+    from ember.core.registry.operator.core.verifier import (
+        VerifierOperator,
+        VerifierOperatorInputs,
+        VerifierOperatorOutputs,
+        VerifierSignature,
+    )
+    from ember.core.registry.prompt_signature.signatures import Signature
+    from ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
 
 # Alias re-export types for backward compatibility with clients/tests from before our
 # registry refactor.
@@ -280,6 +308,18 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
         if self.signature and self.signature.prompt_template:
             return self.signature.render_prompt(inputs=inputs)
         return str(inputs.get("query", ""))
+
+    def call_lm(self, *, prompt: str, lm: Any) -> str:
+        """Call an LM module with a prompt.
+        
+        Args:
+            prompt: The prompt to send to the LM
+            lm: The LM module to call
+            
+        Returns:
+            The LM's response as a string
+        """
+        return lm(prompt=prompt)
 
     def forward(self, *, inputs: VariedEnsembleInputs) -> VariedEnsembleOutputs:
         """Executes the varied ensemble operation and aggregates responses."""

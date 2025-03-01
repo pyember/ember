@@ -83,7 +83,7 @@ def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) ->
         )()
 
     monkeypatch.setattr(
-        "src.ember.core.registry.model.config.settings.EmberSettings",
+        "ember.core.registry.model.config.settings.EmberSettings",
         MockEmberSettings,
     )
 

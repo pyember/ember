@@ -23,9 +23,9 @@ from typing import Any, Dict, Generic, TypeVar, Union, cast, Type, Optional, Cla
 
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base._module import EmberModule
-from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.operator.exceptions import (
+from ember.core.registry.operator.base._module import EmberModule
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.operator.exceptions import (
     OperatorSignatureNotDefinedError,
     OperatorExecutionError,
 )

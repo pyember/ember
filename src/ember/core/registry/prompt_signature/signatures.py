@@ -4,7 +4,7 @@ import logging
 
 from pydantic import BaseModel, model_validator
 
-from src.ember.core.registry.prompt_signature.exceptions import (
+from ember.core.registry.prompt_signature.exceptions import (
     PromptSignatureError,
     PlaceholderMissingError,
     MismatchedModelError,

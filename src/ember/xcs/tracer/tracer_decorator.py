@@ -16,8 +16,8 @@ import functools
 import time
 from typing import Any, Callable, Dict, Optional, Type, TypeVar, cast
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
 
 # Type variable for Operator subclasses.
 OperatorType = TypeVar("OperatorType", bound=Operator)

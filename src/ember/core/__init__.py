@@ -3,10 +3,18 @@
 from __future__ import annotations
 
 # Absolute imports
-from src.ember.core import registry
-from src.ember.core.non import Sequential
-from src.ember.core.app_context import EmberContext
-from src.ember.core.exceptions import EmberError, ValidationError, ConfigurationError
+try:
+    # Try the normal import path first
+    from ember.core import registry
+    from ember.core.non import Sequential
+    from ember.core.app_context import EmberContext
+    from ember.core.exceptions import EmberError, ValidationError, ConfigurationError
+except ImportError:
+    # Fall back to src.ember if the regular imports fail
+    from ember.core import registry
+    from ember.core.non import Sequential
+    from ember.core.app_context import EmberContext
+    from ember.core.exceptions import EmberError, ValidationError, ConfigurationError
 
 __all__ = [
     "EmberContext",

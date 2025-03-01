@@ -37,7 +37,7 @@ class MockPrepper(IDatasetPrepper):
 class TestDiscoverPreppers(unittest.TestCase):
     """Test cases for the discover_preppers function."""
 
-    @mock.patch("src.ember.core.utils.data.loader_factory.entry_points")
+    @mock.patch("ember.core.utils.data.loader_factory.entry_points")
     def test_discover_preppers_success(self, mock_entry_points):
         """discover_preppers() should find and load valid prepper classes."""
         # Arrange
@@ -64,7 +64,7 @@ class TestDiscoverPreppers(unittest.TestCase):
         self.assertEqual(MockPrepper, result["dataset1"])
         self.assertEqual(MockPrepper, result["dataset2"])
 
-    @mock.patch("src.ember.core.utils.data.loader_factory.entry_points")
+    @mock.patch("ember.core.utils.data.loader_factory.entry_points")
     def test_discover_preppers_error_handling(self, mock_entry_points):
         """discover_preppers() should handle errors when loading entry points."""
         # Arrange
@@ -88,7 +88,7 @@ class TestDiscoverPreppers(unittest.TestCase):
         self.assertIn("dataset1", result)
         self.assertNotIn("dataset2", result)
 
-    @mock.patch("src.ember.core.utils.data.loader_factory.entry_points")
+    @mock.patch("ember.core.utils.data.loader_factory.entry_points")
     def test_discover_preppers_empty(self, mock_entry_points):
         """discover_preppers() should return an empty dict when no entry points found."""
         # Arrange
@@ -112,7 +112,7 @@ class TestDatasetLoaderFactory(unittest.TestCase):
 
         # Create a patcher for discover_preppers
         self.discover_preppers_patcher = mock.patch(
-            "src.ember.core.utils.data.loader_factory.discover_preppers"
+            "ember.core.utils.data.loader_factory.discover_preppers"
         )
         self.mock_discover_preppers = self.discover_preppers_patcher.start()
 

@@ -5,11 +5,11 @@ This module tests parallel execution using the TopologicalSchedulerWithParallelD
 
 from typing import Any, Dict
 
-from src.ember.xcs.engine.xcs_engine import (
+from ember.xcs.engine.xcs_engine import (
     TopologicalSchedulerWithParallelDispatch,
     compile_graph,
 )
-from src.ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 
 def dummy_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:

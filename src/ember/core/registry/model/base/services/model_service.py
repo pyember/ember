@@ -3,15 +3,15 @@ from enum import Enum
 import asyncio
 from typing import Any, Optional, Union
 
-from src.ember.core.registry.model.config.model_enum import (
+from ember.core.registry.model.config.model_enum import (
     ModelEnum,
     parse_model_str,
 )
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
-from src.ember.core.registry.model.base.services.usage_service import UsageService
-from src.ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
-from src.ember.core.exceptions import ProviderAPIError
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
+from ember.core.registry.model.base.services.usage_service import UsageService
+from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
+from ember.core.exceptions import ProviderAPIError
 
 
 class ModelService:

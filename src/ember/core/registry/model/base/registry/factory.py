@@ -13,13 +13,13 @@ import os
 import pkgutil
 from typing import Any, Dict, Optional, Type
 
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
-from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
-from src.ember.core.registry.model.config.model_enum import parse_model_str
-from src.ember.core.registry.model.providers.registry import PROVIDER_REGISTRY
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
+from ember.core.registry.model.config.model_enum import parse_model_str
+from ember.core.registry.model.providers.registry import PROVIDER_REGISTRY
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
 

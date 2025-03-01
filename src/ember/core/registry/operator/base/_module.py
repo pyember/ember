@@ -33,8 +33,8 @@ from typing import (
     Generic,
 )
 
-from src.ember.xcs.utils.tree_util import register_tree, tree_flatten
-from src.ember.core.registry.operator.exceptions import (
+from ember.xcs.utils.tree_util import register_tree, tree_flatten
+from ember.core.registry.operator.exceptions import (
     BoundMethodNotInitializedError,
     FlattenError,
 )
@@ -323,9 +323,21 @@ class EmberModuleMeta(abc.ABCMeta):
         )
 
         # If there's a custom __init__, use the standard initialization path
+        # but handle the case where subclasses might not call super().__init__()
         if has_custom_init:
-            # Create an instance using the mutable wrapper
-            instance: T = super(EmberModuleMeta, mutable_cls).__call__(*args, **kwargs)
+            # Create an instance directly
+            instance = object.__new__(mutable_cls)
+            
+            # Call the custom __init__
+            try:
+                # Attempt to call the class's __init__ method
+                mutable_cls.__init__(instance, *args, **kwargs)
+            except TypeError as e:
+                # If there's a TypeError, it might be because the __init__ signature is wrong
+                raise TypeError(
+                    f"Error initializing {cls.__name__}: {str(e)}\n"
+                    f"Ensure __init__ accepts the correct parameters."
+                ) from e
         else:
             # No custom __init__, use direct field initialization
             instance = object.__new__(mutable_cls)

@@ -3,15 +3,15 @@ import logging
 import threading
 from typing import Any, Dict, List
 
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
-from src.ember.core.registry.model.providers.openai.openai_discovery import (
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
+from ember.core.registry.model.providers.openai.openai_discovery import (
     OpenAIDiscovery,
 )
-from src.ember.core.registry.model.providers.anthropic.anthropic_discovery import (
+from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
     AnthropicDiscovery,
 )
-from src.ember.core.registry.model.providers.deepmind.deepmind_discovery import (
+from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,
 )
 
@@ -78,7 +78,7 @@ class ModelDiscoveryService:
 
             # If no models found and we had errors, raise exception
             if not aggregated_models and errors:
-                from src.ember.core.registry.model.providers.base_discovery import (
+                from ember.core.registry.model.providers.base_discovery import (
                     ModelDiscoveryError,
                 )
 
@@ -105,7 +105,7 @@ class ModelDiscoveryService:
         Returns:
             Dict[str, ModelInfo]: Mapping from model ID to merged ModelInfo objects.
         """
-        from src.ember.core.registry.model.config.settings import EmberSettings
+        from ember.core.registry.model.config.settings import EmberSettings
 
         settings = EmberSettings()
         local_models: Dict[str, Dict[str, Any]] = {
@@ -193,7 +193,7 @@ class ModelDiscoveryService:
         await asyncio.gather(*tasks)
 
         if not aggregated_models and errors:
-            from src.ember.core.registry.model.providers.base_discovery import (
+            from ember.core.registry.model.providers.base_discovery import (
                 ModelDiscoveryError,
             )
 

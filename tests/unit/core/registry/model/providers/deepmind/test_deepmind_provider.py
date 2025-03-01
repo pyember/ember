@@ -50,7 +50,7 @@ def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(genai, "list_models", lambda: [])
     # Patch GenerativeModel to be our dummy.
     monkeypatch.setattr(
-        "src.ember.core.registry.model.providers.deepmind.deepmind_provider.GenerativeModel",
+        "ember.core.registry.model.providers.deepmind.deepmind_provider.GenerativeModel",
         lambda model_ref: type(
             "DummyGenerativeModel",
             (),

@@ -1,9 +1,9 @@
 import logging
 from typing import Optional, Any, Dict
 
-from src.ember.core.registry.model.base.services.model_service import ModelService
-from src.ember.core.registry.model.base.services.usage_service import UsageService
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.services.usage_service import UsageService
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 
 class EmberAppContext:
@@ -40,7 +40,7 @@ def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
     """
     logger = logging.getLogger("ember")
 
-    from src.ember.core.configs.config import (
+    from ember.core.configs.config import (
         ConfigManager,
         initialize_api_keys,
         auto_register_known_models,

@@ -2,8 +2,8 @@ import logging
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
-from src.ember.core.registry.model.base.services.model_service import ModelService
-from src.ember.core.registry.model.base.services.usage_service import UsageService
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.services.usage_service import UsageService
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def get_default_model_service() -> ModelService:
     Instead of relying on a global registry, we explicitly call initialize_ember()
     so that the registry is built from the current configuration.
     """
-    from src.ember.core.registry.model.config.settings import initialize_ember
+    from ember.core.registry.model.config.settings import initialize_ember
 
     # Initialize the registry (with default flags; these can be adjusted as needed).
     registry = initialize_ember(auto_register=True, auto_discover=True)

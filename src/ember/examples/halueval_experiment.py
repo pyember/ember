@@ -24,15 +24,15 @@ from prettytable import PrettyTable
 
 # ------------------------------------------------------------------------------
 # Ember imports for model registry, LM modules, and pipelines.
-from src.ember.core import (
+from ember.core import (
     non,
 )  # Provides operators such as Ensemble, GetAnswer, JudgeSynthesis, VariedEnsemble
-from src.ember.core.registry.model.base.registry.model_registry import (
+from ember.core.registry.model.base.registry.model_registry import (
     GLOBAL_MODEL_REGISTRY,
     initialize_system,
 )
-from src.ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from src.ember.examples.mcq_experiment_example import (
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.examples.mcq_experiment_example import (
     EnsureValidChoiceOperator,
     SingleModelBaseline,
     MultiModelEnsemble,
@@ -41,21 +41,21 @@ from src.ember.examples.mcq_experiment_example import (
 
 # ------------------------------------------------------------------------------
 # For dataset loading (we use the HaluEval prepper)
-from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
-from src.ember.core.utils.data.service import DatasetService
-from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from src.ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-from src.ember.core.utils.data.base.samplers import DatasetSampler
-from src.ember.core.utils.data.base.validators import DatasetValidator
-from src.ember.core.utils.data.initialization import initialize_dataset_registry
+from ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
+from ember.core.utils.data.service import DatasetService
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
+from ember.core.utils.data.base.samplers import DatasetSampler
+from ember.core.utils.data.base.validators import DatasetValidator
+from ember.core.utils.data.initialization import initialize_dataset_registry
 
 # ------------------------------------------------------------------------------
 # For constructing operator graphs (for concurrent execution)
-from src.ember.xcs.graph.xcs_graph import XCSGraph  # our OperatorGraph equivalent
+from ember.xcs.graph.xcs_graph import XCSGraph  # our OperatorGraph equivalent
 
 # ADD the execute_graph import:
-from src.ember.xcs.engine.xcs_engine import execute_graph
+from ember.xcs.engine.xcs_engine import execute_graph
 
 
 ###############################################################################

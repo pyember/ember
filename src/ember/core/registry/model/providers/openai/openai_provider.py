@@ -6,22 +6,22 @@ from pydantic import BaseModel, Field, field_validator
 from requests.exceptions import HTTPError
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from src.ember.core.registry.model.base.utils.model_registry_exceptions import (
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from src.ember.core.registry.model.providers.base_provider import (
+from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from src.ember.core.registry.model.base.schemas.chat_schemas import (
+from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
-from src.ember.core.registry.model.base.schemas.usage import UsageStats
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.plugin_system import provider
-from src.ember.core.registry.model.base.utils.usage_calculator import (
+from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.plugin_system import provider
+from ember.core.registry.model.base.utils.usage_calculator import (
     DefaultUsageCalculator,
 )
 

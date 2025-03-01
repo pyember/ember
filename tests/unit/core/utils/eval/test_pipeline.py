@@ -281,8 +281,8 @@ class TestEvaluateBatchWithSummary(unittest.TestCase):
             EvaluationResult(is_correct=True, score=0.8),
         ]
 
-    @mock.patch("src.ember.core.utils.eval.pipeline.evaluate_batch")
-    @mock.patch("src.ember.core.utils.eval.pipeline.summarize_batch")
+    @mock.patch("ember.core.utils.eval.pipeline.evaluate_batch")
+    @mock.patch("ember.core.utils.eval.pipeline.summarize_batch")
     def test_function_composition(
         self, mock_summarize: mock.MagicMock, mock_evaluate: mock.MagicMock
     ) -> None:

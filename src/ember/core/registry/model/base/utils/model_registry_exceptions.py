@@ -5,7 +5,7 @@ external exceptions from 'src.ember.core.exceptions' for unified error handling.
 """
 
 # Re-export external exceptions for use in higher-level modules.
-from src.ember.core.exceptions import (
+from ember.core.exceptions import (
     ProviderAPIError,
     ProviderConfigError,
     InvalidPromptError,

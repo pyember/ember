@@ -3,7 +3,7 @@ from typing import Literal, Optional, Type
 
 from pydantic import BaseModel
 
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class CaravanLabelsOutput(BaseModel):

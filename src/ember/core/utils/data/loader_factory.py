@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional, Type
 from importlib.metadata import entry_points
 
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

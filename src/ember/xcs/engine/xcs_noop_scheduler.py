@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
-from src.ember.xcs.engine.xcs_engine import XCSPlan
-from src.ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.engine.xcs_engine import XCSPlan
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 
 class XCSNoOpScheduler:

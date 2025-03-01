@@ -3,11 +3,11 @@ from random import sample
 
 from pydantic import BaseModel
 
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core import non
-from src.ember.core.registry.operator.base._module import ember_field
-from src.ember.core.registry.model.model_module.lm import LMModule
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core import non
+from ember.core.registry.operator.base._module import ember_field
+from ember.core.registry.model.model_module.lm import LMModule
 
 
 def usage_example() -> None:

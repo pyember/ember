@@ -15,9 +15,9 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from src.ember.core.exceptions import EmberError
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.exceptions import EmberError
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -184,7 +184,7 @@ def _initialize_model_registry(*, settings: EmberSettings) -> ModelRegistry:
 
     discovered_models: Dict[str, ModelInfo] = {}
     if final_settings.registry.auto_discover:
-        from src.ember.core.registry.model.base.registry.discovery import (
+        from ember.core.registry.model.base.registry.discovery import (
             ModelDiscoveryService,
         )
 

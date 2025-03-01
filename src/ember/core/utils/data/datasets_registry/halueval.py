@@ -1,8 +1,8 @@
 from typing import Any, Dict, List, Optional
 
-from src.ember.core.utils.data.base.config import BaseDatasetConfig
-from src.ember.core.utils.data.base.models import DatasetEntry
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.config import BaseDatasetConfig
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 class HaluEvalConfig(BaseDatasetConfig):

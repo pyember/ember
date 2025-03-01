@@ -61,7 +61,7 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Patching the factory to use DummyProvider.
     monkeypatch.setattr(
-        "src.ember.core.registry.model.base.registry.factory.ModelFactory.create_model_from_info",
+        "ember.core.registry.model.base.registry.factory.ModelFactory.create_model_from_info",
         lambda *, model_info: DummyProvider(model_info),
     )
 

@@ -1,7 +1,7 @@
 from typing import Dict, Any
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core import non
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core import non
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 class SubNetwork(Operator[Dict[str, Any], Dict[str, Any]]):

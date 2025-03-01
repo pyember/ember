@@ -81,11 +81,11 @@ def check_env() -> None:
 # ------------------------------------------------------------------------------------
 # Model Registration
 # ------------------------------------------------------------------------------------
-from src.ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
-from src.ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from src.ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from src.ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.prompt_signature.signatures import Signature
 
 
 def register_custom_model() -> None:
@@ -195,8 +195,8 @@ class SimplePromptSignature(BaseModel):
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
-from src.ember.core.registry.operator.base.operator_base import Operator
-from src.ember.core import non
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core import non
 
 
 class SimplePromptOperator(Operator[SimplePromptInputs, Dict[str, Any]]):

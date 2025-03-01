@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Optional
 
-from src.ember.core.registry.model.base.schemas.usage import UsageStats
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
 
 
 class UsageCalculator(ABC):

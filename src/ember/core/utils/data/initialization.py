@@ -1,18 +1,18 @@
 import logging
 from typing import Dict, List, Type
 
-from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from src.ember.core.utils.data.base.models import TaskType, DatasetInfo
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from ember.core.utils.data.base.models import TaskType, DatasetInfo
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
-from src.ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
-from src.ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper
-from src.ember.core.utils.data.datasets_registry.commonsense_qa import (
+from ember.core.utils.data.datasets_registry.truthful_qa import TruthfulQAPrepper
+from ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper
+from ember.core.utils.data.datasets_registry.commonsense_qa import (
     CommonsenseQAPrepper,
 )
-from src.ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
-from src.ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
+from ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
+from ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper
 
 logger: logging.Logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

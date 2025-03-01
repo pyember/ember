@@ -1,9 +1,9 @@
 import logging
-from src.ember.core.registry.model.config.settings import initialize_ember as init
+from ember.core.registry.model.config.settings import initialize_ember as init
 
 # Optional: import ModelEnum for safer, type-checked invocation if available.
 try:
-    from src.ember.core.registry.model.config.model_enum import ModelEnum
+    from ember.core.registry.model.config.model_enum import ModelEnum
 except ImportError:
     ModelEnum = None
 

@@ -27,37 +27,37 @@ from pydantic import BaseModel
 from prettytable import PrettyTable
 
 # ember imports: use only the typed pipeline definitions (avoid direct registry references).
-from src.ember.core.non import Ensemble, JudgeSynthesis
-from src.ember.core.registry.model.base.registry.model_registry import (
+from ember.core.non import Ensemble, JudgeSynthesis
+from ember.core.registry.model.base.registry.model_registry import (
     get_model_registry,
 )
-from src.ember.core import non
-from src.ember.core.registry.model.base.registry.model_registry import (
+from ember.core import non
+from ember.core.registry.model.base.registry.model_registry import (
     GLOBAL_MODEL_REGISTRY,
 )
-from src.ember.core.configs.config import CONFIG, initialize_system
+from ember.core.configs.config import CONFIG, initialize_system
 
 # For dataset usage:
-from src.ember.core.utils.data.base.models import DatasetEntry
-from src.ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
-from src.ember.core.utils.data.service import DatasetService
-from src.ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from src.ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from src.ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-from src.ember.core.utils.data.base.samplers import DatasetSampler
-from src.ember.core.utils.data.base.validators import DatasetValidator
-from src.ember.core.utils.data.initialization import initialize_dataset_registry
-from src.ember.xcs.scheduler import ExecutionPlan
-from src.ember.core.registry.operator.base.operator_base import (
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from ember.core.utils.data.service import DatasetService
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
+from ember.core.utils.data.base.samplers import DatasetSampler
+from ember.core.utils.data.base.validators import DatasetValidator
+from ember.core.utils.data.initialization import initialize_dataset_registry
+from ember.xcs.scheduler import ExecutionPlan
+from ember.core.registry.operator.base.operator_base import (
     LMModule,
     Operator,
     OperatorMetadata,
 )
-from src.ember.core.registry.prompt_signature.signatures import Signature
-from src.ember.core.registry.model.model_module.lm import LMModuleConfig
+from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.model.model_module.lm import LMModuleConfig
 
 # ADD the execute_graph import:
-from src.ember.xcs.engine.xcs_engine import execute_graph
+from ember.xcs.engine.xcs_engine import execute_graph
 
 
 ###############################################################################

@@ -43,7 +43,7 @@ def dummy_discover_providers(*, package_path: str) -> Dict[str, type]:
 def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     # This ensures that 'DummyProvider' is recognized
     monkeypatch.setattr(
-        "src.ember.core.registry.model.base.registry.factory.discover_providers_in_package",
+        "ember.core.registry.model.base.registry.factory.discover_providers_in_package",
         dummy_discover_providers,
     )
     # Also reset the cached providers
@@ -83,7 +83,7 @@ def test_create_model_from_info_invalid(monkeypatch: pytest.MonkeyPatch) -> None
         raise ValueError("Invalid model ID format")
 
     monkeypatch.setattr(
-        "src.ember.core.registry.model.base.registry.factory.parse_model_str",
+        "ember.core.registry.model.base.registry.factory.parse_model_str",
         mock_parse_model_str,
     )
 

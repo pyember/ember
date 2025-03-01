@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
-from src.ember.core.utils.data.base.preppers import IDatasetPrepper
-from src.ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.base.preppers import IDatasetPrepper
+from ember.core.utils.data.base.models import DatasetEntry
 
 
 class CommonsenseQAPrepper(IDatasetPrepper):

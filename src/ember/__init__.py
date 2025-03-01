@@ -11,16 +11,19 @@ for initializing Ember models.
 from __future__ import annotations
 
 # Lazy imports to prevent circular dependencies
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
-    from src.ember.core.registry.model import ModelRegistry, ModelService
-    from src.ember.core.registry.model import initialize_ember
+    from ember.core.registry.model import ModelRegistry, ModelService
+    from ember.core.registry.model import initialize_ember
 
-from typing import Optional
-
-from .core.registry.model import initialize_ember, ModelRegistry, ModelService
-from .core.registry.model.base.services.usage_service import UsageService
+try:
+    from .core.registry.model import initialize_ember, ModelRegistry, ModelService
+    from .core.registry.model.base.services.usage_service import UsageService
+except ImportError:
+    # Alternative import path when the package is not properly installed
+    from ember.core.registry.model import initialize_ember, ModelRegistry, ModelService
+    from ember.core.registry.model.base.services.usage_service import UsageService
 
 __version__ = "0.1.0"
 __all__ = ["ModelRegistry", "ModelService", "initialize_ember"]
@@ -36,21 +39,34 @@ _PACKAGE_METADATA = {
 def __getattr__(name: str) -> object:
     """Lazy load main components using absolute imports."""
     if name == "ModelRegistry":
-        from src.ember.core.registry.model.base.registry.model_registry import (
-            ModelRegistry,
-        )
-
-        return ModelRegistry
+        try:
+            from ember.core.registry.model.base.registry.model_registry import (
+                ModelRegistry,
+            )
+            return ModelRegistry
+        except ImportError:
+            from ember.core.registry.model.base.registry.model_registry import (
+                ModelRegistry,
+            )
+            return ModelRegistry
     if name == "ModelService":
-        from src.ember.core.registry.model.base.services.model_service import (
-            ModelService,
-        )
-
-        return ModelService
+        try:
+            from ember.core.registry.model.base.services.model_service import (
+                ModelService,
+            )
+            return ModelService
+        except ImportError:
+            from ember.core.registry.model.base.services.model_service import (
+                ModelService,
+            )
+            return ModelService
     if name == "initialize_ember":
-        from src.ember.core.registry.model import initialize_ember
-
-        return initialize_ember
+        try:
+            from ember.core.registry.model import initialize_ember
+            return initialize_ember
+        except ImportError:
+            from ember.core.registry.model import initialize_ember
+            return initialize_ember
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
