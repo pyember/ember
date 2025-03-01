@@ -10,6 +10,7 @@ from ember.core.registry.prompt_signature.exceptions import (
     MismatchedModelError,
     InvalidInputTypeError,
 )
+from ember.core.types import EmberModel
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
                 )
         return self
 
-    def render_prompt(self, *, inputs: Dict[str, Any]) -> str:
+    def render_prompt(self, *, inputs: Union[Dict[str, Any], BaseModel, EmberModel]) -> str:
         """Render a prompt using the provided inputs.
 
         If a prompt_template is specified, formats it using the given inputs.
@@ -85,7 +86,7 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
         If neither is available, raises an error.
 
         Args:
-            inputs (Dict[str, Any]): A dictionary containing input values.
+            inputs (Union[Dict[str, Any], BaseModel, EmberModel]): Input values as a dictionary or model.
 
         Returns:
             str: The rendered prompt string.
@@ -99,9 +100,16 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
             logger.error(error_msg)
             raise PlaceholderMissingError(message=error_msg)
 
+        # Convert inputs to dictionary if it's a model
+        input_dict: Dict[str, Any] = inputs
+        if isinstance(inputs, EmberModel):
+            input_dict = inputs.as_dict()
+        elif isinstance(inputs, BaseModel):
+            input_dict = inputs.model_dump()
+
         if self.prompt_template is not None:
             try:
-                prompt: str = self.prompt_template.format(**inputs)
+                prompt: str = self.prompt_template.format(**input_dict)
                 return prompt
             except KeyError as key_err:
                 error_msg: str = f"Missing input for placeholder: {key_err}"
@@ -112,7 +120,7 @@ class Signature(BaseModel, Generic[InputModelT, OutputModelT]):
 
         if self.input_model is not None:
             required_fields: List[str] = self._get_required_fields()
-            return "\n".join(str(inputs.get(field, "")) for field in required_fields)
+            return "\n".join(str(input_dict.get(field, "")) for field in required_fields)
 
         error_msg: str = (
             "No prompt_template or input_model defined for rendering prompt."

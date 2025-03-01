@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from collections import Counter
-from typing import Any, Dict, List
-from pydantic import BaseModel
+from typing import Any, Dict, List, Optional
+from ember.core.types import EmberModel
 
 from ember.core.registry.operator.base.operator_base import Operator
 
 from ember.core.registry.prompt_signature.signatures import Signature
 
 
-class MostCommonAnswerSelectorOperatorInputs(BaseModel):
+class MostCommonAnswerSelectorOperatorInputs(EmberModel):
     """Input model for MostCommonAnswerSelectorOperator.
 
     Attributes:
@@ -19,16 +19,28 @@ class MostCommonAnswerSelectorOperatorInputs(BaseModel):
     responses: List[str]
 
 
+class MostCommonAnswerSelectorOutputs(EmberModel):
+    """Output model for MostCommonAnswerSelectorOperator.
+    
+    Attributes:
+        final_answer (Optional[str]): The most common answer from responses.
+    """
+    final_answer: Optional[str]
+
+
 class MostCommonAnswerSelectorOperator(
-    Operator[MostCommonAnswerSelectorOperatorInputs, Dict[str, Any]]
+    Operator[MostCommonAnswerSelectorOperatorInputs, MostCommonAnswerSelectorOutputs]
 ):
     """Operator that selects the most common answer from provided responses."""
 
-    signature: Signature = Signature(input_model=MostCommonAnswerSelectorOperatorInputs)
+    signature: Signature = Signature(
+        input_model=MostCommonAnswerSelectorOperatorInputs,
+        output_model=MostCommonAnswerSelectorOutputs
+    )
 
     def forward(
         self, *, inputs: MostCommonAnswerSelectorOperatorInputs
-    ) -> Dict[str, Any]:
+    ) -> MostCommonAnswerSelectorOutputs:
         if not inputs.responses:
             return {"final_answer": None}
         counts: Counter = Counter(inputs.responses)

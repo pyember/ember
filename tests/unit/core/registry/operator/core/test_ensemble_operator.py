@@ -3,6 +3,7 @@ import pytest
 from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
+    EnsembleOperatorOutputs,
 )
 from ember.core.registry.prompt_signature.signatures import Signature
 
@@ -28,11 +29,11 @@ def test_ensemble_operator_forward() -> None:
     op.signature = custom_signature
 
     inputs = EnsembleOperatorInputs(query="test query")
-    result = op(inputs=inputs)
+    result: EnsembleOperatorOutputs = op(inputs=inputs)
 
     # Verify the aggregated responses:
     rendered_prompt = custom_signature.render_prompt(inputs=inputs.model_dump())
-    expected = {
+    expected: EnsembleOperatorOutputs = {
         "responses": [
             dummy_lm1(prompt=rendered_prompt),
             dummy_lm2(prompt=rendered_prompt),

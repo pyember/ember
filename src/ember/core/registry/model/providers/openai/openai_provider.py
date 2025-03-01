@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Final, List, Optional
+from typing import Any, Dict, Final, List, Optional, cast
 
 import openai
 from pydantic import BaseModel, Field, field_validator
@@ -17,6 +17,7 @@ from ember.core.registry.model.providers.base_provider import (
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
+    OpenAIProviderParams
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
@@ -87,12 +88,13 @@ class OpenAIChatParameters(BaseChatParameters):
         }
 
 
-class OpenAIExtraParams(BaseModel):
-    """Extra provider parameters for OpenAI that may be safely overridden by users."""
-
-    stream: Optional[bool] = None
-    stop: Optional[List[str]] = None
-    # Additional overrideable parameters can be defined here as needed.
+# NOTE: This class is deprecated and replaced by OpenAIProviderParams TypedDict
+# class OpenAIExtraParams(BaseModel):
+#     """Extra provider parameters for OpenAI that may be safely overridden by users."""
+# 
+#     stream: Optional[bool] = None
+#     stop: Optional[List[str]] = None
+#     # Additional overrideable parameters can be defined here as needed.
 
 
 @provider("OpenAI")
@@ -185,9 +187,10 @@ class OpenAIModel(BaseProviderModel):
         openai_kwargs: Dict[str, Any] = openai_parameters.to_openai_kwargs()
 
         # Merge extra provider parameters in a type-safe manner.
-        extra_params: OpenAIExtraParams = OpenAIExtraParams(**request.provider_params)
-        overrides: Dict[str, Any] = extra_params.model_dump(exclude_unset=True)
-        openai_kwargs.update({k: v for k, v in overrides.items() if v is not None})
+        # Cast the provider_params to OpenAIProviderParams for type safety
+        provider_params = cast(OpenAIProviderParams, request.provider_params)
+        # Only include non-None values
+        openai_kwargs.update({k: v for k, v in provider_params.items() if v is not None})
 
         # Adjust naming: convert "max_tokens" to "max_completion_tokens" if not already set.
         if (

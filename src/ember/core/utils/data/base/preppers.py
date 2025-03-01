@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any, Optional
+from typing_extensions import TypedDict
 
 from .models import DatasetEntry
 from ember.core.utils.data.base.config import BaseDatasetConfig
+from ember.core.utils.data.base.transformers import DatasetItem
 
 
 class IDatasetPrepper(ABC):
@@ -36,7 +38,7 @@ class IDatasetPrepper(ABC):
         raise NotImplementedError("Subclasses must implement get_required_keys()")
 
     @abstractmethod
-    def create_dataset_entries(self, *, item: Dict[str, Any]) -> List[DatasetEntry]:
+    def create_dataset_entries(self, *, item: DatasetItem) -> List[DatasetEntry]:
         """Generates dataset entries from a given input item.
 
         This method expects its parameters to be passed as named arguments and
@@ -44,7 +46,7 @@ class IDatasetPrepper(ABC):
         DatasetEntry instances.
 
         Args:
-            item (Dict[str, Any]): A dictionary representing a single dataset item.
+            item (DatasetItem): A dictionary representing a single dataset item.
 
         Returns:
             List[DatasetEntry]: A list of dataset entries derived from the input item.

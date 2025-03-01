@@ -6,3 +6,13 @@ from __future__ import annotations
 from . import model
 from . import operator
 from . import prompt_signature
+
+# Import EmberModel for easy access
+from ember.core.types import EmberModel
+
+__all__ = [
+    "model",
+    "operator",
+    "prompt_signature",
+    "EmberModel",
+]

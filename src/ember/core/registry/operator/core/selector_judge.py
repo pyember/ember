@@ -1,26 +1,38 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Type
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.exceptions import MissingLMModuleError
+from ember.core.types import EmberModel
 
 from ember.core.registry.prompt_signature.signatures import Signature
 from ember.core.registry.model.model_module.lm import LMModule
 
 
-class SelectorJudgeInputs(BaseModel):
+class SelectorJudgeInputs(EmberModel):
     """Input model for SelectorJudgeOperator."""
 
     query: str
     responses: List[str] = Field(..., description="Aggregated ensemble responses.")
 
 
-class SelectorJudgeOutputs(BaseModel):
+class SelectorJudgeOutputs(EmberModel):
     """Output model for SelectorJudgeOperator."""
 
     final_answer: str
+
+
+class SelectorJudgeOperatorOutputs(EmberModel):
+    """Output model for SelectorJudgeOperator.
+    
+    Attributes:
+        final_answer (str): The selected best final answer.
+        reasoning (str): Reasoning behind the selection.
+    """
+    final_answer: str
+    reasoning: str
 
 
 class SelectorJudgeSignature(Signature):
@@ -36,11 +48,11 @@ class SelectorJudgeSignature(Signature):
         "Reasoning: <your reasoning for selecting this answer>\n"
         "Final Answer: <the single best answer>\n"
     )
-    structured_output: Optional[Type[BaseModel]] = SelectorJudgeOutputs
-    input_model: Type[BaseModel] = SelectorJudgeInputs
+    structured_output: Optional[Type[EmberModel]] = SelectorJudgeOutputs
+    input_model: Type[EmberModel] = SelectorJudgeInputs
 
 
-class SelectorJudgeOperator(Operator[SelectorJudgeInputs, Dict[str, Any]]):
+class SelectorJudgeOperator(Operator[SelectorJudgeInputs, SelectorJudgeOperatorOutputs]):
     """Operator to select the best, final answer from multiple responses."""
 
     signature: Signature = SelectorJudgeSignature()
@@ -49,8 +61,8 @@ class SelectorJudgeOperator(Operator[SelectorJudgeInputs, Dict[str, Any]]):
     def __init__(self, *, lm_module: LMModule) -> None:
         self.lm_module = lm_module
 
-    def forward(self, *, inputs: SelectorJudgeInputs) -> Dict[str, Any]:
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs.model_dump())
+    def forward(self, *, inputs: SelectorJudgeInputs) -> SelectorJudgeOperatorOutputs:
+        rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
         if not self.lm_module:
             raise MissingLMModuleError(
                 "No LM module attached to SelectorJudgeOperator."
