@@ -43,29 +43,35 @@ def __getattr__(name: str) -> object:
             from ember.core.registry.model.base.registry.model_registry import (
                 ModelRegistry,
             )
+
             return ModelRegistry
         except ImportError:
             from ember.core.registry.model.base.registry.model_registry import (
                 ModelRegistry,
             )
+
             return ModelRegistry
     if name == "ModelService":
         try:
             from ember.core.registry.model.base.services.model_service import (
                 ModelService,
             )
+
             return ModelService
         except ImportError:
             from ember.core.registry.model.base.services.model_service import (
                 ModelService,
             )
+
             return ModelService
     if name == "initialize_ember":
         try:
             from ember.core.registry.model import initialize_ember
+
             return initialize_ember
         except ImportError:
             from ember.core.registry.model import initialize_ember
+
             return initialize_ember
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

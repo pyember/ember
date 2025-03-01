@@ -47,9 +47,7 @@ class TestLoadDatasetEntries(unittest.TestCase):
         self.mock_hf_loader_cls = self.hf_loader_patcher.start()
         self.mock_hf_loader = self.mock_hf_loader_cls.return_value
 
-        self.validator_patcher = mock.patch(
-            "ember.core.utils.data.DatasetValidator"
-        )
+        self.validator_patcher = mock.patch("ember.core.utils.data.DatasetValidator")
         self.mock_validator_cls = self.validator_patcher.start()
         self.mock_validator = self.mock_validator_cls.return_value
 

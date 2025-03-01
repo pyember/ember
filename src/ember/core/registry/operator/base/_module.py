@@ -302,69 +302,68 @@ class EmberModuleMeta(abc.ABCMeta):
         return new_class
 
     def __call__(cls: Type[T], *args: Any, **kwargs: Any) -> T:
-        """Creates an instance with appropriate initialization.
-
-        This method supports both dataclass-style initialization and traditional __init__ methods,.
-
+        """Creates an instance with complete initialization, regardless of whether super().__init__() is called.
+        
+        This implementation entirely sidesteps the need for users to call super().__init__()
+        by handling all field initialization before and after the custom __init__ method.
+        
         Args:
             cls: The class being instantiated.
-            *args: Positional arguments for the instance.
-            **kwargs: Keyword arguments for the instance.
-
+            *args: Positional arguments for initialization.
+            **kwargs: Keyword arguments for initialization.
+            
         Returns:
-            T: An instance of the EmberModule subclass.
+            T: A fully initialized, immutable instance of the EmberModule subclass.
         """
         # Create a mutable wrapper for initialization
         mutable_cls: Type[T] = _make_initable_wrapper(cls)
+        
+        # Create an instance directly without calling __init__
+        instance = object.__new__(mutable_cls)
+        
+        # First set defaults for all fields - this ensures all fields exist 
+        # even if a custom __init__ doesn't set them
+        fields_dict = {f.name: f for f in dataclasses.fields(cls)}
+        for field_name, field_def in fields_dict.items():
+            if field_name not in kwargs:
+                if field_def.default is not dataclasses.MISSING:
+                    object.__setattr__(instance, field_name, field_def.default)
+                elif field_def.default_factory is not dataclasses.MISSING:
+                    object.__setattr__(instance, field_name, field_def.default_factory())
 
-        # Check if the class has a custom __init__ method
-        has_custom_init = (
-            hasattr(cls, "__init__") and cls.__init__ is not object.__init__
-        )
-
-        # If there's a custom __init__, use the standard initialization path
-        # but handle the case where subclasses might not call super().__init__()
+        # Call the class's __init__ method if it exists
+        has_custom_init = hasattr(cls, "__init__") and cls.__init__ is not object.__init__
         if has_custom_init:
-            # Create an instance directly
-            instance = object.__new__(mutable_cls)
-            
-            # Call the custom __init__
             try:
-                # Attempt to call the class's __init__ method
                 mutable_cls.__init__(instance, *args, **kwargs)
             except TypeError as e:
-                # If there's a TypeError, it might be because the __init__ signature is wrong
                 raise TypeError(
                     f"Error initializing {cls.__name__}: {str(e)}\n"
                     f"Ensure __init__ accepts the correct parameters."
                 ) from e
         else:
-            # No custom __init__, use direct field initialization
-            instance = object.__new__(mutable_cls)
-
-            # Get field definitions
-            fields_dict = {f.name: f for f in dataclasses.fields(cls)}
-
-            # Set default values for fields
-            for field_name, field_def in fields_dict.items():
-                if field_name not in kwargs:
-                    if field_def.default is not dataclasses.MISSING:
-                        object.__setattr__(instance, field_name, field_def.default)
-                    elif field_def.default_factory is not dataclasses.MISSING:
-                        object.__setattr__(
-                            instance, field_name, field_def.default_factory()
-                        )
-
-            # Set fields from kwargs
+            # For classes without custom __init__, set fields from kwargs
             for field_name, value in kwargs.items():
                 if field_name in fields_dict:
                     object.__setattr__(instance, field_name, value)
-
+            
             # Call __post_init__ if it exists
             post_init = getattr(instance, "__post_init__", None)
             if callable(post_init):
                 post_init()
-
+        
+        # Check for missing fields
+        missing_fields = []
+        for field_name, field_def in fields_dict.items():
+            if field_name not in dir(instance):
+                if field_def.default is dataclasses.MISSING and field_def.default_factory is dataclasses.MISSING:
+                    missing_fields.append(field_name)
+        
+        if missing_fields:
+            raise ValueError(
+                f"The following fields were not initialized: {missing_fields}"
+            )
+        
         # Apply field converters
         for field_info in dataclasses.fields(cls):
             converter = field_info.metadata.get("converter", None)
@@ -372,7 +371,7 @@ class EmberModuleMeta(abc.ABCMeta):
                 current_value = getattr(instance, field_info.name)
                 converted_value = converter(current_value)
                 object.__setattr__(instance, field_info.name, converted_value)
-
+        
         # Revert to the original frozen class
         object.__setattr__(instance, "__class__", cls)
         return instance

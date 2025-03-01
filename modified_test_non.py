@@ -33,13 +33,14 @@ from ember.core.non import (
     VariedEnsembleOutputs,
 )
 
+
 # Mock model and registry components
 class MockModel:
     """Mock model for tests."""
-    
+
     def __init__(self, model_id: str = "dummy"):
         self.model_id = model_id
-        
+
     def generate(self, prompt: str, **kwargs) -> str:
         """Mock generate method."""
         return "Default mock response"
@@ -47,10 +48,10 @@ class MockModel:
 
 class MockRegistry:
     """Mock model registry."""
-    
+
     def __init__(self):
         self.models = {"dummy": MockModel()}
-        
+
     def get_model(self, model_id: str) -> MockModel:
         """Mock get_model method."""
         return self.models.get(model_id, MockModel())
@@ -126,6 +127,7 @@ def test_sequential_pipeline_operator_normal() -> None:
 # 3) VariedEnsemble Operator Tests
 # ------------------------------------------------------------------------------
 
+
 @patch(
     "ember.core.registry.model.model_module.lm.LMModule.__call__",
     return_value="varied response",
@@ -136,15 +138,19 @@ def test_varied_ensemble_operator_normal(mock_call) -> None:
 
     dummy_config: LMModuleConfig = LMModuleConfig(model_id="dummy", temperature=1.0)
     varied_ensemble = VariedEnsemble(model_configs=[dummy_config, dummy_config])
-    
+
     # Test with mocked method
     inputs: VariedEnsembleInputs = VariedEnsembleInputs(query="Test")
     outputs: VariedEnsembleOutputs = varied_ensemble(inputs=inputs)
-    
-    assert isinstance(outputs, VariedEnsembleOutputs), "Output should be a VariedEnsembleOutputs."
+
+    assert isinstance(
+        outputs, VariedEnsembleOutputs
+    ), "Output should be a VariedEnsembleOutputs."
     assert isinstance(outputs.responses, list), "The responses should be a list."
     assert len(outputs.responses) == 2, "There should be 2 responses."
-    assert all(r == "varied response" for r in outputs.responses), "Each response should be correct."
+    assert all(
+        r == "varied response" for r in outputs.responses
+    ), "Each response should be correct."
 
 
 if __name__ == "__main__":

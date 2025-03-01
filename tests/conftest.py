@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
 SRC_PATH = PROJECT_ROOT / "src"
 
+
 # This is the critical path resolution that fixes the imports
 # Create a modules dictionary to make ember.core accessible
 class ImportFixerMeta(type):
@@ -32,9 +33,11 @@ class ImportFixerMeta(type):
                 raise
         raise AttributeError(f"Module 'ember' has no attribute '{name}'")
 
+
 # Apply the metaclass to ember module
 class EmberImportFixer(metaclass=ImportFixerMeta):
     pass
+
 
 # Print current path for debugging
 print(f"Unit test Python path: {sys.path}")

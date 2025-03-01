@@ -52,7 +52,7 @@ class TestHuggingFaceDatasetLoader(unittest.TestCase):
         self.hf_api_patcher = mock.patch("ember.core.utils.data.base.loaders.HfApi")
         self.mock_hf_api_cls = self.hf_api_patcher.start()
         self.mock_hf_api = self.mock_hf_api_cls.return_value
-        
+
         # Make sure dataset_info doesn't actually make API calls
         self.mock_hf_api.dataset_info = mock.MagicMock()
 
@@ -176,10 +176,10 @@ class TestHuggingFaceDatasetLoader(unittest.TestCase):
         # Arrange
         dataset_name = "error_dataset"
         http_error = HTTPError("http://example.com", 404, "Not Found", {}, None)
-        
+
         # Configure the mock for the initial check to succeed
         self.mock_hf_api.dataset_info.return_value = mock.MagicMock()
-        
+
         # Configure the mock to fail on load with HTTP error
         self.mock_load_dataset.side_effect = http_error
 
@@ -202,10 +202,10 @@ class TestHuggingFaceDatasetLoader(unittest.TestCase):
         # Arrange
         dataset_name = "error_dataset"
         unexpected_error = RuntimeError("Unexpected test error")
-        
+
         # Configure the mock for the initial check to succeed
         self.mock_hf_api.dataset_info.return_value = mock.MagicMock()
-        
+
         # Configure the mock to fail on load with unexpected error
         self.mock_load_dataset.side_effect = unexpected_error
 

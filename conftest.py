@@ -1,6 +1,7 @@
 """
 Root conftest.py for pytest configuration
 """
+
 import pytest
 import sys
 import os
@@ -24,11 +25,13 @@ import sys
 import types
 import importlib.util
 
+
 def map_module(from_name, to_name):
     """Map a module from one name to another in sys.modules."""
     if from_name in sys.modules:
         sys.modules[to_name] = sys.modules[from_name]
-    
+
+
 # Set up module aliases
 ember_modules = [
     "src.ember",
@@ -58,7 +61,7 @@ for module_name in ember_modules:
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[module_name] = module
                 spec.loader.exec_module(module)
-        
+
         # Map it to the target name
         if module_name in sys.modules:
             sys.modules[target_name] = sys.modules[module_name]
@@ -70,7 +73,9 @@ for module_name in ember_modules:
 try:
     # Direct import of plugin_system.py
     plugin_system_path = str(PROJECT_ROOT / "src" / "ember" / "plugin_system.py")
-    spec = importlib.util.spec_from_file_location("ember.plugin_system", plugin_system_path)
+    spec = importlib.util.spec_from_file_location(
+        "ember.plugin_system", plugin_system_path
+    )
     if spec:
         plugin_system_module = importlib.util.module_from_spec(spec)
         sys.modules["ember.plugin_system"] = plugin_system_module
@@ -79,15 +84,19 @@ try:
 except Exception as e:
     print(f"Error loading plugin_system.py: {e}")
 
+
 # Configure pytest-asyncio to use session-scoped event loops by default
 def pytest_configure(config):
     """Configure pytest-asyncio."""
     import pytest_asyncio
+
     pytest_asyncio.LOOP_SCOPE = "session"
+
 
 # Custom event loop policy fixture - replaces the deprecated event_loop fixture
 @pytest.fixture(scope="session")
 def event_loop_policy():
     """Return the event loop policy to use."""
     import asyncio
+
     return asyncio.get_event_loop_policy()

@@ -311,11 +311,11 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 
     def call_lm(self, *, prompt: str, lm: Any) -> str:
         """Call an LM module with a prompt.
-        
+
         Args:
             prompt: The prompt to send to the LM
             lm: The LM module to call
-            
+
         Returns:
             The LM's response as a string
         """

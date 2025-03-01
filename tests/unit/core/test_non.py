@@ -13,24 +13,28 @@ from typing import Any, Dict, Optional, Union
 from unittest.mock import patch, MagicMock
 import pytest
 
+
 # Create a mock model for tests
 class MockBaseProviderModel:
     """Mock model class for testing."""
-    
+
     def __init__(self, model_id: str = "dummy"):
         self.model_id = model_id
-        
+
     def generate(self, prompt: str, **kwargs) -> str:
         """Simulated generate method."""
         return "mocked response"
-        
+
+
 # This will be our mock model registry response
 mock_model = MockBaseProviderModel(model_id="openai:gpt-4o")
-        
+
+
 # Custom mock for model registry get_model method
 def mock_get_model_side_effect(model_id: str):
     """Custom side effect for model registry get_model method."""
     return mock_model
+
 
 # Import the wrappers and their input/output types from non.py.
 from ember.core.non import (
@@ -244,7 +248,7 @@ def test_uniform_ensemble_operator_failure_propagation(mock_call) -> None:
     for lm in uniform_ensemble.ensemble_op.lm_modules:
         lm.__call__ = failing_lm  # type: ignore
     inputs: EnsembleInputs = EnsembleInputs(query="Test")
-    
+
     # Just check for any exception since we're already mocking the LM failure
     with pytest.raises(Exception):
         uniform_ensemble(inputs=inputs)

@@ -66,23 +66,27 @@ def setup_package():
     """Set up the proper package structure for the Ember project."""
     # Get the project root directory
     project_root = Path(__file__).parent.absolute()
-    
+
     print(f"Setting up package structure in {project_root}")
-    
+
     # Check if pytest is installed
     try:
         subprocess.run(["pytest", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("Installing pytest and pytest-asyncio...")
-        subprocess.run([sys.executable, "-m", "pip", "install", "pytest", "pytest-asyncio"], check=True)
-    
+        subprocess.run(
+            [sys.executable, "-m", "pip", "install", "pytest", "pytest-asyncio"],
+            check=True,
+        )
+
     # Install package in development mode
     print("Installing package in development mode...")
     subprocess.run([sys.executable, "-m", "pip", "install", "-e", "."], check=True)
-    
+
     # Update pytest.ini
     with open(project_root / "pytest.ini", "w") as f:
-        f.write("""[pytest]
+        f.write(
+            """[pytest]
 markers =
     performance: mark test as a performance test.
     integration: mark test as an integration test requiring external dependencies.
@@ -103,7 +107,8 @@ asyncio_default_fixture_loop_scope = function
 #
 # To run tests that make actual API calls:
 # RUN_INTEGRATION_TESTS=1 ALLOW_EXTERNAL_API_CALLS=1 python -m pytest tests/integration -v 
-""")
+"""
+        )
     print("Updated pytest.ini")
 
 
@@ -124,15 +129,15 @@ def main():
 
     # First, set up the package structure
     setup_package()
-    
+
     # Then fix imports in the test files
     tests_count = fix_imports_recursively(str(tests_dir))
     print(f"Fixed imports in {tests_count} test files")
-    
+
     # Also fix imports in the src files
     src_count = fix_imports_recursively(str(src_dir))
     print(f"Fixed imports in {src_count} source files")
-    
+
     print("\nSetup complete! You should now be able to run tests with:")
     print("python -m pytest tests")
 
