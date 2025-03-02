@@ -17,6 +17,8 @@ The `models` module is responsible for:
 
 Overall, this module provides a "network-of-networks" building block for large-scale model usage in a "PyTorch / JAX-inspired" framework.
 
+> **For a comprehensive quickstart guide, see [docs/quickstart/model_registry.md](/docs/quickstart/model_registry.md)**
+
 ## Package Layout
 
 ```

@@ -8,11 +8,13 @@ Ember is a powerful, extensible Python framework for building and orchestrating 
 
 **Core Features:**
 - 🔥 **Eager Execution by Default**: Intuitive development experience with immediate execution results
-- 🚀 **Parallel Graph Scheduling**: Optional optimization for concurrent operations
-- 🧩 **Composable Operators**: PyTorch-like modular components for reusability
-- 🔌 **Extensible Registry System**: Support for custom models, operators, and evaluators
-- ⚡ **Efficient Multi-Model Pipelines**: Optimized for complex AI system orchestration
-- 🧠 **Enhanced JIT System**: JAX-inspired tracing and optimized execution (see [documentation](#enhanced-jit-api))
+- 🚀 **Parallel Graph Scheduling**: Automatic optimization for concurrent operations
+- 🧩 **Composable Operators**: PyTorch-like modular components for high reusability
+- 🔌 **Extensible Registry System**: First-class support for custom models, operators, and evaluators
+- ⚡ **Efficient Multi-Model Pipelines**: Optimized for complex LLM orchestration at scale
+- 🧠 **Enhanced JIT System**: JAX-inspired tracing and graph optimization
+- 📊 **Built-in Evaluation**: Comprehensive tools for measuring and analyzing model performance
+- 🔄 **Powerful Data Handling**: Extensible data pipeline integration with popular datasets
 
 ## Quick Installation
 
@@ -168,6 +170,31 @@ result = scheduler.run_plan(
 )
 ```
 
+### Enhanced JIT API
+
+Ember provides a JAX-inspired JIT (Just-In-Time) compilation system for optimal performance:
+
+```python
+from ember.xcs.tracer import jit
+
+@jit
+def complex_llm_pipeline(query: str, context: str):
+    # Automatic graph construction and optimization
+    ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o")
+    responses = ensemble({"query": query})
+    
+    judge = JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
+    result = judge({"query": query, "responses": responses.responses})
+    
+    return result.final_answer
+
+# Efficient execution with automatic parallelization
+answer = complex_llm_pipeline(
+    query="What is quantum entanglement?",
+    context="I need a clear, concise explanation."
+)
+```
+
 ## Use Cases
 
 Ember is well-suited for complex AI pipelines such as:
@@ -177,6 +204,7 @@ Ember is well-suited for complex AI pipelines such as:
 - **Multi-agent systems** with specialized roles and coordination
 - **Tool-augmented systems** combining LLMs with specialized tools
 - **Complex reasoning chains** with intermediate evaluations and refinement
+- **Evaluation and benchmarking** of compound AI systems at scale
 
 ## Documentation
 
@@ -187,10 +215,29 @@ For comprehensive documentation, including tutorials, API reference, and advance
 - [Contributing Guide](CONTRIBUTING.md)
 - [Examples Directory](examples/)
 
+### Quickstart Guides
+
+- [Model Registry Quickstart](docs/quickstart/model_registry.md) - Get started with LLM integration
+- [Operators Quickstart](docs/quickstart/operators.md) - Build reusable computation units
+- [Prompt Signatures Quickstart](docs/quickstart/prompt_signatures.md) - Type-safe prompt engineering
+- [NON Quickstart](docs/quickstart/non.md) - Networks of Networks patterns
+- [Data Quickstart](docs/quickstart/data.md) - Working with datasets and evaluation
+
+## Performance
+
+Ember is designed for high-performance LLM orchestration:
+
+- **Parallel execution** of independent operators
+- **Minimal overhead** compared to direct API calls
+- **Optimized scheduling** for complex dependency graphs
+- **Efficient memory usage** with smart caching and pruning
+- **Horizontal scaling** for distributed workloads
+
 ## Community
 
-- [GitHub Issues](https://github.com/foundrytechnologies/ember/issues): Bug reports and feature requests
-- [GitHub Discussions](https://github.com/foundrytechnologies/ember/discussions): Questions and community support
+- [GitHub Issues](https://github.com/pyember/ember/issues): Bug reports and feature requests
+- [GitHub Discussions](https://github.com/pyember/ember/discussions): Questions and community support
+- [Discord](https://discord.gg/ember-ai): Join our community chat
 
 ## License
 
@@ -198,15 +245,4 @@ Ember is released under the [Apache 2.0 License](LICENSE).
 
 ---
 
-Built with 🔥 by [Foundry Technologies](https://foundry.ai)
-## Enhanced JIT API
-
-The enhanced JIT API provides a cleaner, more JAX-like user experience for building and executing complex operator DAGs.
-
-### Basic Usage
-
-\\n
-### Execution Control
-
-\\n
-For more details, see the [enhanced_jit_design_doc.md](./enhanced_jit_design_doc.md).
+Built with 🔥 by the Ember community
