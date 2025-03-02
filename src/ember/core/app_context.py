@@ -1,4 +1,5 @@
 import logging
+import threading
 from threading import Lock
 from typing import Optional, Dict, ClassVar, Type, Any
 
@@ -94,14 +95,43 @@ class EmberContext:
 
     The EmberContext lazy-loads the app context on first access, avoiding
     circular imports and allowing more flexible initialization patterns.
+    
+    For testing purposes, a test mode can be enabled that bypasses the singleton
+    pattern to allow isolated test contexts.
     """
 
     _instance: ClassVar[Optional["EmberContext"]] = None
     _lock: ClassVar[Lock] = Lock()
     _app_context: Optional[EmberAppContext] = None
+    _test_mode: ClassVar[bool] = False
+    _thread_local: ClassVar = threading.local()
 
     # Backwards compatibility attributes for transition
     model_registry: ModelRegistry
+
+    @classmethod
+    def enable_test_mode(cls) -> None:
+        """
+        Enable test mode to bypass singleton restrictions.
+        
+        In test mode, each call to EmberContext() creates a new instance,
+        preventing deadlocks and allowing isolated testing.
+        """
+        cls._test_mode = True
+        # Clear instance to ensure fresh instances even after a previous singleton was created
+        cls._instance = None
+        if hasattr(cls._thread_local, 'instances'):
+            delattr(cls._thread_local, 'instances')
+    
+    @classmethod
+    def disable_test_mode(cls) -> None:
+        """
+        Disable test mode and return to normal singleton behavior.
+        """
+        cls._test_mode = False
+        cls._instance = None
+        if hasattr(cls._thread_local, 'instances'):
+            delattr(cls._thread_local, 'instances')
 
     def __getattr__(self, name: str) -> Any:
         """
@@ -128,6 +158,12 @@ class EmberContext:
         raise AttributeError(f"'{self.__class__.__name__}' has no attribute '{name}'")
 
     def __new__(cls) -> "EmberContext":
+        if cls._test_mode:
+            # In test mode, always create a new instance
+            instance = super().__new__(cls)
+            instance._app_context = None
+            return instance
+            
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
@@ -148,8 +184,20 @@ class EmberContext:
             app_context: Optional pre-configured EmberAppContext
 
         Returns:
-            The initialized EmberContext singleton instance
+            The initialized EmberContext instance (singleton in normal mode, new in test mode)
         """
+        if cls._test_mode:
+            # In test mode, create a new instance
+            instance = cls()
+            
+            # Set app_context or create a new one
+            if app_context is not None:
+                instance._app_context = app_context
+            else:
+                instance._app_context = create_ember_app(config_filename=config_path)
+                
+            return instance
+            
         with cls._lock:
             if cls._instance is None:
                 cls._instance = cls()
@@ -171,8 +219,12 @@ class EmberContext:
         Get the current global context, initializing if needed.
 
         Returns:
-            The EmberContext singleton instance
+            The EmberContext instance (singleton in normal mode, new in test mode)
         """
+        if cls._test_mode:
+            # In test mode, create a new instance
+            return cls.initialize()
+            
         with cls._lock:
             if cls._instance is None:
                 return cls.initialize()
@@ -212,6 +264,17 @@ class EmberContext:
     def logger(self) -> logging.Logger:
         """Access the logger instance."""
         return self.app_context.logger
+        
+    @classmethod
+    def reset(cls) -> None:
+        """
+        Reset the EmberContext to its initial state.
+        
+        This is primarily useful for testing to ensure a clean state.
+        """
+        cls._instance = None
+        if hasattr(cls._thread_local, 'instances'):
+            delattr(cls._thread_local, 'instances')
 
 
 def get_ember_context() -> EmberContext:

@@ -1,0 +1,153 @@
+name: Ember Test Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+    
+    - name: Run unit tests with coverage
+      run: |
+        poetry run pytest tests/unit --cov=src/ember --cov-report=xml
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: true
+    
+    - name: Verify coverage threshold
+      run: |
+        poetry run python -m coverage report --fail-under=90
+    
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+        pip install black ruff mypy
+    
+    - name: Check formatting with black
+      run: |
+        black --check src tests
+    
+    - name: Lint with ruff
+      run: |
+        ruff src tests
+    
+    - name: Type check with mypy
+      run: |
+        mypy src
+
+  integration:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+    
+    - name: Run integration tests
+      run: |
+        RUN_INTEGRATION_TESTS=1 poetry run pytest tests/integration -v
+      env:
+        CI: true
+
+  performance:
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+    
+    - name: Run performance tests
+      run: |
+        poetry run pytest tests/unit -m performance -v
+
+  nightly-fuzzing:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry install
+        pip install atheris
+    
+    - name: Run fuzzing tests
+      run: |
+        mkdir -p fuzzing_results
+        poetry run python -m tests.fuzzing.run_fuzz_tests --time_limit=1800
+    
+    - name: Upload fuzzing results
+      uses: actions/upload-artifact@v3
+      with:
+        name: fuzzing-results
+        path: fuzzing_results/
