@@ -8,19 +8,19 @@ Operators are stateful, typed computation units that:
 - Take structured inputs and produce structured outputs
 - Can be composed into complex graphs
 - Are automatically parallelizable when possible
-- Provide clear typing guarantees with Pydantic models
+- Provide clear typing guarantees with EmberModel
 
 ```python
-from ember.core.registry.operator.base import Operator
-from pydantic import BaseModel
 from typing import List
+from ember.core.registry.operator.base import Operator
+from ember.core.types.ember_model import EmberModel
 
 # Define input/output types
-class ClassifierInput(BaseModel):
+class ClassifierInput(EmberModel):
     text: str
     categories: List[str]
 
-class ClassifierOutput(BaseModel):
+class ClassifierOutput(EmberModel):
     category: str
     confidence: float
 ```
@@ -28,13 +28,14 @@ class ClassifierOutput(BaseModel):
 ## 2. Creating a Basic Operator
 
 ```python
+from typing import ClassVar
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 from ember.core.registry.prompt_signature import Signature
 
 # Define the signature (input/output schema + prompt template)
 class ClassifierSignature(Signature):
     input_model = ClassifierInput
-    structured_output = ClassifierOutput
+    output_model = ClassifierOutput
     prompt_template = """Classify the following text into one of these categories: {categories}
     
 Text: {text}
@@ -46,9 +47,14 @@ Respond with a JSON object with two keys:
 
 # Create the operator
 class TextClassifierOperator(Operator[ClassifierInput, ClassifierOutput]):
-    signature = ClassifierSignature()
+    # Class-level signature declaration
+    signature: ClassVar[Signature] = ClassifierSignature()
+    
+    # Class-level field declarations
+    lm_module: LMModule
     
     def __init__(self, model_name: str = "openai:gpt-4o", temperature: float = 0.0):
+        # Initialize fields
         self.lm_module = LMModule(LMModuleConfig(
             model_name=model_name,
             temperature=temperature,
@@ -66,6 +72,7 @@ class TextClassifierOperator(Operator[ClassifierInput, ClassifierOutput]):
         try:
             import json
             result = json.loads(response)
+            # Return a proper instance of the output model
             return ClassifierOutput(
                 category=result["category"],
                 confidence=result["confidence"]
@@ -81,14 +88,11 @@ class TextClassifierOperator(Operator[ClassifierInput, ClassifierOutput]):
 # Instantiate the operator
 classifier = TextClassifierOperator(model_name="anthropic:claude-3-haiku")
 
-# Create input
-input_data = ClassifierInput(
-    text="The sky is blue and the sun is shining brightly today.",
-    categories=["weather", "politics", "technology", "sports"]
-)
-
-# Execute the operator
-result = classifier(inputs=input_data)
+# Use kwargs format for clean inputs
+result = classifier(inputs={
+    "text": "The sky is blue and the sun is shining brightly today.",
+    "categories": ["weather", "politics", "technology", "sports"]
+})
 
 print(f"Category: {result.category}, Confidence: {result.confidence:.2f}")
 ```
@@ -98,17 +102,17 @@ print(f"Category: {result.category}, Confidence: {result.confidence:.2f}")
 ### Sequential Composition
 
 ```python
-from ember.core.non import Sequential
+from ember.core import non
 
 # Create a pipeline of operators
-pipeline = Sequential(operators=[
+pipeline = non.Sequential(operators=[
     preprocessor,
     classifier,
     postprocessor
 ])
 
 # Execute the entire pipeline with a single call
-final_result = pipeline(inputs=initial_input)
+final_result = pipeline(inputs={"text": "Your input text here"})
 ```
 
 ### Parallel Composition (via graphs)
@@ -147,48 +151,60 @@ result = execute_graph(
 Ember provides pre-built operators for common tasks:
 
 ```python
-from ember.core.non import (
-    UniformEnsemble,  # Run multiple instances of the same model
-    VariedEnsemble,   # Run different models/configs in parallel
-    JudgeSynthesis,   # Evaluate and combine multiple responses
-    MostCommon,       # Select the most common answer from a set
-    Verifier          # Verify and potentially correct an answer
-)
+from ember.core import non
 
 # Create an ensemble of models
-ensemble = UniformEnsemble(
+ensemble = non.UniformEnsemble(
     num_units=3,
     model_name="openai:gpt-4o", 
     temperature=0.7
 )
 
 # Create a judge to evaluate and combine responses
-judge = JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
+judge = non.JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
 
-# Execute them in a pipeline
-responses = ensemble(inputs={"query": "What is the capital of France?"})
-final_result = judge(inputs={"query": "What is the capital of France?", "responses": responses.responses})
+# Execute them in a pipeline with kwargs format
+ensemble_result = ensemble(inputs={"query": "What is the capital of France?"})
+final_result = judge(inputs={
+    "query": "What is the capital of France?", 
+    "responses": ensemble_result["responses"]
+})
 ```
 
 ## 6. Operator Best Practices
 
-1. **Type Everything**: Use Pydantic models for all inputs and outputs
-2. **Error Handling**: Robustly handle parsing errors and LLM failures
-3. **Pure Forward Methods**: Keep `forward()` methods deterministic
-4. **Reuse Operators**: Compose small, specialized operators for complex tasks
-5. **Flexible Initialization**: Allow customization via constructor parameters
-6. **Stateless When Possible**: Prefer immutable state after initialization
+1. **Type Everything**: Define proper EmberModel classes for inputs and outputs
+2. **Class-Level Fields**: Declare operator fields at the class level with type hints
+3. **ClassVar for Signatures**: Use `signature: ClassVar[Signature]` for signature declarations
+4. **Use kwargs Format**: Use dict-style inputs with `inputs={"key": value}` for cleaner code
+5. **Return Model Instances**: Return properly typed model instances from forward methods
+6. **Error Handling**: Robustly handle parsing errors and LLM failures
+7. **Pure Forward Methods**: Keep `forward()` methods deterministic
+8. **Use Named Parameters**: Always use `inputs=` when calling operators
+9. **Reuse Operators**: Compose small, specialized operators for complex tasks
+10. **Flexible Initialization**: Allow customization via constructor parameters
+11. **Stateless When Possible**: Prefer immutable state after initialization
 
 ## 7. Advanced: Custom Operator Transformations
 
 ```python
+from typing import ClassVar, Type, TypeVar
+
 from ember.xcs.tracer import jit
+from ember.core.registry.prompt_signature import Signature
+from ember.core.types.ember_model import EmberModel
+
+I = TypeVar('I', bound=EmberModel)
+O = TypeVar('O', bound=EmberModel)
 
 # Create a decorator to retry operations on failure
 def with_retry(max_attempts=3):
-    def decorator(op_class):
+    def decorator(op_class: Type[Operator[I, O]]) -> Type[Operator[I, O]]:
         class RetryOperator(op_class):
-            def forward(self, *, inputs):
+            # Maintain the signature
+            signature: ClassVar[Signature] = op_class.signature
+            
+            def forward(self, *, inputs: I) -> O:
                 for attempt in range(max_attempts):
                     try:
                         return super().forward(inputs=inputs)
@@ -206,10 +222,26 @@ class ReliableClassifier(TextClassifierOperator):
 
 # Create a JIT-compiled pipeline with the reliable classifier
 @jit
-def analysis_pipeline(text, categories):
-    reliable_op = ReliableClassifier()
-    result = reliable_op(inputs={"text": text, "categories": categories})
-    return result
+class AnalysisPipeline(Operator[ClassifierInput, ClassifierOutput]):
+    # Class-level signature declaration
+    signature: ClassVar[Signature] = AnalysisSignature()
+    
+    # Class-level field declarations
+    classifier: ReliableClassifier
+    
+    def __init__(self):
+        # Initialize fields
+        self.classifier = ReliableClassifier()
+    
+    def forward(self, *, inputs: ClassifierInput) -> ClassifierOutput:
+        result = self.classifier(inputs=inputs)
+        return result
+
+# Use the pipeline with kwargs format
+result = AnalysisPipeline()(inputs={
+    "text": "Solar panels convert sunlight into electricity.",
+    "categories": ["technology", "environment", "politics", "entertainment"]
+})
 ```
 
 ## Next Steps

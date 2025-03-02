@@ -10,6 +10,7 @@ import string
 import pytest
 from typing import List, Optional, Callable
 from unittest.mock import Mock, MagicMock
+import hypothesis
 from hypothesis import given, strategies as st, assume, note
 
 from ember.core.utils.embedding_utils import (
@@ -348,6 +349,7 @@ class TestEmbeddingPropertiesPBT:
         vec_b=non_zero_norm_vectors(),
         vec_c=non_zero_norm_vectors()
     )
+    @hypothesis.settings(suppress_health_check=[hypothesis.HealthCheck.filter_too_much])
     def test_cosine_triangle_inequality(self, vec_a, vec_b, vec_c):
         """Property: Triangle inequality for angular distance derived from cosine similarity."""
         # Make vectors same length for more meaningful test

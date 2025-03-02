@@ -11,27 +11,27 @@ and parallel execution, you'd still need to use XCSGraph and execute_graph
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, ClassVar, Dict, List, Optional, Type
 
-from pydantic import BaseModel
+from ember.core.types.ember_model import EmberModel
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.prompt_signature.signatures import Signature
-from ember.core.non import Ensemble, MostCommon
+from ember.core import non
 from ember.xcs.tracer.tracer_decorator import jit
 
 
 ###############################################################################
 # Custom Input/Output Models
 ###############################################################################
-class QuestionAnsweringInput(BaseModel):
+class QuestionAnsweringInput(EmberModel):
     """Input for question answering pipeline."""
 
     query: str
 
 
-class QuestionAnsweringOutput(BaseModel):
+class QuestionAnsweringOutput(EmberModel):
     """Output for question answering pipeline."""
 
     answer: str
@@ -42,8 +42,8 @@ class QuestionAnsweringOutput(BaseModel):
 class QuestionAnsweringSignature(Signature):
     """Signature for question answering pipeline."""
 
-    input_model: Type[BaseModel] = QuestionAnsweringInput
-    output_model: Type[BaseModel] = QuestionAnsweringOutput
+    input_model = QuestionAnsweringInput
+    output_model = QuestionAnsweringOutput
 
 
 ###############################################################################
@@ -62,7 +62,15 @@ class QuestionAnsweringPipeline(
     The pipeline internally uses an ensemble of models followed by an aggregation step.
     """
 
-    signature: Signature = QuestionAnsweringSignature()
+    # Class-level signature declaration
+    signature: ClassVar[Signature] = QuestionAnsweringSignature()
+    
+    # Class-level field declarations
+    model_name: str
+    num_units: int
+    temperature: float
+    ensemble: non.Ensemble
+    aggregator: non.MostCommon
 
     def __init__(
         self, *, model_name: str, num_units: int = 3, temperature: float = 0.7
@@ -79,21 +87,21 @@ class QuestionAnsweringPipeline(
         self.temperature = temperature
 
         # Create internal operators
-        self.ensemble = Ensemble(
+        self.ensemble = non.Ensemble(
             num_units=self.num_units,
             model_name=self.model_name,
             temperature=self.temperature,
         )
-        self.aggregator = MostCommon()
+        self.aggregator = non.MostCommon()
 
-    def forward(self, *, inputs: QuestionAnsweringInput) -> Dict[str, Any]:
+    def forward(self, *, inputs: QuestionAnsweringInput) -> QuestionAnsweringOutput:
         """Execute the pipeline.
 
         Args:
             inputs: The input query
 
         Returns:
-            The final answer with confidence
+            Structured output with the final answer, confidence, and model responses
         """
         # Run the ensemble to get multiple responses
         ensemble_result = self.ensemble(inputs={"query": inputs.query})
@@ -107,11 +115,12 @@ class QuestionAnsweringPipeline(
         # Extract confidence from aggregation
         confidence = aggregated.get("confidence", 0.0)
 
-        return {
-            "answer": aggregated["final_answer"],
-            "confidence": confidence,
-            "model_responses": responses,
-        }
+        # Return structured output model instance
+        return QuestionAnsweringOutput(
+            answer=aggregated["final_answer"],
+            confidence=confidence,
+            model_responses=responses,
+        )
 
 
 ###############################################################################
@@ -137,14 +146,14 @@ def main() -> None:
     for query in queries:
         print(f"\nProcessing query: {query}")
 
-        # Time the execution
+        # Time the execution - using kwargs format for cleaner code
         start_time = time.perf_counter()
         result = pipeline(inputs={"query": query})
         end_time = time.perf_counter()
 
         # Display results
-        print(f"Answer: {result['answer']}")
-        print(f"Confidence: {result['confidence']:.2f}")
+        print(f"Answer: {result.answer}")
+        print(f"Confidence: {result.confidence:.2f}")
         print(f"Execution time: {end_time - start_time:.4f}s")
 
     print("\nNote: The first execution includes tracing overhead. In the current")

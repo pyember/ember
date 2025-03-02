@@ -8,31 +8,31 @@ from ember.core.registry.prompt_signature.signatures import Signature
 from ember.core.types import EmberModel
 
 
-class TestInputs(EmberModel):
+class OperatorTestInputs(EmberModel):
     query: str
 
 
-class TestOutputs(EmberModel):
+class OperatorTestOutputs(EmberModel):
     results: List[str]
 
 
 class SimpleSignature(Signature):
     prompt_template: str = "Test prompt: {query}"
-    input_model: Type[EmberModel] = TestInputs
-    output_model: Type[EmberModel] = TestOutputs
+    input_model: Type[EmberModel] = OperatorTestInputs
+    output_model: Type[EmberModel] = OperatorTestOutputs
 
 
-class SimpleOperator(Operator[TestInputs, TestOutputs]):
+class SimpleOperator(Operator[OperatorTestInputs, OperatorTestOutputs]):
     signature = SimpleSignature()
 
-    def forward(self, *, inputs: TestInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: OperatorTestInputs) -> Dict[str, Any]:
         # Return a dictionary instead of a model instance
         return {"results": ["test1", "test2"]}
 
 
 # Create and call the operator
 op = SimpleOperator()
-inputs = TestInputs(query="test query")
+inputs = OperatorTestInputs(query="test query")
 result = op(inputs=inputs)
 
 # Examine the result

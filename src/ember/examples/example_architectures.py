@@ -139,7 +139,7 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
 
         # Synthesize results using the judge
         judged_result = self.judge(
-            query=inputs.query, responses=[s1_out.final_answer, s2_out.final_answer]
+            inputs={"query": inputs.query, "responses": [s1_out.final_answer, s2_out.final_answer]}
         )
 
         # Extract the final answer

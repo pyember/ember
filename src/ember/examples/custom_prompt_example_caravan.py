@@ -1,5 +1,4 @@
 """
-
 Usage:
     export AVIOR_API_KEY=avior_api_key
     export AVIOR_BASE_URL=http://avior_base_url
@@ -235,7 +234,7 @@ class SimplePromptSignature(Signature):
 # Operators (Single-step LM calls using these signatures)
 # ------------------------------------------------------------------------------------
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core import non
+from ember.core.non import UniformEnsemble, JudgeSynthesis
 
 
 class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
@@ -250,7 +249,7 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
     """
 
     signature: ClassVar[Signature] = SimplePromptSignature()
-    ensemble: non.UniformEnsemble
+    ensemble: UniformEnsemble
 
     def __init__(self, model_name: str) -> None:
         """Initialize with a specific model name.
@@ -258,7 +257,7 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
         Args:
             model_name: Name of the model to use for answering.
         """
-        self.ensemble = non.UniformEnsemble(
+        self.ensemble = UniformEnsemble(
             num_units=1, model_name=model_name, temperature=0.2, max_tokens=64
         )
 
@@ -275,10 +274,10 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
         prompt = self.signature.render_prompt(inputs=inputs)
 
         # Process through ensemble
-        ensemble_result = self.ensemble(query=prompt)
+        ensemble_result = self.ensemble(inputs={"query": prompt})
 
         # Extract the final_answer from the ensemble result
-        final_answer = ensemble_result.final_answer
+        final_answer = ensemble_result["final_answer"]
 
         # Return structured output
         return SimplePromptOutput(final_answer=final_answer)
@@ -297,8 +296,8 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
     """
 
     signature: ClassVar[Signature] = CaravanLabelingSignature()
-    ensemble: non.UniformEnsemble
-    judge: non.JudgeSynthesis
+    ensemble: UniformEnsemble
+    judge: JudgeSynthesis
 
     def __init__(self, model_name: str) -> None:
         """Initialize with a specific model name.
@@ -306,10 +305,10 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
         Args:
             model_name: Name of the model to use for labeling.
         """
-        self.ensemble = non.UniformEnsemble(
+        self.ensemble = UniformEnsemble(
             num_units=3, model_name=model_name, temperature=0.0, max_tokens=256
         )
-        self.judge = non.JudgeSynthesis(
+        self.judge = JudgeSynthesis(
             model_name=model_name, temperature=0.0, max_tokens=256
         )
 
@@ -326,16 +325,16 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
         prompt = self.signature.render_prompt(inputs=inputs)
 
         # Process through ensemble to get multiple labeling attempts
-        ensemble_output = self.ensemble(query=prompt)
+        ensemble_output = self.ensemble(inputs={"query": prompt})
 
         # Extract the responses from the ensemble output
-        responses = ensemble_output.responses
+        responses = ensemble_output["responses"]
 
         # Synthesize results using judge
-        judge_output = self.judge(query=prompt, responses=responses)
+        judge_output = self.judge(inputs={"query": prompt, "responses": responses})
 
         # Extract the final answer from the judge output
-        final_labels = judge_output.final_answer
+        final_labels = judge_output["final_answer"]
 
         # Return structured output
         return CaravanLabelingOutput(final_answer=final_labels)
@@ -401,16 +400,16 @@ def main():
         operator = create_simple_pipeline(model_name)
         # Example question:
         question_data = "What is the capital of India?"
-        input_model = SimplePromptInputs(question=question_data)
-        response = operator(inputs=input_model)
+        # Using kwargs format for cleaner input
+        response = operator(inputs={"question": question_data})
         print(f"[SIMPLE] Final Answer:\n{response.final_answer}\n")
 
     elif chosen_non == CARAVAN_NON:
         operator = create_caravan_pipeline(model_name)
         # We'll pass the flows into the 'question' field:
         flows = sample_flow_stream
-        input_model = CaravanLabelingInputs(question=flows)
-        response = operator(inputs=input_model)
+        # Using kwargs format for cleaner input
+        response = operator(inputs={"question": flows})
         print(f"[CARAVAN] Final Labeled Output:\n{response.final_answer}\n")
 
     else:
