@@ -84,7 +84,7 @@ class XCSGraph:
         self.entry_node: Optional[str] = None
         self.exit_node: Optional[str] = None
 
-    def add_node(self, *, operator: Any, node_id: Optional[str] = None) -> str:
+    def add_node(self, operator: Any, node_id: Optional[str] = None, name: Optional[str] = None) -> str:
         """
         Adds a new node to the graph.
 
@@ -94,6 +94,8 @@ class XCSGraph:
         Args:
             operator (Any): The operator (callable) to attach to this node.
             node_id (Optional[str]): Optional unique identifier for the node.
+            name (Optional[str]): Optional name for the node (used for compatibility with older code).
+                If provided, it will be used as the node_id.
 
         Returns:
             str: The unique identifier for the newly added node.
@@ -101,6 +103,10 @@ class XCSGraph:
         Raises:
             ValueError: If a node with the provided node_id already exists.
         """
+        # For backward compatibility with APIs that use 'name' parameter
+        if name is not None and node_id is None:
+            node_id = name
+            
         node: XCSNode = XCSNode(operator=operator, node_id=node_id)
         if node.node_id in self.nodes:
             raise ValueError(f"Node with ID '{node.node_id}' already exists.")
@@ -112,28 +118,42 @@ class XCSGraph:
 
         return node.node_id
 
-    def add_edge(self, *, from_id: str, to_id: str) -> None:
+    def add_edge(self, from_id: str, to_id: str = None, **kwargs) -> None:
         """Adds a directed edge from one node to another.
 
         Args:
             from_id (str): The source node's identifier.
-            to_id (str): The destination node's identifier.
+            to_id (str, optional): The destination node's identifier.
+                If not provided, it must be specified via kwargs.
+            **kwargs: Alternative way to provide source/destination IDs.
 
         Raises:
             ValueError: If either the source or destination node does not exist.
         """
+        # Handle different calling patterns for backward compatibility
+        if to_id is None:
+            # Check if kwargs contains from_id and to_id
+            if 'from_id' in kwargs and 'to_id' in kwargs:
+                from_id = kwargs['from_id']
+                to_id = kwargs['to_id']
+            else:
+                raise ValueError("Missing destination node ID. Use add_edge(from_id, to_id) or add_edge(from_id=id1, to_id=id2)")
+                
         if from_id not in self.nodes:
             raise ValueError(f"Source node with ID '{from_id}' does not exist.")
         if to_id not in self.nodes:
             raise ValueError(f"Destination node with ID '{to_id}' does not exist.")
+            
         self.nodes[from_id].add_outbound_edge(to_id=to_id)
         self.nodes[to_id].add_inbound_edge(from_id=from_id)
 
-    def get_node(self, *, node_id: str) -> XCSNode:
+    def get_node(self, node_id: str = None, **kwargs) -> XCSNode:
         """Retrieves the node with the specified identifier.
 
         Args:
-            node_id (str): The identifier of the node to retrieve.
+            node_id (str, optional): The identifier of the node to retrieve.
+                If not provided, it must be specified via kwargs.
+            **kwargs: Alternative way to provide node_id.
 
         Returns:
             XCSNode: The corresponding node instance.
@@ -141,6 +161,13 @@ class XCSGraph:
         Raises:
             ValueError: If the node is not present in the graph.
         """
+        # Handle different calling patterns for backward compatibility
+        if node_id is None:
+            if 'node_id' in kwargs:
+                node_id = kwargs['node_id']
+            else:
+                raise ValueError("Missing node ID. Use get_node(node_id) or get_node(node_id=id)")
+                
         if node_id not in self.nodes:
             raise ValueError(f"Node with ID '{node_id}' is not present in the graph.")
         return self.nodes[node_id]

@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, ANY
 from ember.core.app_context import create_ember_app
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine import execute_graph
 from ember.core.non import UniformEnsemble
@@ -40,8 +40,8 @@ class SummarizeOutput(BaseModel):
     word_count: int
 
 
-class SummarizeSignature(Signature):
-    """Signature for the summarizer."""
+class SummarizeSpecification(Specification):
+    """Specification for the summarizer."""
     input_model: Type[SummarizeInput] = SummarizeInput
     structured_output: Type[SummarizeOutput] = SummarizeOutput
     prompt_template: str = """Summarize the following text in {max_words} words or less:
@@ -53,7 +53,7 @@ Summary:"""
 
 class SummarizerOperator(Operator[SummarizeInput, SummarizeOutput]):
     """Operator that summarizes text."""
-    signature = SummarizeSignature()
+    specification = SummarizeSpecification()
     
     def __init__(self, model_name: str = "mock:model"):
         """Initialize the summarizer."""
@@ -62,7 +62,7 @@ class SummarizerOperator(Operator[SummarizeInput, SummarizeOutput]):
     
     def forward(self, *, inputs: SummarizeInput) -> SummarizeOutput:
         """Summarize the input text."""
-        response = self.lm_module(self.signature.render_prompt(inputs=inputs))
+        response = self.lm_module(self.specification.render_prompt(inputs=inputs))
         
         # Extract the summary and count words
         summary = response.strip()

@@ -9,7 +9,7 @@ import time
 from typing import Any, Dict, List
 
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.xcs.tracer.tracer_decorator import jit
 from ember.xcs.engine.execution_options import execution_options
 
@@ -23,11 +23,11 @@ from ember.xcs.engine.execution_options import execution_options
 class AddOperator(Operator):
     """Simple operator that adds a value to the input."""
 
-    signature = Signature(input_model=None, output_model=None)
+    specification = Specification(input_model=None, output_model=None)
 
     def __init__(self, *, value: int = 1) -> None:
         self.value = value
-        self.signature = Signature(input_model=None, output_model=None)
+        self.specification = Specification(input_model=None, output_model=None)
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         result = inputs.get("value", 0) + self.value
@@ -38,11 +38,11 @@ class AddOperator(Operator):
 class MultiplyOperator(Operator):
     """Simple operator that multiplies the input by a value."""
 
-    signature = Signature(input_model=None, output_model=None)
+    specification = Specification(input_model=None, output_model=None)
 
     def __init__(self, *, value: int = 2) -> None:
         self.value = value
-        self.signature = Signature(input_model=None, output_model=None)
+        self.specification = Specification(input_model=None, output_model=None)
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         result = inputs.get("value", 0) * self.value
@@ -53,11 +53,11 @@ class MultiplyOperator(Operator):
 class DelayOperator(Operator):
     """Simple operator that introduces a delay."""
 
-    signature = Signature(input_model=None, output_model=None)
+    specification = Specification(input_model=None, output_model=None)
 
     def __init__(self, *, delay: float = 0.1) -> None:
         self.delay = delay
-        self.signature = Signature(input_model=None, output_model=None)
+        self.specification = Specification(input_model=None, output_model=None)
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         time.sleep(self.delay)
@@ -78,7 +78,7 @@ class CalculationPipeline(Operator):
     automatically, building a graph based on the actual execution trace.
     """
 
-    signature = Signature(input_model=None, output_model=None)
+    specification = Specification(input_model=None, output_model=None)
 
     def __init__(
         self,

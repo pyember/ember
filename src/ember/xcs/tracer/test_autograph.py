@@ -105,17 +105,17 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # Test dictionary value dependency
         inputs = {"x": 1, "y": "output_from_previous"}
         outputs = {"result": "output_from_previous"}
-        self.assertTrue(builder._has_dependency(inputs, outputs))
+        self.assertTrue(builder._has_dependency(inputs=inputs, outputs=outputs))
 
         # Test no dependency
         inputs = {"x": 1, "y": "no_match"}
         outputs = {"result": "output_from_previous"}
-        self.assertFalse(builder._has_dependency(inputs, outputs))
+        self.assertFalse(builder._has_dependency(inputs=inputs, outputs=outputs))
 
         # Test direct value dependency
         inputs = {"x": 1, "y": "output_value"}
         outputs = "output_value"
-        self.assertTrue(builder._has_dependency(inputs, outputs))
+        self.assertTrue(builder._has_dependency(inputs=inputs, outputs=outputs))
 
 
 if __name__ == "__main__":

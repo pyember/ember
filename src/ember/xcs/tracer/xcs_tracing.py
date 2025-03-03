@@ -14,9 +14,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Type
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=False)  # Allow modifications to instances
 class TraceRecord:
-    """Immutable trace record for an operator invocation.
+    """Trace record for an operator invocation.
 
     Attributes:
         operator_name (str): Name of the operator.
@@ -24,6 +24,7 @@ class TraceRecord:
         inputs (Dict[str, Any]): The inputs passed to the operator.
         outputs (Any): The outputs returned by the operator.
         timestamp (float): The time at which the operator finished execution.
+        graph_node_id (Optional[str]): ID used in the graph representation, for autograph internals.
     """
 
     operator_name: str
@@ -31,6 +32,7 @@ class TraceRecord:
     inputs: Dict[str, Any]
     outputs: Any
     timestamp: float = field(default_factory=time.time)
+    graph_node_id: Optional[str] = None
 
 
 class TracerContext(ContextDecorator):

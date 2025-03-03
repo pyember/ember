@@ -30,10 +30,10 @@ class ClassifierOutput(EmberModel):
 ```python
 from typing import ClassVar
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 
-# Define the signature (input/output schema + prompt template)
-class ClassifierSignature(Signature):
+# Define the specification (input/output schema + prompt template)
+class ClassifierSpecification(Specification):
     input_model = ClassifierInput
     output_model = ClassifierOutput
     prompt_template = """Classify the following text into one of these categories: {categories}
@@ -47,8 +47,8 @@ Respond with a JSON object with two keys:
 
 # Create the operator
 class TextClassifierOperator(Operator[ClassifierInput, ClassifierOutput]):
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = ClassifierSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = ClassifierSpecification()
     
     # Class-level field declarations
     lm_module: LMModule
@@ -63,7 +63,7 @@ class TextClassifierOperator(Operator[ClassifierInput, ClassifierOutput]):
     
     def forward(self, *, inputs: ClassifierInput) -> ClassifierOutput:
         # Render prompt from input
-        prompt = self.signature.render_prompt(inputs=inputs)
+        prompt = self.specification.render_prompt(inputs=inputs)
         
         # Call LLM
         response = self.lm_module(prompt)
@@ -175,7 +175,7 @@ final_result = judge(inputs={
 
 1. **Type Everything**: Define proper EmberModel classes for inputs and outputs
 2. **Class-Level Fields**: Declare operator fields at the class level with type hints
-3. **ClassVar for Signatures**: Use `signature: ClassVar[Signature]` for signature declarations
+3. **ClassVar for Specifications**: Use `specification: ClassVar[Specification]` for specification declarations
 4. **Use kwargs Format**: Use dict-style inputs with `inputs={"key": value}` for cleaner code
 5. **Return Model Instances**: Return properly typed model instances from forward methods
 6. **Error Handling**: Robustly handle parsing errors and LLM failures
@@ -191,7 +191,7 @@ final_result = judge(inputs={
 from typing import ClassVar, Type, TypeVar
 
 from ember.xcs.tracer import jit
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 I = TypeVar('I', bound=EmberModel)
@@ -201,8 +201,8 @@ O = TypeVar('O', bound=EmberModel)
 def with_retry(max_attempts=3):
     def decorator(op_class: Type[Operator[I, O]]) -> Type[Operator[I, O]]:
         class RetryOperator(op_class):
-            # Maintain the signature
-            signature: ClassVar[Signature] = op_class.signature
+            # Maintain the specification
+            specification: ClassVar[Specification] = op_class.specification
             
             def forward(self, *, inputs: I) -> O:
                 for attempt in range(max_attempts):
@@ -223,8 +223,8 @@ class ReliableClassifier(TextClassifierOperator):
 # Create a JIT-compiled pipeline with the reliable classifier
 @jit
 class AnalysisPipeline(Operator[ClassifierInput, ClassifierOutput]):
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = AnalysisSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = AnalysisSpecification()
     
     # Class-level field declarations
     classifier: ReliableClassifier
@@ -247,7 +247,7 @@ result = AnalysisPipeline()(inputs={
 ## Next Steps
 
 Learn more about:
-- [Prompt Signatures](prompt_signatures.md) - Type-safe prompt templating
+- [Prompt Specifications](prompt_specifications.md) - Type-safe prompt templating
 - [Model Registry](model_registry.md) - Managing LLM configurations
 - [NON Patterns](non.md) - Networks of Networks composition
 - [XCS Graphs](../advanced/xcs_graphs.md) - Advanced parallel execution

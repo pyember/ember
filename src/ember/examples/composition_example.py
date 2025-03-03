@@ -22,7 +22,7 @@ from ember.core.configs.config import initialize_system
 from ember.core.app_context import get_ember_context
 from ember.core.non import Ensemble, Verifier, MostCommon
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.xcs import jit, execution_options
 
 T = TypeVar("T")
@@ -65,8 +65,8 @@ class QuestionRefinementOutputs(BaseModel):
     refined_query: str
 
 
-class QuestionRefinementSignature(Signature):
-    """Signature for QuestionRefinement operator."""
+class QuestionRefinementSpecification(Specification):
+    """Specification for QuestionRefinement operator."""
 
     input_model = QuestionRefinementInputs
     output_model = QuestionRefinementOutputs
@@ -82,7 +82,7 @@ class QuestionRefinementSignature(Signature):
 class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOutputs]):
     """Operator that refines a user question to make it more precise."""
 
-    signature = QuestionRefinementSignature()
+    specification = QuestionRefinementSpecification()
     model_name: str
     temperature: float
 
@@ -101,7 +101,7 @@ class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOu
         )
 
     def forward(self, *, inputs: QuestionRefinementInputs) -> Dict[str, Any]:
-        prompt = self.signature.render_prompt(inputs=inputs)
+        prompt = self.specification.render_prompt(inputs=inputs)
         refined_query = self.lm_module(prompt=prompt).strip()
         return {"refined_query": refined_query}
 

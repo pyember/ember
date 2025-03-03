@@ -17,7 +17,7 @@ from ember.core.types.ember_model import EmberModel
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core import non
 from ember.xcs.tracer.tracer_decorator import jit
 
@@ -39,8 +39,8 @@ class QuestionAnsweringOutput(EmberModel):
     model_responses: List[str]
 
 
-class QuestionAnsweringSignature(Signature):
-    """Signature for question answering pipeline."""
+class QuestionAnsweringSpecification(Specification):
+    """Specification for question answering pipeline."""
 
     input_model = QuestionAnsweringInput
     output_model = QuestionAnsweringOutput
@@ -62,8 +62,8 @@ class QuestionAnsweringPipeline(
     The pipeline internally uses an ensemble of models followed by an aggregation step.
     """
 
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = QuestionAnsweringSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = QuestionAnsweringSpecification()
     
     # Class-level field declarations
     model_name: str

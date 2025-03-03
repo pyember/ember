@@ -103,12 +103,12 @@ def test_most_common_operator_normal() -> None:
 def test_sequential_pipeline_operator_normal() -> None:
     """Test that Sequential chains operators in order."""
     from ember.core.registry.operator.base.operator_base import Operator
-    from ember.core.registry.prompt_signature.signatures import Signature
+    from ember.core.registry.prompt_specification.specification import Specification
 
     # Define a dummy operator that increments a value.
     class DummyOp(Operator[Dict[str, Any], Dict[str, Any]]):
-        # Provide a dummy signature so that __call__ does not fail.
-        signature: Signature = Signature(input_model=None)
+        # Provide a dummy specification so that __call__ does not fail.
+        specification: Specification = Specification(input_model=None)
 
         def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             # Increment the value by 1.

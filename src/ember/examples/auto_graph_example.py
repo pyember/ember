@@ -51,7 +51,7 @@ class AutoGraphPipeline(Operator):
     automatically, building a graph based on the actual execution trace.
     """
 
-    signature = None  # Define a minimal signature to satisfy Operator requirements
+    specification = None  # Define a minimal specification to satisfy Operator requirements
 
     def __init__(
         self,
@@ -72,10 +72,10 @@ class AutoGraphPipeline(Operator):
         )
         self.aggregator = AutoMostCommon()
 
-        # Create minimal signature for validation
-        from ember.core.registry.prompt_signature.signatures import Signature
+        # Create minimal specification for validation
+        from ember.core.registry.prompt_specification.specification import Specification
 
-        self.signature = Signature(input_model=None, output_model=None)
+        self.specification = Specification(input_model=None, output_model=None)
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the pipeline on the given inputs.

@@ -5,7 +5,7 @@ from ember.core.types import EmberModel
 
 from ember.core.registry.operator.base.operator_base import Operator
 
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -32,7 +32,7 @@ class EnsembleOperatorOutputs(EmberModel):
 class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]):
     """Operator that executes parallel calls to multiple LMModules concurrently."""
 
-    signature: Signature = Signature(
+    specification: Specification = Specification(
         input_model=EnsembleOperatorInputs, output_model=EnsembleOperatorOutputs
     )
     lm_modules: List[LMModule]
@@ -41,6 +41,6 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]
         self.lm_modules = lm_modules
 
     def forward(self, *, inputs: EnsembleOperatorInputs) -> EnsembleOperatorOutputs:
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
+        rendered_prompt: str = self.specification.render_prompt(inputs=inputs)
         responses: List[str] = [lm(prompt=rendered_prompt) for lm in self.lm_modules]
         return {"responses": responses}

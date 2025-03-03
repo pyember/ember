@@ -58,7 +58,7 @@ CORE_MODULES = [
     "ember.core.utils",
     "ember.core.registry.model",
     "ember.core.registry.operator",
-    "ember.core.registry.prompt_signature",
+    "ember.core.registry.prompt_specification",
     "ember.xcs",
 ]
 

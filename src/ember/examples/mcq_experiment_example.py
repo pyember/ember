@@ -48,7 +48,7 @@ from ember.core.registry.operator.base.operator_base import (
     Operator,
     OperatorMetadata,
 )
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModuleConfig
 
 # Import from XCS engine:
@@ -67,8 +67,8 @@ class EnsureValidChoiceInputs(BaseModel):
     choices: Dict[str, str]
 
 
-class EnsureValidChoiceSignature(Signature):
-    """Signature for the EnsureValidChoiceOperator."""
+class EnsureValidChoiceSpecification(Specification):
+    """Specification for the EnsureValidChoiceOperator."""
 
     input_model: Type[BaseModel] = EnsureValidChoiceInputs
     prompt_template: str = (
@@ -94,7 +94,7 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
     metadata: OperatorMetadata = OperatorMetadata(
         code="ENSURE_VALID_CHOICE",
         description="Refines or validates that final_answer is one of the valid choices, or tries to fix it via LM.",
-        signature=EnsureValidChoiceSignature(),
+        specification=EnsureValidChoiceSpecification(),
     )
 
     def __init__(
@@ -115,7 +115,7 @@ class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]
             **kwargs: Additional keyword arguments.
         """
         super().__init__(
-            name="EnsureValidChoiceOperator", signature=self.metadata.signature
+            name="EnsureValidChoiceOperator", specification=self.metadata.specification
         )
         lm_config: LMModuleConfig = LMModuleConfig(
             model_name=model_name,
@@ -187,8 +187,8 @@ class SingleModelBaselineOutputs(BaseModel):
     final_answer: str
 
 
-class SingleModelBaselineSignature(Signature):
-    """Signature for the SingleModelBaseline pipeline."""
+class SingleModelBaselineSpecification(Specification):
+    """Specification for the SingleModelBaseline pipeline."""
 
     input_model: Type[BaseModel] = SingleModelBaselineInputs
 
@@ -204,11 +204,11 @@ class SingleModelBaseline(
     """
 
     # Declare class variables
-    signature: ClassVar[Signature] = SingleModelBaselineSignature()
+    specification: ClassVar[Specification] = SingleModelBaselineSpecification()
     metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
         code="SINGLE_MODEL_BASELINE",
         description="One-LM baseline with EnsureValidChoice.",
-        signature=signature,
+        specification=specification,
     )
 
     # Declare instance variables
@@ -291,8 +291,8 @@ class MultiModelEnsembleOutputs(BaseModel):
     final_answer: str
 
 
-class MultiModelEnsembleSignature(Signature):
-    """Signature for the MultiModelEnsemble pipeline."""
+class MultiModelEnsembleSpecification(Specification):
+    """Specification for the MultiModelEnsemble pipeline."""
 
     input_model: Type[BaseModel] = MultiModelEnsembleInputs
 
@@ -309,11 +309,11 @@ class MultiModelEnsemble(
     """
 
     # Declare class variables
-    signature: ClassVar[Signature] = MultiModelEnsembleSignature()
+    specification: ClassVar[Specification] = MultiModelEnsembleSpecification()
     metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
         code="MULTI_MODEL_ENSEMBLE",
         description="Multi-model ensemble aggregator with judge step.",
-        signature=signature,
+        specification=specification,
     )
 
     # Declare instance variables
@@ -392,8 +392,8 @@ class VariedModelEnsembleOutputs(BaseModel):
     final_answer: str
 
 
-class VariedModelEnsembleSignature(Signature):
-    """Signature for the VariedModelEnsemble pipeline."""
+class VariedModelEnsembleSpecification(Specification):
+    """Specification for the VariedModelEnsemble pipeline."""
 
     input_model: Type[BaseModel] = VariedModelEnsembleInputs
 
@@ -410,13 +410,13 @@ class VariedModelEnsemble(
     """
 
     # Declare class variables
-    signature: ClassVar[Signature] = VariedModelEnsembleSignature()
+    specification: ClassVar[Specification] = VariedModelEnsembleSpecification()
     metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
         code="VARIED_MODEL_ENSEMBLE",
         description=(
             "Multi-model pipeline aggregator with judge step, using VariedEnsemble for step #1."
         ),
-        signature=signature,
+        specification=specification,
     )
 
     # Declare instance variables

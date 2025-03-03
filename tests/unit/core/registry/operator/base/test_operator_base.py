@@ -5,7 +5,7 @@ This module verifies:
     - Execution of a dummy operator.
     - Registration of sub-operators.
     - Construction of inputs when an input model is defined.
-    - Proper error handling when signatures are missing or misconfigured.
+    - Proper error handling when specifications are missing or misconfigured.
 """
 
 from typing import Any, Dict, Optional, Type
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.operator.exceptions import OperatorExecutionError
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 
 
 class DummyInput(BaseModel):
@@ -38,8 +38,8 @@ class DummyOutput(BaseModel):
     result: int
 
 
-class DummySignature(Signature):
-    """Signature for the dummy operator.
+class DummySpecification(Specification):
+    """Specification for the dummy operator.
 
     Attributes:
         prompt_template (str): Template used for prompts.
@@ -81,7 +81,7 @@ class DummySignature(Signature):
 class AddOneOperator(Operator[DummyInput, DummyOutput]):
     """Operator that increments the input value by one."""
 
-    signature: Signature = DummySignature()
+    specification: Specification = DummySpecification()
 
     def forward(self, *, inputs: DummyInput) -> DummyOutput:
         """Performs the computation by adding one to the input value.
@@ -111,28 +111,28 @@ def test_operator_call_valid() -> None:
     assert output.result == 11, "Expected result to be 11."
 
 
-def test_missing_signature_error() -> None:
-    """Verifies that an operator with a missing signature raises an appropriate error.
+def test_missing_specification_error() -> None:
+    """Verifies that an operator with a missing specification raises an appropriate error.
 
     Tests that OperatorExecutionError is raised with the root cause being a reference to
-    the missing signature.
+    the missing specification.
     """
 
-    class NoSignatureOperator(Operator):
-        """Operator implementation without a defined signature."""
+    class NoSpecificationOperator(Operator):
+        """Operator implementation without a defined specification."""
 
-        signature = None  # type: ignore
+        specification = None  # type: ignore
 
         def forward(self, *, inputs: Any) -> Any:
             """Simply returns the given inputs."""
             return inputs
 
-    operator_instance = NoSignatureOperator()
+    operator_instance = NoSpecificationOperator()
     with pytest.raises(OperatorExecutionError) as exception_info:
         operator_instance(inputs={"value": "test"})
 
     error_message = str(exception_info.value)
-    assert "Error executing operator NoSignatureOperator" in error_message
+    assert "Error executing operator NoSpecificationOperator" in error_message
     assert "'NoneType' object has no attribute 'validate_inputs'" in error_message
 
 
@@ -170,13 +170,13 @@ def test_sub_operator_registration() -> None:
     """
 
     class SubOperator(Operator[DummyInput, DummyOutput]):
-        signature = DummySignature()
+        specification = DummySpecification()
 
         def forward(self, *, inputs: DummyInput) -> DummyOutput:
             return DummyOutput(result=inputs.value * 2)
 
     class MainOperator(Operator[DummyInput, DummyOutput]):
-        signature = DummySignature()
+        specification = DummySpecification()
         sub_operator: SubOperator
 
         def __init__(self, *, sub_operator: Optional[SubOperator] = None) -> None:

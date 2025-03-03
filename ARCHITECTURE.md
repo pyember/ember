@@ -36,7 +36,7 @@ Ember's architecture follows a layered design with clear separations of concern:
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  Model Registry         │  │  Operator System        │  │  Prompt Signatures      │   │
+│  │  Model Registry         │  │  Operator System        │  │  Prompt Specifications      │   │
 │  │                         │  │                         │  │                         │   │
 │  │  • ModelInfo            │  │  • Base Operator        │  │  • Template Rendering   │   │
 │  │  • ModelService         │  │  • Operator Registry    │  │  • Input Validation     │   │
@@ -85,7 +85,7 @@ The building blocks of Ember's functionality:
 
 * **Model Registry**: Management of LLM providers and models
 * **Operator System**: Core computational units and their registry
-* **Prompt Signatures**: Type-safe template rendering and validation
+* **Prompt Specifications**: Type-safe template rendering and validation
 * **Data Processing**: Dataset handling, transformation, and sampling
 * **Evaluation Tools**: Benchmarking and performance analysis
 * **Application Context**: Configuration and dependency management
@@ -201,7 +201,7 @@ class SummarizerOperator(Operator[SummarizerInput, SummarizerOutput]):
 │  └─────────────────┘      └─────────────────┘      └────────┬────────┘ │
 │                                                              │         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌────────▼────────┐ │
-│  │  Base Operator  │◄─────┤ Prompt Signature │◄────►│   forward()    │ │
+│  │  Base Operator  │◄─────┤ Prompt Specification │◄────►│   forward()    │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
 │           │                                                             │
 │           ▼                                                             │
@@ -214,16 +214,16 @@ class SummarizerOperator(Operator[SummarizerInput, SummarizerOutput]):
 
 Key components:
 - `Operator`: Base class for all operators
-- `Signature`: Type definitions for operator I/O
+- `Specification`: Type definitions for operator I/O
 - Core operators: Ensemble, Judge, Verifier, etc.
 - Operator registry for discovery
 
-### Prompt Signature System
+### Prompt Specification System
 
-Signatures define the contract between inputs and outputs:
+Specifications define the contract between inputs and outputs:
 
 ```python
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from pydantic import BaseModel
 
 class QuestionInput(BaseModel):
@@ -234,7 +234,7 @@ class AnswerOutput(BaseModel):
     answer: str
     confidence: float
 
-class QASignature(Signature):
+class QASpecification(Specification):
     input_model = QuestionInput
     structured_output = AnswerOutput
     prompt_template = """
@@ -245,14 +245,14 @@ class QASignature(Signature):
     """
 ```
 
-#### Prompt Signature Component Architecture
+#### Prompt Specification Component Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                          Prompt Signature System                       │
+│                          Prompt Specification System                       │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │    Signature    │──────┤   Input Model   │      │  Output Model   │ │
+│  │    Specification    │──────┤   Input Model   │      │  Output Model   │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
 │           │                                                             │
 │           ▼                                                             │
@@ -510,7 +510,7 @@ The diagram below illustrates the complete dependency flow between major compone
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Base Operators       │◄───►│    Prompt Signatures    │◄───►│   Dataset Loaders   │ │
+│  │    Base Operators       │◄───►│    Prompt Specifications    │◄───►│   Dataset Loaders   │ │
 │  └───────────┬─────────────┘     └─────────────────────────┘     └─────────────────────┘ │
 │              │                                                                            │
 │              ▼                                                                            │
@@ -549,7 +549,7 @@ The code is organized into the following package structure:
 | `ember.core.types` | Type system, protocols, and validation |
 | `ember.core.registry.model` | Model registry and provider implementations |
 | `ember.core.registry.operator` | Operator system |
-| `ember.core.registry.prompt_signature` | Prompt signature system |
+| `ember.core.registry.prompt_specification` | Prompt specification system |
 | `ember.core.utils` | Utility functions and helpers |
 | `ember.core.utils.data` | Data processing and datasets |
 | `ember.core.utils.eval` | Evaluation and metrics |

@@ -7,7 +7,7 @@ from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.exceptions import MissingLMModuleError
 from ember.core.types.ember_model import EmberModel
 
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -35,8 +35,8 @@ class JudgeSynthesisOutputs(EmberModel):
     reasoning: str
 
 
-class JudgeSynthesisSignature(Signature):
-    """Signature for JudgeSynthesisOperator defining the synthesis prompt."""
+class JudgeSynthesisSpecification(Specification):
+    """Specification for JudgeSynthesisOperator defining the synthesis prompt."""
 
     prompt_template: str = (
         "We have multiple advisors who proposed different answers:\n"
@@ -55,7 +55,7 @@ class JudgeSynthesisSignature(Signature):
 class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Operator to synthesize a final answer and reasoning from multiple responses."""
 
-    signature: Signature = JudgeSynthesisSignature()
+    specification: Specification = JudgeSynthesisSpecification()
     lm_module: LMModule
 
     def __init__(self, *, lm_module: LMModule) -> None:
@@ -68,7 +68,7 @@ class JudgeSynthesisOperator(Operator[JudgeSynthesisInputs, JudgeSynthesisOutput
                 "No LM module attached to JudgeSynthesisOperator."
             )
 
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
+        rendered_prompt: str = self.specification.render_prompt(inputs=inputs)
         raw_output: str = self.lm_module(prompt=rendered_prompt).strip()
 
         # Parse the response to extract reasoning and final answer

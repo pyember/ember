@@ -16,13 +16,13 @@ class MockOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     """Mock operator for integration tests that doubles the input value.
 
     Attributes:
-        signature: A dummy signature providing input model definitions and basic
+        specification: A dummy specification providing input model definitions and basic
                    validation methods.
     """
 
-    # For testing, we use a simplified signature.
-    signature = type(
-        "DummySignature",
+    # For testing, we use a simplified specification.
+    specification = type(
+        "DummySpecification",
         (),
         {
             "input_model": dict,

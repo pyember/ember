@@ -35,7 +35,7 @@ from ember.xcs.tracer import jit
 from ember.xcs.engine import execution_options
 from ember.core import non
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 # Define structured model inputs/outputs
@@ -46,7 +46,7 @@ class ReasoningOutput(EmberModel):
     final_answer: str
     confidence: float
 
-class ReasoningSignature(Signature):
+class ReasoningSpecification(Specification):
     input_model = QueryInput
     output_model = ReasoningOutput
 
@@ -58,8 +58,8 @@ class AdvancedReasoningSystem(Operator[QueryInput, ReasoningOutput]):
     3. Synthesis of final response
     """
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = ReasoningSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = ReasoningSpecification()
     
     # Class-level field declarations with types
     reasoning_ensemble: non.UniformEnsemble
@@ -135,7 +135,7 @@ The simplest possible Ember application - a single LLM call wrapped in an operat
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 class SimpleInput(EmberModel):
@@ -144,7 +144,7 @@ class SimpleInput(EmberModel):
 class SimpleOutput(EmberModel):
     answer: str
     
-class SimpleQASignature(Signature):
+class SimpleQASpecification(Specification):
     input_model = SimpleInput
     output_model = SimpleOutput
     prompt_template = "Please answer this question: {query}"
@@ -152,8 +152,8 @@ class SimpleQASignature(Signature):
 class SimpleQA(Operator[SimpleInput, SimpleOutput]):
     """Basic question-answering operator using a single LLM."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = SimpleQASignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = SimpleQASpecification()
     
     # Class-level field declaration
     lm: LMModule
@@ -163,8 +163,8 @@ class SimpleQA(Operator[SimpleInput, SimpleOutput]):
         self.lm = LMModule(LMModuleConfig(model_name=model_name))
         
     def forward(self, *, inputs: SimpleInput) -> SimpleOutput:
-        # Generate prompt using signature
-        prompt = self.signature.render_prompt(inputs)
+        # Generate prompt using specification
+        prompt = self.specification.render_prompt(inputs)
         
         # Get response from LLM
         response = self.lm(prompt)
@@ -187,7 +187,7 @@ from typing import ClassVar, List
 from ember.core.registry.operator.base import Operator
 from ember.xcs.tracer import jit
 from ember.core import non
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 class EnsembleInput(EmberModel):
@@ -198,7 +198,7 @@ class EnsembleOutput(EmberModel):
     confidence: float
     model_responses: List[str]
     
-class EnsembleSignature(Signature):
+class EnsembleSpecification(Specification):
     input_model = EnsembleInput
     output_model = EnsembleOutput
 
@@ -206,8 +206,8 @@ class EnsembleSignature(Signature):
 class QAEnsemble(Operator[EnsembleInput, EnsembleOutput]):
     """Question-answering ensemble with multiple models and automatic graph building."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = EnsembleSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = EnsembleSpecification()
     
     # Class-level field declarations
     ensemble: non.UniformEnsemble
@@ -258,7 +258,7 @@ Demonstrates a multi-stage pipeline with different operators and automatic execu
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
 from ember.xcs.tracer import jit, execution_options
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 
@@ -271,7 +271,7 @@ class DocumentOutput(EmberModel):
     analysis: str
     fact_check: str
 
-class DocumentProcessorSignature(Signature):
+class DocumentProcessorSpecification(Specification):
     input_model = DocumentInput
     output_model = DocumentOutput
     prompt_template = """Summarize the following text in {max_words} words or less:
@@ -284,8 +284,8 @@ Summary:"""
 class DocumentProcessor(Operator[DocumentInput, DocumentOutput]):
     """Advanced document processing pipeline with multiple stages."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = DocumentProcessorSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = DocumentProcessorSpecification()
     
     # Class-level field declarations
     summarizer: LMModule
@@ -308,7 +308,7 @@ class DocumentProcessor(Operator[DocumentInput, DocumentOutput]):
     
     def forward(self, *, inputs: DocumentInput) -> DocumentOutput:
         # Stage 1: Create a summary
-        summary_prompt = self.signature.render_prompt(inputs)
+        summary_prompt = self.specification.render_prompt(inputs)
         summary = self.summarizer(summary_prompt)
         
         # Stage 2: Analyze themes (runs in parallel with fact checking)
@@ -378,7 +378,7 @@ Operators are the fundamental building blocks in Ember, similar to PyTorch's `nn
 ```python
 from typing import ClassVar, List
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 
@@ -391,8 +391,8 @@ class SentimentOutput(EmberModel):
     confidence: float
     reasons: List[str]
 
-# Create a signature with structured I/O and prompt template
-class SentimentSignature(Signature):
+# Create a specification with structured I/O and prompt template
+class SentimentSpecification(Specification):
     input_model = SentimentInput
     output_model = SentimentOutput
     prompt_template = """Analyze the sentiment of the following text:
@@ -406,8 +406,8 @@ Provide your analysis as a JSON object with fields:
 
 # Create the operator
 class SentimentAnalyzer(Operator[SentimentInput, SentimentOutput]):
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = SentimentSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = SentimentSpecification()
     
     # Class-level field declaration
     lm: LMModule
@@ -417,14 +417,14 @@ class SentimentAnalyzer(Operator[SentimentInput, SentimentOutput]):
         self.lm = LMModule(LMModuleConfig(model_name=model_name))
         
     def forward(self, *, inputs: SentimentInput) -> SentimentOutput:
-        # Render prompt from inputs using the signature
-        prompt = self.signature.render_prompt(inputs)
+        # Render prompt from inputs using the specification
+        prompt = self.specification.render_prompt(inputs)
         
         # Get response from LLM
         response = self.lm(prompt)
         
-        # Parse structured output using the signature
-        return self.signature.parse_response(response)
+        # Parse structured output using the specification
+        return self.specification.parse_response(response)
 
 # Use the operator with kwargs format
 analyzer = SentimentAnalyzer()
@@ -440,7 +440,7 @@ Ember provides powerful components for building complex Networks of Networks (NO
 ```python
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 
@@ -450,15 +450,15 @@ class NetworkInput(EmberModel):
 class NetworkOutput(EmberModel):
     final_answer: str
     
-class SubNetworkSignature(Signature):
+class SubNetworkSpecification(Specification):
     input_model = NetworkInput
     output_model = NetworkOutput
 
 class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     """SubNetwork that composes an ensemble with verification."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = SubNetworkSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = SubNetworkSpecification()
     
     # Class-level field declarations
     ensemble: non.UniformEnsemble
@@ -492,8 +492,8 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
 class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
     """Nested network with sub-networks and final judgment."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = SubNetworkSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = SubNetworkSpecification()
     
     # Class-level field declarations
     sub1: SubNetwork
@@ -537,7 +537,7 @@ from ember.xcs.tracer import jit
 from ember.xcs.engine import execution_options  
 from ember.core import non
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 # Define our input and output types
@@ -547,7 +547,7 @@ class PipelineInput(EmberModel):
 class PipelineOutput(EmberModel):
     answer: str
 
-class PipelineSignature(Signature):
+class PipelineSpecification(Specification):
     input_model = PipelineInput
     output_model = PipelineOutput
 
@@ -555,8 +555,8 @@ class PipelineSignature(Signature):
 class ComplexPipeline(Operator[PipelineInput, PipelineOutput]):
     """An operator-based pipeline with automatic graph building and optimization."""
     
-    # Class-level signature declaration
-    signature: ClassVar[Signature] = PipelineSignature()
+    # Class-level specification declaration
+    specification: ClassVar[Specification] = PipelineSpecification()
     
     # Class-level field declarations
     ensemble: non.UniformEnsemble
@@ -654,7 +654,7 @@ For comprehensive documentation, including tutorials, API reference, and advance
 
 - [Model Registry Quickstart](docs/quickstart/model_registry.md) - Get started with LLM integration
 - [Operators Quickstart](docs/quickstart/operators.md) - Build reusable computation units
-- [Prompt Signatures Quickstart](docs/quickstart/prompt_signatures.md) - Type-safe prompt engineering
+- [Prompt Specifications Quickstart](docs/quickstart/prompt_specifications.md) - Type-safe prompt engineering
 - [NON Quickstart](docs/quickstart/non.md) - Networks of Networks patterns
 - [Data Quickstart](docs/quickstart/data.md) - Working with datasets and evaluation
 

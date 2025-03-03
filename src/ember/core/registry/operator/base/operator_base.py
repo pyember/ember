@@ -1,12 +1,12 @@
 """
 Core Operator abstraction for the Ember framework.
 
-An Operator in Ember is an immutable, pure function with an associated Signature.
+An Operator in Ember is an immutable, pure function with an associated Specification.
 Operators are implemented as frozen dataclasses (extending EmberModule) and are
 automatically registered with the PyTree system for transformation operations.
 
 Key features of the Operator system:
-1. Input and output validation through Signatures
+1. Input and output validation through Specifications
 2. Immutability for thread safety and functional programming patterns
 3. Automatic registration with transformation systems
 4. Strong typing with generic input/output model specifications
@@ -24,9 +24,9 @@ from typing import Any, Dict, Generic, TypeVar, Union, cast, Type, Optional, Cla
 from pydantic import BaseModel
 
 from ember.core.registry.operator.base._module import EmberModule
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.operator.exceptions import (
-    OperatorSignatureNotDefinedError,
+    OperatorSpecificationNotDefinedError,
     OperatorExecutionError,
 )
 
@@ -41,19 +41,19 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
     """Abstract base class for operators in the Ember framework.
 
     An Operator is an immutable, functional component that transforms inputs to outputs
-    according to its *signature*.
+    according to its *specification*.
 
     Operators also implement a `forward` method.
     This design is intended to adhere to functional programming
     style, emphasizing immutability, explicit interfaces, and composability.
 
     Attributes:
-        signature (ClassVar[Signature]): Contains the operator's input/output signature specification.
-            Subclasses must define this class variable with a valid Signature instance.
+        specification (ClassVar[Specification]): Contains the operator's input/output specification.
+            Subclasses must define this class variable with a valid Specification instance.
     """
 
     # Class variable to be overridden by subclasses
-    signature: ClassVar[Signature]
+    specification: ClassVar[Specification]
 
     @abc.abstractmethod
     def forward(self, *, inputs: T_in) -> T_out:
@@ -79,9 +79,9 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """Executes the operator with automatic input and output validation.
 
         This method orchestrates the execution flow:
-        1. Validates inputs against the signature's input model
+        1. Validates inputs against the specification's input model
         2. Calls the forward method with validated inputs
-        3. Validates the output against the signature's output model and ensures it's the proper type
+        3. Validates the output against the specification's output model and ensures it's the proper type
 
         The operator can be called in three ways:
         1. With a model instance: op(inputs=my_model_instance)
@@ -98,16 +98,16 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             T_out: The validated, computed output conforming to the output model.
 
         Raises:
-            OperatorSignatureNotDefinedError: If this operator has no valid signature defined.
-            SignatureValidationError: If input or output validation fails.
+            OperatorSpecificationNotDefinedError: If this operator has no valid specification defined.
+            SpecificationValidationError: If input or output validation fails.
             OperatorExecutionError: If any error occurs in the forward computation.
         """
-        # Retrieve and validate the signature
+        # Retrieve and validate the specification
         try:
-            signature: Signature = self.signature
-        except OperatorSignatureNotDefinedError as e:
-            raise OperatorSignatureNotDefinedError(
-                message="Operator signature must be defined."
+            specification: Specification = self.specification
+        except OperatorSpecificationNotDefinedError as e:
+            raise OperatorSpecificationNotDefinedError(
+                message="Operator specification must be defined."
             ) from e
 
         try:
@@ -115,13 +115,13 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             if inputs is not None:
                 # Traditional 'inputs' parameter provided
                 validated_inputs: T_in = (
-                    signature.validate_inputs(inputs=inputs)
+                    specification.validate_inputs(inputs=inputs)
                     if isinstance(inputs, dict)
                     else inputs
                 )
-            elif kwargs and signature.input_model:
+            elif kwargs and specification.input_model:
                 # Using kwargs directly as input fields
-                validated_inputs = signature.input_model(**kwargs)
+                validated_inputs = specification.input_model(**kwargs)
             else:
                 # Empty inputs or no input model defined
                 validated_inputs = kwargs if kwargs else {}
@@ -133,39 +133,40 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             # If we got a dict, convert it to the appropriate model
             if (
                 isinstance(operator_output, dict)
-                and hasattr(signature, "output_model")
-                and signature.output_model
+                and hasattr(specification, "output_model")
+                and specification.output_model
             ):
-                operator_output = signature.output_model.model_validate(operator_output)
+                operator_output = specification.output_model.model_validate(operator_output)
 
             # Final validation to ensure type consistency
-            validated_output: T_out = signature.validate_output(output=operator_output)
+            validated_output: T_out = specification.validate_output(output=operator_output)
             return validated_output
 
         except Exception as e:
             # Catch any errors during execution and wrap them
-            if not isinstance(e, OperatorSignatureNotDefinedError):
+            if not isinstance(e, OperatorSpecificationNotDefinedError):
                 raise OperatorExecutionError(
                     message=f"Error executing operator {self.__class__.__name__}: {str(e)}"
                 ) from e
             raise
 
     @property
-    def signature(self) -> Signature:
-        """Property accessor for the operator's signature.
+    def specification(self) -> Specification:
+        """Property accessor for the operator's specification.
 
         Returns:
-            Signature: The operator's associated signature.
+            Specification: The operator's associated specification.
 
         Raises:
-            OperatorSignatureNotDefinedError: If the signature has not been defined.
+            OperatorSpecificationNotDefinedError: If the specification has not been defined.
         """
-        # Look up the 'signature' in the subclass's dict
-        subclass_sig = type(self).__dict__.get("signature", None)
+        # Look up the 'specification' in the subclass's dict
+        subclass_spec = type(self).__dict__.get("specification", None)
 
-        # Validate that the signature is properly defined
-        if subclass_sig is None or subclass_sig is Operator.__dict__.get("signature"):
-            raise OperatorSignatureNotDefinedError(
-                message="Operator signature must be defined."
+        # Validate that the specification is properly defined
+        if subclass_spec is None or subclass_spec is Operator.__dict__.get("specification"):
+            raise OperatorSpecificationNotDefinedError(
+                message="Operator specification must be defined."
             )
-        return subclass_sig
+        return subclass_spec
+        

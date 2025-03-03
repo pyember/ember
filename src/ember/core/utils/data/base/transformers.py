@@ -14,7 +14,7 @@ DatasetItem = Dict[str, Any]
 class IDatasetTransformer(ABC):
     """Interface for dataset transformers.
 
-    This abstract base class defines the method signature for transforming dataset
+    This abstract base class defines the method specification for transforming dataset
     objects, ensuring consistency across transformer implementations.
     """
 

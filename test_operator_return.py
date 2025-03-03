@@ -4,7 +4,7 @@ Test script to examine operator return handling
 
 from typing import List, Dict, Any, Type
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.types import EmberModel
 
 
@@ -16,14 +16,14 @@ class OperatorTestOutputs(EmberModel):
     results: List[str]
 
 
-class SimpleSignature(Signature):
+class SimpleSpecification(Specification):
     prompt_template: str = "Test prompt: {query}"
     input_model: Type[EmberModel] = OperatorTestInputs
     output_model: Type[EmberModel] = OperatorTestOutputs
 
 
 class SimpleOperator(Operator[OperatorTestInputs, OperatorTestOutputs]):
-    signature = SimpleSignature()
+    specification = SimpleSpecification()
 
     def forward(self, *, inputs: OperatorTestInputs) -> Dict[str, Any]:
         # Return a dictionary instead of a model instance

@@ -10,7 +10,7 @@ from typing import Any, Dict
 from pydantic import BaseModel
 
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.operator.base._module import ember_field
 
 
@@ -30,7 +30,7 @@ class OpTestOutput(BaseModel):
 class NoSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
     """Test operator that doesn't call super().__init__()."""
 
-    signature = Signature(input_model=OpTestInput, structured_output=OpTestOutput)
+    specification = Specification(input_model=OpTestInput, structured_output=OpTestOutput)
     multiplier: int
     computed_field: str = ember_field(init=False)
 
@@ -47,7 +47,7 @@ class NoSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
 class WithSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
     """Test operator that does call super().__init__()."""
 
-    signature = Signature(input_model=OpTestInput, structured_output=OpTestOutput)
+    specification = Specification(input_model=OpTestInput, structured_output=OpTestOutput)
     multiplier: int
     computed_field: str = ember_field(init=False)
 

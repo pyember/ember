@@ -1,20 +1,20 @@
-# Ember Prompt Signatures - Quickstart Guide
+# Ember Prompt Specifications - Quickstart Guide
 
-This guide introduces Ember's Prompt Signature system, which provides type-safe, composable prompt engineering with strong validation guarantees.
+This guide introduces Ember's Prompt Specification system, which provides type-safe, composable prompt engineering with strong validation guarantees.
 
-## 1. Introduction to Signatures
+## 1. Introduction to Specifications
 
-Signatures in Ember define the contract between inputs and outputs for an operator, including:
+Specifications in Ember define the contract between inputs and outputs for an operator, including:
 - Input schema (what data is required for the operation)
 - Output schema (what structure the result will have)
 - Prompt template (how to format inputs into a prompt)
 
 They provide automatic validation, clear error messages, and consistent prompt formatting.
 
-## 2. Creating a Basic Signature
+## 2. Creating a Basic Specification
 
 ```python
-from ember.core.registry.prompt_signature import Signature
+from ember.core.registry.prompt_specification import Specification
 from pydantic import BaseModel, Field
 from typing import List
 
@@ -29,8 +29,8 @@ class QuestionAnsweringOutput(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, description="Confidence score between 0 and 1")
     reasoning: str = Field(description="Step-by-step reasoning process")
 
-# Create the signature
-class QASignature(Signature):
+# Create the specification
+class QASpecification(Specification):
     input_model = QuestionAnsweringInput
     structured_output = QuestionAnsweringOutput
     prompt_template = """Answer the following question based on the provided context.
@@ -43,14 +43,14 @@ Provide a clear, concise answer along with your confidence level and reasoning.
 """
 ```
 
-## 3. Using Signatures with Operators
+## 3. Using Specifications with Operators
 
 ```python
 from ember.core.registry.operator.base import Operator
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 
 class QuestionAnsweringOperator(Operator[QuestionAnsweringInput, QuestionAnsweringOutput]):
-    signature = QASignature()
+    specification = QASpecification()
     
     def __init__(self, model_name: str = "openai:gpt-4o"):
         self.lm_module = LMModule(LMModuleConfig(
@@ -59,19 +59,19 @@ class QuestionAnsweringOperator(Operator[QuestionAnsweringInput, QuestionAnsweri
         ))
     
     def forward(self, *, inputs: QuestionAnsweringInput) -> QuestionAnsweringOutput:
-        # The signature automatically validates inputs
-        prompt = self.signature.render_prompt(inputs=inputs)
+        # The specification automatically validates inputs
+        prompt = self.specification.render_prompt(inputs=inputs)
         
         # Call LLM and parse response
         response_text = self.lm_module(prompt)
         import json
         response_data = json.loads(response_text)
         
-        # The signature automatically validates output
-        return self.signature.validate_output(output=response_data)
+        # The specification automatically validates output
+        return self.specification.validate_output(output=response_data)
 ```
 
-## 4. Signature Features
+## 4. Specification Features
 
 ### Automatic Validation
 
@@ -79,7 +79,7 @@ class QuestionAnsweringOperator(Operator[QuestionAnsweringInput, QuestionAnsweri
 try:
     # This will fail validation (missing required field)
     invalid_input = {"question": "Who was Ada Lovelace?"}
-    validated = signature.validate_inputs(inputs=invalid_input)
+    validated = specification.validate_inputs(inputs=invalid_input)
 except Exception as e:
     print(f"Validation error: {e}")
     
@@ -88,14 +88,14 @@ valid_input = {
     "question": "Who was Ada Lovelace?",
     "context": "Ada Lovelace was an English mathematician and writer..."
 }
-validated = signature.validate_inputs(inputs=valid_input)
+validated = specification.validate_inputs(inputs=valid_input)
 ```
 
 ### Flexible Prompt Rendering
 
 ```python
 # Render from dictionary
-prompt1 = signature.render_prompt(inputs={
+prompt1 = specification.render_prompt(inputs={
     "question": "What is quantum computing?",
     "context": "Quantum computing uses quantum bits or qubits..."
 })
@@ -105,29 +105,29 @@ input_model = QuestionAnsweringInput(
     question="What is quantum computing?",
     context="Quantum computing uses quantum bits or qubits..."
 )
-prompt2 = signature.render_prompt(inputs=input_model)
+prompt2 = specification.render_prompt(inputs=input_model)
 ```
 
 ### JSON Schema Generation
 
 ```python
 # Generate JSON schema for documentation or client SDKs
-input_schema = signature.model_json_schema(by_alias=True)
+input_schema = specification.model_json_schema(by_alias=True)
 print(input_schema)
 ```
 
-## 5. Advanced Signature Patterns
+## 5. Advanced Specification Patterns
 
 ### Inheritance and Composition
 
 ```python
-# Create a base signature
-class BaseQASignature(Signature):
+# Create a base specification
+class BaseQASpecification(Specification):
     input_model = QuestionAnsweringInput
     structured_output = QuestionAnsweringOutput
 
 # Extended version with different prompt
-class DetailedQASignature(BaseQASignature):
+class DetailedQASpecification(BaseQASpecification):
     prompt_template = """Analyze the following question in detail, using the context.
 
 Context:
@@ -143,7 +143,7 @@ Provide a detailed answer with reasoning and your confidence level.
 ### Dynamic Templates
 
 ```python
-class DynamicSignature(Signature):
+class DynamicSpecification(Specification):
     input_model = QuestionAnsweringInput
     structured_output = QuestionAnsweringOutput
     
@@ -178,7 +178,7 @@ class ValidatedInput(BaseModel):
             raise ValueError("Temperature must be between 0 and 1")
         return self
 
-class CustomValidationSignature(Signature):
+class CustomValidationSpecification(Specification):
     input_model = ValidatedInput
     
     def validate_inputs(self, *, inputs):
@@ -195,7 +195,7 @@ class CustomValidationSignature(Signature):
 2. **Explicit Placeholders**: Make all placeholders explicit in your template
 3. **Nested Models**: Use nested Pydantic models for complex data structures
 4. **Clear Errors**: Provide descriptive error messages in custom validators
-5. **Reuse Signatures**: Create base signatures and extend them for specific use cases
+5. **Reuse Specifications**: Create base specifications and extend them for specific use cases
 6. **Documentation**: Use Field descriptions to document your schemas
 
 ## 7. Using with Different LLM Providers
@@ -208,15 +208,15 @@ from ember import initialize_ember
 # Initialize model registry
 service = initialize_ember(auto_register=True)
 
-# Create operator with signature
+# Create operator with specification
 class FlexibleQAOperator(Operator[QuestionAnsweringInput, QuestionAnsweringOutput]):
-    signature = QASignature()
+    specification = QASpecification()
     
     def __init__(self, model_id: str):
         self.model = service.get_model(model_id)
     
     def forward(self, *, inputs: QuestionAnsweringInput) -> QuestionAnsweringOutput:
-        prompt = self.signature.render_prompt(inputs=inputs)
+        prompt = self.specification.render_prompt(inputs=inputs)
         response_text = self.model(prompt)
         # Process response and validate output
         # ...

@@ -5,7 +5,7 @@ from pydantic import Field
 
 from ember.core.app_context import get_ember_context
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 from ember.core.registry.operator.base._module import ember_field
@@ -79,8 +79,8 @@ class MultiPrefixOperatorOutputs(EmberModel):
     responses: List[str] = Field(description="Responses from different LM modules")
 
 
-class MultiPrefixEnsembleSignature(Signature):
-    """Signature for MultiPrefixEnsembleOperator."""
+class MultiPrefixEnsembleSpecification(Specification):
+    """Specification for MultiPrefixEnsembleOperator."""
 
     input_model: Type[EmberModel] = MultiPrefixOperatorInputs
     output_model: Type[EmberModel] = MultiPrefixOperatorOutputs
@@ -95,7 +95,7 @@ class MultiPrefixEnsembleOperator(
     to the user query before sending to different language model modules.
     """
 
-    signature: ClassVar[Signature] = MultiPrefixEnsembleSignature()
+    specification: ClassVar[Specification] = MultiPrefixEnsembleSpecification()
     lm_modules: List[LMModule]
     prefixes: List[str]
 

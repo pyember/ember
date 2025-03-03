@@ -3,7 +3,7 @@ from typing import Literal, Optional, Type
 
 from pydantic import BaseModel
 
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 
 
 class CaravanLabelsOutput(BaseModel):
@@ -28,11 +28,11 @@ class CaravanLabelingInputs(BaseModel):
     flow: str
 
 
-class CaravanLabelingSignature(Signature[CaravanLabelingInputs, CaravanLabelsOutput]):
+class CaravanLabelingSpecification(Specification[CaravanLabelingInputs, CaravanLabelsOutput]):
     """
-    Signature for labeling network flows as benign or malicious.
+    Specification for labeling network flows as benign or malicious.
 
-    This signature defines a prompt template for network security experts to label input flows.
+    This specification defines a prompt template for network security experts to label input flows.
     It leverages associated Pydantic models to validate both the inputs and the outputs.
 
     Attributes:

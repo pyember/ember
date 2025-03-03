@@ -6,7 +6,7 @@ from pydantic import Field
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.exceptions import MissingLMModuleError
 from ember.core.types.ember_model import EmberModel
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -36,8 +36,8 @@ class VerifierOperatorOutputs(EmberModel):
     revised_answer: Optional[str]
 
 
-class VerifierSignature(Signature):
-    """Signature for VerifierOperator defining the verification prompt."""
+class VerifierSpecification(Specification):
+    """Specification for VerifierOperator defining the verification prompt."""
 
     prompt_template: str = (
         "You are a verifier of correctness.\n"
@@ -55,7 +55,7 @@ class VerifierSignature(Signature):
 class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]):
     """Operator to verify a candidate answer and optionally suggest revisions."""
 
-    signature: Signature = VerifierSignature()
+    specification: Specification = VerifierSpecification()
     lm_module: LMModule
 
     def __init__(self, *, lm_module: LMModule) -> None:
@@ -64,7 +64,7 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
     def forward(self, *, inputs: VerifierOperatorInputs) -> VerifierOperatorOutputs:
         if not self.lm_module:
             raise MissingLMModuleError("No LM module attached to VerifierOperator.")
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
+        rendered_prompt: str = self.specification.render_prompt(inputs=inputs)
         raw_output: str = self.lm_module(prompt=rendered_prompt).strip()
 
         # Initialize default values

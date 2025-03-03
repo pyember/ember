@@ -364,8 +364,8 @@ def test_boundmethod_structure() -> None:
     assert hasattr(BoundMethod, "__call__"), "BoundMethod should have a __call__ method"
 
 
-def test_boundmethod_call_signature() -> None:
-    """Tests that the BoundMethod.__call__ method has the expected signature.
+def test_boundmethod_call_specification() -> None:
+    """Tests that the BoundMethod.__call__ method has the expected specification.
 
     The __call__ method should accept *args and **kwargs for forwarding to the bound function.
     """

@@ -14,7 +14,7 @@ from ember.xcs.tracer.tracer_decorator import jit
 
 
 # ----------------------------------------------------------------------------
-# Dummy Models and Signature for Testing
+# Dummy Models and Specification for Testing
 # ----------------------------------------------------------------------------
 
 
@@ -38,10 +38,10 @@ class DummyOutput(BaseModel):
     y: int
 
 
-class DummySignature:
-    """A dummy signature providing minimal validation and prompt rendering.
+class DummySpecification:
+    """A dummy specification providing minimal validation and prompt rendering.
 
-    This class simulates the behavior of an operator signature, enforcing input validation,
+    This class simulates the behavior of an operator specification, enforcing input validation,
     output validation, and prompt rendering using a simple dummy implementation.
     """
 
@@ -95,7 +95,7 @@ class DummyOperator(Operator[DummyInput, DummyOutput]):
     the forward method is only executed once, with subsequent calls using the cached plan.
     """
 
-    signature: DummySignature = DummySignature()
+    specification: DummySpecification = DummySpecification()
 
     def __init__(self) -> None:
         """Initializes the DummyOperator with a counter starting at zero."""

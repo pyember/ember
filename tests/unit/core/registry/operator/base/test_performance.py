@@ -15,7 +15,7 @@ import logging
 from typing import Any, Dict, List, Tuple, Type
 
 from pydantic import BaseModel
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.operator.base.operator_base import Operator
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -33,8 +33,8 @@ class DummyOutput(BaseModel):
     result: int
 
 
-class DummySignature(Signature):
-    """Signature for the dummy operator."""
+class DummySpecification(Specification):
+    """Specification for the dummy operator."""
 
     prompt_template: str = "{value}"
     input_model: Type[BaseModel] = DummyInput
@@ -69,7 +69,7 @@ class DummySignature(Signature):
 class AddOneOperator(Operator[DummyInput, DummyOutput]):
     """Operator that increments an input value by one."""
 
-    signature: DummySignature = DummySignature()
+    specification: DummySpecification = DummySpecification()
 
     def forward(self, *, inputs: DummyInput) -> DummyOutput:
         """Computes the output by adding one to the input value.

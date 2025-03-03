@@ -30,15 +30,15 @@ try:
         JudgeSynthesisOperator,
         JudgeSynthesisInputs,
         JudgeSynthesisOutputs,
-        JudgeSynthesisSignature,
+        JudgeSynthesisSpecification,
     )
     from ember.core.registry.operator.core.verifier import (
         VerifierOperator,
         VerifierOperatorInputs,
         VerifierOperatorOutputs,
-        VerifierSignature,
+        VerifierSpecification,
     )
-    from ember.core.registry.prompt_signature.signatures import Signature
+    from ember.core.registry.prompt_specification.specification import Specification
     from ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
 except ImportError:
     # Fall back to src.ember path (for development)
@@ -56,15 +56,15 @@ except ImportError:
         JudgeSynthesisOperator,
         JudgeSynthesisInputs,
         JudgeSynthesisOutputs,
-        JudgeSynthesisSignature,
+        JudgeSynthesisSpecification,
     )
     from ember.core.registry.operator.core.verifier import (
         VerifierOperator,
         VerifierOperatorInputs,
         VerifierOperatorOutputs,
-        VerifierSignature,
+        VerifierSpecification,
     )
-    from ember.core.registry.prompt_signature.signatures import Signature
+    from ember.core.registry.prompt_specification.specification import Specification
     from ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
 
 # Alias re-export types for backward compatibility with clients/tests from before our
@@ -102,7 +102,7 @@ class UniformEnsemble(Operator[EnsembleInputs, EnsembleOperatorOutputs]):
     temperature: float
     max_tokens: Optional[int]
 
-    signature: Signature = EnsembleOperator.signature
+    specification: Specification = EnsembleOperator.specification
 
     ensemble_op: EnsembleOperator = ember_field(init=False)
 
@@ -153,7 +153,7 @@ class MostCommon(Operator[MostCommonInputs, MostCommonAnswerSelectorOutputs]):
         # output.final_answer will be "A"
     """
 
-    signature: Signature = MostCommonAnswerSelectorOperator.signature
+    specification: Specification = MostCommonAnswerSelectorOperator.specification
     most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
     def __init__(self) -> None:
@@ -177,7 +177,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         output = judge(inputs=JudgeSynthesisInputs(query="What is 2+2?", responses=["3", "4", "2"]))
     """
 
-    signature: Signature = JudgeSynthesisSignature()
+    specification: Specification = JudgeSynthesisSpecification()
     model_name: str
     temperature: float
     max_tokens: Optional[int]
@@ -227,7 +227,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         revised = output.revised_answer
     """
 
-    signature: Signature = VerifierSignature()
+    specification: Specification = VerifierSpecification()
     model_name: str
     temperature: float
     max_tokens: Optional[int]
@@ -283,7 +283,7 @@ class VariedEnsembleOutputs(BaseModel):
     responses: List[str]
 
 
-class VariedEnsembleSignature(Signature):
+class VariedEnsembleSpecification(Specification):
     input_model: Type[BaseModel] = VariedEnsembleInputs
     output_model: Type[BaseModel] = VariedEnsembleOutputs
 
@@ -296,7 +296,7 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
         outputs = varied_ensemble(inputs=VariedEnsembleInputs(query="Example query"))
     """
 
-    signature: Signature = VariedEnsembleSignature()
+    specification: Specification = VariedEnsembleSpecification()
     model_configs: List[LMModuleConfig]
     varied_ensemble_op: EnsembleOperator = ember_field(init=False)
 
@@ -310,10 +310,10 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
     def build_prompt(self, *, inputs: VariedEnsembleInputs) -> str:
         """Builds a prompt from the input model.
 
-        If a prompt_template is defined in the signature, it is used; otherwise, defaults to the query.
+        If a prompt_template is defined in the specification, it is used; otherwise, defaults to the query.
         """
-        if self.signature and self.signature.prompt_template:
-            return self.signature.render_prompt(inputs=inputs)
+        if self.specification and self.specification.prompt_template:
+            return self.specification.render_prompt(inputs=inputs)
         return str(inputs.query)
 
     def call_lm(self, *, prompt: str, lm: Any) -> str:
@@ -347,7 +347,7 @@ class Sequential(Operator[T_in, T_out]):
     """
 
     operators: List[Operator[Any, Any]]
-    signature: Signature = Signature(input_model=None, output_model=None)
+    specification: Specification = Specification(input_model=None, output_model=None)
 
     def __init__(self, *, operators: List[Operator[Any, Any]]) -> None:
         self.operators = operators

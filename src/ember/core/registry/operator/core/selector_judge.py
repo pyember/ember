@@ -7,7 +7,7 @@ from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.exceptions import MissingLMModuleError
 from ember.core.types import EmberModel
 
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -36,8 +36,8 @@ class SelectorJudgeOperatorOutputs(EmberModel):
     reasoning: str
 
 
-class SelectorJudgeSignature(Signature):
-    """Signature for SelectorJudgeOperator defining the synthesis prompt."""
+class SelectorJudgeSpecification(Specification):
+    """Specification for SelectorJudgeOperator defining the synthesis prompt."""
 
     prompt_template: str = (
         "We have multiple advisors who proposed different answers:\n"
@@ -58,14 +58,14 @@ class SelectorJudgeOperator(
 ):
     """Operator to select the best, final answer from multiple responses."""
 
-    signature: Signature = SelectorJudgeSignature()
+    specification: Specification = SelectorJudgeSpecification()
     lm_module: LMModule
 
     def __init__(self, *, lm_module: LMModule) -> None:
         self.lm_module = lm_module
 
     def forward(self, *, inputs: SelectorJudgeInputs) -> SelectorJudgeOperatorOutputs:
-        rendered_prompt: str = self.signature.render_prompt(inputs=inputs)
+        rendered_prompt: str = self.specification.render_prompt(inputs=inputs)
         if not self.lm_module:
             raise MissingLMModuleError(
                 "No LM module attached to SelectorJudgeOperator."

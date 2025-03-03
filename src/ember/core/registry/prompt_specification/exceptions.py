@@ -2,9 +2,9 @@ from __future__ import annotations
 from typing import Optional
 
 
-class PromptSignatureError(Exception):
+class PromptSpecificationError(Exception):
     """
-    Base class for all prompt signature related errors.
+    Base class for all prompt specification related errors.
 
     Attributes:
         message (str): Description of the error.
@@ -24,7 +24,7 @@ class PromptSignatureError(Exception):
         )
 
 
-class PlaceholderMissingError(PromptSignatureError):
+class PlaceholderMissingError(PromptSpecificationError):
     """
     Raised when a required placeholder is missing in the prompt template.
 
@@ -41,7 +41,7 @@ class PlaceholderMissingError(PromptSignatureError):
         self.missing_placeholder: Optional[str] = missing_placeholder
 
 
-class MismatchedModelError(PromptSignatureError):
+class MismatchedModelError(PromptSpecificationError):
     """
     Raised when a provided Pydantic model instance does not match the expected type.
     """
@@ -52,7 +52,7 @@ class MismatchedModelError(PromptSignatureError):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
 
 
-class InvalidInputTypeError(PromptSignatureError):
+class InvalidInputTypeError(PromptSpecificationError):
     """
     Raised when the input or output data type is not a dict or a Pydantic model.
     """

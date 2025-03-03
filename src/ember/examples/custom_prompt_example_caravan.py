@@ -85,7 +85,7 @@ from ember.core.app_context import get_ember_context
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 
@@ -157,7 +157,7 @@ CARAVAN_PROMPT_FULL = (
 
 
 # ------------------------------------------------------------------------------------
-# Minimal 'Signature' & 'Inputs' for Our Caravan Prompt
+# Minimal 'Specification' & 'Inputs' for Our Caravan Prompt
 # ------------------------------------------------------------------------------------
 class CaravanLabelingInputs(EmberModel):
     """Input model for network traffic flow labeling.
@@ -181,8 +181,8 @@ class CaravanLabelingOutput(EmberModel):
     )
 
 
-class CaravanLabelingSignature(Signature):
-    """Signature for the CaravanLabelingOperator.
+class CaravanLabelingSpecification(Specification):
+    """Specification for the CaravanLabelingOperator.
 
     Defines input/output models and the multi-part prompt template
     for network traffic flow labeling.
@@ -194,7 +194,7 @@ class CaravanLabelingSignature(Signature):
 
 
 # ------------------------------------------------------------------------------------
-# A Simple 'Signature' & 'Inputs' for the "simple" pipeline
+# A Simple 'Specification' & 'Inputs' for the "simple" pipeline
 # ------------------------------------------------------------------------------------
 class SimplePromptInputs(EmberModel):
     """The request for a simple question like "What is the capital of India?"
@@ -216,8 +216,8 @@ class SimplePromptOutput(EmberModel):
     final_answer: str = Field(description="Concise answer to the question")
 
 
-class SimplePromptSignature(Signature):
-    """Signature for the SimplePromptOperator.
+class SimplePromptSpecification(Specification):
+    """Specification for the SimplePromptOperator.
 
     Defines input/output models and prompt template for single-sentence Q&A.
     """
@@ -231,7 +231,7 @@ class SimplePromptSignature(Signature):
 
 
 # ------------------------------------------------------------------------------------
-# Operators (Single-step LM calls using these signatures)
+# Operators (Single-step LM calls using these specifications)
 # ------------------------------------------------------------------------------------
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.non import UniformEnsemble, JudgeSynthesis
@@ -244,11 +244,11 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
     and produce a concise answer.
 
     Attributes:
-        signature: The signature defining input/output models and prompt template.
+        specification: The specification defining input/output models and prompt template.
         ensemble: The UniformEnsemble operator with a single LM instance.
     """
 
-    signature: ClassVar[Signature] = SimplePromptSignature()
+    specification: ClassVar[Specification] = SimplePromptSpecification()
     ensemble: UniformEnsemble
 
     def __init__(self, model_name: str) -> None:
@@ -271,7 +271,7 @@ class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):
             A SimplePromptOutput with the final answer.
         """
         # Construct prompt from input
-        prompt = self.signature.render_prompt(inputs=inputs)
+        prompt = self.specification.render_prompt(inputs=inputs)
 
         # Process through ensemble
         ensemble_result = self.ensemble(inputs={"query": prompt})
@@ -290,12 +290,12 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
     and aggregates results from multiple LMs via a judge synthesis step.
 
     Attributes:
-        signature: The signature defining input/output models and prompt template.
+        specification: The specification defining input/output models and prompt template.
         ensemble: The ensemble operator for generating multiple candidate labels.
         judge: The synthesis operator for combining and refining ensemble results.
     """
 
-    signature: ClassVar[Signature] = CaravanLabelingSignature()
+    specification: ClassVar[Specification] = CaravanLabelingSpecification()
     ensemble: UniformEnsemble
     judge: JudgeSynthesis
 
@@ -322,7 +322,7 @@ class CaravanLabelingOperator(Operator[CaravanLabelingInputs, CaravanLabelingOut
             A CaravanLabelingOutput with the classified flows.
         """
         # Construct prompt from input
-        prompt = self.signature.render_prompt(inputs=inputs)
+        prompt = self.specification.render_prompt(inputs=inputs)
 
         # Process through ensemble to get multiple labeling attempts
         ensemble_output = self.ensemble(inputs={"query": prompt})

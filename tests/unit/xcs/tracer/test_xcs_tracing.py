@@ -23,9 +23,9 @@ class MockInput(BaseModel):
 class MockOperator(Operator[MockInput, Dict[str, Any]]):
     """A mock operator that doubles the input value."""
 
-    # For testing, we use a simplified signature.
-    signature = type(
-        "DummySignature",
+    # For testing, we use a simplified specification.
+    specification = type(
+        "DummySpecification",
         (),
         {
             "input_model": MockInput,

@@ -39,7 +39,7 @@ ember_modules = [
     "src.ember.core.registry",
     "src.ember.core.registry.model",
     "src.ember.core.registry.operator",
-    "src.ember.core.registry.prompt_signature",
+    "src.ember.core.registry.prompt_specification",
     "src.ember.xcs",
     "src.ember.plugin_system",  # Add plugin_system module
 ]
@@ -85,12 +85,21 @@ except Exception as e:
     print(f"Error loading plugin_system.py: {e}")
 
 
+# No need to define custom command line options here as they're defined in tests/unit/xcs/transforms/conftest.py
+
 # Configure pytest-asyncio to use session-scoped event loops by default
 def pytest_configure(config):
     """Configure pytest-asyncio."""
     import pytest_asyncio
 
     pytest_asyncio.LOOP_SCOPE = "session"
+
+
+# Add pytest.config helper to access the config during tests
+@pytest.fixture(scope="session", autouse=True)
+def _add_config_helper(request):
+    """Add config attribute to pytest module for backward compatibility."""
+    pytest.config = request.config
 
 
 # Custom event loop policy fixture - replaces the deprecated event_loop fixture

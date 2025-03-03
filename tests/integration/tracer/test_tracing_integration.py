@@ -13,7 +13,7 @@ from ember.xcs.tracer.xcs_tracing import TracerContext
 from ember.xcs.tracer.tracer_decorator import jit
 
 
-class DummySignature:
+class DummySpecification:
     def validate_inputs(self, inputs):
         return inputs
 
@@ -23,7 +23,7 @@ class DummySignature:
 
 @jit()
 class DummyTracingOperator(Operator):
-    signature = DummySignature()
+    specification = DummySpecification()
 
     def forward(self, *, inputs: dict) -> dict:
         return {"output": "traced"}
@@ -57,7 +57,7 @@ def test_convert_traced_graph_to_plan() -> None:
 def test_jit_operator_always_executes() -> None:
     @jit()
     class DummyJITOperator(Operator):
-        signature = DummySignature()
+        specification = DummySpecification()
         call_count = 0
 
         def forward(self, *, inputs: dict) -> dict:
@@ -80,7 +80,7 @@ def test_jit_operator_always_executes() -> None:
 def test_force_trace() -> None:
     @jit(sample_input={"value": 1}, force_trace=True)
     class DummyForceJITOperator(Operator):
-        signature = DummySignature()
+        specification = DummySpecification()
         trace_count = 0
 
         def forward(self, *, inputs: dict) -> dict:
@@ -101,14 +101,14 @@ def test_force_trace() -> None:
 def test_nested_jit() -> None:
     @jit()
     class InnerOperator(Operator):
-        signature = DummySignature()
+        specification = DummySpecification()
 
         def forward(self, *, inputs: dict) -> dict:
             return {"inner": inputs["value"] + "_inner"}
 
     @jit()
     class OuterOperator(Operator):
-        signature = DummySignature()
+        specification = DummySpecification()
 
         def __init__(self):
             # Only instance-level state needed is the inner operator.

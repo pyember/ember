@@ -5,7 +5,7 @@ from ember.core.app_context import get_ember_context
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
-from ember.core.registry.prompt_signature.signatures import Signature
+from ember.core.registry.prompt_specification.specification import Specification
 
 
 class NetworkInput(EmberModel):
@@ -20,8 +20,8 @@ class NetworkOutput(EmberModel):
     final_answer: str = Field(description="The final processed answer")
 
 
-class SubNetworkSignature(Signature):
-    """Signature for SubNetwork operator."""
+class SubNetworkSpecification(Specification):
+    """Specification for SubNetwork operator."""
 
     input_model: Type[EmberModel] = NetworkInput
     output_model: Type[EmberModel] = NetworkOutput
@@ -38,7 +38,7 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
         verifier (non.Verifier): A verification operator using "gpt-4o".
     """
 
-    signature: ClassVar[Signature] = SubNetworkSignature()
+    specification: ClassVar[Specification] = SubNetworkSpecification()
     ensemble: non.UniformEnsemble
     verifier: non.Verifier
 
@@ -94,8 +94,8 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
         return NetworkOutput(final_answer=final_answer)
 
 
-class NestedNetworkSignature(Signature):
-    """Signature for NestedNetwork operator."""
+class NestedNetworkSpecification(Specification):
+    """Specification for NestedNetwork operator."""
 
     input_model: Type[EmberModel] = NetworkInput
     output_model: Type[EmberModel] = NetworkOutput
@@ -112,7 +112,7 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
         judge (non.JudgeSynthesis): A judge synthesis operator using "gpt-4o".
     """
 
-    signature: ClassVar[Signature] = NestedNetworkSignature()
+    specification: ClassVar[Specification] = NestedNetworkSpecification()
     sub1: SubNetwork
     sub2: SubNetwork
     judge: non.JudgeSynthesis

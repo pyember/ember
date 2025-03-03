@@ -1,6 +1,6 @@
 """Custom exception definitions for Ember.
 
-These exceptions provide granular error handling for signature validation,
+These exceptions provide granular error handling for specification validation,
 operator execution, and initialization, making debugging and client error‐handling
 more explicit and robust.
 """
@@ -41,22 +41,36 @@ class FlattenError(OperatorError):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
 
 
-class OperatorSignatureNotDefinedError(OperatorError):
-    """Raised when an Operator's signature is not defined."""
+class OperatorSpecificationNotDefinedError(OperatorError):
+    """Raised when an Operator's specification is not defined."""
 
     DEFAULT_ERROR_CODE = 2002
 
-    def __init__(self, message: str = "Operator signature must be defined."):
+    def __init__(self, message: str = "Operator specification must be defined."):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
+        
+class OperatorSpecificationNotDefinedError(OperatorSpecificationNotDefinedError):
+    """Legacy exception for backward compatibility. 
+    
+    This is an alias for OperatorSpecificationNotDefinedError.
+    """
+    pass
 
 
-class SignatureValidationError(OperatorError):
-    """Raised when input or output signature validation fails."""
+class SpecificationValidationError(OperatorError):
+    """Raised when input or output specification validation fails."""
 
     DEFAULT_ERROR_CODE = 2003
 
-    def __init__(self, message: str = "Signature validation error occurred."):
+    def __init__(self, message: str = "Specification validation error occurred."):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
+        
+class SpecificationValidationError(SpecificationValidationError):
+    """Legacy exception for backward compatibility.
+    
+    This is an alias for SpecificationValidationError.
+    """
+    pass
 
 
 class OperatorExecutionError(EmberException):

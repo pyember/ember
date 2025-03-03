@@ -32,7 +32,7 @@ from ember.core.registry.operator.exceptions import OperatorExecutionError
 
 
 # -----------------------------------------------------------------------------
-# Dummy Models and Signature
+# Dummy Models and Specification
 # -----------------------------------------------------------------------------
 class DummyInputs(BaseModel):
     """Input data model for dummy operators.
@@ -54,14 +54,14 @@ class DummyOutputs(BaseModel):
     answer: str
 
 
-class DummySignature:
-    """A minimal dummy signature for testing purposes.
+class DummySpecification:
+    """A minimal dummy specification for testing purposes.
 
     Provides methods to validate inputs and outputs as well as render prompts.
     """
 
     def __init__(self, input_model: Type[BaseModel]) -> None:
-        """Initializes the dummy signature.
+        """Initializes the dummy specification.
 
         Args:
             input_model (Type[BaseModel]): The input model class.
@@ -114,7 +114,7 @@ class DummyMemberOperator(Operator[DummyInputs, DummyOutputs]):
         member_index (int): The index of this member within an ensemble.
     """
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def __init__(self, *, member_index: int) -> None:
         """Initializes the dummy member operator.
@@ -143,7 +143,7 @@ class WideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
         members (List[DummyMemberOperator]): List of member operators.
     """
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def __init__(self, *, num_members: int) -> None:
         """Initializes a wide ensemble with the given number of members.
@@ -171,7 +171,7 @@ class WideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
 class DummyJudgeOperator(Operator[DummyInputs, DummyOutputs]):
     """Operator that simulates a judge by returning a fixed answer."""
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def forward(self, *, inputs: DummyInputs) -> DummyOutputs:
         """Returns a fixed judge response.
@@ -194,7 +194,7 @@ class NestedOperator(Operator[DummyInputs, Dict[str, Any]]):
         judge (DummyJudgeOperator): The judge operator.
     """
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def __init__(self) -> None:
         self.ensemble1: WideEnsembleOperator = WideEnsembleOperator(num_members=3)
@@ -228,8 +228,8 @@ class DelayOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         delay (float): The number of seconds to sleep.
     """
 
-    # Use a minimal dummy signature.
-    signature = DummySignature(dict)
+    # Use a minimal dummy specification.
+    specification = DummySpecification(dict)
 
     def __init__(self, *, delay: float) -> None:
         self.delay: float = delay
@@ -247,7 +247,7 @@ class DelayEnsembleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     JIT tracing produces trace records and that execution via the XCS engine can run in parallel.
     """
 
-    signature = DummySignature(dict)
+    specification = DummySpecification(dict)
 
     def __init__(self, *, num_members: int, delay: float) -> None:
         self.members: List[DelayOperator] = [
@@ -263,7 +263,7 @@ class DelayEnsembleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
 class RawParallelDummyOperator(Operator[DummyInputs, DummyOutputs]):
     """A raw parallel operator that waits on a barrier before returning a response."""
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def __init__(self, *, barrier: threading.Barrier) -> None:
         self.barrier: threading.Barrier = barrier
@@ -277,7 +277,7 @@ class RawParallelDummyOperator(Operator[DummyInputs, DummyOutputs]):
 class ParallelWideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
     """Operator that executes a wide ensemble in parallel using barrier synchronization."""
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def __init__(self, *, num_members: int, barrier: threading.Barrier) -> None:
         self.members: List[RawParallelDummyOperator] = [
@@ -298,7 +298,7 @@ class ParallelWideEnsembleOperator(Operator[DummyInputs, Dict[str, Any]]):
 class FaultyOperator(Operator[DummyInputs, DummyOutputs]):
     """Operator that raises an error to test error propagation."""
 
-    signature: DummySignature = DummySignature(DummyInputs)
+    specification: DummySpecification = DummySpecification(DummyInputs)
 
     def forward(self, *, inputs: DummyInputs) -> DummyOutputs:
         raise ValueError("Test error")
@@ -372,7 +372,7 @@ def test_jit_tracing() -> None:
 
     @jit(sample_input={"query": "init"}, force_trace=False)
     class TracedOperator(Operator[DummyInputs, Dict[str, Any]]):
-        signature: DummySignature = DummySignature(DummyInputs)
+        specification: DummySpecification = DummySpecification(DummyInputs)
 
         def __init__(self, *, num_members: int) -> None:
             self.members: List[DummyMemberOperator] = [
