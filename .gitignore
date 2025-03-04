@@ -1,17 +1,61 @@
-**/_.DS_Store
-**/*.pyc
-**/__pycache__/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-*.eggs/
+.installed.cfg
+*.egg
 
-.vscode
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Custom configuration file for API keys.
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+._*
+
+# Custom configuration files
 config.ini
 config.ini.*
-
-.env
 *.secret
 
-# Ignoring tests for now. 
-# tests/
+# Temp and backup files
+cleanup_backup/
+old/
+*~
+*.bak
