@@ -16,11 +16,46 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class ModelRegistry(Generic[M]):
-    """
-    Thread-safe registry for managing model instances and metadata.
+    """Thread-safe registry for managing LLM provider model instances and their metadata.
 
-    This registry stores ModelInfo structures and lazily instantiates provider
-    model objects. It also handles basic thread safety and concurrency.
+    The ModelRegistry is a central component in the Ember framework that manages the 
+    lifecycle of language model instances. It provides a unified interface for registering, 
+    retrieving, and managing different language models from various providers.
+    
+    Key features:
+    - Thread-safe operations for concurrent access
+    - Lazy instantiation of model instances to minimize resource usage
+    - Generic typing to support different model implementations
+    - Centralized model metadata management
+    - Model lifecycle management (registration, retrieval, unregistration)
+    
+    Threading model:
+    All public methods of this class are thread-safe, protected by an internal lock.
+    This allows multiple threads to interact with the registry concurrently without
+    data corruption or race conditions.
+    
+    Lazy instantiation:
+    Models are only instantiated when first requested via get_model(), not at registration time.
+    This improves performance and resource usage for applications that register many models
+    but only use a subset of them.
+    
+    Usage example:
+    ```python
+    # Create a registry
+    registry = ModelRegistry()
+    
+    # Register a model
+    model_info = ModelInfo(
+        id="openai:gpt-4",
+        provider=ProviderInfo(name="openai", default_api_key="YOUR_API_KEY")
+    )
+    registry.register_model(model_info)
+    
+    # Get and use a model
+    model = registry.get_model("openai:gpt-4")
+    response = model("Hello, world!")
+    print(response.data)
+    ```
 
     Type Parameters:
         M: The type of models stored in this registry (defaults to BaseProviderModel)

@@ -14,6 +14,7 @@ from typing import (
     Union,
     List,
     get_type_hints,
+    cast,
 )
 from pydantic import BaseModel, create_model
 
@@ -64,7 +65,7 @@ class EmberModel(BaseModel):
         return self._instance_output_format or self.__output_format__
 
     # EmberSerializable protocol implementation
-    def as_dict(self) -> Dict[str, Any]:
+    def as_dict(self) -> Dict[str, object]:
         """Convert to a dictionary representation."""
         return self.model_dump()
 
@@ -73,9 +74,14 @@ class EmberModel(BaseModel):
         return self.model_dump_json()
 
     @classmethod
-    def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
+    def from_dict(cls: Type[T], data: Dict[str, object]) -> T:
         """Create an instance from a dictionary."""
-        return cls(**data)
+        # Use model_validate to properly handle the conversion from dict to model
+        # This properly handles type constraints in a way that the direct constructor may not
+        # Workaround for pydantic's model_validate typing issues by creating first with constructor
+        # then validating with model_validate
+        result = cls.model_validate(data)
+        return result
 
     # EmberTyped protocol implementation
     def get_type_info(self) -> TypeInfo:
@@ -89,20 +95,20 @@ class EmberModel(BaseModel):
         )
 
     # Compatibility operators
-    def __call__(self) -> Union[Dict[str, Any], str, "EmberModel"]:
+    def __call__(self) -> Union[Dict[str, object], str, "EmberModel"]:
         """
         Return the model in the configured format when called as a function.
         Enables backward compatibility with code expecting different return types.
         """
-        match self.output_format:
-            case "dict":
-                return self.as_dict()
-            case "json":
-                return self.as_json()
-            case _:
-                return self
+        format_type = self.output_format
+        if format_type == "dict":
+            return self.as_dict()
+        elif format_type == "json":
+            return self.as_json()
+        else:
+            return self
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str) -> object:
         """Enable dictionary-like access (model["attr"]) alongside attribute access (model.attr)."""
         try:
             return getattr(self, key)
@@ -112,8 +118,8 @@ class EmberModel(BaseModel):
     # Dynamic model creation
     @classmethod
     def create_type(
-        cls, name: str, fields: Dict[str, Type[Any]], output_format: str = "model"
-    ) -> Type[EmberModel]:
+        cls, name: str, fields: Dict[str, Type[object]], output_format: str = "model"
+    ) -> Type["EmberModel"]:
         """
         Dynamically create a new EmberModel subclass with the specified fields.
 
@@ -125,9 +131,25 @@ class EmberModel(BaseModel):
         Returns:
             A new EmberModel subclass
         """
-        model_class = create_model(
-            name, __base__=EmberModel, **{k: (v, ...) for k, v in fields.items()}
-        )
+        # Create field definitions with proper ellipsis for required fields
+        field_definitions = {}
+        for k, v in fields.items():
+            field_definitions[k] = (v, ...)  # All fields are required by default
+            
+        # Use dict-based approach to work around typing limitations
+        # This approach creates the model directly with appropriate base class
+        # without using create_model which has typing constraints
+        model_attrs = {
+            "__annotations__": {k: v for k, v in fields.items()},
+            "__module__": __name__,
+            "__doc__": f"Dynamically generated EmberModel: {name}"
+        }
+        
+        # Create the model class directly as a subclass
+        model_class = type(name, (cls,), model_attrs)
 
-        model_class.__output_format__ = output_format
-        return model_class
+        # Set the output format
+        setattr(model_class, '__output_format__', output_format)
+        
+        # Explicitly cast to the correct return type
+        return cast(Type["EmberModel"], model_class)

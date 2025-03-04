@@ -1,3 +1,37 @@
+"""Configuration Management Module
+
+This module provides the primary configuration management functionality for Ember,
+including API key management, configuration file handling, and model auto-registration.
+
+The configuration system is designed around several key principles:
+1. Configuration can come from multiple sources (env vars, config files, code)
+2. Sensitive data like API keys should be handled securely
+3. Common configurations should have sensible defaults
+4. The system should be friendly for both development and production
+
+Key components:
+- ConfigManager: Core class for managing INI-style configuration
+- API key initialization: Logic for loading API keys from environment variables
+- Model auto-registration: Convenience functionality to register common models
+
+The module supports dependency injection to make testing easier and configurations
+more flexible across different environments.
+
+Usage example:
+```python
+# Basic configuration setup
+config_manager = ConfigManager()
+initialize_api_keys(config_manager)
+
+# Create a model registry with auto-registered models
+registry = ModelRegistry()
+auto_register_known_models(registry, config_manager)
+
+# Access configuration
+openai_key = config_manager.get("models", "openai_api_key")
+```
+"""
+
 import configparser
 import logging
 import os

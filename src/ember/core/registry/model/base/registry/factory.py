@@ -1,8 +1,21 @@
 """Provider Model Factory Module
 
-This module provides a factory for instantiating provider model instances from
-ModelInfo configurations. It dynamically discovers and loads provider classes
-from both explicit registration and runtime discovery within the provider package.
+This module provides a factory pattern implementation for dynamically discovering and 
+instantiating provider model instances from ModelInfo configurations. The factory 
+handles both explicitly registered providers and automatically discovered providers
+at runtime.
+
+Architecture:
+- Provider Discovery: Scans the provider package directory structure to find all 
+  compatible provider implementations
+- Provider Registry: Maintains a cache of discovered provider classes for faster access
+- Lazy Loading: Providers are discovered only when first needed, then cached
+- Custom Registration: Supports manual registration of custom providers
+
+The factory is essential for the model registry system, enabling it to:
+1. Support multiple LLM providers (OpenAI, Anthropic, etc.) through a unified interface
+2. Allow runtime extension with new providers without code changes
+3. Handle provider-specific configuration and instantiation details
 """
 
 from types import ModuleType
@@ -27,19 +40,35 @@ LOGGER: logging.Logger = logging.getLogger(__name__)
 def discover_providers_in_package(
     *, package_name: str, package_path: str
 ) -> Dict[str, Type[BaseProviderModel]]:
-    """Discover provider classes within the specified package.
+    """Discover and load provider model classes within the specified package.
 
-    Traverses modules in the given package directory and inspects each module for
-    valid provider model classes (i.e., subclasses of BaseProviderModel, excluding
-    BaseProviderModel itself). Constructs and returns a mapping from each provider's
-    designated name (as specified by the PROVIDER_NAME attribute) to the corresponding class.
+    Performs dynamic provider discovery by traversing all modules in the given package 
+    directory and inspecting each module for valid provider model implementations.
+    
+    Discovery process:
+    1. Walks through all modules in the given package
+    2. Skips packages themselves (recursive discovery not supported) and special modules
+    3. For each module, finds all classes that:
+       - Inherit from BaseProviderModel (but aren't BaseProviderModel itself)
+       - Have a non-empty PROVIDER_NAME attribute
+    4. Maps each provider's name to its implementing class
+    5. Handles and logs errors during module loading for robustness
 
     Args:
-        package_name (str): The fully qualified package name where provider modules reside.
+        package_name (str): The fully qualified package name where provider modules reside
+                           (e.g., "ember.core.registry.model.providers").
         package_path (str): The filesystem path corresponding to the package.
 
     Returns:
-        Dict[str, Type[BaseProviderModel]]: A mapping from provider names to their respective provider classes.
+        Dict[str, Type[BaseProviderModel]]: A mapping from provider names (e.g., "openai", 
+                                           "anthropic") to their respective provider classes.
+    
+    Example:
+        >>> providers = discover_providers_in_package(
+        ...     package_name="ember.core.registry.model.providers",
+        ...     package_path="/path/to/providers"
+        ... )
+        >>> # Result: {"openai": OpenAIProvider, "anthropic": AnthropicProvider, ...}
     """
     providers: Dict[str, Type[BaseProviderModel]] = {}
     prefix: str = f"{package_name}."
@@ -69,8 +98,26 @@ def discover_providers_in_package(
 class ModelFactory:
     """Factory for creating provider-specific model instances from ModelInfo configurations.
 
-    This factory validates model identifiers, discovers the corresponding provider classes,
-    and instantiates provider models using the given configuration.
+    The ModelFactory serves as the central component for instantiating provider models
+    in the Ember framework. It handles model identifier validation, dynamic provider
+    discovery, and proper instantiation of provider-specific model implementations.
+    
+    Key features:
+    - Thread-safe provider class caching with lazy initialization
+    - Provider autodiscovery from the providers package
+    - Support for explicit provider registration
+    - Validation of model identifiers before instantiation
+    - Informative error messages for configuration issues
+    
+    Usage flow:
+    1. The factory lazily discovers and caches provider implementations on first use
+    2. When a model is requested, it validates the model ID format
+    3. It finds the appropriate provider class based on the provider name
+    4. The provider-specific model is instantiated with the given ModelInfo
+    
+    Thread safety:
+    The class-level provider cache is initialized exactly once in a thread-safe manner
+    via the lazy initialization pattern in the _get_providers method.
     """
 
     _provider_cache: Optional[Dict[str, Type[BaseProviderModel]]] = None

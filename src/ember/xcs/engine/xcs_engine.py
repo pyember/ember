@@ -1,9 +1,23 @@
 """
-Unified XCS Execution Engine.
+XCS Execution Engine: High-Performance Graph Scheduler
 
-This module implements the core execution plan logic, compiling an XCSGraph into an execution plan,
-and scheduling tasks concurrently. All functions and classes use strong typing and named parameter
-invocation.
+This module provides the core execution infrastructure for XCS computational graphs.
+It transforms graph-based representations into optimized execution plans and handles
+their efficient concurrent execution.
+
+Key components:
+1. Compilation - Transforms XCSGraph into an optimized, executable plan
+2. Scheduling - Resolves dependencies and manages parallel execution
+3. Resource management - Handles thread pools and execution contexts
+4. Error handling - Provides robust recovery and reporting
+
+The engine implements a topological execution strategy that respects node dependencies
+while maximizing parallelism. It follows the Open/Closed principle by providing a
+pluggable scheduler interface that allows for different execution strategies without
+modifying the core engine code.
+
+All functions and classes leverage strong typing, immutable data structures where possible,
+and named parameter invocation for clarity and safety.
 """
 
 import logging
@@ -29,12 +43,22 @@ logger: logging.Logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class XCSPlanTask:
     """
-    Represents a single task in an execution plan.
+    Represents a single executable task within an XCS execution plan.
+    
+    XCSPlanTask encapsulates the essential information needed to execute a node
+    in the computational graph. It is designed as an immutable data structure
+    to ensure thread safety during concurrent execution.
+    
+    The task maintains the minimal set of references needed for execution:
+    the operation to perform, its unique identifier, and the dependency information
+    required for scheduling. This design follows the Interface Segregation Principle
+    by focusing exclusively on the execution concerns, separating them from the
+    graph structure concerns.
 
     Attributes:
-        node_id (str): Identifier of the node in the XCSGraph.
-        operator (Callable[..., Any]): The callable operator.
-        inbound_nodes (List[str]): List of node IDs that supply inputs.
+        node_id: Unique identifier that maps this task back to its source node in the XCSGraph.
+        operator: The callable function or object that performs the actual computation.
+        inbound_nodes: List of node IDs that must complete execution before this task can run.
     """
 
     node_id: str
@@ -45,6 +69,18 @@ class XCSPlanTask:
 class XCSPlan:
     """
     Immutable execution plan compiled from an XCSGraph.
+    
+    An XCSPlan represents the finalized, optimized execution strategy for a computational
+    graph. It transforms the declarative graph structure (what to compute) into an
+    imperative execution plan (how to compute it efficiently).
+    
+    The execution plan is immutable by design, ensuring thread safety and consistent
+    behavior during parallel execution. This immutability also allows the plan to be
+    shared and reused across multiple executions with different inputs.
+    
+    The plan maintains a reference to its original graph to enable introspection,
+    debugging, and execution-time optimizations that may need to reference the
+    original graph structure or node attributes.
     """
 
     def __init__(self, tasks: Dict[str, XCSPlanTask], original_graph: XCSGraph) -> None:
@@ -71,13 +107,29 @@ class XCSPlan:
 
 def compile_graph(*, graph: XCSGraph) -> XCSPlan:
     """
-    Compiles an XCSGraph into an immutable XCSPlan.
+    Transforms an XCSGraph into an optimized, immutable execution plan.
+
+    This function performs the critical conversion from a declarative graph representation
+    to an imperative execution plan. The compilation process:
+    
+    1. Extracts essential execution information from each node
+    2. Preserves dependency relationships from the original graph
+    3. Creates immutable task objects for thread-safe concurrent execution
+    4. Maintains a reference to the original graph for introspection
+    
+    The resulting XCSPlan is optimized for the scheduler implementation and
+    guarantees that all dependency relationships from the original graph are
+    preserved. This transformation follows the principle of separating the
+    "what" (graph) from the "how" (execution plan).
 
     Args:
-        graph: The XCSGraph to compile.
+        graph: The source XCSGraph to compile into an execution plan.
 
     Returns:
-        The resulting execution plan.
+        An immutable XCSPlan ready for efficient execution.
+        
+    Raises:
+        ValueError: If the graph contains duplicate node IDs or other structural issues.
     """
     tasks: Dict[str, XCSPlanTask] = {}
     for node in graph.nodes.values():
@@ -101,7 +153,19 @@ def compile_graph(*, graph: XCSGraph) -> XCSPlan:
 
 class IScheduler(ABC):
     """
-    Abstract scheduler interface for executing an XCSPlan.
+    Abstract interface for XCS execution schedulers.
+    
+    This interface defines the contract that all XCS schedulers must implement,
+    enabling pluggable execution strategies while maintaining consistent behavior.
+    It follows the Strategy pattern, allowing different scheduling algorithms to be
+    interchanged without affecting the core execution engine.
+    
+    Implementations of this interface can provide various execution strategies such as:
+    - Sequential execution for debugging or deterministic behavior
+    - Thread-based parallel execution for CPU-bound operations
+    - Distributed execution across multiple machines
+    - GPU-accelerated execution for compatible operations
+    - Priority-based scheduling for time-sensitive applications
     """
 
     @abstractmethod
@@ -113,22 +177,43 @@ class IScheduler(ABC):
         graph: XCSGraph,
     ) -> Dict[str, Any]:
         """
-        Execute the given plan concurrently and return a mapping of node outputs.
+        Executes an execution plan with the given inputs and returns the results.
+
+        This method orchestrates the complete execution of a computational graph
+        according to the strategy defined by the implementing scheduler. It manages
+        concurrency, dependency resolution, resource allocation, and result collection.
 
         Args:
-            plan: Execution plan to run
-            global_input: Input data available to all nodes
-            graph: Original graph containing node definitions
+            plan: The compiled execution plan containing tasks and their dependencies.
+            global_input: Input data available to all nodes in the graph.
+            graph: The original graph containing node definitions and attributes.
 
         Returns:
-            Dictionary mapping node IDs to execution results
+            A dictionary mapping node IDs to their execution results.
+            
+        Raises:
+            ExecutionError: If execution fails due to errors in task execution.
+            ResourceExhaustionError: If execution fails due to resource constraints.
         """
         pass
 
 
 class TopologicalSchedulerWithParallelDispatch(IScheduler):
     """
-    Scheduler implementation using topological sorting and parallel dispatch.
+    High-performance scheduler with dependency-based parallel execution.
+    
+    This scheduler implements a topological execution strategy with dynamic
+    concurrent task dispatch. It processes the execution graph in dependency
+    order while maximizing parallelism for independent tasks.
+    
+    Key features:
+    - Dynamic worker pool for optimal resource utilization
+    - Task dependency resolution for correct execution order
+    - Automatic deadlock detection and prevention
+    - Efficient result propagation between dependent tasks
+    
+    The scheduler maintains minimal state and leverages immutable data structures
+    where possible for thread safety during concurrent execution.
     """
 
     def __init__(self, *, max_workers: Optional[int] = None) -> None:
@@ -268,19 +353,36 @@ def execute_graph(
     concurrency: bool = True,
 ) -> Dict[str, Any]:
     """
-    Executes an XCSGraph or XCSPlan.
+    Executes a computational graph with the specified inputs and configuration.
 
-    If 'graph' has a 'nodes' attribute, it is assumed to be an XCSGraph and is compiled.
-    Otherwise, it is assumed to be an XCSPlan, in which case we use its original_graph.
+    This function serves as the primary entry point for XCS graph execution.
+    It handles the complete execution lifecycle:
+    
+    1. Compilation - If given an XCSGraph, compiles it to an execution plan
+    2. Scheduler selection - Uses the provided scheduler or creates a default one
+    3. Execution - Dispatches the plan to the scheduler for execution
+    4. Result collection - Aggregates and returns the execution results
+    
+    The function accepts either an XCSGraph or a pre-compiled XCSPlan, allowing
+    for both one-off execution and repeated execution with different inputs using
+    the same plan. This flexibility follows the principle of separation of concerns:
+    graph definition, compilation, and execution are distinct phases that can be
+    performed separately.
 
     Args:
-        graph: Graph or plan to execute
-        global_input: Input data available to all nodes
-        scheduler: Optional custom scheduler implementation
-        concurrency: Whether to execute nodes concurrently
+        graph: Either an XCSGraph to be compiled or a pre-compiled XCSPlan.
+        global_input: Dictionary of input values available to all nodes in the graph.
+        scheduler: Optional custom scheduler implementation. If not provided,
+                  a default TopologicalSchedulerWithParallelDispatch is used.
+        concurrency: Whether to execute nodes concurrently. Set to False for
+                    sequential, deterministic execution (useful for debugging).
 
     Returns:
-        Dictionary mapping node IDs to execution results
+        A dictionary mapping node IDs to their execution results.
+        
+    Raises:
+        ExecutionError: If execution fails due to errors in node execution.
+        CompilationError: If graph compilation fails due to structural issues.
     """
     if hasattr(graph, "nodes"):
         plan = compile_graph(graph=graph)

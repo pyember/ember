@@ -14,21 +14,43 @@ All functions enforce strong type annotations and require named parameter invoca
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Tuple, Type
+from typing import Callable, Dict, List, Tuple, Type, TypeVar, Generic, cast, Protocol, Hashable
 
-# Global registry mapping a type to its (flatten, unflatten) functions.
+# Define more precise type variables for tree operations
+T_co = TypeVar('T_co', covariant=True)  # The type being returned (covariant)
+T_contra = TypeVar('T_contra', contravariant=True)  # The type being consumed (contravariant)
+L = TypeVar('L')  # Leaf value type
+A_co = TypeVar('A_co', covariant=True)  # Auxiliary data (covariant when producing)
+A_contra = TypeVar('A_contra', contravariant=True)  # Auxiliary data (contravariant when consuming)
+
+# Protocol for flatten function - converts an object to (leaves, auxiliary data)
+class FlattenFn(Protocol[T_contra, L, A_co]):
+    def __call__(self, obj: T_contra) -> Tuple[List[L], A_co]: ...
+
+# Protocol for unflatten function - reconstructs object from auxiliary data and leaves
+class UnflattenFn(Protocol[T_co, L, A_contra]):
+    def __call__(self, aux: A_contra, children: List[L]) -> T_co: ...
+
+# Type variable for registry keys
+T = TypeVar('T')
+
+# Definition for the Aux type used throughout the module
+AuxType = Tuple[Type[object], object]
+
+# Global registry mapping a type to its (flatten, unflatten) functions with improved typing
+# We use structural subtyping with Protocol classes instead of Any
 _PytreeRegistryType = Dict[
-    Type[Any],
-    Tuple[Callable[[Any], Tuple[List[Any], Any]], Callable[[Any, List[Any]], Any]],
+    Type[T],
+    Tuple[FlattenFn[T, L, AuxType], UnflattenFn[T, L, AuxType]],
 ]
 _pytree_registry: _PytreeRegistryType = {}
 
 
 def register_tree(
     *,
-    cls: Type[Any],
-    flatten_func: Callable[[Any], Tuple[List[Any], Any]],
-    unflatten_func: Callable[[Any, List[Any]], Any],
+    cls: Type[T],
+    flatten_func: FlattenFn[T, L, AuxType],
+    unflatten_func: UnflattenFn[T, L, AuxType],
 ) -> None:
     """Registers a type with its custom flatten and unflatten functions for XCS tree utilities.
 
@@ -47,7 +69,7 @@ def register_tree(
     _pytree_registry[cls] = (flatten_func, unflatten_func)
 
 
-def _flatten_iterable(iterable: Any) -> Tuple[List[Any], List[Tuple[Any, int]]]:
+def _flatten_iterable(iterable: List[object]) -> Tuple[List[L], List[Tuple[Tuple[Type[object], object], int]]]:
     """Helper function to flatten iterable objects such as lists or tuples.
 
     Args:
@@ -58,9 +80,11 @@ def _flatten_iterable(iterable: Any) -> Tuple[List[Any], List[Tuple[Any, int]]]:
           - A list of flattened leaves.
           - A list of tuples, each containing the child's auxiliary metadata and its leaf count.
     """
-    flat_leaves: List[Any] = []
-    children_info: List[Tuple[Any, int]] = []
+    flat_leaves: List[L] = []
+    children_info: List[Tuple[Tuple[Type[object], object], int]] = []
     for element in iterable:
+        leaves: List[L] = []
+        aux: AuxType
         leaves, aux = tree_flatten(tree=element)
         flat_leaves.extend(leaves)
         children_info.append((aux, len(leaves)))
@@ -68,8 +92,8 @@ def _flatten_iterable(iterable: Any) -> Tuple[List[Any], List[Tuple[Any, int]]]:
 
 
 def _unflatten_sequence(
-    aux_list: List[Tuple[Any, int]], children: List[Any]
-) -> List[Any]:
+    aux_list: List[Tuple[AuxType, int]], children: List[L]
+) -> List[object]:
     """Helper function to unflatten sequences (lists or tuples) from auxiliary metadata.
 
     Args:
@@ -82,10 +106,10 @@ def _unflatten_sequence(
     Raises:
         ValueError: If the total number of leaves does not match the expected count.
     """
-    result: List[Any] = []
+    result: List[object] = []
     start: int = 0
     for aux_item, leaf_count in aux_list:
-        child_leaves: List[Any] = children[start : start + leaf_count]
+        child_leaves: List[L] = children[start : start + leaf_count]
         start += leaf_count
         result.append(tree_unflatten(aux=aux_item, children=child_leaves))
     if start != len(children):
@@ -93,9 +117,10 @@ def _unflatten_sequence(
     return result
 
 
+# Function for unflattening dictionaries
 def _unflatten_dict(
-    aux_list: List[Tuple[Any, Any, int]], children: List[Any]
-) -> Dict[Any, Any]:
+    aux_list: List[Tuple[Hashable, AuxType, int]], children: List[L]
+) -> Dict[Hashable, object]:
     """Helper function to unflatten dictionaries from auxiliary metadata.
 
     Args:
@@ -108,10 +133,10 @@ def _unflatten_dict(
     Raises:
         ValueError: If the total number of leaves does not match the expected count.
     """
-    result: Dict[Any, Any] = {}
+    result: Dict[Hashable, object] = {}
     start: int = 0
     for key, aux_item, leaf_count in aux_list:
-        child_leaves: List[Any] = children[start : start + leaf_count]
+        child_leaves: List[L] = children[start : start + leaf_count]
         start += leaf_count
         result[key] = tree_unflatten(aux=aux_item, children=child_leaves)
     if start != len(children):
@@ -119,7 +144,7 @@ def _unflatten_dict(
     return result
 
 
-def tree_flatten(*, tree: Any) -> Tuple[List[Any], Any]:
+def tree_flatten(*, tree: object) -> Tuple[List[L], AuxType]:
     """Recursively flattens a tree object into its constituent leaves and auxiliary metadata.
 
     Args:
@@ -129,36 +154,50 @@ def tree_flatten(*, tree: Any) -> Tuple[List[Any], Any]:
         A tuple where the first element is a list of leaves and the second element is the auxiliary
         metadata that encodes the structure of the tree.
     """
-    tree_type: Type[Any] = type(tree)
+    tree_type: Type[object] = type(tree)
+    
+    # Handle registered types via their custom flatten function
     if tree_type in _pytree_registry:
         flatten_func, _ = _pytree_registry[tree_type]
         children, aux = flatten_func(tree)
-        flat_leaves: List[Any] = []
+        flat_leaves: List[L] = []
         for child in children:
-            child_leaves, _ = tree_flatten(tree=child)
+            child_leaves: List[L] = []
+            child_aux: AuxType
+            child_leaves, child_aux = tree_flatten(tree=child)
             flat_leaves.extend(child_leaves)
         return flat_leaves, (tree_type, aux)
+        
+    # Handle dictionaries specially
     elif isinstance(tree, dict):
         sorted_keys = sorted(tree.keys())
-        flat_leaves: List[Any] = []
-        children_info: List[Tuple[Any, Any, int]] = []
+        dict_leaves: List[L] = []
+        # For dictionaries, the auxiliary data has three components: key, aux data, and leaf count
+        dict_children_info: List[Tuple[Hashable, AuxType, int]] = []
+        
         for key in sorted_keys:
-            leaves, child_aux = tree_flatten(tree=tree[key])
-            leaf_count: int = len(leaves)
-            children_info.append((key, child_aux, leaf_count))
-            flat_leaves.extend(leaves)
-        return flat_leaves, (dict, children_info)
-    elif isinstance(tree, list):
-        flat_leaves, children_info = _flatten_iterable(tree)
-        return flat_leaves, (list, children_info)
-    elif isinstance(tree, tuple):
-        flat_leaves, children_info = _flatten_iterable(tree)
-        return flat_leaves, (tuple, children_info)
+            item_dict = cast(Dict[Hashable, object], tree)
+            dict_item_leaves: List[L] = []
+            dict_item_aux: AuxType
+            dict_item_leaves, dict_item_aux = tree_flatten(tree=item_dict[key])
+            leaf_count: int = len(dict_item_leaves)
+            dict_children_info.append((key, dict_item_aux, leaf_count))
+            dict_leaves.extend(dict_item_leaves)
+            
+        return dict_leaves, (dict, dict_children_info)
+        
+    # Handle lists and tuples with a common helper
+    elif isinstance(tree, (list, tuple)):
+        # For lists and tuples, process with the common iterable flattener
+        flat_leaves, children_info = _flatten_iterable(cast(List[object], tree))
+        return flat_leaves, (tree_type, children_info)
+        
+    # Base case: a leaf node
     else:
-        return [tree], (tree_type, None)
+        return [cast(L, tree)], (tree_type, None)
 
 
-def tree_unflatten(*, aux: Any, children: List[Any]) -> Any:
+def tree_unflatten(*, aux: AuxType, children: List[L]) -> object:
     """Reconstructs an object from its auxiliary metadata and a list of leaves.
 
     Args:
@@ -173,22 +212,32 @@ def tree_unflatten(*, aux: Any, children: List[Any]) -> Any:
                     type with multiple leaves is encountered.
     """
     tree_type, metadata = aux
+    
+    # Handle registered types via their custom unflatten function
     if tree_type in _pytree_registry:
         _, unflatten_func = _pytree_registry[tree_type]
-        return unflatten_func(metadata, children)
+        # Cast the metadata to the expected type for the unflatten function
+        typed_metadata = cast(AuxType, metadata)
+        return unflatten_func(typed_metadata, children)
+        
+    # Handle built-in container types
     if tree_type is list:
         if not isinstance(metadata, list):
             raise ValueError("Invalid metadata for list reconstruction.")
-        return _unflatten_sequence(metadata, children)
+        return _unflatten_sequence(cast(List[Tuple[AuxType, int]], metadata), children)
+        
     elif tree_type is tuple:
         if not isinstance(metadata, list):
             raise ValueError("Invalid metadata for tuple reconstruction.")
-        unflattened_seq = _unflatten_sequence(metadata, children)
+        unflattened_seq = _unflatten_sequence(cast(List[Tuple[AuxType, int]], metadata), children)
         return tuple(unflattened_seq)
+        
     elif tree_type is dict:
         if not isinstance(metadata, list):
             raise ValueError("Invalid metadata for dict reconstruction.")
-        return _unflatten_dict(metadata, children)
+        return _unflatten_dict(cast(List[Tuple[Hashable, AuxType, int]], metadata), children)
+        
+    # Handle leaf nodes
     if len(children) != 1:
         raise ValueError(
             f"Unregistered type {tree_type.__name__} expected a single leaf, got {len(children)}."

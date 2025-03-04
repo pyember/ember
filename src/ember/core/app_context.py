@@ -1,3 +1,16 @@
+"""
+Application Context System for Ember Framework
+
+This module implements Ember's application context architecture, providing a dependency
+injection system and global service management. The context serves as the composition
+root for framework services, while offering thread-safe singleton access when needed.
+
+The design supports both direct dependency injection for components and convenient 
+global access for application code, with special accommodations for testing scenarios.
+
+For complete architectural details, see ARCHITECTURE.md
+"""
+
 import logging
 import threading
 from threading import Lock
@@ -11,10 +24,18 @@ from ember.core.types.config_types import ConfigManager
 
 class EmberAppContext:
     """
-    Application context for Ember, holding references to core services.
+    Core dependency container for Ember's service architecture.
 
-    This context serves as the composition root for dependency injection, eliminating
-    reliance on global singleton state. For architectural details, see ARCHITECTURE.md.
+    The EmberAppContext serves as the composition root for the entire framework, 
+    centralizing all service dependencies and their lifecycle management. It implements
+    the Dependency Inversion Principle by decoupling service consumers from their
+    concrete implementations, enabling flexible configuration, testing, and extension.
+
+    This design intentionally avoids service location within services themselves,
+    instead passing dependencies explicitly through constructors. This ensures
+    clear dependency graphs, simplified testing, and resilience to architectural changes.
+
+    For detailed implementation guidance, see ARCHITECTURE.md
     """
 
     def __init__(
@@ -41,20 +62,32 @@ class EmberAppContext:
 
 def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
     """
-    Creates and returns an initialized EmberAppContext.
+    Creates a fully initialized EmberAppContext with all core services.
 
-    This composition root:
-      1. Creates a logger.
-      2. Instantiates the ConfigManager.
-      3. Injects API keys using a unified logging approach.
-      4. Creates the ModelRegistry and auto-registers known models.
-      5. Instantiates additional services.
+    This factory function serves as the primary composition root for the Ember framework,
+    implementing the Builder pattern to construct and wire together all essential services.
+    The step-by-step initialization process ensures proper dependency order and consistent
+    error handling.
+
+    Implementation details:
+    1. Creates a centralized logger with consistent formatting
+    2. Constructs the ConfigManager with fallback mechanisms for missing configs
+    3. Injects all API keys into the environment with secure handling
+    4. Builds the ModelRegistry with automatic provider discovery
+    5. Instantiates and wires secondary services with their dependencies
+
+    This design follows the Single Responsibility Principle by isolating the complex
+    creation logic away from both the EmberAppContext (which focuses on being a container)
+    and the client code (which focuses on using the services).
 
     Args:
-        config_filename: Optional path to config file
+        config_filename: Optional path to a YAML configuration file. If not provided,
+                       the system will search standard locations and use environment
+                       variables as fallbacks.
 
     Returns:
-        Initialized EmberAppContext with all services
+        A fully configured EmberAppContext instance with all services initialized
+        and properly wired together.
     """
     logger = logging.getLogger("ember")
 
@@ -88,16 +121,32 @@ def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
 
 class EmberContext:
     """
-    Global application context for Ember.
+    Thread-safe global access point for Ember's core service architecture.
 
-    This class implements the Singleton pattern to provide global access to
-    the EmberAppContext instance, which contains all core services.
-
-    The EmberContext lazy-loads the app context on first access, avoiding
-    circular imports and allowing more flexible initialization patterns.
+    The EmberContext combines three critical design patterns to provide a robust 
+    foundation for the framework:
     
-    For testing purposes, a test mode can be enabled that bypasses the singleton
-    pattern to allow isolated test contexts.
+    1. Singleton Pattern: Guarantees a single global instance in standard usage,
+       ensuring consistent state and memory efficiency
+    
+    2. Lazy Initialization: Defers resource creation until first access, avoiding
+       circular dependencies and reducing startup overhead
+    
+    3. Test Mode Pattern: Provides a configurable escape hatch from the singleton
+       constraint specifically for testing scenarios, enabling isolated test contexts
+    
+    This hybrid approach satisfies both production needs (centralized, consistent access)
+    and testing requirements (isolation, deterministic setup/teardown). All operations
+    are thread-safe through careful lock management, making the context suitable for
+    concurrent applications.
+    
+    The EmberContext implements the Facade pattern, providing simplified access to
+    the underlying service architecture through property accessors while encapsulating
+    all initialization complexity.
+    
+    For internal use, consider direct dependency injection. This global context
+    is primarily intended for application code that cannot easily receive injected
+    dependencies.
     """
 
     _instance: ClassVar[Optional["EmberContext"]] = None
@@ -112,10 +161,26 @@ class EmberContext:
     @classmethod
     def enable_test_mode(cls) -> None:
         """
-        Enable test mode to bypass singleton restrictions.
+        Enables isolated context instances for concurrent testing environments.
         
-        In test mode, each call to EmberContext() creates a new instance,
-        preventing deadlocks and allowing isolated testing.
+        This method reconfigures the EmberContext to bypass its singleton constraint,
+        allowing each test to create completely isolated instances without interference.
+        After enabling test mode, calls to EmberContext() will produce independent contexts
+        with separate service instances and configurations.
+        
+        Test mode is critical for:
+        - Parallel test execution without shared state contamination
+        - Dependency isolation for deterministic test outcomes
+        - Preventing test order dependencies
+        - Avoiding deadlocks from concurrent singleton access
+        
+        Important implementation notes:
+        - This is a class-level operation affecting all future instantiations
+        - Existing instances are not affected, but their references are cleared
+        - Thread-local storage is reset to prevent cross-test leakage
+        
+        This method should typically be called in test setup fixtures or
+        at the beginning of test modules.
         """
         cls._test_mode = True
         # Clear instance to ensure fresh instances even after a previous singleton was created
@@ -177,14 +242,37 @@ class EmberContext:
         app_context: Optional[EmberAppContext] = None,
     ) -> "EmberContext":
         """
-        Initialize the global context with provided or default components.
+        Initializes or reconfigures the global context with explicit configuration.
+
+        This method serves as the canonical initialization point for the EmberContext,
+        supporting both automatic configuration and explicit dependency injection
+        scenarios. It handles thread synchronization, singleton enforcement (when not
+        in test mode), and lifecycle management.
+
+        The implementation follows a clear priority order for initialization sources:
+        1. If app_context is provided, it is used directly (full DI scenario)
+        2. If only config_path is provided, a new app_context is created using that path
+        3. If neither is provided, default configuration discovery is used
+
+        This flexibility enables multiple initialization patterns:
+        - Standard usage: EmberContext.initialize()
+        - Custom config: EmberContext.initialize(config_path="/path/to/config.yaml")
+        - Mock services: EmberContext.initialize(app_context=mock_context)
+        
+        Thread safety is guaranteed through careful lock management, making this
+        method safe to call from concurrent initialization code.
 
         Args:
-            config_path: Optional path to config file
-            app_context: Optional pre-configured EmberAppContext
+            config_path: Optional path to a YAML configuration file for initializing
+                       a new app context when one isn't explicitly provided
+            app_context: Optional pre-configured EmberAppContext for dependency
+                       injection scenarios, typically in testing or when services
+                       need custom configuration
 
         Returns:
-            The initialized EmberContext instance (singleton in normal mode, new in test mode)
+            The initialized EmberContext instance, providing a typed interface to
+            the underlying services. In normal mode, this is the global singleton;
+            in test mode, it's a new independent instance.
         """
         if cls._test_mode:
             # In test mode, create a new instance
@@ -279,12 +367,32 @@ class EmberContext:
 
 def get_ember_context() -> EmberContext:
     """
-    Get the global EmberContext instance, creating it if necessary.
+    Retrieves the global EmberContext instance with guaranteed initialization.
 
-    This is the recommended entry point for accessing the context.
+    This factory function serves as the primary entry point for application code
+    to access Ember's service infrastructure. It encapsulates the complexity of
+    context management, ensuring that callers always receive a valid, initialized
+    context without needing to understand the underlying initialization mechanisms.
+
+    Key features of this function:
+    - Transparent handling of lazy initialization
+    - Consistent thread-safety guarantees
+    - Support for both singleton and test modes
+    - Zero configuration required for standard usage
+    
+    This function implements the Service Locator pattern in its most disciplined form,
+    providing centralized access while minimizing the drawbacks typically associated
+    with service location. It should be used in application code that cannot easily
+    receive dependencies through normal injection.
+
+    Example usage:
+        context = get_ember_context()
+        model_service = context.model_service
+        result = model_service.invoke_model("gpt-4", "Hello world")
 
     Returns:
-        The global EmberContext instance
+        A fully initialized EmberContext instance with access to all framework services.
+        In standard operation, this will always be the same singleton instance.
     """
     return EmberContext.get()
 

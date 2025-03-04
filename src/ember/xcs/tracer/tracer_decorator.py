@@ -1,13 +1,36 @@
 """
-Tracer Decorator for XCS Operators.
+JIT Compilation and Execution Tracing for XCS Operators
 
-This module provides a decorator that instruments an Operator
-subclass for execution tracing. Upon first invocation, the operator's execution is traced
-symbolically. The tracer leverages PyTree flattening (via EmberModule) and
-records operations into an IR graph (consisting of IRNode objects). Subsequent
-calls execute the cached plan.
+This module provides a just-in-time (JIT) compilation system for Ember operators
+through execution tracing. The @jit decorator transforms operator classes by
+instrumenting them to record their execution patterns and automatically compile
+optimized execution plans.
 
-Allows optional forced tracing on every call and customizable caching logic.
+Key features:
+1. Transparent operator instrumentation via the @jit decorator
+2. Automatic execution graph construction from traced operator calls
+3. Compile-once, execute-many optimization for repeated operations
+4. Support for pre-compilation with sample inputs 
+5. Configurable tracing and caching behaviors
+
+Implementation follows functional programming principles where possible,
+separating concerns between tracing, compilation, and execution. The design
+adheres to the Open/Closed Principle by extending operator behavior without
+modifying their core implementation.
+
+Example:
+    @jit
+    class MyOperator(Operator):
+        def __call__(self, *, inputs):
+            # Complex, multi-step computation
+            return result
+            
+    # First call triggers tracing and compilation
+    op = MyOperator()
+    result1 = op(inputs={"text": "example"})
+    
+    # Subsequent calls reuse the compiled execution plan
+    result2 = op(inputs={"text": "another example"})
 """
 
 from __future__ import annotations
@@ -52,28 +75,55 @@ def jit(
     force_trace: bool = False,
     recursive: bool = True,
 ) -> OperatorDecorator:
-    """Decorator that instruments an Operator for automatic graph building and execution.
+    """Just-In-Time compilation decorator for Ember Operators.
 
-    When applied, the operator's execution is traced on first call (or during initialization
-    if sample_input is provided). A graph is automatically built based on the traces and
-    cached for future use. Subsequent calls use the cached graph for efficient execution.
+    The @jit decorator transforms Operator classes to automatically trace their execution
+    and compile optimized execution plans. This brings significant performance benefits
+    for complex operations and operator pipelines by analyzing the execution pattern
+    once and reusing the optimized plan for subsequent calls.
+
+    The implementation follows a lazily evaluated, memoization pattern:
+    1. First execution triggers tracing to capture the full execution graph
+    2. The traced operations are compiled into an optimized execution plan
+    3. Subsequent calls reuse this plan without re-tracing (unless force_trace=True)
+    
+    Pre-compilation via sample_input is available for performance-critical paths where
+    even the first execution needs to be fast. This implements an "eager" JIT pattern
+    where compilation happens at initialization time rather than first execution time.
+
+    Design principles:
+    - Separation of concerns: Tracing, compilation, and execution are distinct phases
+    - Minimal overhead: Non-tracing execution paths have negligible performance impact
+    - Transparency: Decorated operators maintain their original interface contract
+    - Configurability: Multiple options allow fine-tuning for different use cases
 
     Args:
-        sample_input: Optional pre-defined input for compilation during initialization.
-            If provided, the operator will be traced during initialization, and the
-            resulting graph will be cached for future use.
-        force_trace: If True, traces every invocation regardless of caching.
-            Useful for debugging or when inputs might affect the execution graph.
-            Defaults to False.
-        recursive: If True, automatically handles nested operators.
-            Currently limited to direct relationships observed during tracing.
-            Defaults to True.
+        sample_input: Optional pre-defined input for eager compilation during initialization.
+                    This enables "compile-time" optimization rather than runtime JIT compilation.
+                    Recommended for performance-critical initialization paths.
+        force_trace: When True, disables caching and traces every invocation.
+                    This is valuable for debugging and for operators whose execution
+                    pattern varies significantly based on input values. 
+                    Performance impact: Significant, as caching benefits are disabled.
+        recursive: Controls whether nested operator calls are also traced and compiled.
+                 Currently limited to direct child operators observed during tracing.
+                 Default is True, enabling full pipeline optimization.
 
     Returns:
-        A decorator function that transforms the Operator subclass.
+        A decorator function that transforms the target Operator subclass by
+        instrumenting its initialization and call methods for tracing.
 
     Raises:
         TypeError: If applied to a class that doesn't inherit from Operator.
+                  The decorator strictly enforces type safety to prevent
+                  incorrect usage on unsupported class types.
+    
+    Example:
+        @jit(sample_input={"text": "example"})  # Pre-compile with sample input
+        class ProcessorOperator(Operator):
+            def __call__(self, *, inputs):
+                # Complex multi-step process
+                return {"result": processed_output}
     """
 
     def decorator(cls: Type[OperatorType]) -> Type[OperatorType]:

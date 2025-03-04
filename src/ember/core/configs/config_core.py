@@ -1,3 +1,31 @@
+"""Configuration Core Module
+
+This module provides core functionality for loading, merging, and processing
+configuration files in the Ember framework. It handles YAML configuration loading,
+hierarchical configuration merging, and environment variable resolution.
+
+Key features:
+- Deep merging of nested configuration structures
+- Environment variable interpolation in configuration values
+- Support for configuration inclusion and inheritance
+- Robust error handling for configuration loading
+
+The module is designed to support a flexible configuration system where:
+1. Base configurations can include and extend other configurations
+2. Values can be overridden at multiple levels
+3. Sensitive information can be stored in environment variables
+4. Configuration can be adapted to different deployment environments
+
+Usage example:
+```python
+# Load a configuration with inheritance
+config = load_full_config(base_config_path="/path/to/config.yaml")
+
+# Access configuration values
+api_key = config.get("services", {}).get("model_api", {}).get("api_key")
+```
+"""
+
 import os
 import re
 import yaml
