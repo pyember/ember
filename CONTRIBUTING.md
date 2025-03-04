@@ -43,7 +43,8 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 
 3. **Install dependencies**:
    ```bash
-   poetry install
+   # Install with all development dependencies
+   poetry install --with dev
    ```
 
 4. **Activate the virtual environment**:
@@ -53,8 +54,33 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 
 5. **Set up pre-commit hooks** (recommended):
    ```bash
-   poetry run pre-commit install
+   pre-commit install
    ```
+
+#### Alternative Installation with pip
+
+If you prefer not to use Poetry, you can use pip:
+
+```bash
+# Create a virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install in development mode with dev dependencies
+pip install -e ".[dev]"
+```
+
+#### Note on Imports
+
+The project is set up with proper Python packaging, so you should import from `ember` directly:
+
+```python
+# Correct way to import
+from ember.core import non
+from ember.xcs.tracer import jit
+
+# No need to manipulate sys.path or use symlinks
+```
 
 ### Project Structure
 
@@ -63,19 +89,30 @@ The Ember codebase is organized into the following structure:
 ```
 ember/
 ├── docs/               # Documentation
+│   ├── cli/            # CLI documentation
+│   ├── design/         # Design documents
+│   └── quickstart/     # Quick start guides
 ├── src/                # Source code
-│   └── ember/          # Main package
+│   ├── cli/            # TypeScript CLI implementation
+│   └── ember/          # Main Python package
+│       ├── cli.py      # Python CLI entrypoint
 │       ├── core/       # Core framework
 │       ├── xcs/        # Execution engine
 │       └── examples/   # Example applications
 ├── tests/              # Test suite
+│   ├── cli/            # CLI tests
 │   ├── unit/           # Unit tests
 │   ├── integration/    # Integration tests
 │   └── fuzzing/        # Fuzzing tests
+├── examples/           # Standalone examples 
 ├── scripts/            # Development and CI scripts
-├── pyproject.toml      # Project configuration
+├── pyproject.toml      # Python project configuration
+├── package.json        # Node.js project configuration
+├── tsconfig.json       # TypeScript configuration
 └── README.md           # Project overview
 ```
+
+The `.gitignore` file is configured to exclude common development files, caches, and sensitive configuration files.
 
 ### Running Tests
 

@@ -7,125 +7,109 @@ maintainers = ["Ember Team <team@pyember.org>"]
 readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/pyember/ember"
-documentation = "https://ember-ai.readthedocs.io"
+documentation = "https://docs.pyember.org"
 homepage = "https://pyember.org"
-keywords = ["AI", "LLM", "Networks of Networks", "Machine Learning", "Compound AI", "Orchestration"]
+keywords = ["AI", "LLM", "Networks of Networks", "Machine Learning", "Compound AI", "Orchestration", "AI Framework", "LLM Orchestration", "AI System Design"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Operating System :: OS Independent",
 ]
 packages = [
-    { include = "ember/**/*.py", from = "src" },
+    { include = "ember", from = "src" },
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.11,<3.13"  # Add Python 3.12 support
 pandas = ">=1.0.0,<2.2.0"
 numpy = ">=1.21.0,<1.27.0"
 
 # Core dependencies
-pydantic = "2.7.4"
-pydantic-core = "2.18.4"
-pydantic-settings = "2.3.0"
-PyYAML = "6.0.1"
-typing_extensions = "4.12.2"
+pydantic = "^2.7.4"
+pydantic-core = "^2.18.4"
+pydantic-settings = "^2.3.0"
+PyYAML = "^6.0.1"
+typing_extensions = "^4.12.2"
 
-# LLM providers
-openai = "1.57.2"
-anthropic = "0.40.0"
-google-generativeai = ">=0.8.3"
-ibm-watsonx-ai = "1.1.25"
+# LLM providers - Using optional dependencies for flexibility
+openai = {version = "^1.57.2", optional = true}
+anthropic = {version = "^0.40.0", optional = true}
+google-generativeai = {version = "^0.8.3", optional = true}
+ibm-watsonx-ai = {version = "^1.1.25", optional = true}
 
-# HTTP and async
-aiohttp = "3.9.5"
-aiosignal = "1.3.1"
-httpx = "0.27.0"
-requests = "2.32.2"  # Downgraded to satisfy ibm-cos-sdk-core requirements
+# HTTP and async - Critical core functionality
+aiohttp = "^3.9.5"
+aiosignal = "^1.3.1"
+httpx = "^0.27.0"
+requests = "^2.32.2"
 
-# Data processing
-datasets = "2.20.0"
-scikit-learn = "1.6.0"
-scipy = "1.13.1"
-huggingface-hub = "0.26.5"
-pyarrow = "16.1.0"
-"pyarrow-hotfix" = "0.6"
+# Data processing - Optional for advanced users
+datasets = {version = "^2.20.0", optional = true}
+scikit-learn = {version = "^1.6.0", optional = true}
+scipy = {version = "^1.13.1", optional = true}
+huggingface-hub = {version = "^0.26.5", optional = true}
+pyarrow = {version = "^16.1.0", optional = true}
+"pyarrow-hotfix" = {version = "^0.6", optional = true}
 
-# Visualization
-matplotlib = "3.9.1"
-prettytable = "3.12.0"
+# Visualization - Optional for users who need it
+matplotlib = {version = "^3.9.1", optional = true}
+prettytable = {version = "^3.12.0", optional = true}
 
-# Utilities
-tqdm = "4.67.1"
-tenacity = "9.0.0"
-cachetools = "5.4.0"
-dill = "0.3.8"
+# Core utilities - Required for robust operation
+tqdm = "^4.67.1"
+tenacity = "^9.0.0"
+cachetools = "^5.4.0"
+dill = "^0.3.8"
 
-# Google API dependencies
-google-ai-generativelanguage = "^0.6.6"
-google-api-core = "2.19.1"
-google-api-python-client = "2.139.0"
-google-auth = "2.32.0"
-google-auth-httplib2 = "0.2.0"
-googleapis-common-protos = "1.63.2"
+# Google API dependencies - Only needed for Google provider
+google-ai-generativelanguage = {version = "^0.6.6", optional = true}
+google-api-core = {version = "^2.19.1", optional = true}
+google-api-python-client = {version = "^2.139.0", optional = true}
+google-auth = {version = "^2.32.0", optional = true}
+google-auth-httplib2 = {version = "^0.2.0", optional = true}
+googleapis-common-protos = {version = "^1.63.2", optional = true}
 
-# Additional dependencies
-annotated-types = "0.7.0"
-anyio = "4.4.0"
-attrs = "23.2.0"
-certifi = "2024.6.2"
-charset-normalizer = "3.3.2"
-contourpy = "1.2.1"
-cycler = "0.12.1"
-distro = "1.9.0"
-filelock = "3.15.1"
-fonttools = "4.53.1"
-frozenlist = "1.4.1"
-fsspec = "2024.5.0"
-grpcio = "1.65.4"
-grpcio-status = "1.62.2"
-h11 = "0.14.0"
-httpcore = "1.0.5"
-httplib2 = "0.22.0"
-idna = "3.7"
-iniconfig = "2.0.0"
-jiter = "0.5.0"
-joblib = "1.4.2"
-kiwisolver = "1.4.5"
-multidict = "6.0.5"
-multiprocess = "0.70.16"
-packaging = "24.1"
-pillow = "10.4.0"
-pluggy = "1.5.0"
-proto-plus = "1.24.0"
-protobuf = "4.25.4"
-pyasn1 = "0.6.0"
-pyasn1_modules = "0.4.0"
-pyparsing = "3.1.2"
-python-dateutil = "2.9.0.post0"
-pytz = "2024.1"
-rsa = "4.9"
-setuptools = "75.2.0"
-six = "1.16.0"
-sniffio = "1.3.1"
-threadpoolctl = "3.5.0"
-tokenizers = "0.19.1"
-tzdata = "2024.1"
-uritemplate = "4.1.1"
-urllib3 = "1.26.19"  # Downgraded from 2.2.1 to satisfy dependency constraints
-wcwidth = "0.2.13"
-xxhash = "3.4.1"
-yarl = "1.9.4"
+# Basic required dependencies
+annotated-types = "^0.7.0"
+anyio = "^4.4.0"
+attrs = "^23.2.0"
+certifi = "^2024.6.2"
+charset-normalizer = "^3.3.2"
+
+# For dependency resolution, these will be managed by poetry automatically
+packaging = "^24.1"
+six = "^1.16.0"
+idna = "^3.7"
+urllib3 = "^1.26.19"
+sniffio = "^1.3.1"
 
 [tool.poetry.extras]
-all = ["dev", "docs", "optional"]
-dev = ["pytest", "parameterized", "jupyterlab", "ipykernel", "pytest-cov", "hypothesis", "mutmut", "tox", "atheris"]
-docs = ["sphinx", "sphinx-rtd-theme", "nbsphinx", "myst-parser"]
-optional = ["jupyter", "notebook", "matplotlib"]
+# Main extras groups
+all = ["openai", "anthropic", "google", "ibm", "data", "viz", "dev", "docs"]
+minimal = ["openai"]  # Minimal viable installation with just OpenAI
+
+# Provider-specific extras
+openai = ["openai"]
+anthropic = ["anthropic"]
+google = ["google-generativeai", "google-ai-generativelanguage", "google-api-core", "google-api-python-client", "google-auth", "google-auth-httplib2", "googleapis-common-protos"]
+ibm = ["ibm-watsonx-ai"]
+allproviders = ["openai", "anthropic", "google", "ibm"]
+
+# Feature-specific extras
+data = ["datasets", "scikit-learn", "scipy", "huggingface-hub", "pyarrow", "pyarrow-hotfix"]
+viz = ["matplotlib", "prettytable"]
+
+# Developer extras
+dev = ["pytest", "parameterized", "jupyterlab", "ipykernel", "pytest-cov", "hypothesis", "mutmut", "tox", "atheris", "black", "isort", "mypy", "pylint", "pre-commit", "ruff"]
+docs = ["sphinx", "sphinx-rtd-theme", "nbsphinx", "myst-parser", "jupyter", "notebook"]
 
 [tool.poetry.group.dev.dependencies]
 # Testing
@@ -158,7 +142,6 @@ myst-parser = "^2.0.0"
 
 [tool.pytest.ini_options]
 pythonpath = [
-    ".",
     "src",
     "tests"
 ]
@@ -232,3 +215,6 @@ mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["ember"]
+
+[tool.poetry.scripts]
+ember = "ember.cli:main"
