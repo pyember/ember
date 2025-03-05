@@ -648,7 +648,7 @@ For comprehensive documentation, including tutorials, API reference, and advance
 - [Ember Documentation](https://pyember.ai)
 - [Architecture Overview](ARCHITECTURE.md)
 - [Contributing Guide](CONTRIBUTING.md)
-- [Examples Directory](src/ember/examples)
+- [Examples Directory](src/ember/examples) (moved from root /examples)
 
 ### Quickstart Guides
 
