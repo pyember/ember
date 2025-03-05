@@ -148,7 +148,7 @@ A project created with Ember CLI.
 
 1. Install dependencies:
 ```bash
-pip install "ember-ai[openai]"
+poetry add ember-ai -E openai
 ```
 
 2. Set up your API keys:
@@ -178,7 +178,7 @@ ANTHROPIC_API_KEY=your-anthropic-key
     print(f"Created Ember project in '{dir_name}'")
     print(f"To get started:")
     print(f"  cd {dir_name}")
-    print(f"  pip install 'ember-ai[openai]'")
+    print(f"  poetry add ember-ai -E openai")
     print(f"  # Set your API keys")
     print(f"  python ember_example.py")
 

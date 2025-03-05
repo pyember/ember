@@ -139,7 +139,7 @@ async function createProject(name: string, options: any): Promise<void> {
       console.log('');
       console.log(`To get started, run:`);
       console.log(chalk.cyan(`  cd ${directory}`));
-      console.log(chalk.cyan('  pip install -e .'));
+      console.log(chalk.cyan('  poetry install'));
       console.log('');
       displayTip('Set up your API keys as environment variables or configure them with ember provider configure <provider>');
     } else {

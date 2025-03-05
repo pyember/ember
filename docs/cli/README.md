@@ -391,7 +391,7 @@ $ ember project new my-ember-app --template complete
 
 To get started, run:
   cd my-ember-app
-  pip install -e .
+  poetry install
 
 💡 Tip: Set up your API keys as environment variables or configure them with ember provider configure <provider>
 
@@ -480,7 +480,7 @@ The Ember CLI is designed to be extensible. You can create plugins and extension
 
 1. **Python Bridge Errors**
    - Ensure Python 3.11+ is installed and in your PATH
-   - Verify Ember AI is installed (`pip list | grep ember-ai`)
+   - Verify Ember AI is installed (`poetry show ember-ai`)
 
 2. **API Key Issues**
    - Check provider configuration (`ember config list`)

@@ -6,7 +6,7 @@ try:
     from tenacity import retry, stop_after_attempt, wait_random_exponential
 except ImportError as err:
     raise ImportError(
-        "tenacity is required for retry_utils. Install via pip install tenacity"
+        "tenacity is required for retry_utils. Install via Poetry: poetry add tenacity"
     ) from err
 
 T = TypeVar("T")
