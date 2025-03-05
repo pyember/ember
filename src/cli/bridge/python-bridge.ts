@@ -385,7 +385,7 @@ A project created with Ember CLI.
     
 1. Install dependencies:
 ```bash
-pip install "ember-ai[openai]"
+poetry add ember-ai -E openai
 ```
     
 2. Set up your API keys:

@@ -116,7 +116,7 @@ export class PythonBridgeError extends EmberCliError {
     if (!options?.suggestions) {
       this.suggestions = [
         'Ensure Python is installed and in your PATH',
-        'Verify that the Ember package is installed (`pip install ember-ai`)',
+        'Verify that the Ember package is installed (`poetry add ember-ai`)',
         'Check for any Python error messages in the output'
       ];
     }
