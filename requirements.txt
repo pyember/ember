@@ -1,4 +1,9 @@
--e git+https://github.com/foundrytechnologies/ember.git@6df31891d9a25852803ee1a1dd75d5895cc6ec32#egg=ember
+# DEPRECATED: This file is kept only for backward compatibility.
+# Please use Poetry (pyproject.toml) for dependency management.
+# Run: poetry install
+#
+# This file will be removed in a future release.
+
 aiohttp==3.9.5
 aiosignal==1.3.1
 annotated-types==0.7.0
