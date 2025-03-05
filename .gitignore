@@ -37,6 +37,7 @@ venv.bak/
 .coverage
 htmlcov/
 .hypothesis/
+.hypothesis/**/*
 
 # IDE
 .idea/
