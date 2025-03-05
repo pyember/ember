@@ -57,18 +57,6 @@ We are committed to providing a friendly, safe, and welcoming environment for al
    pre-commit install
    ```
 
-#### Alternative Installation with pip
-
-If you prefer not to use Poetry, you can use pip:
-
-```bash
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install in development mode with dev dependencies
-pip install -e ".[dev]"
-```
 
 #### Note on Imports
 

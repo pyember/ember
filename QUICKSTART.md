@@ -7,28 +7,28 @@ This guide will help you quickly get started with Ember, the compositional frame
 ### Option 1: Minimal Installation (OpenAI Only)
 
 ```bash
-# Install via pip with OpenAI support only
-pip install "ember-ai[minimal]"
+# Install with Poetry, with OpenAI support only
+poetry add ember-ai -E minimal
 ```
 
 ### Option 2: Full Installation (All Features)
 
 ```bash
 # Install with all providers and features
-pip install "ember-ai[all]"
+poetry add ember-ai -E all
 ```
 
 ### Option 3: Custom Installation
 
 ```bash
 # Install with specific providers
-pip install "ember-ai[openai,anthropic]"
+poetry add ember-ai -E openai -E anthropic
 
 # Install with data processing capabilities
-pip install "ember-ai[openai,data]"
+poetry add ember-ai -E openai -E data
 
 # Install for developers
-pip install "ember-ai[dev]"
+poetry add ember-ai -E dev
 ```
 
 ## Setting Up API Keys

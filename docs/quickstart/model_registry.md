@@ -5,7 +5,7 @@ This quickstart guide will help you integrate LLM models into your project using
 ## 1. Installation
 
 ```bash
-pip install ember-ai
+poetry add ember-ai
 ```
 
 ## 2. API Key Setup

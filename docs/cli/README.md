@@ -8,7 +8,7 @@ The Ember CLI is a powerful command-line interface for interacting with the Embe
 
 - Node.js 16.0 or higher
 - Python 3.11 or higher
-- Ember AI package installed (`pip install ember-ai`)
+- Ember AI package installed (`poetry add ember-ai`)
 
 ### Installing the CLI
 

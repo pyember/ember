@@ -3,6 +3,9 @@ Ember - Compositional Framework for AI Systems
 
 This setup.py file is provided for pip install compatibility.
 For the full package configuration, please use Poetry.
+
+NOTE: requirements.txt has been removed in favor of Poetry.
+All dependencies are now managed through pyproject.toml.
 """
 
 from setuptools import setup
