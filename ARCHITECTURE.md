@@ -223,7 +223,7 @@ Key components:
 Specifications define the contract between inputs and outputs:
 
 ```python
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from pydantic import BaseModel
 
 class QuestionInput(BaseModel):
@@ -549,7 +549,7 @@ The code is organized into the following package structure:
 | `ember.core.types` | Type system, protocols, and validation |
 | `ember.core.registry.model` | Model registry and provider implementations |
 | `ember.core.registry.operator` | Operator system |
-| `ember.core.registry.prompt_specification` | Prompt specification system |
+| `ember.core.registry.specification` | Prompt specification system |
 | `ember.core.utils` | Utility functions and helpers |
 | `ember.core.utils.data` | Data processing and datasets |
 | `ember.core.utils.eval` | Evaluation and metrics |

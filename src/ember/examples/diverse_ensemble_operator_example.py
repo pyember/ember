@@ -1,16 +1,21 @@
+"""Diverse Ensemble Operator Example
+
+This example demonstrates using the MultiPrefixEnsembleOperator with distinct prefixes
+for each language model to generate diverse responses to a query.
+
+To run:
+    poetry run python src/ember/examples/diverse_ensemble_operator_example.py
+"""
+
 from typing import ClassVar, Dict, List, Optional, Type
 from random import sample
 
 from pydantic import Field
 
-from ember.core.app_context import get_ember_context
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_specification.specification import Specification
-from ember.core.types.ember_model import EmberModel
-from ember.core import non
-from ember.core.registry.operator.base._module import ember_field
-from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from ember.core.utils import extract_value
+from ember.api import models, non
+from ember.api.operator import Operator, Specification
+from ember.api.models import LMModule, LMModuleConfig
+from ember.api.types import EmberModel, extract_value
 
 
 def usage_example() -> None:
@@ -22,20 +27,31 @@ def usage_example() -> None:
     Returns:
         None.
     """
-    # Initialize ember context
-    context = get_ember_context()
 
-    # Define example prefixes
-    example_prefixes: List[str] = ["PrefixA", "PrefixB", "PrefixC"]
+    # Define example prefixes to guide different response styles
+    example_prefixes: List[str] = [
+        "Analyze this from a scientific perspective:",
+        "Consider this from a philosophical angle:",
+        "Provide a practical approach to:"
+    ]
 
-    # Create LM modules through the context
+    # Create LM modules with different models for diversity
     lm_modules = [
         LMModule(
             config=LMModuleConfig(
                 model_name="anthropic:claude-3-opus", temperature=0.5, max_tokens=256
             )
+        ),
+        LMModule(
+            config=LMModuleConfig(
+                model_name="openai:gpt-4", temperature=0.7, max_tokens=256
+            )
+        ),
+        LMModule(
+            config=LMModuleConfig(
+                model_name="anthropic:claude-3-haiku", temperature=0.3, max_tokens=256
+            )
         )
-        for _ in range(3)
     ]
 
     # Instantiate the operator with named parameters.
@@ -45,18 +61,27 @@ def usage_example() -> None:
         name="MultiPrefixEnsembleExample",
     )
 
-    # Create input data.
+    # Create input data with a more substantive query
     inputs: MultiPrefixOperatorInputs = MultiPrefixOperatorInputs(
-        query="What's the best approach?"
+        query="How can we effectively combat climate change while balancing economic needs?"
     )
 
     # Execute the operator using __call__ with named parameters
     result = operator(inputs=inputs)
 
     # Display structured results
-    print(f"Number of responses: {len(result.responses)}")
-    for i, response in enumerate(result.responses, 1):
-        print(f"Response {i}: {response[:50]}..." if len(response) > 50 else response)
+    print(f"Original query: \"{inputs.query}\"")
+    print(f"\nNumber of responses: {len(result.responses)}")
+    
+    # Display each response with its corresponding prefix
+    for i, (prefix, response) in enumerate(zip(example_prefixes, result.responses), 1):
+        # Show the prefix and a truncated response for readability
+        truncated = response[:100] + "..." if len(response) > 100 else response
+        print(f"\nResponse {i}:")
+        print(f"  Prefix: \"{prefix}\"")
+        print(f"  Response: \"{truncated}\"")
+    
+    print("\nNote: In a real application, these responses would be further processed or aggregated.")
 
 
 class MultiPrefixOperatorInputs(EmberModel):
@@ -138,11 +163,14 @@ class MultiPrefixEnsembleOperator(
             # Call LM module
             response = lm(prompt=prompt)
 
+            # Extract text from response
+            text = extract_value(response, "text", "")
+            
             # Guard against None responses
-            if response is None:
-                response = ""
+            if text is None:
+                text = ""
 
-            responses.append(response)
+            responses.append(text)
 
         # Return structured output
         return MultiPrefixOperatorOutputs(responses=responses)

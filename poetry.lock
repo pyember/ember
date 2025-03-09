@@ -884,7 +884,7 @@ tests = ["pytest", "pytest-cov", "pytest-xdist"]
 name = "datasets"
 version = "2.21.0"
 description = "HuggingFace community-driven open-source library of datasets"
-optional = true
+optional = false
 python-versions = ">=3.8.0"
 files = [
     {file = "datasets-2.21.0-py3-none-any.whl", hash = "sha256:25e4e097110ce28824b746a107727ada94024cba11db8bc588d468414692b65a"},
@@ -1262,7 +1262,7 @@ files = [
 name = "fsspec"
 version = "2024.6.1"
 description = "File-system specification"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "fsspec-2024.6.1-py3-none-any.whl", hash = "sha256:3cb443f8bcd2efb31295a5b9fdb02aee81d8452c80d28f97a6d0959e6cee101e"},
@@ -1608,7 +1608,7 @@ zstd = ["zstandard (>=0.18.0)"]
 name = "huggingface-hub"
 version = "0.26.5"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
-optional = true
+optional = false
 python-versions = ">=3.8.0"
 files = [
     {file = "huggingface_hub-0.26.5-py3-none-any.whl", hash = "sha256:fb7386090bbe892072e64b85f7c4479fd2d65eea5f2543327c970d5169e83924"},
@@ -2777,7 +2777,7 @@ files = [
 name = "multiprocess"
 version = "0.70.16"
 description = "better multiprocessing and multithreading in Python"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "multiprocess-0.70.16-pp310-pypy310_pp73-macosx_10_13_x86_64.whl", hash = "sha256:476887be10e2f59ff183c006af746cb6f1fd0eadcfd4ef49e605cbe2659920ee"},
@@ -3174,8 +3174,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2,<2", markers = "python_version == \"3.11\""},
     {version = ">=1.26.0,<2", markers = "python_version >= \"3.12\""},
+    {version = ">=1.23.2,<2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -3659,7 +3659,7 @@ tests = ["pytest"]
 name = "pyarrow"
 version = "16.1.0"
 description = "Python library for Apache Arrow"
-optional = true
+optional = false
 python-versions = ">=3.8"
 files = [
     {file = "pyarrow-16.1.0-cp310-cp310-macosx_10_15_x86_64.whl", hash = "sha256:17e23b9a65a70cc733d8b738baa6ad3722298fa0c81d88f63ff94bf25eaa77b9"},
@@ -3931,8 +3931,8 @@ files = [
 astroid = ">=3.3.8,<=3.4.0-dev0"
 colorama = {version = ">=0.4.5", markers = "sys_platform == \"win32\""}
 dill = [
-    {version = ">=0.3.6", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
     {version = ">=0.3.7", markers = "python_version >= \"3.12\""},
+    {version = ">=0.3.6", markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
 ]
 isort = ">=4.2.5,<5.13.0 || >5.13.0,<7"
 mccabe = ">=0.6,<0.8"
@@ -5204,7 +5204,7 @@ test = ["websockets"]
 name = "xxhash"
 version = "3.5.0"
 description = "Python binding for xxHash"
-optional = true
+optional = false
 python-versions = ">=3.7"
 files = [
     {file = "xxhash-3.5.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ece616532c499ee9afbb83078b1b952beffef121d989841f7f4b3dc5ac0fd212"},
@@ -5463,4 +5463,4 @@ viz = ["matplotlib", "prettytable"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "ac2fd52770a0d4597a1a4d4a4305b1b9d319c29d74f26ed603642e077014bd9e"
+content-hash = "8e843206352999efe00101609ed3d90a6990814ae486179a62fa075804b24f23"

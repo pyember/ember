@@ -12,6 +12,9 @@ This example shows:
 
 For comprehensive documentation, see:
 docs/quickstart/model_registry.md
+
+To run:
+    poetry run python src/ember/examples/model_registry_example.py
 """
 
 import os
@@ -20,13 +23,11 @@ from typing import Dict, Any, List
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from ember import initialize_ember
-from ember.core.registry.model.base.services.model_service import ModelService
-from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.schemas.model_info import ModelInfo, ModelCost, RateLimit
-from ember.core.registry.model.base.schemas.usage import UsageStats
-from ember.core.registry.model.config.model_enum import ModelEnum
+from ember.api import models
+from ember.api.models import (
+    ModelService, UsageService, ModelRegistry, 
+    ModelInfo, ModelCost, RateLimit, UsageStats, ModelEnum
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,19 +35,15 @@ logger = logging.getLogger(__name__)
 
 def one_line_pattern():
     """Demonstrates the simplest one-line initialization pattern."""
-    # Import the init function
-    # In a real project, this would be: from ember import init
-    from ember.core.registry.model.config.settings import initialize_ember as init
+    # With the new API, we don't need to initialize anything
+    # Just use the models API directly
     
-    # Initialize and get a ready-to-use service in one line
-    service = init(usage_tracking=True)
-    
-    # Use the service directly with a model ID
     try:
-        response = service("openai:gpt-4o", "What is the capital of France?")
+        # Direct model invocation
+        response = models.openai.gpt4o("What is the capital of France?")
         print("\n=== One-line pattern result ===")
-        print(response.data)
-        return service  # Return for reuse in other examples
+        print(response.text)
+        return models  # Return for reuse in other examples
     except Exception as e:
         logger.exception(f"Error in one-line pattern: {e}")
         return None
@@ -55,50 +52,47 @@ def one_line_pattern():
 def standard_pattern():
     """Demonstrates the standard initialization pattern with more control."""
     try:
-        # Initialize the registry
-        registry = initialize_ember(auto_register=True)
+        # With the new API, we can create a model instance with more control
+        from ember.api.models import ModelBuilder
         
-        # Create a service instance with usage tracking
-        usage_service = UsageService()
-        service = ModelService(registry=registry, usage_service=usage_service)
+        # Create a model with specific parameters
+        model = (
+            ModelBuilder()
+            .temperature(0.7)
+            .max_tokens(100)
+            .build("anthropic:claude-3.5-sonnet")
+        )
         
-        # Use the service to invoke a model
-        response = service.invoke_model(
-            model_id="anthropic:claude-3.5-sonnet",
+        # Use the model
+        response = model.generate(
             prompt="Explain quantum computing in one sentence."
         )
         
         print("\n=== Standard pattern result ===")
-        print(f"Response: {response.data}")
+        print(f"Response: {response.text}")
         
         # Check usage statistics
-        usage = usage_service.get_total_usage()
-        print(f"Total tokens used: {usage.tokens}")
-        print(f"Estimated cost: ${usage.cost:.6f}")
+        print(f"Total tokens used: {response.token_count}")
+        print(f"Estimated cost: available through the models.usage API")
         
-        return service, usage_service
+        return model
     except Exception as e:
         logger.exception(f"Error in standard pattern: {e}")
-        return None, None
+        return None
 
 
 def direct_model_pattern():
     """Demonstrates direct model access (PyTorch-like pattern)."""
     try:
-        # Initialize the registry
-        registry = initialize_ember(auto_register=True)
-        service = ModelService(registry=registry)
+        # With the new API, we can use models directly
         
-        # Get the model directly
-        model = service.get_model("openai:gpt-4o")
-        
-        # Use the model directly, like you would use a PyTorch module
-        response = model("What is the tallest mountain in the world?")
+        # Use the direct model ID pattern
+        response = models("openai:gpt-4o", "What is the tallest mountain in the world?")
         
         print("\n=== Direct model pattern result ===")
-        print(response.data)
+        print(response.text)
         
-        return service
+        return models
     except Exception as e:
         logger.exception(f"Error in direct model pattern: {e}")
         return None
@@ -107,26 +101,27 @@ def direct_model_pattern():
 def type_safe_enum_pattern():
     """Demonstrates using ModelEnum for type-safe model references."""
     try:
-        # Initialize with the standard pattern
-        registry = initialize_ember(auto_register=True)
-        service = ModelService(registry=registry)
+        # With the new API, we can use enums directly with models
+        from ember.api.models import ModelAPI
         
         # Use enum instead of string literals
-        response = service.invoke_model(
-            model_id=ModelEnum.OPENAI_GPT4O,  # Type-safe enum
+        model = ModelAPI.from_enum(ModelEnum.OPENAI_GPT4O)
+        response = model.generate(
             prompt="What's your favorite programming language and why?"
         )
         
         print("\n=== Type-safe enum pattern result ===")
-        print(response.data)
+        print(f"Response: {response.text[:150]}...")  # Truncated for readability
         
-        # Access model metadata via enum
-        model_info = service.registry.get_model_info(ModelEnum.OPENAI_GPT4O)
+        # Access model metadata
+        model_info = models.registry.get_model_info(ModelEnum.OPENAI_GPT4O)
         print("\nModel metadata:")
         print(f"Name: {model_info.name}")
         print(f"Provider: {model_info.provider['name']}")
-        print(f"Input cost per 1K tokens: ${model_info.cost.input_cost_per_thousand}")
-        print(f"Output cost per 1K tokens: ${model_info.cost.output_cost_per_thousand}")
+        print(f"Input cost per 1K tokens: ${model_info.cost.input_cost_per_thousand:.4f}")
+        print(f"Output cost per 1K tokens: ${model_info.cost.output_cost_per_thousand:.4f}")
+        print(f"Context window: {model_info.context_window} tokens")
+        print(f"Version: {model_info.version if hasattr(model_info, 'version') else 'N/A'}")
     except Exception as e:
         logger.exception(f"Error in type-safe enum pattern: {e}")
 
@@ -134,10 +129,7 @@ def type_safe_enum_pattern():
 def batch_processing_pattern():
     """Demonstrates batch processing with multiple models."""
     try:
-        # Initialize
-        registry = initialize_ember(auto_register=True)
-        usage_service = UsageService()
-        service = ModelService(registry=registry, usage_service=usage_service)
+        from ember.api.models import ModelAPI
         
         # Define prompts and models
         prompts = [
@@ -147,26 +139,27 @@ def batch_processing_pattern():
             "Describe reinforcement learning."
         ]
         
-        models = [
-            ModelEnum.OPENAI_GPT4O,
-            ModelEnum.OPENAI_GPT4O_MINI,
-            ModelEnum.ANTHROPIC_CLAUDE_3_SONNET,
-            ModelEnum.ANTHROPIC_CLAUDE_3_HAIKU
+        model_ids = [
+            "openai:gpt-4o",
+            "openai:gpt-4o-mini",
+            "anthropic:claude-3-sonnet",
+            "anthropic:claude-3-haiku"
         ]
         
         # Process in parallel
         def process_prompt(args):
             model_id, prompt = args
             try:
+                model = ModelAPI.from_id(model_id)
                 start_time = time.time()
-                response = service.invoke_model(model_id=model_id, prompt=prompt)
+                response = model.generate(prompt=prompt)
                 duration = time.time() - start_time
-                return model_id, prompt, response.data, duration
+                return model_id, prompt, response.text, duration
             except Exception as e:
                 return model_id, prompt, f"Error: {str(e)}", 0
         
         print("\n=== Batch processing results ===")
-        tasks = list(zip(models, prompts))
+        tasks = list(zip(model_ids, prompts))
         
         with ThreadPoolExecutor(max_workers=4) as executor:
             results = list(executor.map(process_prompt, tasks))
@@ -179,11 +172,21 @@ def batch_processing_pattern():
             print(f"Duration: {duration:.2f} seconds")
             print(f"Result: {result[:100]}..." if len(result) > 100 else f"Result: {result}")
         
-        # Show aggregated usage
-        usage = usage_service.get_total_usage()
-        print("\nTotal usage across all batch operations:")
-        print(f"Total tokens: {usage.tokens}")
-        print(f"Estimated cost: ${usage.cost:.6f}")
+        # Calculate and show aggregate stats
+        total_duration = sum(duration for _, _, _, duration in results)
+        avg_duration = total_duration / len(results) if results else 0
+        completed_tasks = sum(1 for _, _, result, _ in results if not result.startswith("Error:"))
+        
+        print("\n=== Batch Processing Statistics ===")
+        print(f"Total tasks: {len(results)}")
+        print(f"Successfully completed: {completed_tasks}")
+        print(f"Failed: {len(results) - completed_tasks}")
+        print(f"Total processing time: {total_duration:.2f} seconds")
+        print(f"Average response time: {avg_duration:.2f} seconds per task")
+        print(f"Effective throughput: {len(results) / total_duration:.2f} tasks per second")
+        
+        # Usage tracking with new API
+        print("\nTotal usage across all batch operations is available through models.usage API")
     except Exception as e:
         logger.exception(f"Error in batch processing pattern: {e}")
 
@@ -191,44 +194,51 @@ def batch_processing_pattern():
 def custom_model_pattern():
     """Demonstrates adding custom models to the registry."""
     try:
-        # Create a new registry (don't use the global one)
-        registry = ModelRegistry()
+        # With the new API, we register models directly with the registry
+        from ember.api.models import register_model
         
-        # Register a custom model
+        # Register a custom model with realistic values
         custom_model = ModelInfo(
-            id="custom:my-llm",
-            name="My Custom LLM",
+            id="custom:my-advanced-llm",
+            name="MyOrg Advanced LLM",
             cost=ModelCost(
-                input_cost_per_thousand=3.0,
-                output_cost_per_thousand=6.0
+                input_cost_per_thousand=0.0015,  # $0.0015 per 1K input tokens
+                output_cost_per_thousand=0.002   # $0.002 per 1K output tokens
             ),
             rate_limit=RateLimit(
-                tokens_per_minute=50000,
-                requests_per_minute=1000
+                tokens_per_minute=100000,      # 100K tokens per minute
+                requests_per_minute=3000       # 3K requests per minute
             ),
+            context_window=128000,            # 128K context window
             provider={
-                "name": "CustomProvider",
-                "default_api_key": "${CUSTOM_API_KEY}"
+                "name": "MyOrg AI",
+                "default_api_key": "${MYORG_API_KEY}",
+                "api_base": "https://api.myorg-ai.example.com/v1"
             }
         )
         
-        registry.register_model(custom_model)
+        # Register the model
+        register_model(custom_model)
         
         # List all models
-        model_ids = registry.list_models()
+        model_ids = models.registry.list_models()
         
         print("\n=== Custom model registration ===")
         print(f"Registered models: {model_ids}")
         
         # Check model exists and get info
-        exists = registry.model_exists("custom:my-llm")
+        exists = models.registry.model_exists("custom:my-advanced-llm")
         if exists:
-            info = registry.get_model_info("custom:my-llm")
+            info = models.registry.get_model_info("custom:my-advanced-llm")
             print("\nCustom model details:")
             print(f"ID: {info.id}")
             print(f"Name: {info.name}")
             print(f"Provider: {info.provider['name']}")
-            print(f"Input cost: ${info.cost.input_cost_per_thousand} per 1K tokens")
+            print(f"API Base URL: {info.provider.get('api_base', 'N/A')}")
+            print(f"Context window: {info.context_window} tokens")
+            print(f"Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
+            print(f"Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens")
+            print(f"Rate limits: {info.rate_limit.tokens_per_minute} tokens/min, {info.rate_limit.requests_per_minute} req/min")
         else:
             print("Custom model registration failed!")
     except Exception as e:
@@ -237,15 +247,15 @@ def custom_model_pattern():
 
 def main():
     """Run all example patterns."""
-    print("Running Model Registry examples...\n")
+    print("Running Model Registry examples with the new API...\n")
     print("Make sure you have set up your API keys in environment variables:")
     print("  - OPENAI_API_KEY")
     print("  - ANTHROPIC_API_KEY")
     print("  - GOOGLE_API_KEY (if using Gemini models)")
     
     # Run each pattern
-    service = one_line_pattern()
-    service, usage_service = standard_pattern()
+    one_line_pattern()
+    standard_pattern()
     direct_model_pattern()
     type_safe_enum_pattern()
     custom_model_pattern()

@@ -69,7 +69,7 @@ Let's create a simple example that uses multiple models with parallelization:
 from typing import ClassVar
 from ember.xcs.tracer import jit
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 

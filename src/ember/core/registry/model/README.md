@@ -118,8 +118,8 @@ registry/
 
    In your Python code (e.g., `main.py`):
    ```python
-   from src.ember.registry.model.config import initialize_global_registry, GLOBAL_MODEL_REGISTRY
-   from src.ember.registry.model.base.services.model_service import ModelService
+   from ember.registry.model.config import initialize_global_registry, GLOBAL_MODEL_REGISTRY
+   from ember.registry.model.base.services.model_service import ModelService
 
    def main():
        # 1) Initialize the global registry
@@ -155,7 +155,7 @@ print(response.data)
 Below is a simplified usage example (see `example.py` in the `examples/` folder for a more detailed version):
 
 ```python
-from src.ember.registry.model.base.services.model_service import ModelService
+from ember.registry.model.base.services.model_service import ModelService
 ....
 svc = ModelService()
 response = svc(model_id="openai:gpt-4o", prompt="Hello world!")
@@ -259,14 +259,14 @@ If you don't need advanced discovery or usage tracking, here's a minimal workflo
 2. **Initialize the global registry** in your application start-up code:
 
 ```python
-from src.ember.core.registry.model.settings import initialize_global_registry
+from ember.core.registry.model.settings import initialize_global_registry
 
 initialize_global_registry()  # Reads and merges config, registers models
 ```
 
 3. **Use the ModelService or LMModule** to run inference:
 ```python
-from src.ember.core.registry.model.core.modules.lm_modules import LMModule, LMModuleConfig
+from ember.core.registry.model.core.modules.lm_modules import LMModule, LMModuleConfig
 
 # Minimal usage with an LMModule:
 config = LMModuleConfig(model_id="openai:gpt-4o", temperature=0.7)
@@ -275,7 +275,7 @@ response_text = lm("Hello world!")
 print("Got:", response_text)
 
 # Or via ModelService:
-from src.ember.core.registry.model.core.services.model_service import ModelService
+from ember.core.registry.model.core.services.model_service import ModelService
 service = ModelService(registry=GLOBAL_MODEL_REGISTRY, usage_service=None)
 resp = service.invoke_model(model_id="openai:gpt-4o", prompt="Hello world!")
 print("Got:", resp.data)

@@ -5,7 +5,7 @@ from __future__ import annotations
 # Import subpackages to make them available when importing registry
 from . import model
 from . import operator
-from . import prompt_specification
+from . import specification
 
 # Import EmberModel for easy access
 from ember.core.types import EmberModel
@@ -13,6 +13,6 @@ from ember.core.types import EmberModel
 __all__ = [
     "model",
     "operator",
-    "prompt_specification",
+    "specification",
     "EmberModel",
 ]

@@ -11,7 +11,8 @@ import threading
 import time
 from typing import Dict, Any, List, Callable, Set, Tuple
 
-from ember.xcs.transforms import vmap
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import vmap
 from ember.xcs.transforms.vmap import _get_batch_size, _prepare_batched_inputs, _combine_outputs
 
 # Import test operators

@@ -15,7 +15,7 @@ import logging
 from typing import Any, Dict, List, Tuple, Type
 
 from pydantic import BaseModel
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.operator.base.operator_base import Operator
 
 logger: logging.Logger = logging.getLogger(__name__)

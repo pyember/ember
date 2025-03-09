@@ -3,6 +3,9 @@
 This example demonstrates the enhanced JIT API with automatic graph building.
 It shows how applying @jit to operators enables automatic graph building and
 parallel execution without requiring manual graph construction.
+
+To run:
+    poetry run python src/ember/examples/auto_graph_example.py
 """
 
 import logging
@@ -73,7 +76,7 @@ class AutoGraphPipeline(Operator):
         self.aggregator = AutoMostCommon()
 
         # Create minimal specification for validation
-        from ember.core.registry.prompt_specification.specification import Specification
+        from ember.core.registry.specification.specification import Specification
 
         self.specification = Specification(input_model=None, output_model=None)
 

@@ -48,7 +48,7 @@ from ember.core.registry.operator.base.operator_base import (
     Operator,
     OperatorMetadata,
 )
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModuleConfig
 
 # Import from XCS engine:

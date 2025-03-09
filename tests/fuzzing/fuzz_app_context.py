@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 # Ensure Ember is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from src.ember.core.app_context import (
+from ember.core.app_context import (
     EmberAppContext,
     EmberContext,
     get_ember_context,

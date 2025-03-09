@@ -9,7 +9,7 @@ from typing import Any, Dict, Type
 import pytest
 from pydantic import BaseModel
 
-from ember.core.registry.operator.base.operator_base import Operator
+from tests.helpers.stub_classes import Operator
 from ember.xcs.tracer.tracer_decorator import jit
 
 

@@ -3,13 +3,18 @@ Example demonstrating the use of XCS transformations: vmap, pmap/pjit, and mesh.
 
 This example shows how to use the various XCS transformation APIs to parallelize and
 distribute computations across devices.
+
+To run:
+    poetry run python src/ember/examples/transformation_example.py
 """
 
 import time
 from time import perf_counter
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Type
 
+from pydantic import BaseModel
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
 # Note: Unused import removed to adhere to clean code practices.
 from ember.xcs.transforms import (
     vmap,
@@ -41,23 +46,37 @@ def _time_function_call(
     return elapsed, result
 
 
-class SimpleOperator(Operator):
+class SimpleInput(BaseModel):
+    prompts: Any  # Accept any type for prompts
+    
+class SimpleOutput(BaseModel):
+    results: List[str]
+
+class SimpleSpecification(Specification):
+    input_model: Type[BaseModel] = SimpleInput
+    output_model: Type[BaseModel] = SimpleOutput
+
+class SimpleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     """A simple operator that processes input prompts by appending a suffix.
 
     This operator simulates a processing delay and returns the processed results.
     """
-
-    def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, List[str]]:
+    
+    specification = SimpleSpecification()
+    
+    def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Process the provided inputs by concatenating a processing suffix.
 
         Args:
-            inputs: A dictionary with input data. The key 'prompts' should map to a
-                single string or a list of strings to be processed.
+            inputs: A validated SimpleInput model. The prompts field should contain
+                a single string or a list of strings to be processed.
 
         Returns:
             A dictionary with the key 'results' mapping to a list of processed prompts.
         """
-        prompts: Any = inputs.get("prompts", [])
+        # Get prompts from validated input
+        # inputs is actually a SimpleInput model, not a dict
+        prompts: Any = inputs.prompts
         # Simulate processing delay.
         time.sleep(0.1)
         if isinstance(prompts, list):

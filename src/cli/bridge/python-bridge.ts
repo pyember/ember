@@ -311,7 +311,7 @@ import ember
 from typing import ClassVar
 
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 

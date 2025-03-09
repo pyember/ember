@@ -164,3 +164,36 @@ class ModelService:
     # Aliases for method invocation.
     forward = invoke_model
     __call__ = invoke_model
+
+
+def create_model_service(
+    *,
+    registry: ModelRegistry,
+    usage_service: Optional[UsageService] = None,
+    default_model_id: Optional[Union[str, Enum]] = None,
+    logger: Optional[logging.Logger] = None,
+    metrics: Optional[dict[str, object]] = None,
+) -> ModelService:
+    """
+    Creates and returns a ModelService instance with the specified configuration.
+
+    This factory function simplifies the creation of ModelService objects.
+
+    Args:
+        registry (ModelRegistry): The registry instance used to retrieve model objects.
+        usage_service (Optional[UsageService]): Service to record model usage statistics.
+        default_model_id (Optional[Union[str, Enum]]): Default model identifier when none is provided.
+        logger (Optional[logging.Logger]): Logger instance; if not supplied, a default logger
+            named after the class is created.
+        metrics (Optional[dict[str, object]]): A dictionary of metrics (e.g., Prometheus counters/histograms).
+
+    Returns:
+        ModelService: A configured ModelService instance.
+    """
+    return ModelService(
+        registry=registry,
+        usage_service=usage_service,
+        default_model_id=default_model_id,
+        logger=logger,
+        metrics=metrics,
+    )

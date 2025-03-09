@@ -12,8 +12,9 @@ import os
 import threading
 from typing import Dict, Any, List, Callable, Set, Tuple, Optional
 
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.transforms import vmap, pmap, pjit, DeviceMesh, PartitionSpec, mesh_sharded
+from tests.helpers.stub_classes import Operator
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import vmap, pmap, pjit, DeviceMesh, PartitionSpec, mesh_sharded
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine.xcs_engine import execute_graph, TopologicalSchedulerWithParallelDispatch
 

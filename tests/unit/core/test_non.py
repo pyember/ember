@@ -1,6 +1,6 @@
 """Placeholder test for NON wrappers.
 
-Since the prompt_specification module has been removed and refactored to use Specification
+Since the specification module has been removed and refactored to use Specification
 instead of Specification, this test file is a placeholder until the test can be 
 properly updated to match the new architecture.
 """

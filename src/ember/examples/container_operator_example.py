@@ -7,6 +7,9 @@ Note: In the current implementation, the JIT decorator enables tracing but
 doesn't automatically build execution graphs. For automatic graph building
 and parallel execution, you'd still need to use XCSGraph and execute_graph
 (shown in the other examples).
+
+To run:
+    poetry run python src/ember/examples/container_operator_example.py
 """
 
 import logging
@@ -17,7 +20,7 @@ from ember.core.types.ember_model import EmberModel
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core import non
 from ember.xcs.tracer.tracer_decorator import jit
 

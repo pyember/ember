@@ -82,10 +82,9 @@ def test_discovery_service_merge_with_config(monkeypatch: pytest.MonkeyPatch) ->
             },
         )()
 
-    monkeypatch.setattr(
-        "ember.core.registry.model.config.settings.EmberSettings",
-        MockEmberSettings,
-    )
+    # Use a direct import and mock to avoid module import issues
+    from ember.core.registry.model.config import settings
+    settings.EmberSettings = MockEmberSettings
 
     service = ModelDiscoveryService()
     discovered = {"mock:model": {"id": "mock:model", "name": "Mock Model"}}

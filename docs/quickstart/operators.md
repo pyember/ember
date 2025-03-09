@@ -30,7 +30,7 @@ class ClassifierOutput(EmberModel):
 ```python
 from typing import ClassVar
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 
 # Define the specification (input/output schema + prompt template)
 class ClassifierSpecification(Specification):
@@ -191,7 +191,7 @@ final_result = judge(inputs={
 from typing import ClassVar, Type, TypeVar
 
 from ember.xcs.tracer import jit
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 I = TypeVar('I', bound=EmberModel)
@@ -247,7 +247,7 @@ result = AnalysisPipeline()(inputs={
 ## Next Steps
 
 Learn more about:
-- [Prompt Specifications](prompt_specifications.md) - Type-safe prompt templating
+- [Prompt Specifications](specifications.md) - Type-safe prompt templating
 - [Model Registry](model_registry.md) - Managing LLM configurations
 - [NON Patterns](non.md) - Networks of Networks composition
 - [XCS Graphs](../advanced/xcs_graphs.md) - Advanced parallel execution

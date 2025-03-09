@@ -6,7 +6,7 @@ from pydantic import Field
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.exceptions import MissingLMModuleError
 from ember.core.types.ember_model import EmberModel
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -49,7 +49,7 @@ class VerifierSpecification(Specification):
         "Revised Answer (optional): <If you can and want to provide a corrected version>\n"
     )
     input_model: Type[EmberModel] = VerifierOperatorInputs
-    output_model: Type[EmberModel] = VerifierOperatorOutputs
+    structured_output: Type[EmberModel] = VerifierOperatorOutputs
 
 
 class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]):
@@ -119,6 +119,8 @@ class VerifierOperator(Operator[VerifierOperatorInputs, VerifierOperatorOutputs]
         if revised_answer_lines:
             revised_answer = "\n".join(revised_answer_lines)
 
+        # Return as dictionary - the operator __call__ will properly convert to model
+        # This maintains flexibility while ensuring type safety
         return {
             "verdict": verdict,
             "explanation": explanation,

@@ -16,25 +16,26 @@ from typing import (
     get_type_hints,
     cast,
 )
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, create_model, ConfigDict, Field
 
 # Import locally to avoid circular imports
 from .protocols import TypeInfo, EmberTyped, EmberSerializable
 
 T = TypeVar("T", bound="EmberModel")
 
-
 class EmberModel(BaseModel):
     """
     A unified model for Ember input/output types that combines BaseModel validation
     with flexible serialization to dict, JSON, and potentially other formats.
-
+    
     This class supports both attribute access (model.attr) and dictionary access (model["attr"])
     patterns for maximum flexibility and backward compatibility.
-
+    
     It implements EmberTyped and EmberSerializable protocols to provide consistent
     type information and serialization capabilities.
     """
+    # Use the new ConfigDict style instead of class Config
+    model_config = ConfigDict()
 
     # Class variable to store output format preference
     __output_format__: ClassVar[str] = "model"  # Options: "model", "dict", "json"

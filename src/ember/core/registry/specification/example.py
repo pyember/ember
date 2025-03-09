@@ -1,12 +1,12 @@
 from __future__ import annotations
 from typing import Literal, Optional, Type
 
-from pydantic import BaseModel
+from ember.core.types import EmberModel
 
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 
 
-class CaravanLabelsOutput(BaseModel):
+class CaravanLabelsOutput(EmberModel):
     """
     Data model representing Caravan labeling output.
 
@@ -17,7 +17,7 @@ class CaravanLabelsOutput(BaseModel):
     label: Literal["0", "1"]
 
 
-class CaravanLabelingInputs(BaseModel):
+class CaravanLabelingInputs(EmberModel):
     """
     Data model representing Caravan labeling inputs.
 

@@ -59,8 +59,16 @@ OperatorType = TypeVar("OperatorType", bound="Operator")
 # Type alias for the decorator function's return type
 OperatorDecorator = Callable[[Type[OperatorType]], Type[OperatorType]]
 
-# Forward reference to avoid circular imports
-from ember.core.registry.operator.base.operator_base import Operator
+# Use a Protocol for Operator to avoid circular imports
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class Operator(Protocol):
+    """Protocol defining the expected interface for Operators."""
+    
+    def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute the operator with provided inputs."""
+        ...
 
 # Forward import execution components to avoid circular imports
 from ember.xcs.graph.xcs_graph import XCSGraph

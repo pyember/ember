@@ -16,8 +16,9 @@ from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 import numpy as np
 from unittest.mock import MagicMock, patch
 
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.transforms import vmap, pmap, pjit, DeviceMesh, PartitionSpec, mesh_sharded
+from tests.helpers.stub_classes import Operator
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import vmap, pmap, pjit, DeviceMesh, PartitionSpec, mesh_sharded
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine.xcs_engine import execute_graph, TopologicalSchedulerWithParallelDispatch
 

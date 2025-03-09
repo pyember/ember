@@ -13,136 +13,82 @@ Core Features:
 - Enhanced JIT System
 - Built-in Evaluation
 - Powerful Data Handling
+- Intuitive Model Access
 
 For more information, visit https://pyember.org
+
+Examples:
+    # Import primary API modules
+    import ember
+    
+    # Initialize model registry and service
+    from ember.api.models import initialize_registry, create_model_service
+    
+    registry = initialize_registry(auto_discover=True)
+    model_service = create_model_service(registry=registry)
+    
+    # Call a model
+    response = model_service.invoke_model(
+        model_id="openai:gpt-4",
+        prompt="What's the capital of France?",
+        temperature=0.7
+    )
+    
+    # Load datasets directly
+    from ember.api.data import datasets
+    mmlu_data = datasets("mmlu")
+    
+    # Or use the dataset builder pattern
+    from ember.api.data import DatasetBuilder
+    dataset = DatasetBuilder().split("test").sample(100).build("mmlu")
+    
+    # Create Networks of Networks (NONs)
+    from ember.api import non
+    ensemble = non.UniformEnsemble(
+        num_units=3, 
+        model_name="openai:gpt-4o"
+    )
+    
+    # Optimize with XCS
+    from ember.api import xcs
+    @xcs.jit
+    def optimized_fn(x):
+        return complex_computation(x)
 """
 
 from __future__ import annotations
 
 import importlib.metadata
-from typing import TYPE_CHECKING, Optional, Any, Union, Callable
+from typing import Optional
 
-if TYPE_CHECKING:
-    from ember.core.registry.model import ModelRegistry, ModelService
-    from ember.core.registry.model import initialize_ember
+# Import primary API components - these are the only public interfaces
+from ember.api import (
+    models,    # Language model access (models.openai.gpt4, etc.)
+    data,  # Dataset access (datasets("mmlu"), etc.)
+    operators, # Operator registry (operators.get_operator(), etc.)
+    non,       # Network of Networks patterns (non.UniformEnsemble, etc.)
+    xcs        # Execution optimization (xcs.jit, etc.)
+)
 
-try:
-    from .core.registry.model import initialize_ember, ModelRegistry, ModelService
-    from .core.registry.model.base.services.usage_service import UsageService
-except ImportError:
-    # Alternative import path when the package is not properly installed
-    from ember.core.registry.model import initialize_ember, ModelRegistry, ModelService
-    from ember.core.registry.model.base.services.usage_service import UsageService
-
-# Try to get version from package metadata, fallback to hardcoded version
+# Version detection
 try:
     __version__ = importlib.metadata.version("ember-ai")
 except importlib.metadata.PackageNotFoundError:
     __version__ = "0.1.0"
 
-__all__ = ["ModelRegistry", "ModelService", "initialize_ember", "init", "non", "jit", "autograph"]
-
-# Package version and metadata
+# Package metadata
 _PACKAGE_METADATA = {
     "name": "ember-ai",
     "version": __version__,
     "description": "Compositional framework for building and orchestrating Compound AI Systems and Networks of Networks (NONs).",
 }
 
-
-def __getattr__(name: str) -> object:
-    """Lazy load main components using absolute imports."""
-    if name == "ModelRegistry":
-        try:
-            from ember.core.registry.model.base.registry.model_registry import (
-                ModelRegistry,
-            )
-            return ModelRegistry
-        except ImportError:
-            from ember.core.registry.model.base.registry.model_registry import (
-                ModelRegistry,
-            )
-            return ModelRegistry
-    if name == "ModelService":
-        try:
-            from ember.core.registry.model.base.services.model_service import (
-                ModelService,
-            )
-            return ModelService
-        except ImportError:
-            from ember.core.registry.model.base.services.model_service import (
-                ModelService,
-            )
-            return ModelService
-    if name == "initialize_ember":
-        try:
-            from ember.core.registry.model import initialize_ember
-            return initialize_ember
-        except ImportError:
-            from ember.core.registry.model import initialize_ember
-            return initialize_ember
-    if name == "non":
-        try:
-            from ember.core import non
-            return non
-        except ImportError:
-            from ember.core import non
-            return non
-    if name == "jit":
-        try:
-            from ember.xcs.tracer import jit
-            return jit
-        except ImportError:
-            from ember.xcs.tracer import jit
-            return jit
-    if name == "autograph":
-        try:
-            from ember.xcs.tracer import autograph
-            return autograph
-        except ImportError:
-            from ember.xcs.tracer import autograph
-            return autograph
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def init(
-    *,
-    config_path: Optional[str] = None,
-    auto_register: bool = True,
-    auto_discover: bool = True,
-    usage_tracking: bool = True,
-) -> ModelService:
-    """Initialize Ember with a single function call.
-    
-    This is the quickest way to get started with Ember. It:
-    1. Sets up the model registry with available providers
-    2. Enables usage tracking by default
-    3. Returns a callable model service
-    
-    Args:
-        config_path: Custom path to the YAML configuration file
-        auto_register: Whether to automatically register local models
-        auto_discover: Whether to automatically discover remote models
-        usage_tracking: Whether to track token usage and costs (on by default)
-        
-    Returns:
-        A callable model service for invoking language models
-        
-    Example:
-        >>> import ember
-        >>> service = ember.init()
-        >>> response = service("openai:gpt-4o", "Hello world!")
-        >>> print(response.data)
-    """
-    # Initialize the registry using the unified settings flow
-    registry = initialize_ember(
-        config_path=config_path,
-        auto_register=auto_register,
-        auto_discover=auto_discover,
-    )
-
-    # Create a UsageService if usage tracking is enabled (default: True)
-    usage_service: Optional[UsageService] = UsageService() if usage_tracking else None
-
-    # Return the callable ModelService
-    return ModelService(registry=registry, usage_service=usage_service)
+# Public interface - only export the main API components
+__all__ = [
+    "models",    # Language model access
+    "data",  # Dataset access
+    "operators", # Operator registry
+    "non",       # Network of Networks patterns
+    "xcs",       # Execution optimization
+    "__version__"
+]

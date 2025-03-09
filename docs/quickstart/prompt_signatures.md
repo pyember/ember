@@ -14,7 +14,7 @@ They provide automatic validation, clear error messages, and consistent prompt f
 ## 2. Creating a Basic Specification
 
 ```python
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from pydantic import BaseModel, Field
 from typing import List
 

@@ -35,7 +35,7 @@ from ember.xcs.tracer import jit
 from ember.xcs.engine import execution_options
 from ember.core import non
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 # Define structured model inputs/outputs
@@ -135,7 +135,7 @@ The simplest possible Ember application - a single LLM call wrapped in an operat
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 class SimpleInput(EmberModel):
@@ -187,7 +187,7 @@ from typing import ClassVar, List
 from ember.core.registry.operator.base import Operator
 from ember.xcs.tracer import jit
 from ember.core import non
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 class EnsembleInput(EmberModel):
@@ -258,7 +258,7 @@ Demonstrates a multi-stage pipeline with different operators and automatic execu
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
 from ember.xcs.tracer import jit, execution_options
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 
@@ -378,7 +378,7 @@ Operators are the fundamental building blocks in Ember, similar to PyTorch's `nn
 ```python
 from typing import ClassVar, List
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core.registry.model.model_module import LMModule, LMModuleConfig
 
@@ -440,7 +440,7 @@ Ember provides powerful components for building complex Networks of Networks (NO
 ```python
 from typing import ClassVar
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 
@@ -537,7 +537,7 @@ from ember.xcs.tracer import jit
 from ember.xcs.engine import execution_options  
 from ember.core import non
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 # Define our input and output types
@@ -654,7 +654,7 @@ For comprehensive documentation, including tutorials, API reference, and advance
 
 - [Model Registry Quickstart](docs/quickstart/model_registry.md) - Get started with LLM integration
 - [Operators Quickstart](docs/quickstart/operators.md) - Build reusable computation units
-- [Prompt Specifications Quickstart](docs/quickstart/prompt_specifications.md) - Type-safe prompt engineering
+- [Prompt Specifications Quickstart](docs/quickstart/specifications.md) - Type-safe prompt engineering
 - [NON Quickstart](docs/quickstart/non.md) - Networks of Networks patterns
 - [Data Quickstart](docs/quickstart/data.md) - Working with datasets and evaluation
 

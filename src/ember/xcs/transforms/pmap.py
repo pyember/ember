@@ -11,9 +11,16 @@ import multiprocessing
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Protocol, TypeVar, runtime_checkable
 
-from ember.core.registry.operator.base.operator_base import Operator
+# Use a placeholder class to avoid circular imports
+@runtime_checkable
+class Operator(Protocol):
+    """Stub Operator protocol to avoid circular imports."""
+    
+    def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Call protocol for operators."""
+        ...
 
 logger = logging.getLogger(__name__)
 

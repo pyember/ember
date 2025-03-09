@@ -3,19 +3,11 @@ Parallel Ensemble Pattern Implementation
 
 This module implements the Ensemble pattern, a foundational distributed inference pattern
 that enables parallel execution of multiple language model instances. This pattern addresses
-several critical needs in LLM applications:
+several critical needs in Compound AI Systems applications:
 
-1. Statistical Robustness: Multiple independent inferences reduce variance in outputs
-2. Throughput Optimization: Concurrent execution maximizes utilization of available resources
-3. Diverse Perspectives: Different models or configurations can provide complementary insights
-4. Reliability Improvement: Fault tolerance through redundant computation
-
-The implementation follows SOLID principles:
-- Single Responsibility: The operator focuses solely on parallel distribution of queries
-- Open for Extension: Easily extended for specialized ensemble variants
-- Liskov Substitution: Proper typing enables seamless composition
-- Interface Segregation: Minimal input/output interface for clarity
-- Dependency Inversion: Model instances injected rather than created internally
+1. Statistical Robustness: Multiple "independent" inferences reduce variance in outputs
+2. Throughput Optimization: Concurrent execution maximizes utilization of available resources, or rate-limits
+3. Entropy and diversity of perspectives: Different models or configurations can provide complementary insights
 
 The pattern serves as a foundational building block for more complex NON patterns
 and reliability-focused LLM applications.
@@ -23,12 +15,13 @@ and reliability-focused LLM applications.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, TypeVar
+from typing import List
+
 from ember.core.types import EmberModel
 
 from ember.core.registry.operator.base.operator_base import Operator
 
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
 
 
@@ -40,11 +33,6 @@ class EnsembleOperatorInputs(EmberModel):
     focusing on the core query text while allowing the specification to
     handle rendering details. The model is intentionally minimalist to
     enable maximum flexibility in ensemble configurations.
-    
-    The single query field supports multiple use cases:
-    - Direct prompting with raw text
-    - Template-based prompting through specification rendering
-    - Complex prompts via structured rendering in subclasses
     
     Attributes:
         query: The primary text query to be sent to all language models
@@ -63,7 +51,7 @@ class EnsembleOperatorOutputs(EmberModel):
     between responses and their source models, enabling downstream operators
     to apply model-specific weighting or processing if needed.
     
-    Design considerations:
+    Notable design considerations:
     - Maintains original response ordering for reproducibility
     - Preserves raw text outputs for maximum flexibility
     - Simple structure facilitates easy aggregation and analysis
@@ -90,7 +78,7 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]
     """
 
     specification: Specification = Specification(
-        input_model=EnsembleOperatorInputs, output_model=EnsembleOperatorOutputs
+        input_model=EnsembleOperatorInputs, structured_output=EnsembleOperatorOutputs
     )
     lm_modules: List[LMModule]
 

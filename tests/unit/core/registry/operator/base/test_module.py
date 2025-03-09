@@ -27,14 +27,8 @@ from ember.core.registry.operator.base._module import (
     static_field,
     ember_field,
     _make_initable_wrapper,
-    _flatten_ember_module,
-    _unflatten_ember_module,
-    _thread_local,
     EmberModuleMeta,
-)
-from ember.core.registry.operator.exceptions import (
-    BoundMethodNotInitializedError,
-    FlattenError,
+    ModuleCache,
 )
 from ember.xcs.utils.tree_util import (
     tree_flatten,
@@ -501,11 +495,13 @@ def test_imported_modules() -> None:
     assert callable(tree_unflatten), "tree_unflatten should be imported and callable"
 
 
-def test_thread_local_initialization() -> None:
-    """Tests that _thread_local is correctly initialized.
+def test_module_cache_initialization() -> None:
+    """Tests that ModuleCache creates a thread-local instance.
 
-    _thread_local should be an instance of threading.local.
+    ModuleCache should initialize a thread-local instance for caching.
     """
+    cache = ModuleCache()
+    assert hasattr(cache, "_thread_local"), "ModuleCache should have a _thread_local attribute"
     assert isinstance(
-        _thread_local, threading.local
+        cache._thread_local, threading.local
     ), "_thread_local should be an instance of threading.local"

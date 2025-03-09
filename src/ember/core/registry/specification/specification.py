@@ -4,8 +4,7 @@ import logging
 
 from pydantic import BaseModel, model_validator
 
-from ember.core.registry.prompt_specification.exceptions import (
-    PromptSpecificationError,
+from ember.core.registry.specification.exceptions import (
     PlaceholderMissingError,
     MismatchedModelError,
     InvalidInputTypeError,
@@ -14,11 +13,11 @@ from ember.core.types import EmberModel
 
 logger = logging.getLogger(__name__)
 
-InputModelT = TypeVar("InputModelT", bound=BaseModel)
-OutputModelT = TypeVar("OutputModelT", bound=BaseModel)
+InputModelT = TypeVar("InputModelT", bound=EmberModel)
+OutputModelT = TypeVar("OutputModelT", bound=EmberModel)
 
 
-class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
+class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
     """Base class representing an operator's specification.
 
     Attributes:
@@ -79,7 +78,7 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
         return self
 
     def render_prompt(
-        self, *, inputs: Union[Dict[str, Any], BaseModel, EmberModel]
+        self, *, inputs: Union[Dict[str, Any], EmberModel]
     ) -> str:
         """Render a prompt using the provided inputs.
 
@@ -88,7 +87,7 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
         If neither is available, raises an error.
 
         Args:
-            inputs (Union[Dict[str, Any], BaseModel, EmberModel]): Input values as a dictionary or model.
+            inputs (Union[Dict[str, Any], EmberModel]): Input values as a dictionary or model.
 
         Returns:
             str: The rendered prompt string.
@@ -106,8 +105,6 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
         input_dict: Dict[str, Any] = inputs
         if isinstance(inputs, EmberModel):
             input_dict = inputs.as_dict()
-        elif isinstance(inputs, BaseModel):
-            input_dict = inputs.model_dump()
 
         if self.prompt_template is not None:
             try:
@@ -148,27 +145,27 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
     def _validate_data(
         self,
         *,
-        data: Union[Dict[str, Any], BaseModel],
-        model: Type[BaseModel],
+        data: Union[Dict[str, Any], EmberModel],
+        model: Type[EmberModel],
         model_label: str,
-    ) -> BaseModel:
+    ) -> EmberModel:
         """Validate the provided data against a specified Pydantic model.
 
         Args:
-            data (Union[Dict[str, Any], BaseModel]): The data to validate.
-            model (Type[BaseModel]): The Pydantic model for validation.
+            data (Union[Dict[str, Any], EmberModel]): The data to validate.
+            model (Type[EmberModel]): The Pydantic model for validation.
             model_label (str): A label for error messages (e.g., "Input" or "Output").
 
         Returns:
-            BaseModel: A validated instance of the specified model.
+            EmberModel: A validated instance of the specified model.
 
         Raises:
-            MismatchedModelError: If a BaseModel instance does not match the expected model.
+            MismatchedModelError: If a EmberModel instance does not match the expected model.
             InvalidInputTypeError: If the data is neither a dict nor a Pydantic model.
         """
         if isinstance(data, dict):
             return model.model_validate(data)
-        if isinstance(data, BaseModel):
+        if isinstance(data, EmberModel):
             if not isinstance(data, model):
                 error_msg: str = (
                     f"{model_label} model mismatch. Expected {model.__name__}, got {type(data).__name__}."
@@ -177,7 +174,7 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
                 raise MismatchedModelError(message=error_msg)
             return data
         error_msg: str = (
-            f"{model_label} must be a dict or a Pydantic model, got {type(data).__name__}."
+            f"{model_label} must be a dict or an EmberModel, got {type(data).__name__}."
         )
         logger.error(error_msg)
         raise InvalidInputTypeError(message=error_msg)
@@ -201,10 +198,10 @@ class Specification(BaseModel, Generic[InputModelT, OutputModelT]):
             return self._validate_data(
                 data=inputs, model=self.input_model, model_label="Input"
             )
-        if isinstance(inputs, (dict, BaseModel)):
+        if isinstance(inputs, (dict, EmberModel)):
             return inputs
         error_msg: str = (
-            f"Inputs must be a dict or a Pydantic model, got {type(inputs).__name__}."
+            f"Inputs must be a dict or an EmberModel, got {type(inputs).__name__}."
         )
         logger.error(error_msg)
         raise InvalidInputTypeError(message=error_msg)

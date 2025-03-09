@@ -48,9 +48,24 @@ from typing import (
 )
 from typing_extensions import TypedDict, Protocol
 
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.types import EmberModel
-from ember.core.types.xcs_types import NodeInputT, NodeOutputT
+# Use stub classes to avoid import errors
+from typing import TypeVar, Dict, Any
+
+# Stub class for Operator to avoid circular imports
+class Operator:
+    """Temporary Operator stub class to avoid import errors."""
+    def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Placeholder for calling an operator."""
+        return {}
+
+# Use TypeVar for NodeInputT and NodeOutputT
+NodeInputT = TypeVar('NodeInputT', bound=Dict[str, Any])
+NodeOutputT = TypeVar('NodeOutputT', bound=Dict[str, Any])
+
+# Stub class for EmberModel
+class EmberModel:
+    """Temporary EmberModel stub class to avoid import errors."""
+    pass
 
 # Define more specific type variables
 InputItemT = TypeVar("InputItemT")

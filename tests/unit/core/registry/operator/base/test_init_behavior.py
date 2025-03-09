@@ -7,21 +7,20 @@ This module tests that Operator subclasses don't need to call super().__init__()
 import unittest
 from typing import Any, Dict
 
-from pydantic import BaseModel
-
+from ember.core.types.ember_model import EmberModel
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.operator.base._module import ember_field
 
 
 # Models defined outside of test classes to avoid collection warnings
-class OpTestInput(BaseModel):
+class OpTestInput(EmberModel):
     """Simple input model for testing."""
 
     value: int
 
 
-class OpTestOutput(BaseModel):
+class OpTestOutput(EmberModel):
     """Simple output model for testing."""
 
     result: int

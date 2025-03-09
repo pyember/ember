@@ -6,6 +6,9 @@ branching paths and parallel execution using JIT-enabled operators.
 Note: In the current implementation, each operator needs to be
 decorated with @jit separately, and the graph must be built manually.
 Future versions will simplify this process.
+
+To run:
+    poetry run python src/ember/examples/parallel_pipeline_example.py
 """
 
 import logging
@@ -14,7 +17,7 @@ from typing import Any, Dict, List, Optional
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.non import Ensemble, JudgeSynthesis
+from ember.core.non import UniformEnsemble, JudgeSynthesis
 from ember.xcs.tracer.tracer_decorator import jit
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine.xcs_engine import (
@@ -29,21 +32,21 @@ from ember.xcs.engine.xcs_engine import (
 
 
 @jit()
-class FactEnsemble(Ensemble):
+class FactEnsemble(UniformEnsemble):
     """Ensemble focused on factual information."""
 
     pass
 
 
 @jit()
-class CreativeEnsemble(Ensemble):
+class CreativeEnsemble(UniformEnsemble):
     """Ensemble focused on creative responses."""
 
     pass
 
 
 @jit()
-class DetailedEnsemble(Ensemble):
+class DetailedEnsemble(UniformEnsemble):
     """Ensemble focused on detailed explanations."""
 
     pass

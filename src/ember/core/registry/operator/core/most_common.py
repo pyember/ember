@@ -6,7 +6,7 @@ from ember.core.types import EmberModel
 
 from ember.core.registry.operator.base.operator_base import Operator
 
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 
 
 class MostCommonAnswerSelectorOperatorInputs(EmberModel):
@@ -36,7 +36,7 @@ class MostCommonAnswerSelectorOperator(
 
     specification: Specification = Specification(
         input_model=MostCommonAnswerSelectorOperatorInputs,
-        output_model=MostCommonAnswerSelectorOutputs,
+        structured_output=MostCommonAnswerSelectorOutputs,
     )
 
     def forward(

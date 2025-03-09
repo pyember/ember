@@ -1,30 +1,41 @@
-from typing import ClassVar, Dict, Optional, Union, cast, Type
-from pydantic import Field
+"""Example architectures demonstrating clean Ember operator composition patterns.
 
+This module showcases best practices for defining and composing operators
+in Ember, following patterns from high-quality OSS libraries like JAX and PyTorch.
+It uses the Network of Operators (NON) pattern for standardized, composable LLM pipelines.
+"""
+
+from typing import ClassVar, Dict, List, Type, Any
+
+# Import the non module directly from ember
+from ember import non
+from ember.api.operators import Operator, EmberModel, Field
+from ember.core.registry.specification.specification import Specification
 from ember.core.app_context import get_ember_context
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.types.ember_model import EmberModel
-from ember.core import non
-from ember.core.registry.prompt_specification.specification import Specification
 
 
 class NetworkInput(EmberModel):
-    """Input model for network operators."""
-
+    """Input model for network operators.
+    
+    Attributes:
+        query: The query to process
+    """
     query: str = Field(description="The query to process")
 
 
 class NetworkOutput(EmberModel):
-    """Output model for network operators."""
-
+    """Output model for network operators.
+    
+    Attributes:
+        final_answer: The final processed answer
+    """
     final_answer: str = Field(description="The final processed answer")
 
 
 class SubNetworkSpecification(Specification):
     """Specification for SubNetwork operator."""
-
     input_model: Type[EmberModel] = NetworkInput
-    output_model: Type[EmberModel] = NetworkOutput
+    structured_output: Type[EmberModel] = NetworkOutput
 
 
 class SubNetwork(Operator[NetworkInput, NetworkOutput]):
@@ -34,136 +45,172 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     the output based on the initial ensemble's response.
 
     Attributes:
-        ensemble (non.UniformEnsemble): An ensemble operator with 2 units of "gpt-4o".
-        verifier (non.Verifier): A verification operator using "gpt-4o".
+        specification: The operator's input/output contract
+        ensemble: A uniform ensemble with N units of the specified model
+        verifier: A verification operator using the specified model
     """
-
     specification: ClassVar[Specification] = SubNetworkSpecification()
     ensemble: non.UniformEnsemble
     verifier: non.Verifier
 
-    def __init__(self) -> None:
-        """Initializes the SubNetwork with a specified ensemble and verification components."""
-        super().__init__()
+    def __init__(self, *, model_name: str = "gpt-4o", num_units: int = 2) -> None:
+        """Initialize the SubNetwork with configurable components.
+        
+        Args:
+            model_name: The model to use for both ensemble and verification
+            num_units: Number of ensemble units to run in parallel
+        """
         self.ensemble = non.UniformEnsemble(
-            num_units=2, model_name="gpt-4o", temperature=0.0
+            num_units=num_units, 
+            model_name=model_name, 
+            temperature=0.0
         )
-        self.verifier = non.Verifier(model_name="gpt-4o", temperature=0.0)
+        self.verifier = non.Verifier(
+            model_name=model_name, 
+            temperature=0.0
+        )
 
     def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
-        """Processes the input through the ensemble and applies verification.
+        """Process the input through the ensemble and verify the results.
 
         Args:
-            inputs: The validated input containing the query.
+            inputs: The validated input containing the query
 
         Returns:
-            A NetworkOutput with the verified answer.
+            A NetworkOutput with the verified answer
         """
-        # Process through ensemble
-        ensemble_input = {"query": inputs.query}
-        ensemble_result = self.ensemble(inputs=ensemble_input)
-
-        # Extract ensemble result explicitly
-        if (
-            not isinstance(ensemble_result, dict)
-            or "final_answer" not in ensemble_result
-        ):
-            candidate_answer = ""
-        else:
-            candidate_answer = ensemble_result["final_answer"]
-
-        # Prepare verification input
-        verification_input = {
-            "query": inputs.query,
-            "candidate_answer": candidate_answer,
-        }
-
-        # Verify the ensemble's output
-        verified_result = self.verifier(inputs=verification_input)
-
-        # Extract result explicitly - no hidden error handling
-        if (
-            not isinstance(verified_result, dict)
-            or "final_answer" not in verified_result
-        ):
-            final_answer = ""
-        else:
-            final_answer = verified_result["final_answer"]
-
+        ensemble_result = self.ensemble(query=inputs.query)
+        
+        # Extract the first response for verification
+        candidate_answer = ensemble_result["responses"][0]
+        
+        verified_result = self.verifier(
+            query=inputs.query,
+            candidate_answer=candidate_answer
+        )
+        
         # Return structured output
-        return NetworkOutput(final_answer=final_answer)
+        return NetworkOutput(final_answer=verified_result["revised_answer"])
 
 
 class NestedNetworkSpecification(Specification):
     """Specification for NestedNetwork operator."""
-
     input_model: Type[EmberModel] = NetworkInput
-    output_model: Type[EmberModel] = NetworkOutput
+    structured_output: Type[EmberModel] = NetworkOutput
 
 
 class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
-    """Nested network that aggregates results from multiple sub-networks and applies a final judgment.
+    """Nested network that aggregates results from multiple sub-networks and applies judgment.
 
     This operator executes two subnetwork branches and uses a judge operator to synthesize the outputs.
 
     Attributes:
-        sub1 (SubNetwork): The first sub-network instance.
-        sub2 (SubNetwork): The second sub-network instance.
-        judge (non.JudgeSynthesis): A judge synthesis operator using "gpt-4o".
+        specification: The operator's input/output contract
+        sub1: The first sub-network instance
+        sub2: The second sub-network instance
+        judge: A judge synthesis operator
     """
-
     specification: ClassVar[Specification] = NestedNetworkSpecification()
     sub1: SubNetwork
     sub2: SubNetwork
     judge: non.JudgeSynthesis
 
-    def __init__(self) -> None:
-        """Initializes the NestedNetwork with two SubNetwork instances and a final Judge operator."""
-        super().__init__()
-        self.sub1 = SubNetwork()
-        self.sub2 = SubNetwork()
-        self.judge = non.JudgeSynthesis(model_name="gpt-4o", temperature=0.0)
+    def __init__(self, *, model_name: str = "gpt-4o") -> None:
+        """Initialize the NestedNetwork with sub-networks and a judge.
+        
+        Args:
+            model_name: The model to use for all components
+        """
+        self.sub1 = SubNetwork(model_name=model_name)
+        self.sub2 = SubNetwork(model_name=model_name)
+        self.judge = non.JudgeSynthesis(model_name=model_name, temperature=0.0)
 
     def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
-        """Executes the nested network by processing inputs through sub-networks and aggregating responses.
+        """Execute the nested network by processing through sub-networks and judging results.
 
         Args:
-            inputs: The validated input containing the query.
+            inputs: The validated input containing the query
 
         Returns:
-            A NetworkOutput with the final judged answer.
+            A NetworkOutput with the final judged answer
         """
         # Process through parallel sub-networks
         s1_out = self.sub1(inputs=inputs)
         s2_out = self.sub2(inputs=inputs)
 
-        # Synthesize results using the judge
         judged_result = self.judge(
-            inputs={"query": inputs.query, "responses": [s1_out.final_answer, s2_out.final_answer]}
+            query=inputs.query,
+            responses=[s1_out.final_answer, s2_out.final_answer]
         )
 
-        # Extract the final answer
-        final_answer = judged_result.final_answer
-
         # Return structured output
-        return NetworkOutput(final_answer=final_answer)
+        return NetworkOutput(final_answer=judged_result["synthesized_response"])
 
 
-def nested_module_graph() -> Operator[NetworkInput, NetworkOutput]:
-    """Creates an instance of the NestedNetwork operator representing a complex nested network structure.
-
+def create_nested_network(*, model_name: str = "gpt-4o") -> NestedNetwork:
+    """Create a nested network with the specified model.
+    
+    Args:
+        model_name: The model to use throughout the network
+        
     Returns:
-        A strongly-typed NestedNetwork operator instance for pipeline execution.
+        A configured NestedNetwork operator
     """
-    return NestedNetwork()
+    return NestedNetwork(model_name=model_name)
+
+
+def create_pipeline(*, model_name: str = "gpt-4o") -> non.Sequential:
+    """Create a declarative pipeline using the Sequential NON operator.
+    
+    This demonstrates a more declarative approach to building operator pipelines
+    using the Sequential operator, which chains operators together automatically.
+    
+    Args:
+        model_name: The model to use throughout the pipeline
+        
+    Returns:
+        A callable pipeline accepting standardized inputs
+    """
+    # Create a pipeline using Sequential operator for cleaner composition
+    return non.Sequential(operators=[
+        # Generate 3 responses with the same model
+        non.UniformEnsemble(
+            num_units=3,
+            model_name=model_name,
+            temperature=0.7  # Using higher temperature for diversity
+        ),
+        
+        # Pass the ensemble responses to a judge for synthesis
+        non.JudgeSynthesis(
+            model_name=model_name,
+            temperature=0.0
+        ),
+        
+        # Verify the synthesized response
+        non.Verifier(
+            model_name=model_name,
+            temperature=0.0
+        )
+    ])
 
 
 if __name__ == "__main__":
-    # Initialize the ember context first
+    # Initialize the ember context
     context = get_ember_context()
 
-    # Quick test invocation using explicit method calls with named parameters.
-    network = nested_module_graph()
-    test_input = NetworkInput(query="Hello from the new approach")
+    # Example 1: Using the object-oriented approach
+    print("\n=== Object-Oriented Style ===")
+    network = NestedNetwork(model_name="gpt-4o")
+    test_input = NetworkInput(query="What are three key principles of functional programming?")
     test_result = network(inputs=test_input)
-    print(f"NestedNetwork final output: {test_result.final_answer}")
+    print(f"Query: {test_input.query}")
+    print(f"Answer: {test_result.final_answer}\n")
+    
+    # Example 2: Using the declarative pipeline style
+    print("=== Declarative Pipeline Style ===")
+    pipeline = create_pipeline(model_name="gpt-4o")
+    
+    # For consistency, use kwargs pattern for pipeline invocation too
+    result = pipeline(query="What are three key principles of functional programming?")
+    print(f"Query: What are three key principles of functional programming?")
+    print(f"Answer: {result['revised_answer']}\n")

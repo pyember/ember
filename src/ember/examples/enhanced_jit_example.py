@@ -1,6 +1,9 @@
 """Enhanced JIT API Demonstration.
 
 This script demonstrates nested operator analysis using the enhanced JIT system.
+
+To run:
+    poetry run python src/ember/examples/enhanced_jit_example.py
 """
 
 import logging

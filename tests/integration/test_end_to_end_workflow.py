@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock, ANY
 from ember.core.app_context import create_ember_app
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine import execute_graph
 from ember.core.non import UniformEnsemble

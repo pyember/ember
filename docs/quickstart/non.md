@@ -243,7 +243,7 @@ print(f"Answer: {answer}")
 
 Learn more about:
 - [Operators](operators.md) - Building custom computation units
-- [Prompt Specifications](prompt_specifications.md) - Type-safe prompt engineering
+- [Prompt Specifications](specifications.md) - Type-safe prompt engineering
 - [Model Registry](model_registry.md) - Managing LLM configurations
 - [XCS Graphs](../advanced/xcs_graphs.md) - Advanced parallel execution
 - [Enhanced JIT](../advanced/enhanced_jit.md) - Optimized tracing and execution

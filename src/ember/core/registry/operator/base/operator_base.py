@@ -2,12 +2,12 @@
 Operator System: Core Computational Abstraction
 
 The Operator system represents the fundamental computational unit in Ember's architecture.
-It implements a principled approach to functional programming with strong typing, input/output
+It implements an Ember-specific approach to functional programming with strong typing, native input/output
 validation, immutability guarantees, and composition patterns.
 
 Architectural Philosophy:
 - Pure Functions: Operators are stateless, deterministic transformations from input to output
-- Strong Type Safety: Generic type parameters and Pydantic validation ensure correctness
+- Strong Type Safety: Generic type parameters and Pydantic validation ensure `specification` correctness
 - Composition First: Designed specifically for transparent composition at any scale
 - Immutability: All operators are immutable after construction for thread safety
 - Explicit Interface: Clear input/output contracts enforced through specifications
@@ -17,7 +17,7 @@ These design principles enable several powerful capabilities:
 2. Safe Parallelization: Immutability guarantees make parallel execution safe
 3. Automatic Validation: Input/output validation catches errors at interface boundaries
 4. Transparent Transformation: Auto-registration enables higher-order transformations
-5. Predictable Behavior: Deterministic execution simplifies testing and reasoning
+5. Predictable Behavior: Deterministic execution simplifies testing and reasoning about things
 
 The system intentionally separates specification (what inputs/outputs are valid) from
 implementation (how computation occurs). This separation of concerns allows for
@@ -27,9 +27,9 @@ Core Design Patterns:
 - Template Method: Abstract forward() with concrete __call__() implementation
 - Strategy: Operators implement different computational strategies with common interface
 - Specification: Runtime validation with detailed error information
-- Generic Programming: Type variables enable rich compile-time checking
+- Generic Programming: Type variables enable extensive compile-time checking
 
-Relationship to FP/FaaS:
+Quick note on relationship to FP/FaaS:
 The Operator system draws inspiration from functional programming and serverless
 architectures, treating computation as pure functions with explicit contracts.
 """
@@ -38,25 +38,24 @@ from __future__ import annotations
 
 import abc
 import logging
-from typing import Any, Dict, Generic, TypeVar, Union, cast, Type, Optional, ClassVar
-
-from pydantic import BaseModel
+from typing import ClassVar, Generic, Optional, Type, cast
 
 from ember.core.registry.operator.base._module import EmberModule
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.registry.operator.exceptions import (
     OperatorSpecificationNotDefinedError,
     OperatorExecutionError,
 )
+from ember.core.types import InputT, OutputT
 
 logger = logging.getLogger(__name__)
 
-# Type variables for input and output models, bounded to BaseModel
-T_in = TypeVar("T_in", bound=BaseModel)
-T_out = TypeVar("T_out", bound=BaseModel)
+# Type aliases for backward compatibility
+T_in = InputT
+T_out = OutputT
 
 
-class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
+class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
     """
     Abstract base class for all computational operators in Ember.
     
@@ -68,15 +67,15 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
     while forward() provides the specific implementation.
     
     Attributes:
-        specification (ClassVar[Specification]): Defines the input/output contract
+        specification: ClassVar[Specification[InputT, OutputT]]: Defines the input/output contract
             that all subclasses must provide.
     """
 
     # Class variable to be overridden by subclasses
-    specification: ClassVar[Specification]
+    specification: ClassVar[Specification[InputT, OutputT]]
 
     @abc.abstractmethod
-    def forward(self, *, inputs: T_in) -> T_out:
+    def forward(self, *, inputs: InputT) -> OutputT:
         """
         Implements the core computational logic of the operator.
         
@@ -119,8 +118,8 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         raise NotImplementedError("Subclasses must implement forward()")
 
     def __call__(
-        self, *, inputs: Union[T_in, Dict[str, Any]] = None, **kwargs
-    ) -> T_out:
+        self, *, inputs: Optional[InputT | dict[str, object]] = None, **kwargs: object
+    ) -> OutputT:
         """
         Executes the operator with comprehensive validation and error handling.
         
@@ -134,7 +133,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         4. Output Validation: Ensures results conform to the specification
         5. Error Handling: Catches and wraps all execution errors
         
-        The design supports multiple invocation patterns for maximum flexibility:
+        The design supports multiple invocation patterns for flexibility:
         
         A. Pre-validated model invocation:
            ```python
@@ -166,7 +165,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         
         Returns:
             The validated computation result conforming to the output model specification.
-            Type checking guarantees this will be an instance of T_out.
+            Type checking guarantees this will be an instance of OutputT.
             
         Raises:
             OperatorSpecificationNotDefinedError: If the operator class does not define
@@ -177,7 +176,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
         """
         # Retrieve and validate the specification
         try:
-            specification: Specification = self.specification
+            specification: Specification[InputT, OutputT] = self.specification
         except OperatorSpecificationNotDefinedError as e:
             raise OperatorSpecificationNotDefinedError(
                 message="Operator specification must be defined."
@@ -185,34 +184,36 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
 
         try:
             # Determine input format (model, dict, or kwargs)
+            validated_inputs: InputT
             if inputs is not None:
                 # Traditional 'inputs' parameter provided
-                validated_inputs: T_in = (
-                    specification.validate_inputs(inputs=inputs)
-                    if isinstance(inputs, dict)
-                    else inputs
-                )
+                if isinstance(inputs, dict):
+                    validated_inputs = cast(InputT, specification.validate_inputs(inputs=inputs))
+                else:
+                    validated_inputs = cast(InputT, inputs)
             elif kwargs and specification.input_model:
                 # Using kwargs directly as input fields
-                validated_inputs = specification.input_model(**kwargs)
+                input_model_type: Type[InputT] = cast(Type[InputT], specification.input_model)
+                validated_inputs = input_model_type(**kwargs)
             else:
                 # Empty inputs or no input model defined
-                validated_inputs = kwargs if kwargs else {}
+                validated_inputs = cast(InputT, kwargs if kwargs else {})
 
             # Execute the core computation
-            operator_output: T_out = self.forward(inputs=validated_inputs)
+            operator_output: OutputT = self.forward(inputs=validated_inputs)
 
             # Ensure we have a proper model instance for the output
             # If we got a dict, convert it to the appropriate model
             if (
                 isinstance(operator_output, dict)
-                and hasattr(specification, "output_model")
-                and specification.output_model
+                and hasattr(specification, "structured_output")
+                and specification.structured_output
             ):
-                operator_output = specification.output_model.model_validate(operator_output)
+                output_model_type: Type[OutputT] = cast(Type[OutputT], specification.structured_output)
+                operator_output = output_model_type.model_validate(operator_output)
 
             # Final validation to ensure type consistency
-            validated_output: T_out = specification.validate_output(output=operator_output)
+            validated_output: OutputT = cast(OutputT, specification.validate_output(output=operator_output))
             return validated_output
 
         except Exception as e:
@@ -224,7 +225,7 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             raise
 
     @property
-    def specification(self) -> Specification:
+    def specification(self) -> Specification[InputT, OutputT]:
         """
         Retrieves the operator's specification with runtime validation.
         
@@ -264,5 +265,4 @@ class Operator(EmberModule, Generic[T_in, T_out], abc.ABC):
             raise OperatorSpecificationNotDefinedError(
                 message="Operator specification must be explicitly defined in the concrete class."
             )
-        return subclass_spec
-        
+        return cast(Specification[InputT, OutputT], subclass_spec)

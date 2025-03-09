@@ -1,62 +1,59 @@
 """JIT Ensemble Demonstration.
 
 This module demonstrates three variants of a "LargeEnsemble" operator using ember's
-non.py and operator registry:
+API:
     1) BaselineEnsemble: Executes eagerly without parallelism.
     2) ParallelEnsemble: Leverages concurrency via a scheduling plan.
     3) JITEnsemble: Combines parallel execution with JIT tracing to cache the concurrency plan.
 
 It measures the total and per-query execution times for each approach.
 
-All ensembles rely on the implementation in non.py, which wraps the EnsembleOperator
-from operator_registry.
+To run:
+    poetry run python src/ember/examples/jit_example.py
 """
 
 import logging
 import time
 from typing import Any, Dict, List, Tuple
-
+import numpy as np
+import matplotlib.pyplot as plt
 from prettytable import PrettyTable
 
-# ember imports
-from ember.core.configs.config import initialize_system
-from ember.core.app_context import get_ember_context
-from ember.xcs.graph_ir.operator_graph import OperatorGraph
-from ember.xcs.graph_ir.operator_graph_runner import OperatorGraphRunner
-from ember.xcs.tracer.tracer_decorator import jit
-
-# Existing 'Ensemble' and its input type from non.py.
-from ember.core.non import Ensemble
-from ember.core.registry.operator.core.ensemble import (
-    EnsembleOperatorInputs as EnsembleInputs,
-)
+# ember API imports
+from ember.api import non
+from ember.api.xcs import jit, execution_options
 
 
 ###############################################################################
 # BaselineEnsemble - Eager Execution (No Concurrency)
 ###############################################################################
-class BaselineEnsemble(Ensemble):
+class BaselineEnsemble(non.Ensemble):
     """Ensemble implementation that forces fully eager (serial) execution.
 
-    This subclass disables concurrency by configuring the execution to
-    run serially rather than in parallel.
+    This subclass configures the execution to run serially rather than in parallel
+    by using appropriate execution options.
     """
-
-    # BaselineEnsemble forces serial execution by configuration
-    # The metaclass-based EmberModule system handles execution details
+    
+    def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
+        """Initialize with sequential execution options."""
+        super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
+        # Will be configured to run sequentially in the runner
 
 
 ###############################################################################
 # ParallelEnsemble - Standard Concurrency
 ###############################################################################
-class ParallelEnsemble(Ensemble):
+class ParallelEnsemble(non.Ensemble):
     """Ensemble implementation that leverages standard concurrency.
 
     Inherits directly from the underlying Ensemble, which produces a concurrency plan
-    via the EnsembleOperator when the runner's max_workers is greater than 1.
+    when executed with parallel execution options.
     """
 
-    pass
+    def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
+        """Initialize with standard configuration."""
+        super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
+        # Will be configured to run in parallel in the runner
 
 
 ###############################################################################
@@ -71,55 +68,62 @@ class JITEnsemble(ParallelEnsemble):
     reducing overhead for subsequent invocations.
     """
 
-    pass
+    def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
+        """Initialize with JIT capabilities."""
+        super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
+        # The @jit decorator will handle caching the execution plan
 
 
 def run_operator_queries(
     *,
-    operator_instance: Ensemble,
-    operator_graph_runner: OperatorGraphRunner,
+    operator_instance: non.Ensemble,
     queries: List[str],
-    node_identifier: str,
-) -> Tuple[List[float], float]:
+    name: str,
+    mode: str = "parallel"
+) -> Tuple[List[float], float, List[Dict[str, Any]]]:
     """Execute the given ensemble operator for each query and measure execution times.
 
     Args:
-        operator_instance (Ensemble): The ensemble operator instance to run.
-        operator_graph_runner (OperatorGraphRunner): Runner for executing operator graphs.
+        operator_instance (non.Ensemble): The ensemble operator instance to run.
         queries (List[str]): List of query strings.
-        node_identifier (str): Identifier for the node when adding to the operator graph.
+        name (str): Name for logging purposes.
+        mode (str): Execution mode ("parallel" or "sequential")
 
     Returns:
-        Tuple[List[float], float]:
+        Tuple[List[float], float, List[Dict[str, Any]]]:
             A tuple containing:
                 1. A list of per-query execution times.
                 2. The total execution time for all queries.
+                3. A list of result objects.
     """
     execution_times: List[float] = []
+    results: List[Dict[str, Any]] = []
     total_start_time: float = time.perf_counter()
 
-    for query in queries:
-        operator_graph: OperatorGraph = OperatorGraph()
-        operator_graph.add_node(operator=operator_instance, node_id=node_identifier)
-        query_start_time: float = time.perf_counter()
-        result = operator_graph_runner.run(
-            graph=operator_graph, inputs={"query": query}
-        )
-        query_end_time: float = time.perf_counter()
+    # Set the execution options based on the mode
+    ctx_manager = execution_options(scheduler=mode)
+    
+    with ctx_manager:
+        for query in queries:
+            query_start_time: float = time.perf_counter()
+            result = operator_instance(inputs={"query": query})
+            query_end_time: float = time.perf_counter()
 
-        elapsed_time: float = query_end_time - query_start_time
-        execution_times.append(elapsed_time)
-        logging.info(
-            "[%s] Query='%s' => #responses=%d | time=%.4fs",
-            node_identifier.upper(),
-            query,
-            len(result.responses),
-            elapsed_time,
-        )
+            elapsed_time: float = query_end_time - query_start_time
+            execution_times.append(elapsed_time)
+            results.append(result)
+            
+            logging.info(
+                "[%s] Query='%s' => #responses=%d | time=%.4fs",
+                name.upper(),
+                query,
+                len(result["responses"]) if "responses" in result else 0,
+                elapsed_time,
+            )
 
     total_end_time: float = time.perf_counter()
     total_elapsed_time: float = total_end_time - total_start_time
-    return execution_times, total_elapsed_time
+    return execution_times, total_elapsed_time, results
 
 
 ###############################################################################
@@ -128,21 +132,15 @@ def run_operator_queries(
 def main() -> None:
     """Run demonstrations comparing Baseline, Parallel, and JIT ensembles.
 
-    This function initializes the ember system, constructs ensemble operator instances, executes
-    a series of queries using each ensemble variant, and prints a consolidated timing summary.
+    This function constructs ensemble operator instances, executes a series of queries 
+    using each ensemble variant, and prints a consolidated timing summary with visualization.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-    # Initialize the ember system.
-    context = get_ember_context()
-    initialize_system(registry=context.registry)
-    # Optionally configure further settings, e.g., API keys:
-    # CONFIG.set("models", "openai_api_key", "<YOUR-KEY>")
-
     # Define ensemble configuration parameters.
-    model_name: str = "openai:gpt-4o-mini"
+    model_name: str = "openai:gpt-4o-mini"  # You can change this to any available model
     temperature: float = 0.7
-    num_units: int = 10  # Number of ensemble units (sub-calls)
+    num_units: int = 5  # Number of ensemble units (sub-calls)
 
     # Create ensemble operator instances.
     baseline_op: BaselineEnsemble = BaselineEnsemble(
@@ -155,72 +153,106 @@ def main() -> None:
         num_units=num_units, model_name=model_name, temperature=temperature
     )
 
-    # Instantiate the OperatorGraphRunner with the specified number of workers.
-    runner: OperatorGraphRunner = OperatorGraphRunner(max_workers=num_units)
-
     # List of queries to execute.
     queries: List[str] = [
         "What is 2 + 2?",
         "Summarize quantum entanglement in simple terms.",
-        "Longest river in Europe?",
+        "What is the longest river in Europe?",
         "Explain synergy in a business context.",
         "Who wrote Pride and Prejudice?",
     ]
 
+    print(f"\n=== JIT Ensemble Comparison ({num_units} units per ensemble) ===")
+    print(f"Model: {model_name}")
+    print(f"Temperature: {temperature}")
+    print(f"Number of queries: {len(queries)}")
+    
     # Execute queries for each ensemble variant.
-    baseline_times, total_baseline_time = run_operator_queries(
+    print("\nRunning baseline ensemble (sequential execution)...")
+    baseline_times, total_baseline_time, baseline_results = run_operator_queries(
         operator_instance=baseline_op,
-        operator_graph_runner=runner,
         queries=queries,
-        node_identifier="baseline_op",
+        name="Baseline",
+        mode="sequential"
     )
 
-    parallel_times, total_parallel_time = run_operator_queries(
+    print("\nRunning parallel ensemble...")
+    parallel_times, total_parallel_time, parallel_results = run_operator_queries(
         operator_instance=parallel_op,
-        operator_graph_runner=runner,
         queries=queries,
-        node_identifier="parallel_op",
+        name="Parallel",
+        mode="parallel"
     )
 
-    jit_times, total_jit_time = run_operator_queries(
+    print("\nRunning JIT ensemble...")
+    jit_times, total_jit_time, jit_results = run_operator_queries(
         operator_instance=jit_op,
-        operator_graph_runner=runner,
         queries=queries,
-        node_identifier="jit_op",
+        name="JIT",
+        mode="parallel"
     )
 
     # Print timing summary using PrettyTable.
     summary_table: PrettyTable = PrettyTable()
-    summary_table.field_names = ["Query #", "Baseline (s)", "Parallel (s)", "JIT (s)"]
+    summary_table.field_names = ["Query", "Baseline (s)", "Parallel (s)", "JIT (s)", "Speedup"]
 
     for index in range(len(queries)):
+        # Calculate speedup percentage of JIT over baseline
+        speedup = ((baseline_times[index] - jit_times[index]) / baseline_times[index]) * 100
+        
+        # Truncate query for display
+        query_display = queries[index][:30] + "..." if len(queries[index]) > 30 else queries[index]
+        
         summary_table.add_row(
             [
-                index + 1,
+                query_display,
                 f"{baseline_times[index]:.4f}",
                 f"{parallel_times[index]:.4f}",
                 f"{jit_times[index]:.4f}",
+                f"{speedup:.1f}%"
             ]
         )
 
-    print(
-        "\nTiming Results for Baseline vs. Parallel vs. JIT "
-        f"({num_units} LM calls each, max_workers={num_units}):"
-    )
+    print("\n=== Timing Results ===")
     print(summary_table)
 
-    print(f"\nTotal Baseline time: {total_baseline_time:.4f}s")
-    print(f"Total Parallel time: {total_parallel_time:.4f}s")
-    print(f"Total JIT time:      {total_jit_time:.4f}s")
-
-    # Calculate and print average per-query execution times.
+    # Calculate and print summary statistics
     avg_baseline: float = sum(baseline_times) / len(baseline_times)
     avg_parallel: float = sum(parallel_times) / len(parallel_times)
     avg_jit: float = sum(jit_times) / len(jit_times)
-
-    print(f"\nAverage per-query Baseline: {avg_baseline:.4f}s")
-    print(f"Average per-query Parallel: {avg_parallel:.4f}s")
-    print(f"Average per-query JIT:      {avg_jit:.4f}s")
+    
+    print("\n=== Performance Summary ===")
+    print(f"Total Baseline time: {total_baseline_time:.4f}s")
+    print(f"Total Parallel time: {total_parallel_time:.4f}s")
+    print(f"Total JIT time:      {total_jit_time:.4f}s")
+    
+    print(f"\nAverage per-query time:")
+    print(f"  Baseline: {avg_baseline:.4f}s")
+    print(f"  Parallel: {avg_parallel:.4f}s")
+    print(f"  JIT:      {avg_jit:.4f}s")
+    
+    # Calculate overall speedups
+    parallel_speedup = ((avg_baseline - avg_parallel) / avg_baseline) * 100
+    jit_speedup = ((avg_baseline - avg_jit) / avg_baseline) * 100
+    jit_vs_parallel_speedup = ((avg_parallel - avg_jit) / avg_parallel) * 100
+    
+    print(f"\nSpeedup percentages:")
+    print(f"  Parallel vs Baseline: {parallel_speedup:.1f}%")
+    print(f"  JIT vs Baseline:      {jit_speedup:.1f}%")
+    print(f"  JIT vs Parallel:      {jit_vs_parallel_speedup:.1f}%")
+    
+    print("\n=== Key Benefits of JIT ===")
+    print("1. Automatic tracing and optimization of execution paths")
+    print("2. Cached execution plan for repeated queries")
+    print("3. Reduced overhead for complex pipelines")
+    print("4. Optimization across operator boundaries")
+    
+    print("\nTo use JIT in your code, simply add the @jit decorator to your operator class:")
+    print("@jit()")
+    print("class MyOperator(Operator):")
+    print("    def forward(self, *, inputs):")
+    print("        # Your implementation here")
+    print("        return result")
 
 
 if __name__ == "__main__":

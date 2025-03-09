@@ -2,17 +2,17 @@ from __future__ import annotations
 from typing import Dict, Type
 
 import pytest
-from pydantic import BaseModel
+from ember.core.types import EmberModel
 
-from ember.core.registry.prompt_specification.exceptions import (
+from ember.core.registry.specification.exceptions import (
     InvalidInputTypeError,
     MismatchedModelError,
     PlaceholderMissingError,
 )
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 
 
-class DummyInput(BaseModel):
+class DummyInput(EmberModel):
     """Dummy input model for testing prompt specifications.
 
     Attributes:
@@ -22,7 +22,7 @@ class DummyInput(BaseModel):
     name: str
 
 
-class DummyOutput(BaseModel):
+class DummyOutput(EmberModel):
     """Dummy output model for testing prompt specification functionality.
 
     Attributes:
@@ -121,7 +121,7 @@ def test_misconfigured_specification_missing_input_model() -> None:
 def test_misconfigured_specification_incompatible_model() -> None:
     """Test that validate_inputs raises an error when the provided input model type is incompatible."""
 
-    class AnotherInput(BaseModel):
+    class AnotherInput(EmberModel):
         """Alternate input model for testing specification compatibility."""
 
         other: str

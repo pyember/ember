@@ -12,6 +12,9 @@ Overview:
     1) 'simple': minimal single-sentence Q&A pipeline.
     2) 'caravan': more advanced prompt that references the UNSW-NB15 dataset
                   flows, providing labeled references and then labeling new flows.
+
+To run:
+    poetry run python src/ember/examples/custom_prompt_example_caravan.py
 """
 
 import argparse
@@ -85,7 +88,7 @@ from ember.core.app_context import get_ember_context
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.prompt_specification.specification import Specification
+from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
 

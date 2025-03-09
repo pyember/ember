@@ -10,6 +10,7 @@ import sys
 from typing import Any, Dict, List, Optional, Union
 
 import ember
+from ember.data.cli import setup_parser as setup_dataset_parser
 
 
 def version_cmd(args: argparse.Namespace) -> None:
@@ -74,7 +75,7 @@ import ember
 from typing import ClassVar
 
 from ember.core.registry.operator.base import Operator
-from ember.core.registry.prompt_specification import Specification
+from ember.core.registry.specification import Specification
 from ember.core.types.ember_model import EmberModel
 from ember.core import non
 
@@ -246,6 +247,10 @@ def main() -> None:
     invoke_parser.add_argument("--prompt", "-p", help="Prompt to send to the model")
     invoke_parser.add_argument("--show-usage", "-u", action="store_true", help="Show token usage")
     invoke_parser.set_defaults(func=invoke_cmd)
+    
+    # Dataset commands
+    dataset_parser = subparsers.add_parser("dataset", help="Work with datasets")
+    setup_dataset_parser(dataset_parser)
     
     # Parse args
     args = parser.parse_args()
