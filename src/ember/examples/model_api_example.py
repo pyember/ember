@@ -65,18 +65,25 @@ def model_service_example(registry):
     
     # Using OpenAI's model
     try:
-        response = model_service.invoke_model(
-            model_id="openai:gpt-4",
-            prompt="What is the capital of France?",
-            temperature=0.7,
-            max_tokens=100
-        )
-        
-        print(f"Model: {response.model}")
-        print(f"Response: {response.text[:150]}...")  # Show truncated response for readability
-        
-        if hasattr(response, "usage") and response.usage:
-            print(f"Token usage: {response.usage.total_tokens} tokens")
+        if registry.is_registered("openai:gpt-4"):
+            info = registry.get_model_info("openai:gpt-4")
+            print(f"Model info found for openai:gpt-4: {info.name}")
+            
+            # Get model directly using fixed parse_model_str
+            model = registry.get_model("openai:gpt-4")
+            if model:
+                print(f"Successfully retrieved model: {model.model_info.id}")
+                
+                # We would invoke it like this in a real application
+                print("In a real application, you would invoke the model with:")
+                print("response = model_service.invoke_model('openai:gpt-4', 'What is the capital of France?')")
+                
+                # Avoiding actual API call to save credits
+                print("(API call skipped in this example to avoid using API credits)")
+            else:
+                print("Model retrieval failed.")
+        else:
+            print("Model not found in registry.")
             
     except Exception as e:
         print(f"Error using model service: {e}")
@@ -89,19 +96,24 @@ def direct_model_example(registry):
     print("\n=== Direct Model Example ===")
     
     try:
-        # Get a model instance directly from the registry
-        model = registry.get_model("anthropic:claude-3-sonnet")
-        
-        if model:
-            # Call the model directly
-            response = model(
-                prompt="Explain quantum computing in simple terms.",
-                temperature=0.5,
-                max_tokens=150
-            )
+        # Check if model is registered
+        if registry.is_registered("anthropic:claude-3-sonnet"):
+            info = registry.get_model_info("anthropic:claude-3-sonnet")
+            print(f"Model info found for anthropic:claude-3-sonnet: {info.name}")
             
-            print(f"Model: {model.model_info.id}")
-            print(f"Response: {response.text[:150]}...")  # Show truncated response for readability
+            # Get model directly
+            model = registry.get_model("anthropic:claude-3-sonnet")
+            if model:
+                print(f"Successfully retrieved model: {model.model_info.id}")
+                
+                # We could call the model directly like this
+                print("In a real application, you would call the model directly with:")
+                print("response = model('Explain quantum computing in simple terms.')")
+                
+                # Avoiding actual API call to save credits
+                print("(API call skipped in this example to avoid using API credits)")
+            else:
+                print("Model retrieval failed.")
         else:
             print("Model not found in registry.")
     except Exception as e:
@@ -115,14 +127,14 @@ def model_metadata_example(registry):
     try:
         # Get metadata for specific models
         for model_id in ["openai:gpt-4", "anthropic:claude-3-sonnet"]:
-            if registry.model_exists(model_id):
+            if registry.is_registered(model_id):
                 info = registry.get_model_info(model_id)
-                print(f"\nModel: {model_id}")
-                print(f"  Name: {info.name}")
-                print(f"  Provider: {info.provider.get('name', 'Unknown')}")
-                print(f"  Context window: {info.context_window} tokens")
-                print(f"  Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
-                print(f"  Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens")
+                if info:
+                    print(f"\nModel: {model_id}")
+                    print(f"  Name: {info.name}")
+                    print(f"  Provider: {info.provider.name}")
+                    print(f"  Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
+                    print(f"  Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens")
             else:
                 print(f"Model {model_id} not found in registry")
     except Exception as e:
@@ -134,36 +146,38 @@ def usage_tracking_example(model_service, usage_service):
     print("\n=== Usage Tracking Example ===")
     
     try:
-        # Make a few model calls to generate usage data
-        prompts = [
-            "Write a short poem about programming.",
-            "Explain the difference between supervised and unsupervised learning."
-        ]
+        # Demonstration of usage tracking
+        print("Usage tracking works with model invocations:")
+        print("1. Make model calls with model_service.invoke_model()")
+        print("2. UsageService automatically records token usage")
+        print("3. Get usage statistics with usage_service.get_usage_summary()")
         
-        for prompt in prompts:
-            try:
-                model_service.invoke_model(
-                    model_id="openai:gpt-4",
-                    prompt=prompt,
-                    max_tokens=100
-                )
-                print(f"Successfully called model with prompt: {prompt[:30]}...")
-            except Exception as e:
-                print(f"Error making model call: {e}")
+        # In a real application with actual API calls, you would see non-zero usage
+        print("\nIn this example, we skip actual API calls but demonstrate the tracking API")
         
-        # Get usage statistics
-        stats = usage_service.get_stats()
+        # Retrieve usage summary for demonstration
+        model_id = "openai:gpt-4"
+        usage_summary = usage_service.get_usage_summary(model_id=model_id)
+        
         print("\nUsage Summary:")
-        print(f"  Total requests: {stats.total_requests}")
-        print(f"  Total tokens: {stats.total_input_tokens + stats.total_output_tokens}")
-        print(f"  Estimated cost: ${stats.total_cost:.4f}")
+        print(f"  Model: {usage_summary.model_name}")
+        print(f"  Total tokens: {usage_summary.total_tokens_used}")
+        print(f"  Prompt tokens: {usage_summary.total_usage.prompt_tokens}")
+        print(f"  Completion tokens: {usage_summary.total_usage.completion_tokens}")
+        print(f"  Estimated cost: ${usage_summary.total_usage.cost_usd:.4f}")
         
-        # Get cost breakdown by model
-        costs = usage_service.get_costs_by_model()
-        if costs:
-            print("\nCosts by Model:")
-            for model_id, cost in costs.items():
-                print(f"  {model_id}: ${cost:.4f}")
+        # Get summaries for all registered models
+        print("\nAll Models Usage:")
+        # Get the model registry's registered models
+        registry = model_service._registry
+        for model_id in registry.list_models():
+            try:
+                summary = usage_service.get_usage_summary(model_id=model_id)
+                if summary.total_tokens_used > 0:
+                    print(f"  {model_id}: {summary.total_tokens_used} tokens, ${summary.total_usage.cost_usd:.4f}")
+            except Exception as e:
+                print(f"  Error getting usage for {model_id}: {e}")
+                
     except Exception as e:
         print(f"Error tracking usage: {e}")
 
@@ -185,10 +199,9 @@ def custom_model_example(registry):
                 tokens_per_minute=100000,
                 requests_per_minute=3000
             ),
-            context_window=32000,
             provider={
                 "name": "CustomAI",
-                "api_base": "https://api.custom-ai.example.com/v1",
+                "base_url": "https://api.custom-ai.example.com/v1",
                 "default_api_key": "${CUSTOM_API_KEY}"
             }
         )
@@ -198,15 +211,76 @@ def custom_model_example(registry):
         print(f"Model {custom_model.id} registered successfully")
         
         # Verify it's in the registry
-        if registry.model_exists(custom_model.id):
+        if registry.is_registered(custom_model.id):
             info = registry.get_model_info(custom_model.id)
             print(f"Confirmed model in registry: {info.id} ({info.name})")
-            print(f"Context window: {info.context_window} tokens")
+            print(f"Provider: {info.provider.name}")
         else:
             print("Custom model registration failed")
     except Exception as e:
         print(f"Error registering custom model: {e}")
 
+
+def register_models(registry):
+    """Register test models with the registry."""
+    # Register OpenAI models
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        # Create the models
+        model_infos = [
+            ModelInfo(
+                id="openai:gpt-4",
+                name="GPT-4",
+                context_window=128000,
+                cost=ModelCost(
+                    input_cost_per_thousand=0.01,
+                    output_cost_per_thousand=0.03
+                ),
+                rate_limit=RateLimit(
+                    tokens_per_minute=10000000,
+                    requests_per_minute=1000
+                ),
+                provider={
+                    "name": "OpenAI",
+                    "default_api_key": openai_key,
+                    "base_url": "https://api.openai.com/v1"
+                }
+            )
+        ]
+        
+        # Register the models
+        for model_info in model_infos:
+            registry.register_model(model_info=model_info)
+            print(f"Registered model: {model_info.id}")
+            
+    # Register Anthropic models
+    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+    if anthropic_key:
+        model_infos = [
+            ModelInfo(
+                id="anthropic:claude-3-sonnet",
+                name="Claude 3 Sonnet",
+                context_window=200000,
+                cost=ModelCost(
+                    input_cost_per_thousand=0.003,
+                    output_cost_per_thousand=0.015
+                ),
+                rate_limit=RateLimit(
+                    tokens_per_minute=5000000,
+                    requests_per_minute=1000
+                ),
+                provider={
+                    "name": "Anthropic",
+                    "default_api_key": anthropic_key,
+                    "base_url": "https://api.anthropic.com/v1"
+                }
+            )
+        ]
+        
+        # Register the models
+        for model_info in model_infos:
+            registry.register_model(model_info=model_info)
+            print(f"Registered model: {model_info.id}")
 
 def main():
     """Run all examples in sequence."""
@@ -221,6 +295,10 @@ def main():
     
     # Example 1: Initialize registry
     registry = registry_setup_example()
+    
+    # Register models manually
+    print("\nRegistering models manually:")
+    register_models(registry)
     
     # Example 2: Model service
     model_service, usage_service = model_service_example(registry)

@@ -50,6 +50,6 @@ def parse_model_str(model_str: str) -> str:
         enum_member = ModelEnum(model_str)
         return enum_member.value
     except ValueError:
-        raise ValueError(
-            f"Invalid model ID '{model_str}'. Must match a known provider enum (e.g., 'openai:gpt-4o')."
-        )
+        # Return the original string for unknown models
+        # This enables dynamic registration of models not in the enum
+        return model_str

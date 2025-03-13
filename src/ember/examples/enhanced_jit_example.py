@@ -10,8 +10,6 @@ import logging
 import time
 from typing import Dict, List, Any, Optional
 
-from prettytable import PrettyTable
-
 # For tracing with the autograph module
 from ember.xcs.tracer.autograph import AutoGraphBuilder
 from ember.xcs.tracer.xcs_tracing import TraceRecord
@@ -113,29 +111,28 @@ def build_graph_example() -> None:
     print("2. Aggregator should NOT depend on Generator1 and Generator2 directly")
     print("   (should depend only on Ensemble)")
 
-    # Check if the outputs match our expectations
-    has_expected_difference = False
+    # Analyze both graphs to find actual differences
+    basic_deps = {}
+    enhanced_deps = {}
+    
+    for node_id, node in basic_graph.nodes.items():
+        basic_deps[node_id] = list(node.inbound_edges)
+        
     for node_id, node in enhanced_graph.nodes.items():
-        if node_id == "NextQuery_6":
-            if (
-                "Generator1_3" not in node.inbound_edges
-                and "Generator2_4" not in node.inbound_edges
-            ):
-                has_expected_difference = True
-
-    print("\n--- ACTUAL RESULTS ---")
-    if has_expected_difference:
-        print(
-            "SUCCESS: The hierarchical analysis correctly eliminated false dependencies!"
-        )
-    else:
-        print("NOTE: In this example run, both graphs show similar dependencies.")
-        print(
-            "This happens because the automatic hierarchy detection in _build_hierarchy_map"
-        )
-        print(
-            "depends on execution patterns that may not be perfectly captured in our mocked example."
-        )
+        enhanced_deps[node_id] = list(node.inbound_edges)
+    
+    print("\n--- ACTUAL DIFFERENCES DETECTED ---")
+    for node_id in basic_deps.keys():
+        basic_deps_set = set(basic_deps.get(node_id, []))
+        enhanced_deps_set = set(enhanced_deps.get(node_id, []))
+        
+        if basic_deps_set != enhanced_deps_set:
+            print(f"Node: {node_id}")
+            print(f"  Basic dependencies: {', '.join(basic_deps_set) if basic_deps_set else 'None'}")
+            print(f"  Enhanced dependencies: {', '.join(enhanced_deps_set) if enhanced_deps_set else 'None'}")
+            print(f"  Removed in enhanced: {', '.join(basic_deps_set - enhanced_deps_set) if basic_deps_set - enhanced_deps_set else 'None'}")
+            print(f"  Added in enhanced: {', '.join(enhanced_deps_set - basic_deps_set) if enhanced_deps_set - basic_deps_set else 'None'}")
+            print()
 
 
 def print_graph_dependencies(graph: XCSGraph) -> None:

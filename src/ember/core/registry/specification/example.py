@@ -43,8 +43,8 @@ class CaravanLabelingSpecification(Specification[CaravanLabelingInputs, CaravanL
 
     prompt_template: str = (
         "You are a network security expert.\n"
-        "Given these unlabeled flows:\n{flow}\n"
-        "Label each flow as 0 for benign or 1 for malicious, one per line, no explanation.\n"
+        "Given this unlabeled flow:\n{flow}\n"
+        "Label the flow as 0 for benign or 1 for malicious, no explanation.\n"
     )
     structured_output: Optional[Type[CaravanLabelsOutput]] = CaravanLabelsOutput
     input_model: Optional[Type[CaravanLabelingInputs]] = CaravanLabelingInputs

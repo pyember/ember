@@ -91,7 +91,7 @@ class QueryOutput(EmberModel):
 # Define the specification
 class SimpleQASpecification(Specification):
     input_model = QueryInput
-    output_model = QueryOutput
+    structured_output = QueryOutput
     prompt_template = "Please answer this question: {query}"
 
 
@@ -101,18 +101,18 @@ class SimpleQA(Operator[QueryInput, QueryOutput]):
     specification: ClassVar[Specification] = SimpleQASpecification()
     
     # Class-level field declarations
-    lm: non.UniformEnsemble
+    ensemble: non.UniformEnsemble
     
     def __init__(self, model_name: str = "openai:gpt-4o-mini"):
         # Initialize fields
-        self.lm = non.UniformEnsemble(
+        self.ensemble = non.UniformEnsemble(
             num_units=1,
             model_name=model_name
         )
     
     def forward(self, *, inputs: QueryInput) -> QueryOutput:
         # Process the query through the LLM
-        response = self.lm(inputs={"query": inputs.query})
+        response = self.ensemble(inputs={"query": inputs.query})
         
         # Return structured output
         return QueryOutput(answer=response["responses"][0])

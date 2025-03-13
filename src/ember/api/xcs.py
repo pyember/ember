@@ -54,6 +54,9 @@ from ember.xcs import (
     TransformOptions,        # Options for transforms
 )
 
+# Import execution options directly - essential for controlling parallel execution
+from ember.xcs.engine.execution_options import execution_options
+
 __all__ = [
     # Core execution framework
     "xcs",
@@ -62,6 +65,7 @@ __all__ = [
     "jit",
     "autograph",
     "execute",
+    "execution_options",  # Essential for execution control
     
     # Transforms
     "vmap",

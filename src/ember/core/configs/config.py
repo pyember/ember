@@ -233,9 +233,9 @@ def auto_register_known_models(
         None
     """
     local_logger: logging.Logger = config_manager.logger
-    from ember.core.registry.model.core.schemas.model_info import ModelInfo
-    from ember.core.registry.model.core.schemas.provider_info import ProviderInfo
-    from ember.core.registry.model.core.schemas.cost import ModelCost, RateLimit
+    from ember.core.registry.model.base.schemas.model_info import ModelInfo
+    from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+    from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
     known_model_id: str = "openai:gpt-4o"
     if registry.get_model(model_id=known_model_id) is None:

@@ -1,133 +1,59 @@
 """
-Execution Options Context for Ember.
+Execution options for XCS graph execution.
 
-This module provides a context manager for configuring execution options for operators,
-such as scheduler type and parallelism parameters.
+This module provides configuration options for graph execution, allowing
+customization of dispatching strategy, parallelism, and device selection.
 """
 
-from __future__ import annotations
-
-import threading
-from contextlib import ContextDecorator
-from typing import Any, Dict, Optional, Type, Union
-
-from ember.xcs.engine.xcs_engine import (
-    IScheduler,
-    TopologicalSchedulerWithParallelDispatch,
-)
+from typing import Any, Dict, List, Optional, Union
+import dataclasses
 
 
-class ExecutionOptions(ContextDecorator):
-    """Context manager for configuring operator execution options.
-
-    This provides a way to set execution parameters (scheduler, worker count, etc.)
-    that will be used when executing operators within the context.
-
+@dataclasses.dataclass
+class ExecutionOptions:
+    """Options for XCS graph execution.
+    
     Attributes:
-        scheduler (Union[str, IScheduler]): The scheduler to use for execution.
-            Can be a string identifier ("parallel", "sequential") or an IScheduler instance.
-        max_workers (Optional[int]): Maximum number of worker threads for parallel execution.
-    """
-
-    _local = threading.local()
-
-    def __init__(
-        self,
-        *,
-        scheduler: Union[str, IScheduler] = "parallel",
-        max_workers: Optional[int] = None,
-    ) -> None:
-        """Initialize execution options.
-
-        Args:
-            scheduler: Scheduler to use for execution. Can be a string ("parallel", "sequential")
-                or an IScheduler instance.
-            max_workers: Maximum number of worker threads for parallel execution.
-        """
-        self.scheduler = scheduler
-        self.max_workers = max_workers
-
-    def __enter__(self) -> ExecutionOptions:
-        """Enter the execution options context.
-
-        Returns:
-            The active execution options context.
-        """
-        self._set_current(self)
-        return self
-
-    def __exit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc_value: Optional[BaseException],
-        traceback: Optional[Any],
-    ) -> Optional[bool]:
-        """Exit the execution options context.
-
-        Args:
-            exc_type: Exception type, if any.
-            exc_value: Exception value, if any.
-            traceback: Traceback, if any.
-
-        Returns:
-            None.
-        """
-        self._clear_current()
-        return None
-
-    @classmethod
-    def get_current(cls) -> Optional[ExecutionOptions]:
-        """Get the current active execution options.
-
-        Returns:
-            The current execution options, or None if not in an execution options context.
-        """
-        return getattr(cls._local, "current", None)
-
-    def get_scheduler(self) -> IScheduler:
-        """Get a scheduler instance based on the current configuration.
-
-        Returns:
-            An IScheduler instance.
-        """
-        if isinstance(self.scheduler, IScheduler):
-            return self.scheduler
-
-        if self.scheduler == "sequential":
-            # Import here to avoid circular imports
-            from ember.xcs.engine.xcs_noop_scheduler import NoopScheduler
-
-            return NoopScheduler()
-        else:  # Default to parallel
-            return TopologicalSchedulerWithParallelDispatch(
-                max_workers=self.max_workers
-            )
-
-    def _set_current(self, ctx: ExecutionOptions) -> None:
-        """Set the current execution options context.
-
-        Args:
-            ctx: The execution options context to set as current.
-        """
-        type(self)._local.current = ctx
-
-    def _clear_current(self) -> None:
-        """Clear the current execution options context."""
-        type(self)._local.current = None
-
-
-# Convenience function for use as context manager
-def execution_options(
-    *, scheduler: Union[str, IScheduler] = "parallel", max_workers: Optional[int] = None
-) -> ExecutionOptions:
-    """Create an execution options context.
-
-    Args:
-        scheduler: Scheduler to use for execution. Can be a string ("parallel", "sequential")
-            or an IScheduler instance.
+        use_parallel: Whether to use parallel execution where possible.
         max_workers: Maximum number of worker threads for parallel execution.
-
-    Returns:
-        An ExecutionOptions context manager.
+        device_strategy: Strategy for device selection ('auto', 'cpu', 'gpu', etc.).
+        enable_caching: Whether to cache intermediate results.
+        trace_execution: Whether to trace execution for debugging.
+        timeout_seconds: Maximum execution time in seconds before timeout.
     """
-    return ExecutionOptions(scheduler=scheduler, max_workers=max_workers)
+    
+    use_parallel: bool = True
+    max_workers: Optional[int] = None
+    device_strategy: str = 'auto'
+    enable_caching: bool = False
+    trace_execution: bool = False
+    timeout_seconds: Optional[float] = None
+
+
+# Global default execution options
+execution_options = ExecutionOptions()
+
+
+def set_execution_options(**kwargs: Any) -> None:
+    """Update the global execution options.
+    
+    Args:
+        **kwargs: Keyword arguments to update execution options.
+            Valid options match the attributes of ExecutionOptions.
+    """
+    global execution_options
+    
+    for key, value in kwargs.items():
+        if hasattr(execution_options, key):
+            setattr(execution_options, key, value)
+        else:
+            raise ValueError(f"Invalid execution option: {key}")
+
+
+def get_execution_options() -> ExecutionOptions:
+    """Get a copy of the current execution options.
+    
+    Returns:
+        A copy of the current execution options.
+    """
+    return dataclasses.replace(execution_options)

@@ -43,22 +43,46 @@ def create_dummy_deepmind_model_info() -> ModelInfo:
 
 
 @pytest.fixture(autouse=True)
-def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
+def patch_genai() -> None:
     import google.generativeai as genai
-
-    # Patch list_models to return an empty list (we don't need it here).
-    monkeypatch.setattr(genai, "list_models", lambda: [])
-    # Patch GenerativeModel to be our dummy.
-    monkeypatch.setattr(
-        "ember.core.registry.model.providers.deepmind.deepmind_provider.GenerativeModel",
-        lambda model_ref: type(
-            "DummyGenerativeModel",
-            (),
-            {
-                "generate_content": lambda self, prompt, generation_config, **kwargs: DummyGeminiResponse()
-            },
-        )(),
-    )
+    from unittest.mock import patch
+    
+    # Patch google's generativeai directly to avoid import path issues
+    # First, save the original
+    original_list_models = getattr(genai, "list_models", None)
+    original_gen_model = None
+    
+    # Import deepmind_provider specifically so we can patch it directly
+    try:
+        # Now try to import the provider to patch
+        from ember.core.registry.model.providers.deepmind import deepmind_provider
+        # Get the original GenerativeModel class (if it exists)
+        if hasattr(deepmind_provider, "GenerativeModel"):
+            original_gen_model = deepmind_provider.GenerativeModel
+        
+        # Create a patch for list_models directly on the genai module
+        genai.list_models = lambda: []
+        
+        # Create a dummy GenerativeModel and patch it on the module
+        def dummy_generative_model(model_ref):
+            return type(
+                "DummyGenerativeModel",
+                (),
+                {
+                    "generate_content": lambda self, prompt, generation_config, **kwargs: DummyGeminiResponse()
+                },
+            )()
+            
+        # Apply the patch directly
+        deepmind_provider.GenerativeModel = dummy_generative_model
+        
+        yield
+    finally:
+        # Restore original functions if they existed
+        if original_list_models:
+            genai.list_models = original_list_models
+        if original_gen_model:
+            deepmind_provider.GenerativeModel = original_gen_model
 
 
 def test_deepmind_forward() -> None:

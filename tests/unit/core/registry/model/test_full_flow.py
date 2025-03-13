@@ -45,9 +45,11 @@ def create_dummy_config(tmp_path: Path) -> Path:
 
 
 @pytest.fixture(autouse=True)
-def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
+def patch_factory() -> None:
     """Patch ModelFactory to always return a dummy provider for integration testing."""
-
+    from unittest.mock import patch
+    
+    # Define a DummyProvider class for our tests
     class DummyProvider:
         def __init__(self, model_info: Any) -> None:
             self.model_info = model_info
@@ -58,22 +60,43 @@ def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
                 usage = None
 
             return DummyResponse()
-
-    # Patching the factory to use DummyProvider.
-    monkeypatch.setattr(
-        "ember.core.registry.model.base.registry.factory.ModelFactory.create_model_from_info",
-        lambda *, model_info: DummyProvider(model_info),
-    )
-
-    # Also patch the registry's register_model method to ensure our model info is also registered.
-    def mock_register_model(self, model_info: ModelInfo) -> None:
-        """Mock registration that adds the model to both _models and _model_infos."""
-        self._model_infos[model_info.id] = model_info
-        self._models[model_info.id] = DummyProvider(model_info)
-
+    
+    # Import the modules directly rather than using string-based monkeypatching
+    from ember.core.registry.model.base.registry import factory
     from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-
-    monkeypatch.setattr(ModelRegistry, "register_model", mock_register_model)
+    
+    # Save original functions
+    original_create_model = None
+    original_register_model = None
+    
+    if hasattr(factory.ModelFactory, "create_model_from_info"):
+        original_create_model = factory.ModelFactory.create_model_from_info
+        
+    if hasattr(ModelRegistry, "register_model"):
+        original_register_model = ModelRegistry.register_model
+    
+    try:
+        # Define a replacement for create_model_from_info
+        def dummy_create_model_from_info(*, model_info):
+            return DummyProvider(model_info)
+        
+        # Define a replacement for register_model
+        def mock_register_model(self, model_info: ModelInfo) -> None:
+            """Mock registration that adds the model to both _models and _model_infos."""
+            self._model_infos[model_info.id] = model_info
+            self._models[model_info.id] = DummyProvider(model_info)
+        
+        # Apply the patches directly
+        factory.ModelFactory.create_model_from_info = dummy_create_model_from_info
+        ModelRegistry.register_model = mock_register_model
+        
+        yield
+    finally:
+        # Restore original functions
+        if original_create_model:
+            factory.ModelFactory.create_model_from_info = original_create_model
+        if original_register_model:
+            ModelRegistry.register_model = original_register_model
 
 
 def test_full_flow_concurrent_invocations(tmp_path, monkeypatch):

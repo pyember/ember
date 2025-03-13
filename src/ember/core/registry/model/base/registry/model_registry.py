@@ -163,14 +163,111 @@ class ModelRegistry(Generic[M]):
             return model_id in self._model_infos
 
     def list_models(self) -> List[str]:
-        """
-        Lists all registered model IDs.
+        """Lists all registered model IDs.
 
         Returns:
-            A list of *registered* model IDs (lazy loaded or not).
+            List[str]: A list of registered model IDs (lazy loaded or not).
         """
         with self._lock:
             return list(self._model_infos.keys())
+            
+    def discover_models(self) -> List[str]:
+        """Discovers models using the ModelDiscoveryService and registers them.
+        
+        This method encapsulates the model discovery process by:
+        1. Creating a ModelDiscoveryService instance
+        2. Retrieving model metadata from provider APIs 
+        3. Merging with local configuration
+        4. Registering newly discovered models
+        
+        The discovery process is resilient to failures, with detailed logging
+        of each step and proper error handling.
+        
+        Returns:
+            List[str]: A list of newly discovered and registered model IDs.
+            
+        Note:
+            This method is thread-safe and can be called concurrently from
+            multiple threads. Any failures during discovery are logged but
+            will not raise exceptions to the caller.
+        """
+        # Import here to avoid circular dependency issues
+        from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
+        from ember.core.exceptions import EmberError
+        
+        discovery_service = ModelDiscoveryService()
+        self._logger.info("Initiating model discovery via ModelDiscoveryService")
+        
+        newly_registered: List[str] = []
+        
+        try:
+            # Step 1: Discover raw model metadata from provider APIs
+            discovered_models = discovery_service.discover_models()
+            if not discovered_models:
+                self._logger.info("No models discovered from provider APIs")
+                return newly_registered
+                
+            self._logger.debug(
+                "Raw discovery found %d models: %s", 
+                len(discovered_models), 
+                list(discovered_models.keys())
+            )
+            
+            # Step 2: Merge discovered models with local configuration
+            merged_models = discovery_service.merge_with_config(discovered=discovered_models)
+            if not merged_models:
+                self._logger.info("No models remaining after merging with configuration")
+                return newly_registered
+                
+            self._logger.debug(
+                "Merged discovery found %d models: %s", 
+                len(merged_models), 
+                list(merged_models.keys())
+            )
+            
+            # Step 3: Register each model, tracking newly added ones
+            with self._lock:  # Ensure thread safety during registration
+                for model_id, model_info in merged_models.items():
+                    if not self.is_registered(model_id):
+                        try:
+                            self.register_model(model_info=model_info)
+                            newly_registered.append(model_id)
+                            self._logger.info("Discovered and registered model: %s", model_id)
+                        except ValueError as registration_error:
+                            # Expected error if model already exists (already checked with is_registered)
+                            self._logger.debug(
+                                "Model %s already registered: %s", 
+                                model_id, 
+                                registration_error
+                            )
+                        except Exception as unexpected_error:
+                            # Unexpected error during registration (validation failure, etc.)
+                            self._logger.error(
+                                "Failed to register discovered model %s: %s", 
+                                model_id, 
+                                unexpected_error
+                            )
+            
+            if newly_registered:
+                self._logger.info(
+                    "Successfully discovered and registered %d new models: %s",
+                    len(newly_registered),
+                    newly_registered
+                )
+            else:
+                self._logger.info("No new models discovered that weren't already registered")
+                
+            return newly_registered
+            
+        except EmberError as ember_error:
+            self._logger.error("Model discovery failed with framework error: %s", ember_error)
+            return newly_registered
+        except Exception as unexpected_error:
+            self._logger.exception(
+                "Unexpected error during model discovery: %s", 
+                unexpected_error
+            )
+            return newly_registered
 
     def get_model_info(self, model_id: str) -> Optional[ModelInfo]:
         """

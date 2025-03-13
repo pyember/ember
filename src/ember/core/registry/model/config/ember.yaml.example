@@ -1,0 +1,91 @@
+# Ember Configuration Example
+# 
+# This file shows the structure and options available in the Ember configuration.
+# Copy this file to 'config.yaml' and customize as needed.
+
+# Model registry configuration
+model_registry:
+  # Whether to automatically register models
+  auto_register: true
+  
+  # Whether to discover models from provider APIs
+  auto_discover: true
+  
+  # Cache TTL for discovered models in seconds
+  cache_ttl: 3600
+  
+  # Provider-specific configurations
+  providers:
+    # OpenAI provider configuration
+    openai:
+      enabled: true
+      timeout: 30.0
+      max_retries: 3
+      api_keys:
+        default:
+          key: "${OPENAI_API_KEY}"  # Will be replaced with environment variable
+      models:
+        # Examples of model configurations (these will be auto-discovered if API key is available)
+        - id: "openai:gpt-4o"
+          name: "gpt-4o"
+          cost:
+            input_cost_per_thousand: 5.0
+            output_cost_per_thousand: 15.0
+          rate_limit:
+            tokens_per_minute: 300000
+            requests_per_minute: 10000
+        
+        - id: "openai:gpt-3.5-turbo"
+          name: "gpt-3.5-turbo"
+          cost:
+            input_cost_per_thousand: 0.5
+            output_cost_per_thousand: 1.5
+          rate_limit:
+            tokens_per_minute: 1000000
+            requests_per_minute: 20000
+    
+    # Anthropic provider configuration
+    anthropic:
+      enabled: true
+      timeout: 30.0
+      max_retries: 3
+      api_keys:
+        default:
+          key: "${ANTHROPIC_API_KEY}"  # Will be replaced with environment variable
+      models:
+        - id: "anthropic:claude-3-opus-20240229"
+          name: "claude-3-opus-20240229"
+          cost:
+            input_cost_per_thousand: 15.0
+            output_cost_per_thousand: 75.0
+          rate_limit:
+            tokens_per_minute: 100000
+            requests_per_minute: 5000
+    
+    # Google deepmind provider configuration
+    deepmind:
+      enabled: true
+      timeout: 30.0
+      max_retries: 3
+      api_keys:
+        default:
+          key: "${GOOGLE_API_KEY}"  # Will be replaced with environment variable
+
+# Logging configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  handlers:
+    console:
+      class: "logging.StreamHandler"
+      level: "INFO"
+    file:
+      class: "logging.FileHandler"
+      filename: "ember.log"
+      level: "DEBUG"
+      formatter: "detailed"
+
+# Data paths configuration
+data_paths:
+  datasets: "datasets"  # Path to datasets directory
+  cache: ".cache"      # Path to cache directory

@@ -15,11 +15,8 @@ from ember.core.utils.data.registry import (
     initialize_registry
 )
 
-warnings.warn(
-    "This module is deprecated. Use ember.core.utils.data.registry instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
+# Removed explicit warning since this is an internal module
+# The warning will be shown just by importing, so the importing code should handle this
 
 # For potential compatibility with internal code
 # TODO: Since there are no external users yet, we should update all internal references

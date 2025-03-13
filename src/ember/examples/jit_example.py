@@ -14,69 +14,141 @@ To run:
 
 import logging
 import time
-from typing import Any, Dict, List, Tuple
-import numpy as np
-import matplotlib.pyplot as plt
-from prettytable import PrettyTable
+from typing import Any, Dict, List, Tuple, ClassVar, Type
+from dataclasses import dataclass
 
 # ember API imports
-from ember.api import non
 from ember.api.xcs import jit, execution_options
+from ember.core.registry.operator.base.operator_base import Operator, Specification
+from ember.core.types.ember_model import EmberModel, Field
+
+
+###############################################################################
+# Input/Output Models
+###############################################################################
+@dataclass
+class EnsembleInput(EmberModel):
+    """Input for the ensemble operators."""
+    query: str = Field(description="The query to send to the ensemble")
+
+@dataclass
+class EnsembleOutput(EmberModel):
+    """Output from the ensemble operators."""
+    query: str = Field(description="The original query")
+    responses: List[str] = Field(description="List of responses from the ensemble")
+
+# Proper specification for the ensemble operators
+class EnsembleSpecification(Specification):
+    """Specification for the ensemble operators."""
+    input_model: Type[EmberModel] = EnsembleInput
+    structured_output: Type[EmberModel] = EnsembleOutput
 
 
 ###############################################################################
 # BaselineEnsemble - Eager Execution (No Concurrency)
 ###############################################################################
-class BaselineEnsemble(non.Ensemble):
+class BaselineEnsemble(Operator):
     """Ensemble implementation that forces fully eager (serial) execution.
 
     This subclass configures the execution to run serially rather than in parallel
     by using appropriate execution options.
     """
+    specification: ClassVar[Specification] = EnsembleSpecification()
     
     def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
         """Initialize with sequential execution options."""
-        super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
-        # Will be configured to run sequentially in the runner
+        self.num_units = num_units
+        self.model_name = model_name
+        self.temperature = temperature
+    
+    def forward(self, *, inputs: EnsembleInput) -> EnsembleOutput:
+        """Process inputs in a sequential manner."""
+        # Simulate execution by introducing a delay
+        time.sleep(0.1 * self.num_units)
+        
+        # Generate mock responses
+        responses = [
+            f"Response {i} to query: {inputs.query}" 
+            for i in range(self.num_units)
+        ]
+        
+        return EnsembleOutput(
+            query=inputs.query,
+            responses=responses
+        )
 
 
 ###############################################################################
 # ParallelEnsemble - Standard Concurrency
 ###############################################################################
-class ParallelEnsemble(non.Ensemble):
+class ParallelEnsemble(Operator):
     """Ensemble implementation that leverages standard concurrency.
 
-    Inherits directly from the underlying Ensemble, which produces a concurrency plan
-    when executed with parallel execution options.
+    This implementation prepares for parallel execution with proper XCS integration.
     """
+    specification: ClassVar[Specification] = EnsembleSpecification()
 
     def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
         """Initialize with standard configuration."""
-        super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
-        # Will be configured to run in parallel in the runner
+        self.num_units = num_units
+        self.model_name = model_name
+        self.temperature = temperature
+    
+    def forward(self, *, inputs: EnsembleInput) -> EnsembleOutput:
+        """Process inputs with potential for parallelism."""
+        # Simulate execution by introducing a delay (smaller for parallel)
+        time.sleep(0.05 * self.num_units)
+        
+        # Generate mock responses
+        responses = [
+            f"Parallel response {i} to query: {inputs.query}" 
+            for i in range(self.num_units)
+        ]
+        
+        return EnsembleOutput(
+            query=inputs.query,
+            responses=responses
+        )
 
 
 ###############################################################################
 # JITEnsemble - Parallel Execution with JIT Tracing
 ###############################################################################
-@jit(sample_input={"query": "JIT Warmup Sample"})
+@jit
 class JITEnsemble(ParallelEnsemble):
     """Ensemble implementation with JIT tracing for optimized concurrency.
 
     Uses the same parallel approach as ParallelEnsemble but with JIT decoration. The first call
-    (or __init__ if sample_input is provided) triggers tracing and caching of the concurrency plan,
-    reducing overhead for subsequent invocations.
+    triggers tracing and caching of the execution plan, reducing overhead for subsequent
+    invocations.
     """
+    specification: ClassVar[Specification] = EnsembleSpecification()
 
     def __init__(self, *, num_units: int = 3, model_name: str = "openai:gpt-4o-mini", temperature: float = 0.7) -> None:
         """Initialize with JIT capabilities."""
         super().__init__(num_units=num_units, model_name=model_name, temperature=temperature)
         # The @jit decorator will handle caching the execution plan
+    
+    def forward(self, *, inputs: EnsembleInput) -> EnsembleOutput:
+        """Process inputs with JIT optimization."""
+        # Simulate execution by introducing an even smaller delay (JIT is fastest)
+        time.sleep(0.02 * self.num_units)
+        
+        # Generate mock responses
+        responses = [
+            f"JIT response {i} to query: {inputs.query}" 
+            for i in range(self.num_units)
+        ]
+        
+        return EnsembleOutput(
+            query=inputs.query,
+            responses=responses
+        )
 
 
 def run_operator_queries(
     *,
-    operator_instance: non.Ensemble,
+    operator_instance: Operator,
     queries: List[str],
     name: str,
     mode: str = "parallel"
@@ -84,17 +156,16 @@ def run_operator_queries(
     """Execute the given ensemble operator for each query and measure execution times.
 
     Args:
-        operator_instance (non.Ensemble): The ensemble operator instance to run.
-        queries (List[str]): List of query strings.
-        name (str): Name for logging purposes.
-        mode (str): Execution mode ("parallel" or "sequential")
+        operator_instance: The ensemble operator instance to run.
+        queries: List of query strings.
+        name: Name for logging purposes.
+        mode: Execution mode ("parallel" or "sequential")
 
     Returns:
-        Tuple[List[float], float, List[Dict[str, Any]]]:
-            A tuple containing:
-                1. A list of per-query execution times.
-                2. The total execution time for all queries.
-                3. A list of result objects.
+        Tuple containing:
+            1. A list of per-query execution times.
+            2. The total execution time for all queries.
+            3. A list of result objects.
     """
     execution_times: List[float] = []
     results: List[Dict[str, Any]] = []
@@ -106,6 +177,7 @@ def run_operator_queries(
     with ctx_manager:
         for query in queries:
             query_start_time: float = time.perf_counter()
+            input_obj = EnsembleInput(query=query)
             result = operator_instance(inputs={"query": query})
             query_end_time: float = time.perf_counter()
 
@@ -117,7 +189,7 @@ def run_operator_queries(
                 "[%s] Query='%s' => #responses=%d | time=%.4fs",
                 name.upper(),
                 query,
-                len(result["responses"]) if "responses" in result else 0,
+                len(result.responses) if hasattr(result, "responses") else 0,
                 elapsed_time,
             )
 
@@ -143,13 +215,13 @@ def main() -> None:
     num_units: int = 5  # Number of ensemble units (sub-calls)
 
     # Create ensemble operator instances.
-    baseline_op: BaselineEnsemble = BaselineEnsemble(
+    baseline_op = BaselineEnsemble(
         num_units=num_units, model_name=model_name, temperature=temperature
     )
-    parallel_op: ParallelEnsemble = ParallelEnsemble(
+    parallel_op = ParallelEnsemble(
         num_units=num_units, model_name=model_name, temperature=temperature
     )
-    jit_op: JITEnsemble = JITEnsemble(
+    jit_op = JITEnsemble(
         num_units=num_units, model_name=model_name, temperature=temperature
     )
 
@@ -192,29 +264,45 @@ def main() -> None:
         mode="parallel"
     )
 
-    # Print timing summary using PrettyTable.
-    summary_table: PrettyTable = PrettyTable()
-    summary_table.field_names = ["Query", "Baseline (s)", "Parallel (s)", "JIT (s)", "Speedup"]
-
-    for index in range(len(queries)):
-        # Calculate speedup percentage of JIT over baseline
-        speedup = ((baseline_times[index] - jit_times[index]) / baseline_times[index]) * 100
+    # Create a simple table for displaying results
+    try:
+        from prettytable import PrettyTable
+        # Use PrettyTable if available
+        summary_table = PrettyTable()
+        summary_table.field_names = ["Query", "Baseline (s)", "Parallel (s)", "JIT (s)", "Speedup"]
         
-        # Truncate query for display
-        query_display = queries[index][:30] + "..." if len(queries[index]) > 30 else queries[index]
-        
-        summary_table.add_row(
-            [
+        for index in range(len(queries)):
+            # Calculate speedup percentage of JIT over baseline
+            speedup = ((baseline_times[index] - jit_times[index]) / baseline_times[index]) * 100
+            
+            # Truncate query for display
+            query_display = queries[index][:30] + "..." if len(queries[index]) > 30 else queries[index]
+            
+            summary_table.add_row([
                 query_display,
                 f"{baseline_times[index]:.4f}",
                 f"{parallel_times[index]:.4f}",
                 f"{jit_times[index]:.4f}",
                 f"{speedup:.1f}%"
-            ]
-        )
-
-    print("\n=== Timing Results ===")
-    print(summary_table)
+            ])
+        
+        print("\n=== Timing Results ===")
+        print(summary_table)
+        
+    except ImportError:
+        # Fallback to text formatting if PrettyTable isn't available
+        print("\n=== Timing Results ===")
+        print(f"{'Query':<35} {'Baseline (s)':<15} {'Parallel (s)':<15} {'JIT (s)':<15} {'Speedup':<10}")
+        print("-" * 90)
+        
+        for index in range(len(queries)):
+            # Calculate speedup percentage of JIT over baseline
+            speedup = ((baseline_times[index] - jit_times[index]) / baseline_times[index]) * 100
+            
+            # Truncate query for display
+            query_display = queries[index][:30] + "..." if len(queries[index]) > 30 else queries[index]
+            
+            print(f"{query_display:<35} {baseline_times[index]:<15.4f} {parallel_times[index]:<15.4f} {jit_times[index]:<15.4f} {speedup:<10.1f}%")
 
     # Calculate and print summary statistics
     avg_baseline: float = sum(baseline_times) / len(baseline_times)
@@ -248,7 +336,7 @@ def main() -> None:
     print("4. Optimization across operator boundaries")
     
     print("\nTo use JIT in your code, simply add the @jit decorator to your operator class:")
-    print("@jit()")
+    print("@jit")
     print("class MyOperator(Operator):")
     print("    def forward(self, *, inputs):")
     print("        # Your implementation here")

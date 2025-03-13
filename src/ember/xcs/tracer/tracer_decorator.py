@@ -78,11 +78,12 @@ _COMPILED_GRAPHS: Dict[int, XCSGraph] = {}
 
 
 def jit(
+    func=None,
     *,
     sample_input: Optional[Dict[str, Any]] = None,
     force_trace: bool = False,
     recursive: bool = True,
-) -> OperatorDecorator:
+):
     """Just-In-Time compilation decorator for Ember Operators.
 
     The @jit decorator transforms Operator classes to automatically trace their execution
@@ -106,6 +107,8 @@ def jit(
     - Configurability: Multiple options allow fine-tuning for different use cases
 
     Args:
+        func: The function or class to be JIT-compiled. This is automatically passed when
+             using the @jit syntax directly. If using @jit(...) with parameters, this will be None.
         sample_input: Optional pre-defined input for eager compilation during initialization.
                     This enables "compile-time" optimization rather than runtime JIT compilation.
                     Recommended for performance-critical initialization paths.
@@ -118,8 +121,8 @@ def jit(
                  Default is True, enabling full pipeline optimization.
 
     Returns:
-        A decorator function that transforms the target Operator subclass by
-        instrumenting its initialization and call methods for tracing.
+        A decorated function/class or a decorator function that transforms the target
+        Operator subclass by instrumenting its initialization and call methods for tracing.
 
     Raises:
         TypeError: If applied to a class that doesn't inherit from Operator.
@@ -127,7 +130,14 @@ def jit(
                   incorrect usage on unsupported class types.
     
     Example:
-        @jit(sample_input={"text": "example"})  # Pre-compile with sample input
+        # Direct decoration (no parameters)
+        @jit
+        class SimpleOperator(Operator):
+            def __call__(self, *, inputs):
+                return process(inputs)
+            
+        # Parameterized decoration
+        @jit(sample_input={"text": "example"})
         class ProcessorOperator(Operator):
             def __call__(self, *, inputs):
                 # Complex multi-step process
@@ -146,9 +156,18 @@ def jit(
         Raises:
             TypeError: If cls is not an Operator subclass.
         """
-        if not issubclass(cls, Operator):
+        # More robust type checking that allows duck typing
+        try:
+            if not issubclass(cls, Operator):
+                # Check for duck typing - if it has a __call__ method with the right signature
+                if not (hasattr(cls, "__call__") and callable(getattr(cls, "__call__"))):
+                    raise TypeError(
+                        "@jit decorator can only be applied to an Operator-like class with a __call__ method."
+                    )
+        except TypeError:
+            # This handles the case where cls is not a class at all
             raise TypeError(
-                "@jit decorator can only be applied to an Operator subclass."
+                "@jit decorator can only be applied to a class, not a function or other object."
             )
 
         original_call = cls.__call__
@@ -221,7 +240,13 @@ def jit(
         cls.__call__ = cast(Callable, traced_call)
         return cls
 
-    return decorator
+    # Handle both @jit and @jit(...) patterns
+    if func is not None:
+        # Called as @jit without parentheses
+        return decorator(func)
+    else:
+        # Called with parameters as @jit(...)
+        return decorator
 
 
 # Removed _build_graph_from_trace function since we're not implementing the enhanced

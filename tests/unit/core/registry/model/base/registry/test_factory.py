@@ -41,14 +41,19 @@ def dummy_discover_providers(*, package_path: str) -> Dict[str, type]:
 
 @pytest.fixture(autouse=True)
 def patch_factory(monkeypatch: pytest.MonkeyPatch) -> None:
-    # This ensures that 'DummyProvider' is recognized
-    monkeypatch.setattr(
-        "ember.core.registry.model.base.registry.factory.discover_providers_in_package",
-        dummy_discover_providers,
-    )
+    """Patch the factory for testing purposes.
+    
+    This function directly patches the ModelFactory implementation since
+    monkeypatching the import path has issues with duplicate modules.
+    """
+    # Import factory module directly
+    from ember.core.registry.model.base.registry import factory
+    
+    # Apply patch directly to the module
+    monkeypatch.setattr(factory, "discover_providers_in_package", dummy_discover_providers)
+    
     # Also reset the cached providers
     from ember.core.registry.model.base.registry.factory import ModelFactory
-
     ModelFactory._provider_cache = None
 
 
@@ -74,18 +79,32 @@ def test_create_model_from_info_success(mock_get_providers) -> None:
     assert model_instance.model_info.id == "openai:gpt-4o"
 
 
-def test_create_model_from_info_invalid(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_create_model_from_info_invalid() -> None:
     """Test that an invalid model id causes ProviderConfigError."""
     dummy_info = create_dummy_model_info("invalid:model")
 
-    # Monkey-patch parse_model_str to always raise ValueError
-    def mock_parse_model_str(model_str: str) -> str:
-        raise ValueError("Invalid model ID format")
-
-    monkeypatch.setattr(
-        "ember.core.registry.model.base.registry.factory.parse_model_str",
-        mock_parse_model_str,
-    )
-
-    with pytest.raises(ProviderConfigError):
-        ModelFactory.create_model_from_info(model_info=dummy_info)
+    # Use patch to avoid import path issues
+    from ember.core.registry.model.base.registry import factory
+    from ember.core.registry.model.config import model_enum
+    
+    # Keep original function for restoration after test
+    original_parse_func = model_enum.parse_model_str
+    
+    try:
+        # Directly modify the function
+        def mock_parse_model_str(model_str: str) -> str:
+            raise ValueError("Invalid model ID format")
+            
+        # Apply the patch directly to the imported module
+        model_enum.parse_model_str = mock_parse_model_str
+        
+        # The factory imports parse_model_str directly, so we need to patch that reference too
+        factory.parse_model_str = mock_parse_model_str
+        
+        # Now test the factory function - should raise ProviderConfigError
+        with pytest.raises(ProviderConfigError):
+            ModelFactory.create_model_from_info(model_info=dummy_info)
+    finally:
+        # Restore the original function
+        model_enum.parse_model_str = original_parse_func
+        factory.parse_model_str = original_parse_func

@@ -7,6 +7,7 @@ from ember.xcs.engine.execution_options import execution_options, ExecutionOptio
 from ember.xcs.engine.xcs_engine import (
     execute_graph,
     IScheduler,
+    TopologicalScheduler,
     TopologicalSchedulerWithParallelDispatch,
 )
 
@@ -15,5 +16,6 @@ __all__ = [
     "execution_options",
     "ExecutionOptions",
     "IScheduler",
+    "TopologicalScheduler",
     "TopologicalSchedulerWithParallelDispatch",
 ]

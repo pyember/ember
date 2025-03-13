@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 import threading
@@ -32,17 +33,85 @@ class ModelDiscoveryService:
         Args:
             ttl (int): Cache time-to-live in seconds. Defaults to 3600.
         """
-        self.providers: List[BaseDiscoveryProvider] = [
-            OpenAIDiscovery(),
-            AnthropicDiscovery(),
-            DeepmindDiscovery(),
-        ]
+        # Load discovery providers dynamically based on available API keys
+        self.providers: List[BaseDiscoveryProvider] = self._initialize_providers()
+        
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: float = 0.0
         self.ttl: int = ttl
-        self._lock: threading.RLock = (
-            threading.RLock()
-        )  # Added reentrant lock for thread safety
+        self._lock: threading.RLock = threading.RLock()  # Added reentrant lock for thread safety
+        
+    def _initialize_providers(self) -> List[BaseDiscoveryProvider]:
+        """Initialize discovery providers based on available API keys.
+        
+        This method creates provider instances with appropriate configuration:
+        1. Checks for required API keys for each provider
+        2. Only initializes providers with valid credentials
+        3. Configures providers with appropriate settings
+        
+        Returns:
+            List[BaseDiscoveryProvider]: A list of initialized discovery providers.
+        """
+        from typing import Dict, Tuple, Optional, Type, Callable
+        
+        # Define provider configurations
+        ProviderConfig = Tuple[Type[BaseDiscoveryProvider], str, Optional[Callable[[], Dict[str, str]]]]
+        
+        provider_configs: List[ProviderConfig] = [
+            # Provider class, env var name, optional config function
+            (OpenAIDiscovery, "OPENAI_API_KEY", lambda: {"api_key": os.environ.get("OPENAI_API_KEY", "")}),
+            (AnthropicDiscovery, "ANTHROPIC_API_KEY", lambda: {"api_key": os.environ.get("ANTHROPIC_API_KEY", "")}),
+            (DeepmindDiscovery, "GOOGLE_API_KEY", lambda: {"api_key": os.environ.get("GOOGLE_API_KEY", "")})
+        ]
+        
+        # Initialize providers with available credentials
+        providers: List[BaseDiscoveryProvider] = []
+        
+        for provider_class, env_var_name, config_fn in provider_configs:
+            api_key = os.environ.get(env_var_name)
+            if api_key:
+                try:
+                    # Initialize with configuration if available
+                    if config_fn:
+                        config = config_fn()
+                        if hasattr(provider_class, "configure"):
+                            # If provider has a configure method, use it
+                            instance = provider_class()
+                            instance.configure(**config)  # type: ignore
+                            providers.append(instance)
+                        else:
+                            # Otherwise try to pass config to constructor
+                            providers.append(provider_class(**config))  # type: ignore
+                    else:
+                        # Simple initialization without config
+                        providers.append(provider_class())
+                    
+                    logger.debug(
+                        "%s found, initialized %s successfully", 
+                        env_var_name, 
+                        provider_class.__name__
+                    )
+                except Exception as init_error:
+                    logger.error(
+                        "Failed to initialize %s: %s", 
+                        provider_class.__name__, 
+                        init_error
+                    )
+            else:
+                logger.info(
+                    "%s not found, skipping %s", 
+                    env_var_name, 
+                    provider_class.__name__
+                )
+        
+        if not providers:
+            logger.warning(
+                "No API keys found for any providers. "
+                "Set one of %s environment variables to enable discovery.",
+                ", ".join(env_var for _, env_var, _ in provider_configs)
+            )
+        
+        return providers
 
     def discover_models(self) -> Dict[str, Dict[str, Any]]:
         """Discover models using registered providers, with caching based on TTL.
@@ -98,45 +167,107 @@ class ModelDiscoveryService:
         """Merge discovered model metadata with local configuration overrides.
 
         Local configuration (loaded from YAML) takes precedence over API-reported data.
+        This method also ensures that environment variables are considered for API keys.
 
         Args:
-            discovered (Dict[str, Dict[str, Any]]): Discovered model metadata.
+            discovered: Discovered model metadata from providers.
 
         Returns:
             Dict[str, ModelInfo]: Mapping from model ID to merged ModelInfo objects.
         """
+        import os
         from ember.core.registry.model.config.settings import EmberSettings
 
         settings = EmberSettings()
+        
+        # Get models from local configuration
         local_models: Dict[str, Dict[str, Any]] = {
             model.id: model.model_dump() for model in settings.registry.models
         }
 
+        # Map provider prefixes to their environment variable keys
+        provider_api_keys: Dict[str, str] = {
+            "openai": os.environ.get("OPENAI_API_KEY", ""),
+            "anthropic": os.environ.get("ANTHROPIC_API_KEY", ""),
+            "google": os.environ.get("GOOGLE_API_KEY", ""),
+            "deepmind": os.environ.get("GOOGLE_API_KEY", ""),  # Uses same key as Google
+        }
+        
+        def get_provider_from_model_id(model_id: str) -> str:
+            """Extract provider name from model ID."""
+            if ":" in model_id:
+                return model_id.split(":", 1)[0].lower()
+            return "unknown"
+        
         merged_models: Dict[str, ModelInfo] = {}
+        
         for model_id, api_metadata in discovered.items():
+            provider_name = get_provider_from_model_id(model_id)
+            api_key = provider_api_keys.get(provider_name, "")
+            
             if model_id in local_models:
-                # Local configuration overrides API metadata.
+                # Local configuration overrides API metadata except for API keys
+                # which we take from environment if available.
                 merged_data: Dict[str, Any] = {**api_metadata, **local_models[model_id]}
+                
+                # Override with environment API key if available and not explicitly set
+                if api_key and not merged_data.get("provider", {}).get("default_api_key"):
+                    if "provider" not in merged_data:
+                        merged_data["provider"] = {}
+                    if isinstance(merged_data["provider"], dict):
+                        merged_data["provider"]["default_api_key"] = api_key
             else:
+                # For discovered models not in local config, create reasonable defaults
                 logger.warning(
-                    "Model %s discovered via API but not in local config; using defaults.",
+                    "Model %s discovered via API but not in local config; using defaults with environment API key.",
                     model_id,
                 )
+                
+                # Extract provider prefix from model ID
+                provider_prefix = provider_name.capitalize()
+                
                 merged_data = {
                     "id": model_id,
-                    "name": api_metadata.get("name", model_id),
+                    "name": api_metadata.get("model_name", api_metadata.get("name", model_id.split(":")[-1])),
                     "cost": {
                         "input_cost_per_thousand": 0.0,
                         "output_cost_per_thousand": 0.0,
                     },
                     "rate_limit": {"tokens_per_minute": 0, "requests_per_minute": 0},
-                    "provider": {"name": model_id.split(":")[0]},
-                    "api_key": None,
+                    "provider": {
+                        "name": provider_prefix,
+                        "default_api_key": api_key,
+                    },
                 }
+                
+            # Validate model info and add to results if valid
             try:
-                merged_models[model_id] = ModelInfo(**merged_data)
-            except Exception as err:
-                logger.error("Failed to merge model info for %s: %s", model_id, err)
+                # Skip models without API keys - they can't be used anyway
+                if not merged_data.get("provider", {}).get("default_api_key"):
+                    logger.warning(
+                        "Skipping model %s because no API key is available", 
+                        model_id
+                    )
+                    continue
+                    
+                # Create ModelInfo instance
+                model_info = ModelInfo(**merged_data)
+                merged_models[model_id] = model_info
+                logger.debug("Successfully merged model info for %s", model_id)
+                
+            except Exception as validation_error:
+                logger.error(
+                    "Failed to merge model info for %s: %s", 
+                    model_id, 
+                    validation_error
+                )
+                
+        if not merged_models:
+            logger.warning(
+                "No valid models found after merging with configuration. "
+                "Check that API keys are set in environment variables and model schemas are valid."
+            )
+            
         return merged_models
 
     def refresh(self) -> Dict[str, ModelInfo]:
