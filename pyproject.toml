@@ -215,5 +215,6 @@ mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
 package-dir = {"" = "src"}
 packages = ["ember"]
 
-[tool.poetry.scripts]
-ember = "ember.cli:main"
+# CLI is being developed separately and is currently excluded
+# [tool.poetry.scripts]
+# ember = "ember.cli:main"

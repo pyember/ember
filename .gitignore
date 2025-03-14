@@ -63,3 +63,12 @@ old/
 
 # Claude assistant files
 CLAUDE.md
+
+# CLI related files (to be developed separately)
+src/cli/
+/dist/
+/node_modules/
+package.json
+package-lock.json
+tsconfig.json
+.eslintrc.js
