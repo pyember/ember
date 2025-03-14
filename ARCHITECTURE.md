@@ -2,133 +2,6 @@
 
 This document describes Ember's architecture, core components, and design principles. It serves as both a high-level overview for users and a detailed guide for contributors.
 
-## Quick Reference
-
-### Common Import Patterns
-
-```python
-# Model access
-from ember.api.models import EmberModel, LMModule, LMModuleConfig, ModelEnum
-
-# Operator building blocks
-from ember.api.operator import Operator, Specification
-
-# Execution and optimization
-from ember.api.xcs import jit, execution_options
-
-# Network of Networks patterns
-from ember.core import non
-
-# Data processing
-from ember.api.data import DataLoader, DataTransformer, EvaluationPipeline
-```
-
-### Typical Workflow
-
-1. **Define input/output models**
-   ```python
-   class QueryInput(EmberModel):
-       query: str
-       
-   class QueryOutput(EmberModel):
-       answer: str
-   ```
-
-2. **Create a specification with constraints**
-   ```python
-   from typing import Literal, Optional
-   
-   class VerifierInput(EmberModel):
-       query: str
-       candidate_answer: str
-       
-   class VerifierOutput(EmberModel):
-       verdict: Literal[0, 1]  # 0 for incorrect, 1 for correct
-       explanation: str
-       revised_answer: Optional[str] = None
-       
-   class VerifierSpecification(Specification):
-       input_model = VerifierInput
-       structured_output = VerifierOutput
-       prompt_template = """
-       You are a verifier of correctness.
-       
-       Question: {query}
-       
-       Candidate Answer: {candidate_answer}
-       
-       Please decide if this is correct. Provide:
-       Verdict: <1 for correct, 0 for incorrect>
-       Explanation: <Your reasoning>
-       Revised Answer (optional): <If you can provide a corrected version>
-       """
-   ```
-
-3. **Build your operator**
-   ```python
-   @jit  # For optimization
-   class VerifierOperator(Operator[VerifierInput, VerifierOutput]):
-       specification = VerifierSpecification()
-       
-       def __init__(self, model_name: str = "anthropic:claude-3-sonnet", temperature: float = 0.0):
-           self.model = LMModule(LMModuleConfig(
-               model_name=model_name, 
-               temperature=temperature
-           ))
-           
-       def forward(self, *, inputs: VerifierInput) -> VerifierOutput:
-           # Generate prompt from template
-           prompt = self.specification.render_prompt(inputs)
-           
-           # Get model response
-           response = self.model(prompt)
-           
-           # Parse the response to extract structured information
-           lines = response.strip().split('\n')
-           verdict = 0
-           explanation = ""
-           revised_answer = None
-           
-           # Simple parsing (in practice, use a more robust approach)
-           for line in lines:
-               if line.startswith("Verdict:"):
-                   # Extract verdict value (0 or 1)
-                   verdict_text = line.replace("Verdict:", "").strip()
-                   verdict = 1 if verdict_text == "1" or "correct" in verdict_text.lower() else 0
-               elif line.startswith("Explanation:"):
-                   explanation = line.replace("Explanation:", "").strip()
-               elif line.startswith("Revised Answer:"):
-                   revised_answer = line.replace("Revised Answer:", "").strip()
-           
-           # Return structured output with validation
-           return VerifierOutput(
-               verdict=verdict,
-               explanation=explanation,
-               revised_answer=revised_answer if revised_answer else None
-           )
-   ```
-
-4. **Use your operator**
-   ```python
-   verifier = VerifierOperator(model_name="anthropic:claude-3-sonnet")
-   
-   # Verify a correct answer using standardized kwargs format
-   result1 = verifier(
-       query="What's the capital of France?",
-       candidate_answer="The capital of France is Paris."
-   )
-   print(f"Verdict: {result1.verdict}")  # 1 (correct)
-   print(f"Explanation: {result1.explanation}")
-   
-   # Verify an incorrect answer (alternative: using inputs dict)
-   result2 = verifier(inputs={
-       "query": "What's the capital of France?",
-       "candidate_answer": "The capital of France is Lyon."
-   })
-   print(f"Verdict: {result2.verdict}")  # 0 (incorrect)
-   print(f"Revised answer: {result2.revised_answer}")  # "The capital of France is Paris."
-   ```
-
 ## Design Philosophy
 
 Ember is built on these foundational principles:
@@ -157,7 +30,7 @@ Ember's architecture follows a layered design with clear separations of concern:
 │  │  • Model Registry       │  │  • Input/Output Models  │  │  • Graph Controls       │   │
 │  │  • Usage Tracking       │  │  • Operator Registry    │  │  • Transform Functions  │   │
 │  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
-│                                                                                           │
+│                                                                                          │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐                                │
 │  │  api.data               │  │  api.non                │                                │
 │  │                         │  │                         │                                │
@@ -220,25 +93,15 @@ Ember's architecture follows a layered design with clear separations of concern:
 
 ## Layer Responsibilities
 
-### 1. Public API Layer
+### 1. Execution Engine (XCS)
 
-The simplified interface for developers to interact with Ember:
+The foundational layer providing computation graph definition and execution:
 
-* **api.models**: LLM service and model management interfaces
-* **api.operator**: Operator base classes and specifications for building components
-* **api.xcs**: JIT and execution control for optimization
-* **api.data**: Dataset access and processing utilities
-* **api.non**: Ready-to-use Network of Networks components
+* **Graph Definition**: Defines the structure of computation
+* **Tracer System**: Records execution and enables optimization
+* **Execution Engine**: Manages the actual running of operations with parallelization
 
-### 2. Application Layer
-
-High-level abstractions for building compound AI systems:
-
-* **NON Patterns**: Ready-to-use Networks of Networks patterns
-* **Auto Graph Builder**: Automatic graph construction from code
-* **Enhanced JIT**: Just-in-time compilation for optimized execution
-
-### 3. Core Component Layer
+### 2. Core Component Layer
 
 The building blocks of Ember's functionality:
 
@@ -249,13 +112,13 @@ The building blocks of Ember's functionality:
 * **Evaluation Tools**: Benchmarking and performance analysis
 * **Application Context**: Configuration and dependency management
 
-### 4. Execution Engine (XCS)
+### 3. Application Layer
 
-The foundational layer providing computation graph definition and execution:
+High-level abstractions built on the core components:
 
-* **Graph Definition**: Defines the structure of computation
-* **Tracer System**: Records execution and enables optimization
-* **Execution Engine**: Manages the actual running of operations with parallelization
+* **NON Patterns**: Ready-to-use Networks of Networks patterns
+* **Auto Graph Builder**: Automatic graph construction from code
+* **Enhanced JIT**: Just-in-time compilation for optimized execution
 
 ## Component Details
 
@@ -316,19 +179,19 @@ response = service("anthropic:claude-3-sonnet", "Hello Claude")
 #### Model Registry Component Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                           Model Registry System                         │
+│                           Model Registry System                        │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │  ModelRegistry  │◄────►│  ModelFactory   │─────►│ Provider Models │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
-│           │                                                            │
+│           │                                                             │
 │           │               ┌─────────────────┐      ┌─────────────────┐ │
 │           └──────────────►│  ModelService   │◄────►│  UsageService   │ │
 │                           └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ OpenAI Provider │      │ Anthropic Provider │    │ Other Providers │ │
+│  │ OpenAI Provider │      │Anthropic Provider│      │ Other Providers │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -574,15 +437,15 @@ mmlu_data = data_service.load_dataset(
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │  DataService    │─────►│ Dataset Registry │─────►│ Dataset Loaders │ │
+│  │  DataService    │─────►│ Dataset Registry │─────►│ Dataset Loaders│ │
 │  └────────┬────────┘      └─────────────────┘      └────────┬────────┘ │
 │           │                                                  │         │
 │           ▼                                                  ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │ Dataset Cache   │◄─────┤  Dataset Item   │◄─────┤  External API   │ │
 │  └─────────────────┘      └────────┬────────┘      └─────────────────┘ │
-│                                    │                                    │
-│                                    ▼                                    │
+│                                    │                                   │
+│                                    ▼                                   │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │ Data Transformer│◄─────┤ Data Sampler    │─────►│ Data Validator  │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
@@ -651,51 +514,35 @@ The diagram below illustrates the complete dependency flow between major compone
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   Configuration Layer                                      │
+│                                   Configuration Layer                                     │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Config Files         │────►│    Config Manager       │◄────┤   Environment       │ │
-│  │    (.yaml, .env)        │     │                         │     │   Variables         │ │
-│  └─────────────────────────┘     └───────────┬─────────────┘     └─────────────────────┘ │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │    Config Files         │────►│    Config Manager       │────►│   Environment       │  │
+│  │    (.yaml, .env)        │     │                         │     │   Variables         │  │
+│  └─────────────────────────┘     └───────────┬─────────────┘     └─────────────────────┘  │
 │                                              │                                            │
 │                                              ▼                                            │
-│                                 ┌─────────────────────────┐                              │
-│                                 │    EmberAppContext      │                              │
-│                                 └───────────┬─────────────┘                              │
+│                                 ┌─────────────────────────┐                               │
+│                                 │    EmberAppContext      │                               │
+│                                 └───────────┬─────────────┘                               │
 │                                             │                                             │
 └─────────────────────────────────────────────┼─────────────────────────────────────────────┘
                                               │
                                               ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-│                                    Public API Layer                                       │
-├───────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    api.models           │     │     api.operator        │     │   api.xcs           │ │
-│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────┬───────────┘ │
-│              │                               │                             │             │
-│              │                               │                             │             │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐              │             │
-│  │    api.data             │     │     api.non             │              │             │
-│  └───────────┬─────────────┘     └───────────┬─────────────┘              │             │
-│              │                               │                             │             │
-└──────────────┼───────────────────────────────┼─────────────────────────────┼─────────────┘
-               │                               │                             │
-               ▼                               ▼                             ▼
-┌───────────────────────────────────────────────────────────────────────────────────────────┐
 │                                    Service Layer                                          │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Model Registry       │◄───►│     Model Service       │◄───►│   Usage Service     │ │
-│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────────────────┘ │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │    Model Registry       │◄───►│     Model Service       │◄───►│   Usage Service     │  │
+│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────────────────┘  │
 │              │                               │                                            │
 │              ▼                               ▼                                            │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │   Provider Models       │◄───►│    Operator Registry    │◄───►│  Data Service       │ │
-│  └─────────────────────────┘     └───────────┬─────────────┘     └───────────┬─────────┘ │
-│                                              │                               │           │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │   Provider Models       │◄───►│    Operator Registry    │◄───►│  Data Service       │  │
+│  └─────────────────────────┘     └───────────┬─────────────┘     └───────────┬─────────┘  │
+│                                              │                               │            │
 └─────────────────────────────────────────────┼───────────────────────────────┼─────────────┘
                                               │                               │
                                               ▼                               ▼
@@ -703,30 +550,30 @@ The diagram below illustrates the complete dependency flow between major compone
 │                                    Component Layer                                        │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Base Operators       │◄───►│  Prompt Specifications  │◄───►│   Dataset Loaders   │ │
-│  └───────────┬─────────────┘     └─────────────────────────┘     └─────────────────────┘ │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │    Base Operators       │◄───►│    Prompt Specifications│◄───►│   Dataset Loaders   │  │
+│  └───────────┬─────────────┘     └─────────────────────────┘     └─────────────────────┘  │
 │              │                                                                            │
 │              ▼                                                                            │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │   Core Operators        │◄───►│     NON Patterns        │◄───►│   Evaluators        │ │
-│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────────────────┘ │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │   Core Operators        │◄───►│     NON Patterns        │◄───►│   Evaluators        │  │
+│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────────────────┘  │
 │              │                               │                                            │
-└─────────────┼───────────────────────────────┼────────────────────────────────────────────┘
+└─────────────┼───────────────────────────────┼────────────────────────────────────────────-┘
               │                               │
               ▼                               ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
 │                                  Execution Engine Layer                                   │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │       XCSGraph          │◄───►│     Graph Compiler      │◄───►│   JIT Compiler      │ │
-│  └───────────┬─────────────┘     └───────────┬─────────────┘     └───────────┬─────────┘ │
-│              │                               │                               │           │
-│              ▼                               ▼                               ▼           │
-│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Execution Plan       │◄───►│      Scheduler          │◄───►│  Parallel Executor  │ │
-│  └─────────────────────────┘     └─────────────────────────┘     └─────────────────────┘ │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │       XCSGraph          │◄───►│     Graph Compiler      │◄───►│   JIT Compiler      │  │
+│  └───────────┬─────────────┘     └───────────┬─────────────┘     └───────────┬─────────┘  │
+│              │                               │                               │            │
+│              ▼                               ▼                               ▼            │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐  │
+│  │    Execution Plan       │◄───►│      Scheduler          │◄───►│  Parallel Executor  │  │
+│  └─────────────────────────┘     └─────────────────────────┘     └─────────────────────┘  │
 │                                                                                           │
 └───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -990,7 +837,7 @@ The following diagram illustrates the flow of a typical request through the Embe
        │                     │                     │              ┌──────────────┐
        │                     │                     │              │              │
        │                     │                     └─────────────►│ Provider     │
-       │                     │                                    │ Implementation│
+       │                     │                                    │ Impl.        │
        │                     │                                    └──────┬───────┘
        │                     │                                           │
        │                     │                                           ▼
@@ -1018,37 +865,6 @@ The Ember architecture continues to evolve along these paths:
 4. **Plugin System**: More comprehensive plugin interfaces for extensions
 5. **Advanced Graph Optimizations**: Additional graph transformations and optimizations
 
-## Troubleshooting Guide
-
-### Configuration Issues
-
-- **API Key Problems**
-  - Ensure environment variables are set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
-  - Check config file location and permissions (`~/.ember/config.yaml`)
-  - Verify API keys are valid and not expired
-
-- **Import Errors**
-  - Use the `ember.api` namespace for cleaner imports (`from ember.api.models import ...`)
-  - Check your installation includes required extras (`poetry add ember-ai -E anthropic`)
-
-### Operator Development
-
-- **Specification Issues**
-  - Ensure prompt templates include all required placeholders
-  - Use proper type annotations on all models and operators
-  
-- **JIT Optimization Concerns**
-  - Apply `@jit` to the class, not individual methods
-  - Make sure your operator follows the proper inheritance chain
-  - Verify type annotations are correct and complete
-
-### Execution Problems
-
-- **Parallelization Not Working**
-  - Use `with execution_options(max_workers=N)` to control parallel execution
-  - Ensure operator dependencies are correctly defined
-  - Check that your graph doesn't have circular dependencies
-
 ## Additional Resources
 
 For more detailed information, consult these resources:
@@ -1057,6 +873,4 @@ For more detailed information, consult these resources:
 - [Operator System Documentation](docs/quickstart/operators.md)
 - [XCS Execution Engine Documentation](docs/advanced/xcs_graphs.md)
 - [Enhanced JIT Documentation](docs/advanced/enhanced_jit.md)
-- [Configuration Guide](docs/quickstart/configuration.md)
-- [Simplified Imports](SIMPLIFIED_IMPORTS.md)
 - [Example Applications](src/ember/examples)

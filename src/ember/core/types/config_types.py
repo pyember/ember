@@ -6,7 +6,7 @@ used throughout the Ember system, replacing generic Dict[str, Any] with
 more precise TypedDict and Protocol definitions.
 """
 
-from typing import Dict, Any, Optional, Protocol, runtime_checkable, TypedDict, Union
+from typing import Dict, Any, List, Optional, Protocol, runtime_checkable, TypedDict, Union
 from typing_extensions import NotRequired, Required
 
 from .protocols import EmberTyped, TypeInfo
@@ -106,6 +106,9 @@ class ModelDict(TypedDict):
     cost: ModelCostDict
     rate_limit: NotRequired[RateLimitDict]
     parameters: NotRequired[Dict[str, Any]]
+    
+# Backward compatibility alias
+ModelConfigDict = ModelDict
 
 
 class ProviderDict(TypedDict, total=False):
