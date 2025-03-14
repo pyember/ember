@@ -13,13 +13,15 @@ For complete architectural details, see ARCHITECTURE.md
 
 import logging
 import threading
+import os
 from threading import Lock
 from typing import Optional, Dict, ClassVar, Type, Any
 
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.types.config_types import ConfigManager
+from ember.core.config.manager import ConfigManager, create_config_manager
+from ember.core.registry.model.config.settings import initialize_ember
 
 
 class EmberAppContext:
@@ -60,7 +62,7 @@ class EmberAppContext:
         self.logger = logger
 
 
-def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
+def create_ember_app(config_path: Optional[str] = None) -> EmberAppContext:
     """
     Creates a fully initialized EmberAppContext with all core services.
 
@@ -76,47 +78,62 @@ def create_ember_app(config_filename: Optional[str] = None) -> EmberAppContext:
     4. Builds the ModelRegistry with automatic provider discovery
     5. Instantiates and wires secondary services with their dependencies
 
-    This design follows the Single Responsibility Principle by isolating the complex
-    creation logic away from both the EmberAppContext (which focuses on being a container)
-    and the client code (which focuses on using the services).
-
     Args:
-        config_filename: Optional path to a YAML configuration file. If not provided,
-                       the system will search standard locations and use environment
-                       variables as fallbacks.
+        config_path: Optional path to a configuration file. If not provided,
+                    the system will search standard locations and use environment
+                    variables as fallbacks.
 
     Returns:
-        A fully configured EmberAppContext instance with all services initialized
-        and properly wired together.
+        A fully configured EmberAppContext instance with all services initialized.
     """
     logger = logging.getLogger("ember")
 
-    from ember.core.configs.config import (
-        ConfigManager,
-        initialize_api_keys,
-        auto_register_known_models,
+    # 1) Create the configuration manager
+    config_manager = create_config_manager(config_path=config_path, logger=logger)
+    logger.debug("Configuration manager initialized")
+
+    # 2) Initialize API keys from environment variables
+    _initialize_api_keys_from_env(config_manager)
+
+    # 3) Create and initialize the model registry
+    model_registry = initialize_ember(
+        config_path=config_path, 
+        auto_discover=True, 
+        auto_register=True
     )
+    logger.debug("Model registry initialized")
 
-    # 1) Create the configuration manager with dependency injection.
-    config_manager = ConfigManager(config_filename=config_filename, logger=logger)
-
-    # 2) Initialize API keys, passing in the consistent logger.
-    initialize_api_keys(config_manager, logger=logger)
-
-    # 3) Create the model registry and auto-register models.
-    model_registry = ModelRegistry(logger=logger)
-    auto_register_known_models(registry=model_registry, config_manager=config_manager)
-
-    # 4) Create additional services (e.g., usage service).
+    # 4) Create additional services
     usage_service = UsageService(logger=logger)
 
-    # 5) Return the aggregated application context.
+    # 5) Return the aggregated application context
     return EmberAppContext(
         config_manager=config_manager,
         model_registry=model_registry,
         usage_service=usage_service,
         logger=logger,
     )
+
+
+def _initialize_api_keys_from_env(config_manager: ConfigManager) -> None:
+    """
+    Initialize API keys from environment variables.
+    
+    Args:
+        config_manager: Configuration manager to update
+    """
+    # Common API keys to check for
+    env_keys = {
+        "OPENAI_API_KEY": "openai",
+        "ANTHROPIC_API_KEY": "anthropic", 
+        "GOOGLE_API_KEY": "google"
+    }
+    
+    # Set API keys from environment if available
+    for env_var, provider in env_keys.items():
+        api_key = os.environ.get(env_var)
+        if api_key:
+            config_manager.set_provider_api_key(provider, api_key)
 
 
 class EmberContext:
@@ -197,6 +214,13 @@ class EmberContext:
         cls._instance = None
         if hasattr(cls._thread_local, 'instances'):
             delattr(cls._thread_local, 'instances')
+            
+    @classmethod
+    def clear_test_context(cls) -> None:
+        """
+        Alias for disable_test_mode for backward compatibility with tests.
+        """
+        cls.disable_test_mode()
 
     def __getattr__(self, name: str) -> Any:
         """
@@ -282,7 +306,7 @@ class EmberContext:
             if app_context is not None:
                 instance._app_context = app_context
             else:
-                instance._app_context = create_ember_app(config_filename=config_path)
+                instance._app_context = create_ember_app(config_path=config_path)
                 
             return instance
             
@@ -295,9 +319,7 @@ class EmberContext:
                 cls._instance._app_context = app_context
             # Otherwise create a new one if needed
             elif cls._instance._app_context is None:
-                cls._instance._app_context = create_ember_app(
-                    config_filename=config_path
-                )
+                cls._instance._app_context = create_ember_app(config_path=config_path)
 
             return cls._instance
 
@@ -403,3 +425,6 @@ __all__ = [
     "EmberContext",
     "get_ember_context",
 ]
+
+# Alias for backward compatibility
+get_app_context = get_ember_context

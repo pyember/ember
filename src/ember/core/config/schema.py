@@ -5,15 +5,14 @@ The schemas are designed to be minimal but extensible through Pydantic.
 """
 
 from typing import Dict, List, Optional, Any, ClassVar
-from pydantic import BaseModel, Field, field_validator, computed_field
+from pydantic import BaseModel, Field, field_validator, computed_field, model_validator
 
 
-class Cost:
+class Cost(BaseModel):
     """Value object for model cost calculations."""
     
-    def __init__(self, input_cost: float = 0.0, output_cost: float = 0.0):
-        self.input_cost = input_cost
-        self.output_cost = output_cost
+    input_cost: float = 0.0
+    output_cost: float = 0.0
     
     def calculate(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate cost for given token counts.

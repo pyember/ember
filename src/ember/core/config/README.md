@@ -1,10 +1,11 @@
 # Ember Configuration System
 
-This module provides a clean, minimal, and extensible configuration system for the Ember framework. It's designed to be simple to use while being flexible enough to handle complex configurations.
+This module provides a standardized configuration system for the Ember framework. It's designed to be simple to use while being flexible enough to handle complex configurations.
 
 ## Key Features
 
-- **Minimal API**: Simple, consistent interface with clear entry points
+- **Clean API**: Simple, consistent interface with clear entry points
+- **Thread Safety**: Thread-safe configuration access and updates
 - **Multiple Sources**: Load from files and environment variables
 - **Environment Resolution**: Replace `${VAR}` patterns with environment values
 - **Validation**: Type checking and validation with Pydantic
@@ -13,14 +14,21 @@ This module provides a clean, minimal, and extensible configuration system for t
 ## Basic Usage
 
 ```python
-from ember.core.config import load_config
+from ember.core.config import load_config, create_config_manager
 
-# Load configuration from default locations
+# Option 1: Load configuration directly
 config = load_config()
 
 # Access configuration
 if config.registry.auto_discover:
     print("Auto-discovery is enabled")
+    
+# Option 2: Use ConfigManager for more features
+config_manager = create_config_manager()
+config = config_manager.get_config()
+
+# Update configuration
+config_manager.set_provider_api_key("openai", "sk-your-key")
 ```
 
 ## Configuration Sources
@@ -46,7 +54,9 @@ You can also reference environment variables within your YAML file:
 registry:
   providers:
     openai:
-      api_key: "${OPENAI_API_KEY}"
+      api_keys:
+        default:
+          key: "${OPENAI_API_KEY}"
 ```
 
 ## Configuration Schema
@@ -71,7 +81,7 @@ The configuration system provides helper methods for working with models and pro
 # Get provider by name
 provider = config.get_provider("openai")
 if provider and provider.enabled:
-    print(f"OpenAI API key: {provider.api_key}")
+    print(f"OpenAI API key: {provider.api_keys['default'].key}")
     
 # Get model by ID
 model = config.get_model_config("openai:gpt-4")
@@ -90,7 +100,10 @@ See `config.yaml.example` for a complete example configuration file.
 
 ```python
 # Load from a specific file
-config = load_config(file_path="/path/to/custom-config.yaml")
+config = load_config(config_path="/path/to/custom-config.yaml")
+
+# Or with the config manager
+config_manager = create_config_manager(config_path="/path/to/custom-config.yaml")
 ```
 
 ### Custom Environment Prefix
@@ -98,6 +111,17 @@ config = load_config(file_path="/path/to/custom-config.yaml")
 ```python
 # Use MY_APP_ prefix instead of EMBER_
 config = load_config(env_prefix="MY_APP")
+```
+
+### Thread-Safe Updates
+
+```python
+# Update configuration in a thread-safe manner
+config_manager = create_config_manager()
+config_manager.set_provider_api_key("openai", "new-key")
+
+# Get the updated configuration
+updated_config = config_manager.get_config()
 ```
 
 ### Schema Extensions

@@ -146,13 +146,13 @@ def load_from_env(prefix: str = "EMBER") -> Dict[str, Any]:
 
 
 def load_config(
-    file_path: Optional[str] = None,
+    config_path: Optional[str] = None,
     env_prefix: str = "EMBER"
 ) -> EmberConfig:
     """Load EmberConfig from file and environment.
     
     Args:
-        file_path: Path to config file (defaults to EMBER_CONFIG from env or "config.yaml")
+        config_path: Path to config file (defaults to EMBER_CONFIG from env or "config.yaml")
         env_prefix: Prefix for environment variables
         
     Returns:
@@ -163,14 +163,14 @@ def load_config(
     """
     try:
         # Determine config path
-        config_path = file_path or os.environ.get(f"{env_prefix}_CONFIG", "config.yaml")
+        path = config_path or os.environ.get(f"{env_prefix}_CONFIG", "config.yaml")
         
         # Start with default empty config
         config_data: Dict[str, Any] = {}
         
         # Load from file if it exists
-        if os.path.exists(config_path):
-            file_config = load_yaml_file(config_path)
+        if os.path.exists(path):
+            file_config = load_yaml_file(path)
             config_data = merge_dicts(config_data, file_config)
         
         # Load from environment (overrides file)

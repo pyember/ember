@@ -15,48 +15,72 @@ registry:
       # Whether this provider is enabled
       enabled: true
       
-      # API key (can use environment variable)
-      api_key: "${OPENAI_API_KEY}"
+      # API keys with named profiles
+      api_keys:
+        default:
+          key: "${OPENAI_API_KEY}"
+        secondary:
+          key: "${OPENAI_BACKUP_API_KEY}"
+          org_id: "org-123456"
       
       # Optional provider-specific settings
       base_url: "https://api.openai.com/v1"
       timeout: 30.0
       
-      # Model configurations
+      # Model configurations as a list
       models:
-        # Key is the model name (referenced as "openai:gpt-4o")
-        gpt-4o:
-          # Human-readable name
+        - id: "openai:gpt-4o"
           name: "GPT-4o"
+          provider: "openai"
           
-          # Cost per 1000 tokens
-          cost_input: 5.0
-          cost_output: 15.0
+          # Cost configuration
+          cost:
+            input_cost_per_thousand: 5.0
+            output_cost_per_thousand: 15.0
           
-          # Optional model-specific settings
-          context_length: 128000
-          vision_enabled: true
+          # Rate limiting
+          rate_limit:
+            tokens_per_minute: 100000
+            requests_per_minute: 500
+          
+          # Optional model-specific parameters
+          parameters:
+            temperature: 0.7
+            max_tokens: 1000
+            context_length: 128000
+            vision_enabled: true
         
         # Another model example
-        gpt-3.5-turbo:
+        - id: "openai:gpt-3.5-turbo"
           name: "GPT-3.5 Turbo"
-          cost_input: 0.5
-          cost_output: 1.5
+          provider: "openai"
+          cost:
+            input_cost_per_thousand: 0.5
+            output_cost_per_thousand: 1.5
+          rate_limit:
+            tokens_per_minute: 180000
+            requests_per_minute: 600
     
     # Anthropic provider
     anthropic:
       enabled: true
-      api_key: "${ANTHROPIC_API_KEY}"
+      api_keys:
+        default:
+          key: "${ANTHROPIC_API_KEY}"
       models:
-        claude-3-opus:
+        - id: "anthropic:claude-3-opus"
           name: "Claude 3 Opus"
-          cost_input: 15.0
-          cost_output: 75.0
+          provider: "anthropic"
+          cost:
+            input_cost_per_thousand: 15.0
+            output_cost_per_thousand: 75.0
           
-        claude-3-sonnet:
+        - id: "anthropic:claude-3-sonnet"
           name: "Claude 3 Sonnet"
-          cost_input: 3.0
-          cost_output: 15.0
+          provider: "anthropic"
+          cost:
+            input_cost_per_thousand: 3.0
+            output_cost_per_thousand: 15.0
 
 # Logging configuration
 logging:
