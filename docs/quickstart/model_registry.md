@@ -37,7 +37,7 @@ GOOGLE_API_KEY=your-google-key
 ```python
 import ember
 
-# Initialize and use in one line
+# Initialize and use in one line (automatically uses configuration system)
 service = ember.init()
 response = service("openai:gpt-4o", "Hello world!")
 print(response.data)
@@ -46,11 +46,13 @@ print(response.data)
 ## 4. Standard Usage Pattern
 
 ```python
-from ember import initialize_ember
+from ember.core.registry.model.initialization import initialize_registry
+from ember.core.configs.config_manager import create_default_config_manager
 from ember.core.registry.model.base.services.model_service import ModelService
 
-# Initialize the model registry
-registry = initialize_ember(auto_register=True)
+# Initialize the configuration and registry
+config_manager = create_default_config_manager()
+registry = initialize_registry(config_manager=config_manager)
 
 # Create a service instance
 service = ModelService(registry=registry)
@@ -77,12 +79,14 @@ print(response.data)
 ## 6. Usage Tracking
 
 ```python
-from ember import initialize_ember
+from ember.core.registry.model.initialization import initialize_registry
+from ember.core.configs.config_manager import create_default_config_manager
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
 
-# Initialize with usage tracking
-registry = initialize_ember(auto_register=True)
+# Initialize configuration and registry with usage tracking
+config_manager = create_default_config_manager()
+registry = initialize_registry(config_manager=config_manager)
 usage_service = UsageService()
 service = ModelService(registry=registry, usage_service=usage_service)
 
@@ -139,10 +143,13 @@ registry.register_model(custom_model)
 ## 10. Type-safe Model Invocation with Enums
 
 ```python
-from ember import initialize_ember
+from ember.core.registry.model.initialization import initialize_registry  
+from ember.core.configs.config_manager import create_default_config_manager
 from ember.core.registry.model.config.model_enum import ModelEnum
 
-service = initialize_ember(auto_register=True)
+# Initialize the registry with configuration
+config_manager = create_default_config_manager()
+service = initialize_registry(config_manager=config_manager)
 
 # Use enum for type-safety
 response = service(ModelEnum.OPENAI_GPT4O, "Hello world!")

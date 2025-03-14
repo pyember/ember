@@ -16,15 +16,15 @@ The configuration system is built around these key components:
 The simplest way to use the configuration system is with the config manager:
 
 ```python
-from ember.core.config.manager import create_config_manager
+from ember.core.configs.config_manager import create_default_config_manager
 
 # Create a configuration manager
-config_manager = create_config_manager()
+config_manager = create_default_config_manager()
 
 # Access configuration
 config = config_manager.get_config()
-auto_discover = config.registry.auto_discover
-openai_enabled = config.registry.providers["openai"].enabled
+auto_discover = config.model_registry.auto_discover
+openai_enabled = config.model_registry.providers["openai"].enabled
 ```
 
 ### Configuration Sources
@@ -41,7 +41,7 @@ You can configure Ember using environment variables with the `EMBER_` prefix:
 
 ```bash
 # Set configuration via environment variables
-export EMBER_REGISTRY_AUTO_DISCOVER=false
+export EMBER_MODEL_REGISTRY_AUTO_DISCOVER=false
 export EMBER_LOGGING_LEVEL=DEBUG
 export OPENAI_API_KEY=sk-...
 export ANTHROPIC_API_KEY=sk-...
@@ -52,7 +52,7 @@ export ANTHROPIC_API_KEY=sk-...
 You can reference environment variables in your YAML configuration:
 
 ```yaml
-registry:
+model_registry:
   providers:
     openai:
       enabled: true
@@ -70,13 +70,21 @@ registry:
 
 The default Ember configuration schema includes:
 
-- **registry**: Model registry settings
+- **model_registry**: Model registry settings
   - **auto_discover**: Whether to auto-discover models from providers
   - **auto_register**: Whether to auto-register discovered models
   - **providers**: Provider-specific settings
     - **enabled**: Whether the provider is enabled
     - **api_keys**: API keys for the provider
     - **models**: Model-specific settings
+      - **id**: Unique model identifier
+      - **name**: Display name for the model
+      - **cost**: Cost configuration
+        - **input_cost_per_thousand**: Cost per 1000 input tokens
+        - **output_cost_per_thousand**: Cost per 1000 output tokens
+      - **rate_limit**: Rate limit configuration
+        - **tokens_per_minute**: Maximum tokens allowed per minute
+        - **requests_per_minute**: Maximum requests allowed per minute
 - **logging**: Logging settings
   - **level**: Logging level
   - **format**: Log format string
@@ -84,7 +92,7 @@ The default Ember configuration schema includes:
   - **datasets**: Path to datasets
   - **cache**: Path to cache
 
-For a complete example, see `src/ember/core/registry/model/config/ember.yaml.example`.
+For a complete example, see the `config.yaml.example` file in the project root directory.
 
 ## Application Context Integration
 
@@ -99,6 +107,11 @@ app_context = create_ember_app(config_path="my_config.yaml")
 # Get config from app context
 context = get_ember_context()
 config = context.config_manager.get_config()
+
+# Access model registry configuration
+auto_discover = config.model_registry.auto_discover
+openai_config = config.get_provider("openai")
+gpt4_config = config.get_model_config("openai:gpt-4o")
 ```
 
 ## Advanced Usage
@@ -108,13 +121,14 @@ config = context.config_manager.get_config()
 You can define your own configuration schema:
 
 ```python
-from pydantic import BaseModel
-from ember.core.configs import ConfigManager, YamlFileProvider
+from pydantic import BaseModel, Field
+from ember.core.configs.config_manager import ConfigManager
+from ember.core.configs.providers import YamlFileProvider
 
 class MyConfig(BaseModel):
     name: str
     version: str
-    debug: bool = False
+    debug: bool = Field(default=False)
 
 # Create manager with custom schema
 config_manager = ConfigManager(
@@ -122,7 +136,7 @@ config_manager = ConfigManager(
     providers=[YamlFileProvider("my_config.yaml")]
 )
 
-config = config_manager.load()
+config = config_manager.get_config()
 print(f"App: {config.name} v{config.version}, Debug: {config.debug}")
 ```
 
@@ -132,16 +146,18 @@ You can create custom providers for different configuration sources:
 
 ```python
 from typing import Dict, Any
-from ember.core.configs import ConfigProvider, ConfigManager
+from ember.core.configs.config_manager import ConfigManager
+from ember.core.configs.providers import ConfigProvider
 
-class DatabaseProvider(ConfigProvider):
-    def __init__(self, connection_string):
+class DatabaseProvider(ConfigProvider[Dict[str, Any]]):
+    def __init__(self, connection_string: str):
         self.connection_string = connection_string
     
     def load(self) -> Dict[str, Any]:
         # Load configuration from database
         # Implementation depends on your database
         ...
+        return {"name": "App", "version": "1.0"}
         
     def save(self, config: Dict[str, Any]) -> None:
         # Save configuration to database
@@ -159,7 +175,10 @@ config_manager = ConfigManager(
 You can create custom transformations:
 
 ```python
-from ember.core.configs import ConfigTransformer
+from typing import Dict, Any, Callable
+from ember.core.configs.config_manager import ConfigManager
+from ember.core.configs.providers import YamlFileProvider
+from ember.core.configs.transformer import ConfigTransformer
 
 # Define a transformation function
 def uppercase_keys(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -175,8 +194,7 @@ def uppercase_keys(config: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 # Create a transformer
-transformer = ConfigTransformer()
-transformer.add_transformation(uppercase_keys)
+transformer = ConfigTransformer([uppercase_keys])
 
 # Use the transformer
 config_manager = ConfigManager(
@@ -191,7 +209,8 @@ config_manager = ConfigManager(
 You can use multiple configuration files that override each other:
 
 ```python
-from ember.core.configs import ConfigManager, YamlFileProvider
+from ember.core.configs.config_manager import ConfigManager
+from ember.core.configs.providers import YamlFileProvider
 
 # Create providers (later providers override earlier ones)
 providers = [
@@ -211,8 +230,11 @@ You can update configuration at runtime:
 # Update a provider API key
 config_manager.set_provider_api_key("openai", "new_api_key")
 
-# Save the updated configuration
-config_manager.save()
+# Configure a model's cost settings
+config_manager.update_config(lambda config: 
+    setattr(config.model_registry.get_model_config("openai:gpt-4o").cost, 
+            "input_cost_per_thousand", 6.0)
+)
 
 # Reload configuration
 config_manager.reload()
@@ -262,20 +284,37 @@ Ember maintains compatibility with code using the older configuration system:
 - API keys set in the new system are propagated to the old system
 - Configuration values from the new system can be accessed through the old API
 
+For backward compatibility, you can still use the old initialization function, which will be transparently redirected to the new system:
+
+```python
+# Old way - still works but shows deprecation warning
+from ember.core.registry.model.config.settings import initialize_ember
+registry = initialize_ember(auto_discover=True)
+
+# New way - preferred approach
+from ember.core.registry.model.initialization import initialize_registry
+from ember.core.configs.config_manager import create_default_config_manager
+config_manager = create_default_config_manager()
+registry = initialize_registry(config_manager=config_manager)
+```
+
 ## Examples
 
 For complete configuration examples, see:
 
-- [Configuration Example](https://github.com/ember-ai/ember/blob/main/src/ember/examples/configuration_example.py)
-- [Model Registry Example](https://github.com/ember-ai/ember/blob/main/src/ember/examples/model_registry_example.py)
+- The `config.yaml.example` file in the project root
+- The `src/ember/examples/model_registry_example.py` file
 
 ## Best Practices
 
 1. **Use Environment Variables for Secrets**:
    ```yaml
-   api_keys:
-     default:
-       key: "${OPENAI_API_KEY}"
+   model_registry:
+     providers:
+       openai:
+         api_keys:
+           default:
+             key: "${OPENAI_API_KEY}"
    ```
 
 2. **Layer Your Configuration**:
@@ -285,13 +324,15 @@ For complete configuration examples, see:
 
 3. **Validate Configuration Early**:
    ```python
-   # Load and validate on startup
-   config = config_manager.load()
+   # Create and validate on startup
+   config_manager = create_default_config_manager()
+   config = config_manager.get_config()
    ```
 
 4. **Use Type Hints**:
    ```python
    # Get strongly-typed configuration
+   from ember.core.configs.schema import EmberConfig
    config: EmberConfig = config_manager.get_config()
    ```
 
