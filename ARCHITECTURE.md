@@ -2,6 +2,133 @@
 
 This document describes Ember's architecture, core components, and design principles. It serves as both a high-level overview for users and a detailed guide for contributors.
 
+## Quick Reference
+
+### Common Import Patterns
+
+```python
+# Model access
+from ember.api.models import EmberModel, LMModule, LMModuleConfig, ModelEnum
+
+# Operator building blocks
+from ember.api.operator import Operator, Specification
+
+# Execution and optimization
+from ember.api.xcs import jit, execution_options
+
+# Network of Networks patterns
+from ember.core import non
+
+# Data processing
+from ember.api.data import DataLoader, DataTransformer, EvaluationPipeline
+```
+
+### Typical Workflow
+
+1. **Define input/output models**
+   ```python
+   class QueryInput(EmberModel):
+       query: str
+       
+   class QueryOutput(EmberModel):
+       answer: str
+   ```
+
+2. **Create a specification with constraints**
+   ```python
+   from typing import Literal, Optional
+   
+   class VerifierInput(EmberModel):
+       query: str
+       candidate_answer: str
+       
+   class VerifierOutput(EmberModel):
+       verdict: Literal[0, 1]  # 0 for incorrect, 1 for correct
+       explanation: str
+       revised_answer: Optional[str] = None
+       
+   class VerifierSpecification(Specification):
+       input_model = VerifierInput
+       structured_output = VerifierOutput
+       prompt_template = """
+       You are a verifier of correctness.
+       
+       Question: {query}
+       
+       Candidate Answer: {candidate_answer}
+       
+       Please decide if this is correct. Provide:
+       Verdict: <1 for correct, 0 for incorrect>
+       Explanation: <Your reasoning>
+       Revised Answer (optional): <If you can provide a corrected version>
+       """
+   ```
+
+3. **Build your operator**
+   ```python
+   @jit  # For optimization
+   class VerifierOperator(Operator[VerifierInput, VerifierOutput]):
+       specification = VerifierSpecification()
+       
+       def __init__(self, model_name: str = "anthropic:claude-3-sonnet", temperature: float = 0.0):
+           self.model = LMModule(LMModuleConfig(
+               model_name=model_name, 
+               temperature=temperature
+           ))
+           
+       def forward(self, *, inputs: VerifierInput) -> VerifierOutput:
+           # Generate prompt from template
+           prompt = self.specification.render_prompt(inputs)
+           
+           # Get model response
+           response = self.model(prompt)
+           
+           # Parse the response to extract structured information
+           lines = response.strip().split('\n')
+           verdict = 0
+           explanation = ""
+           revised_answer = None
+           
+           # Simple parsing (in practice, use a more robust approach)
+           for line in lines:
+               if line.startswith("Verdict:"):
+                   # Extract verdict value (0 or 1)
+                   verdict_text = line.replace("Verdict:", "").strip()
+                   verdict = 1 if verdict_text == "1" or "correct" in verdict_text.lower() else 0
+               elif line.startswith("Explanation:"):
+                   explanation = line.replace("Explanation:", "").strip()
+               elif line.startswith("Revised Answer:"):
+                   revised_answer = line.replace("Revised Answer:", "").strip()
+           
+           # Return structured output with validation
+           return VerifierOutput(
+               verdict=verdict,
+               explanation=explanation,
+               revised_answer=revised_answer if revised_answer else None
+           )
+   ```
+
+4. **Use your operator**
+   ```python
+   verifier = VerifierOperator(model_name="anthropic:claude-3-sonnet")
+   
+   # Verify a correct answer using standardized kwargs format
+   result1 = verifier(
+       query="What's the capital of France?",
+       candidate_answer="The capital of France is Paris."
+   )
+   print(f"Verdict: {result1.verdict}")  # 1 (correct)
+   print(f"Explanation: {result1.explanation}")
+   
+   # Verify an incorrect answer (alternative: using inputs dict)
+   result2 = verifier(inputs={
+       "query": "What's the capital of France?",
+       "candidate_answer": "The capital of France is Lyon."
+   })
+   print(f"Verdict: {result2.verdict}")  # 0 (incorrect)
+   print(f"Revised answer: {result2.revised_answer}")  # "The capital of France is Paris."
+   ```
+
 ## Design Philosophy
 
 Ember is built on these foundational principles:
@@ -19,11 +146,33 @@ Ember's architecture follows a layered design with clear separations of concern:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                       PUBLIC API LAYER                                     │
+├───────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                           │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
+│  │  api.models             │  │  api.operator           │  │  api.xcs                │   │
+│  │                         │  │                         │  │                         │   │
+│  │  • LLM Interfaces       │  │  • Operator Base        │  │  • JIT Functions        │   │
+│  │  • Model Service        │  │  • Specification        │  │  • Execution Options    │   │
+│  │  • Model Registry       │  │  • Input/Output Models  │  │  • Graph Controls       │   │
+│  │  • Usage Tracking       │  │  • Operator Registry    │  │  • Transform Functions  │   │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
+│                                                                                           │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                                │
+│  │  api.data               │  │  api.non                │                                │
+│  │                         │  │                         │                                │
+│  │  • Dataset Access       │  │  • Ensemble Patterns    │                                │
+│  │  • Data Loaders         │  │  • Verification         │                                │
+│  │  • Transformers         │  │  • Synthesis            │                                │
+│  │  • Evaluators           │  │  • Composition Helpers  │                                │
+│  └─────────────────────────┘  └─────────────────────────┘                                │
+│                                                                                           │
+├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                    APPLICATION LAYER                                       │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  NON Patterns           │  │  Auto Graph Builder     │  │  Enhanced JIT            │   │
+│  │  NON Patterns           │  │  Auto Graph Builder     │  │  Enhanced JIT           │   │
 │  │                         │  │                         │  │                         │   │
 │  │  • UniformEnsemble      │  │  • Autograph            │  │  • Function Tracing     │   │
 │  │  • JudgeSynthesis       │  │  • Graph Construction   │  │  • Optimized Execution  │   │
@@ -36,7 +185,7 @@ Ember's architecture follows a layered design with clear separations of concern:
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  Model Registry         │  │  Operator System        │  │  Prompt Specifications      │   │
+│  │  Model Registry         │  │  Operator System        │  │  Prompt Specifications  │   │
 │  │                         │  │                         │  │                         │   │
 │  │  • ModelInfo            │  │  • Base Operator        │  │  • Template Rendering   │   │
 │  │  • ModelService         │  │  • Operator Registry    │  │  • Input Validation     │   │
@@ -47,7 +196,7 @@ Ember's architecture follows a layered design with clear separations of concern:
 │  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
 │  │  Data Processing        │  │  Evaluation Tools       │  │  Application Context    │   │
 │  │                         │  │                         │  │                         │   │
-│  │  • Dataset Loaders      │  │  • Evaluators           │  │  • Config Management    │   │
+│  │  • Dataset Loaders      │  │  • Evaluators           │  │  • Config Manager       │   │
 │  │  • Transformers         │  │  • Metrics              │  │  • Dependency Injection │   │
 │  │  • Samplers             │  │  • Result Analysis      │  │  • Service Registry     │   │
 │  │  • Benchmark Registry   │  │  • Visualization        │  │  • Logging              │   │
@@ -71,15 +220,25 @@ Ember's architecture follows a layered design with clear separations of concern:
 
 ## Layer Responsibilities
 
-### 1. Execution Engine (XCS)
+### 1. Public API Layer
 
-The foundational layer providing computation graph definition and execution:
+The simplified interface for developers to interact with Ember:
 
-* **Graph Definition**: Defines the structure of computation
-* **Tracer System**: Records execution and enables optimization
-* **Execution Engine**: Manages the actual running of operations with parallelization
+* **api.models**: LLM service and model management interfaces
+* **api.operator**: Operator base classes and specifications for building components
+* **api.xcs**: JIT and execution control for optimization
+* **api.data**: Dataset access and processing utilities
+* **api.non**: Ready-to-use Network of Networks components
 
-### 2. Core Component Layer
+### 2. Application Layer
+
+High-level abstractions for building compound AI systems:
+
+* **NON Patterns**: Ready-to-use Networks of Networks patterns
+* **Auto Graph Builder**: Automatic graph construction from code
+* **Enhanced JIT**: Just-in-time compilation for optimized execution
+
+### 3. Core Component Layer
 
 The building blocks of Ember's functionality:
 
@@ -90,13 +249,13 @@ The building blocks of Ember's functionality:
 * **Evaluation Tools**: Benchmarking and performance analysis
 * **Application Context**: Configuration and dependency management
 
-### 3. Application Layer
+### 4. Execution Engine (XCS)
 
-High-level abstractions built on the core components:
+The foundational layer providing computation graph definition and execution:
 
-* **NON Patterns**: Ready-to-use Networks of Networks patterns
-* **Auto Graph Builder**: Automatic graph construction from code
-* **Enhanced JIT**: Just-in-time compilation for optimized execution
+* **Graph Definition**: Defines the structure of computation
+* **Tracer System**: Records execution and enables optimization
+* **Execution Engine**: Manages the actual running of operations with parallelization
 
 ## Component Details
 
@@ -114,14 +273,20 @@ context = get_app_context()
 model_service = context.model_service
 usage_service = context.usage_service
 
-# Access configuration
-config = context.config_manager.get_config("model_registry")
+# Access configuration via standardized manager
+config_manager = context.config_manager
+model_registry_config = config_manager.get_config("model_registry")
+app_config = config_manager.get_config("app")
+
+# Configuration values are accessed via dot notation
+api_key = model_registry_config.providers.openai.api_key
 ```
 
 Key responsibilities:
 - Initialization and configuration of system components
 - Service registration and dependency injection
-- Configuration management
+- Standardized configuration management with schema validation
+- Environment variable resolution and config merging
 - Logging setup
 
 ### Model Registry System
@@ -129,8 +294,8 @@ Key responsibilities:
 The Model Registry manages connections to LLM providers:
 
 ```python
-from ember.core.registry.model import ModelRegistry, ModelInfo
-from ember.core.registry.model.base.services import ModelService
+# Using the simplified API
+from ember.api.models import ModelRegistry, ModelInfo, ModelService
 
 # Register a model
 registry = ModelRegistry()
@@ -139,24 +304,31 @@ registry.register_model(ModelInfo(id="openai:gpt-4o", ...))
 # Create a service for model access
 service = ModelService(registry=registry)
 response = service.invoke_model("openai:gpt-4o", "Hello world")
+
+# Even simpler with automatic initialization
+from ember import initialize_ember
+
+# Initialize and get the service in one step
+service = initialize_ember()
+response = service("anthropic:claude-3-sonnet", "Hello Claude")
 ```
 
 #### Model Registry Component Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                           Model Registry System                        │
+│                           Model Registry System                         │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │  ModelRegistry  │◄────►│  ModelFactory   │─────►│ Provider Models │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
-│           │                                                             │
+│           │                                                            │
 │           │               ┌─────────────────┐      ┌─────────────────┐ │
 │           └──────────────►│  ModelService   │◄────►│  UsageService   │ │
 │                           └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ OpenAI Provider │      │Anthropic Provider│      │ Other Providers │ │
+│  │ OpenAI Provider │      │ Anthropic Provider │    │ Other Providers │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -173,18 +345,25 @@ Key components:
 Operators are the fundamental computational units in Ember:
 
 ```python
-from ember.core.registry.operator.base import Operator
-from pydantic import BaseModel
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel
 
-class SummarizerInput(BaseModel):
+class SummarizerInput(EmberModel):
     text: str
     max_words: int = 100
 
-class SummarizerOutput(BaseModel):
+class SummarizerOutput(EmberModel):
     summary: str
     word_count: int
 
+class SummarizerSpec(Specification):
+    input_model = SummarizerInput
+    structured_output = SummarizerOutput
+    prompt_template = "Summarize the following text in {max_words} words or less:\n\n{text}"
+
 class SummarizerOperator(Operator[SummarizerInput, SummarizerOutput]):
+    specification = SummarizerSpec()
+    
     def forward(self, *, inputs: SummarizerInput) -> SummarizerOutput:
         # Implementation
         ...
@@ -223,14 +402,14 @@ Key components:
 Specifications define the contract between inputs and outputs:
 
 ```python
-from ember.core.registry.specification import Specification
-from pydantic import BaseModel
+from ember.api.operator import Specification
+from ember.api.models import EmberModel
 
-class QuestionInput(BaseModel):
+class QuestionInput(EmberModel):
     question: str
     context: str
 
-class AnswerOutput(BaseModel):
+class AnswerOutput(EmberModel):
     answer: str
     confidence: float
 
@@ -278,8 +457,7 @@ Key features:
 The XCS (eXecution Control System) handles graph-based execution:
 
 ```python
-from ember.xcs.graph import XCSGraph
-from ember.xcs.engine import execute_graph
+from ember.api.xcs import XCSGraph, execute_graph, execution_options
 
 # Create execution graph
 graph = XCSGraph()
@@ -288,11 +466,11 @@ graph.add_node(operator=judge, node_id="judge")
 graph.add_edge(from_id="ensemble", to_id="judge")
 
 # Execute with parallelization
-result = execute_graph(
-    graph=graph,
-    global_input={"query": "What is quantum computing?"},
-    max_workers=3
-)
+with execution_options(max_workers=3):
+    result = execute_graph(
+        graph=graph,
+        global_input={"query": "What is quantum computing?"}
+    )
 ```
 
 #### XCS Engine Component Architecture
@@ -477,7 +655,7 @@ The diagram below illustrates the complete dependency flow between major compone
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Config Files         │────►│    Config Manager       │────►│   Environment       │ │
+│  │    Config Files         │────►│    Config Manager       │◄────┤   Environment       │ │
 │  │    (.yaml, .env)        │     │                         │     │   Variables         │ │
 │  └─────────────────────────┘     └───────────┬─────────────┘     └─────────────────────┘ │
 │                                              │                                            │
@@ -489,6 +667,22 @@ The diagram below illustrates the complete dependency flow between major compone
 └─────────────────────────────────────────────┼─────────────────────────────────────────────┘
                                               │
                                               ▼
+┌───────────────────────────────────────────────────────────────────────────────────────────┐
+│                                    Public API Layer                                       │
+├───────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                           │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
+│  │    api.models           │     │     api.operator        │     │   api.xcs           │ │
+│  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────┬───────────┘ │
+│              │                               │                             │             │
+│              │                               │                             │             │
+│  ┌─────────────────────────┐     ┌─────────────────────────┐              │             │
+│  │    api.data             │     │     api.non             │              │             │
+│  └───────────┬─────────────┘     └───────────┬─────────────┘              │             │
+│              │                               │                             │             │
+└──────────────┼───────────────────────────────┼─────────────────────────────┼─────────────┘
+               │                               │                             │
+               ▼                               ▼                             ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
 │                                    Service Layer                                          │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
@@ -510,7 +704,7 @@ The diagram below illustrates the complete dependency flow between major compone
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
 │  ┌─────────────────────────┐     ┌─────────────────────────┐     ┌─────────────────────┐ │
-│  │    Base Operators       │◄───►│    Prompt Specifications    │◄───►│   Dataset Loaders   │ │
+│  │    Base Operators       │◄───►│  Prompt Specifications  │◄───►│   Dataset Loaders   │ │
 │  └───────────┬─────────────┘     └─────────────────────────┘     └─────────────────────┘ │
 │              │                                                                            │
 │              ▼                                                                            │
@@ -537,15 +731,57 @@ The diagram below illustrates the complete dependency flow between major compone
 └───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## Configuration System
+
+Ember's configuration system provides a standardized way to configure all aspects of the framework:
+
+```python
+from ember.core.configs import ConfigManager, create_default_config_manager
+
+# Create configuration manager with standard discovery
+config_manager = create_default_config_manager()
+
+# Access typed, validated configuration
+model_registry_config = config_manager.get_config("model_registry")
+openai_api_key = model_registry_config.providers.openai.api_key
+
+# Configuration sources (in order of precedence):
+# 1. Runtime overrides
+# 2. Environment variables 
+# 3. User config files (~/.ember/config.yaml)
+# 4. Project config files (./ember.yaml)
+# 5. Default config (package defaults)
+
+# Modify configuration at runtime
+config_manager.update_config(
+    "model_registry",
+    {"providers": {"openai": {"api_key": "new-key"}}}
+)
+```
+
+Key features:
+- Centralized schema-based configuration with Pydantic
+- Multiple configuration sources with priority ordering
+- Environment variable expansion (${VAR_NAME} syntax)
+- Deep config merging with proper override behavior
+- Thread-safe configuration access
+- Extensible provider system
+
 ## Code Organization
 
 The code is organized into the following package structure:
 
 | Package | Purpose |
 |---------|---------|
+| `ember.api` | Simplified public API for clean imports |
+| `ember.api.models` | Models API for LLMs and providers |
+| `ember.api.operator` | Operator API for computational units |
+| `ember.api.non` | NON patterns API |
+| `ember.api.xcs` | Execution engine API |
+| `ember.api.data` | Data processing API |
 | `ember.core` | Core framework classes and utilities |
 | `ember.core.app_context` | Application context and DI container |
-| `ember.core.configs` | Configuration management |
+| `ember.core.configs` | Standardized configuration system with typed schema validation |
 | `ember.core.types` | Type system, protocols, and validation |
 | `ember.core.registry.model` | Model registry and provider implementations |
 | `ember.core.registry.operator` | Operator system |
@@ -558,6 +794,23 @@ The code is organized into the following package structure:
 | `ember.xcs.graph` | Graph definition and manipulation |
 | `ember.xcs.engine` | Execution scheduling |
 | `ember.xcs.tracer` | Tracing and JIT compilation |
+
+## Import System
+
+Ember organizes imports through the `ember.api` namespace:
+
+```python
+from ember.api.operator import Operator, Specification
+from ember.api.xcs import jit, execution_options
+from ember.api.models import EmberModel, LMModule
+from ember.api.data import DataLoader
+from ember.core import non
+```
+
+This approach:
+- Separates public API from internal implementation details
+- Maintains backward compatibility during internal refactoring
+- Follows conventions from our favorite, established frameworks
 
 ## Design Patterns
 
@@ -765,6 +1018,37 @@ The Ember architecture continues to evolve along these paths:
 4. **Plugin System**: More comprehensive plugin interfaces for extensions
 5. **Advanced Graph Optimizations**: Additional graph transformations and optimizations
 
+## Troubleshooting Guide
+
+### Configuration Issues
+
+- **API Key Problems**
+  - Ensure environment variables are set (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.)
+  - Check config file location and permissions (`~/.ember/config.yaml`)
+  - Verify API keys are valid and not expired
+
+- **Import Errors**
+  - Use the `ember.api` namespace for cleaner imports (`from ember.api.models import ...`)
+  - Check your installation includes required extras (`poetry add ember-ai -E anthropic`)
+
+### Operator Development
+
+- **Specification Issues**
+  - Ensure prompt templates include all required placeholders
+  - Use proper type annotations on all models and operators
+  
+- **JIT Optimization Concerns**
+  - Apply `@jit` to the class, not individual methods
+  - Make sure your operator follows the proper inheritance chain
+  - Verify type annotations are correct and complete
+
+### Execution Problems
+
+- **Parallelization Not Working**
+  - Use `with execution_options(max_workers=N)` to control parallel execution
+  - Ensure operator dependencies are correctly defined
+  - Check that your graph doesn't have circular dependencies
+
 ## Additional Resources
 
 For more detailed information, consult these resources:
@@ -773,4 +1057,6 @@ For more detailed information, consult these resources:
 - [Operator System Documentation](docs/quickstart/operators.md)
 - [XCS Execution Engine Documentation](docs/advanced/xcs_graphs.md)
 - [Enhanced JIT Documentation](docs/advanced/enhanced_jit.md)
+- [Configuration Guide](docs/quickstart/configuration.md)
+- [Simplified Imports](SIMPLIFIED_IMPORTS.md)
 - [Example Applications](src/ember/examples)

@@ -41,21 +41,13 @@ from ember.core.registry.model.base.services.usage_service import UsageService
 # Configuration and initialization - moved to avoid circular imports
 from ember.core.registry.model.config.settings import EmberSettings
 
-# Import key components
-from .base.services.model_service import ModelService
-from .base.utils.model_registry_exceptions import (
-    ModelRegistrationError,
-    ModelDiscoveryError,
-)
+# These are already imported above using absolute imports, so we can remove these relative imports
 
 # Absolute imports for exceptions
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ModelRegistrationError,
     ModelDiscoveryError,
 )
-
-# Add ModelRegistry import
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 
 # Add load_model function

@@ -1,14 +1,19 @@
 """Configuration module for Ember's model registry.
 
-This module provides functionality for initializing and configuring the model
-registry using the minimalist configuration system.
+This module provides backwards compatibility with the previous configuration system.
+It now serves as a bridge to the new centralized configuration in ember.core.configs.
+
+IMPORTANT: This module is maintained for backward compatibility only.
+New code should import directly from ember.core.configs and use the 
+initialize_registry() function from ember.core.registry.model.initialization.
 """
 
-# Import compatibility for existing code
-from ember.core.config.schema import EmberConfig as EmberSettings
+# Import from new centralized config system
+from ember.core.configs.schema import EmberConfig as EmberSettings
 
 import logging
 import os
+import warnings
 from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel
@@ -18,9 +23,24 @@ from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.config.schema import EmberConfig, Provider, Model
-from ember.core.config.loader import load_config
-from ember.core.config.exceptions import ConfigError
+
+# Import from new locations
+from ember.core.configs.schema import EmberConfig
+from ember.core.configs.config_manager import create_default_config_manager
+from ember.core.registry.model.initialization import initialize_registry
+
+# Keep imports for compatibility with old code
+try:
+    from ember.core.config.schema import Provider, Model
+    from ember.core.config.loader import load_config
+    from ember.core.config.exceptions import ConfigError
+except ImportError:
+    # Fallbacks for environments without the old modules
+    class Provider: pass
+    class Model: pass
+    class ConfigError(Exception): pass
+    def load_config(config_path=None): 
+        return EmberConfig()
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -206,11 +226,8 @@ def initialize_ember(
 ) -> ModelRegistry:
     """Initialize Ember's model registry using the configuration system.
     
-    This function is the recommended entry point for setting up Ember. It performs:
-      - Loading configuration from files and environment variables
-      - Creating and configuring the ModelRegistry
-      - Registering models from configuration
-      - Optional discovery of models from provider APIs
+    DEPRECATED: This function is maintained for backward compatibility.
+    New code should use initialize_registry() from ember.core.registry.model.initialization.
     
     Args:
         config_path: Custom path to configuration file
@@ -223,6 +240,27 @@ def initialize_ember(
         
     Raises:
         EmberError: If initialization fails
+    """
+    warnings.warn(
+        "initialize_ember() is deprecated. Use initialize_registry() from "
+        "ember.core.registry.model.initialization instead.",
+        DeprecationWarning, 
+        stacklevel=2
+    )
+    
+    try:
+        # Use the new centralized configuration system via the bridge function
+        config_manager = create_default_config_manager(config_path=config_path)
+        return initialize_registry(
+            config_manager=config_manager,
+            auto_discover=auto_discover,
+            force_discovery=force_discovery
+        )
+    except Exception as e:
+        logger.error(f"Error during initialization: {e}")
+        raise EmberError(f"Failed to initialize Ember: {e}") from e
+    
+    # The following implementation is kept for reference but is not used
     """
     registry = ModelRegistry(logger=logger)
     
@@ -317,3 +355,4 @@ def initialize_ember(
     except Exception as e:
         logger.error(f"Unexpected error during initialization: {e}")
         raise EmberError(f"Failed to initialize Ember: {e}") from e
+    """

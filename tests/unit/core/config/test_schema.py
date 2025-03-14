@@ -43,41 +43,53 @@ class TestModel:
     
     def test_minimal_creation(self):
         """Test creating a Model with minimal required fields."""
-        model = Model(name="Test Model")
+        model = Model(id="test", name="Test Model", provider="test-provider")
+        assert model.id == "test"
         assert model.name == "Test Model"
-        assert model.cost_input == 0.0
-        assert model.cost_output == 0.0
+        assert model.provider == "test-provider"
+        assert model.cost.input_cost_per_thousand == 0.0
+        assert model.cost.output_cost_per_thousand == 0.0
         
     def test_full_creation(self):
         """Test creating a Model with all fields."""
         model = Model(
+            id="test",
             name="Test Model",
-            cost_input=1.5,
-            cost_output=2.5
+            provider="test-provider",
+            cost=Cost(input_cost_per_thousand=1.5, output_cost_per_thousand=2.5),
+            rate_limit={"tokens_per_minute": 1000, "requests_per_minute": 100}
         )
+        assert model.id == "test"
         assert model.name == "Test Model"
-        assert model.cost_input == 1.5
-        assert model.cost_output == 2.5
+        assert model.provider == "test-provider"
+        assert model.cost.input_cost_per_thousand == 1.5
+        assert model.cost.output_cost_per_thousand == 2.5
+        assert model.rate_limit.tokens_per_minute == 1000
         
     def test_cost_property(self):
         """Test the cost property."""
         model = Model(
+            id="test",
             name="Test Model",
-            cost_input=1.5,
-            cost_output=2.5
+            provider="test-provider",
+            cost=Cost(input_cost_per_thousand=1.5, output_cost_per_thousand=2.5)
         )
         assert isinstance(model.cost, Cost)
-        assert model.cost.input_cost == 1.5
-        assert model.cost.output_cost == 2.5
+        assert model.cost.input_cost_per_thousand == 1.5
+        assert model.cost.output_cost_per_thousand == 2.5
         
     def test_arbitrary_fields(self):
         """Test adding arbitrary fields."""
         model = Model(
+            id="test",
             name="Test Model",
+            provider="test-provider",
             context_length=4096,
             vision_enabled=True
         )
+        assert model.id == "test"
         assert model.name == "Test Model"
+        assert model.provider == "test-provider"
         assert model.context_length == 4096
         assert model.vision_enabled is True
 
@@ -89,34 +101,34 @@ class TestProvider:
         """Test creating a Provider with minimal fields."""
         provider = Provider()
         assert provider.enabled is True
-        assert provider.api_key is None
-        assert provider.models == {}
+        assert provider.api_keys == {}
+        assert provider.models == []
         
     def test_full_creation(self):
         """Test creating a Provider with all fields."""
-        models = {
-            "model1": Model(name="Model One"),
-            "model2": Model(name="Model Two")
-        }
+        models = [
+            Model(id="model1", name="Model One", provider="test"),
+            Model(id="model2", name="Model Two", provider="test")
+        ]
         provider = Provider(
             enabled=True,
-            api_key="test-api-key",
+            api_keys={"default": {"key": "test-api-key"}},
             models=models
         )
         assert provider.enabled is True
-        assert provider.api_key == "test-api-key"
+        assert provider.api_keys["default"].key == "test-api-key"
         assert len(provider.models) == 2
-        assert provider.models["model1"].name == "Model One"
+        assert provider.models[0].name == "Model One"
         
     def test_get_model_config(self):
         """Test get_model_config method."""
-        models = {
-            "model1": Model(name="Model One"),
-            "model2": Model(name="Model Two")
-        }
+        models = [
+            Model(id="model1", name="Model One", provider="test"),
+            Model(id="model2", name="Model Two", provider="test")
+        ]
         provider = Provider(
             enabled=True,
-            api_key="test-api-key",
+            api_keys={"default": {"key": "test-api-key"}},
             models=models
         )
         provider.__root_key__ = "test"
@@ -139,12 +151,12 @@ class TestProvider:
         """Test adding arbitrary fields."""
         provider = Provider(
             enabled=True,
-            api_key="test-api-key",
+            api_keys={"default": {"key": "test-api-key"}},
             base_url="https://api.example.com",
             timeout=30.0
         )
         assert provider.enabled is True
-        assert provider.api_key == "test-api-key"
+        assert provider.api_keys["default"].key == "test-api-key"
         assert provider.base_url == "https://api.example.com"
         assert provider.timeout == 30.0
 
@@ -161,8 +173,8 @@ class TestRegistryConfig:
     def test_full_creation(self):
         """Test creating a RegistryConfig with all fields."""
         providers = {
-            "provider1": Provider(enabled=True, api_key="key1"),
-            "provider2": Provider(enabled=False, api_key="key2")
+            "provider1": Provider(enabled=True, api_keys={"default": {"key": "key1"}}),
+            "provider2": Provider(enabled=False, api_keys={"default": {"key": "key2"}})
         }
         config = RegistryConfig(
             auto_discover=False,
@@ -241,16 +253,16 @@ class TestEmberConfig:
         
     def test_get_model_config(self):
         """Test get_model_config method."""
-        models1 = {
-            "model1": Model(name="Model One"),
-            "model2": Model(name="Model Two")
-        }
-        models2 = {
-            "model3": Model(name="Model Three")
-        }
+        models1 = [
+            Model(id="model1", name="Model One", provider="provider1"),
+            Model(id="model2", name="Model Two", provider="provider1")
+        ]
+        models2 = [
+            Model(id="model3", name="Model Three", provider="provider2")
+        ]
         providers = {
-            "provider1": Provider(enabled=True, api_key="key1", models=models1),
-            "provider2": Provider(enabled=True, api_key="key2", models=models2)
+            "provider1": Provider(enabled=True, api_keys={"default": {"key": "key1"}}, models=models1),
+            "provider2": Provider(enabled=True, api_keys={"default": {"key": "key2"}}, models=models2)
         }
         registry = RegistryConfig(providers=providers)
         config = EmberConfig(registry=registry)

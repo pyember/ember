@@ -1,6 +1,6 @@
 # Ember Configuration System
 
-This directory contains Ember's unified configuration system, which provides a flexible, type-safe, and extensible way to configure the framework.
+This directory contains Ember's unified configuration system, which provides a flexible, type-safe, and extensible way to configure the framework. The configuration system is now the central source of truth for all Ember configuration, including model registry settings.
 
 ## Key Features
 
@@ -72,7 +72,7 @@ The configuration schema is defined in `schema.py` using Pydantic models:
 - `LoggingConfig`: Logging settings
 - `DataPathsConfig`: Data paths settings
 
-See the example configuration file at `src/ember/core/registry/model/config/ember.yaml.example` for a complete example.
+See the example configuration file at `config.yaml.example` in the project root directory for a complete example.
 
 ## Advanced Usage
 
@@ -140,3 +140,57 @@ The system looks for configuration files in the following order:
 ## Default Values
 
 Default values are defined in `schema.py` in the `DEFAULT_CONFIG` dictionary and in the Pydantic model field defaults.
+
+## Integration with Model Registry
+
+The model registry is fully integrated with the centralized configuration system. The initialization flow is:
+
+1. Configuration is loaded through `create_default_config_manager()`
+2. API keys are injected from environment variables if available
+3. Model registry is initialized using `initialize_registry()` in `src/ember/core/registry/model/initialization.py`
+4. Models are registered from configuration, with proper conversion from configuration schema to registry schema
+5. Provider discovery runs if auto-discovery is enabled
+
+This integration eliminates duplication and ensures a single source of truth for all configuration.
+
+### Provider Integration
+
+All model providers have been updated to use the centralized configuration system:
+
+- **Anthropic**: Uses `get_provider("anthropic")` to retrieve API keys and settings
+- **OpenAI**: Uses `get_provider("openai")` to retrieve API keys and settings
+- **Google/DeepMind**: Uses `get_provider("google")` to retrieve API keys and settings
+
+Each provider follows a consistent pattern:
+1. First check the centralized configuration for API keys and settings
+2. Fall back to environment variables if needed
+3. Use default values as a last resort
+
+### Model Registry Bridge
+
+The `initialization.py` module serves as a bridge between the configuration system and the model registry. It handles:
+
+- Converting configuration models to registry models
+- Processing provider-specific settings
+- Extracting and formatting cost information
+- Managing API keys securely
+- Handling errors gracefully with detailed logging
+
+### Backward Compatibility
+
+For backward compatibility, the old configuration system is still accessible through:
+
+```python
+from ember.core.registry.model.config.settings import initialize_ember
+```
+
+This function is now a thin wrapper around the new `initialize_registry()` function, which delegates to the centralized configuration system. It also issues a deprecation warning to encourage migration to the new API.
+
+### Configuration Example
+
+For a complete example of model registry configuration, see the `config.yaml.example` file in the project root directory, which demonstrates:
+
+- API key configuration with environment variables
+- Model registration with costs and rate limits
+- Provider-specific settings
+- Logging configuration

@@ -60,3 +60,6 @@ cleanup_backup/
 old/
 *~
 *.bak
+
+# Claude assistant files
+CLAUDE.md

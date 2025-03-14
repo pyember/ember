@@ -10,7 +10,7 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from ..base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
+from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
 
 # Module-level logger.
 logger = logging.getLogger(__name__)
@@ -76,10 +76,27 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
         if self._client is not None:
             return self._client
 
+        # Try to get API key from configuration if not provided
         if self._api_key is None:
-            self._api_key = os.environ.get("OPENAI_API_KEY")
+            try:
+                # Get from centralized config
+                from ember.core.app_context import get_app_context
+                app_context = get_app_context()
+                provider_config = app_context.config_manager.get_config().get_provider("openai")
+                if provider_config and provider_config.api_keys.get("default"):
+                    self._api_key = provider_config.api_keys["default"].key
+                    # Also get base_url if not already specified
+                    if not self._base_url and hasattr(provider_config, "base_url"):
+                        self._base_url = provider_config.base_url
+            except Exception as config_error:
+                logger.debug(f"Could not get API key from config: {config_error}")
+                
+            # Fallback to environment variable
             if not self._api_key:
-                raise ModelDiscoveryError("OpenAI API key is not set")
+                self._api_key = os.environ.get("OPENAI_API_KEY")
+                
+            if not self._api_key:
+                raise ModelDiscoveryError("OpenAI API key is not set in config or environment")
 
         try:
             self._client = self._create_modern_client()

@@ -31,12 +31,10 @@ Let's start with a real-world compound AI system that demonstrates Ember's power
 
 ```python
 from typing import ClassVar
-from ember.xcs.tracer import jit
-from ember.xcs.engine import execution_options
-from ember.core import non
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.xcs import jit, execution_options
+from ember.api.non import UniformEnsemble, Verifier, JudgeSynthesis
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel
 
 # Define structured model inputs/outputs
 class QueryInput(EmberModel):
@@ -133,10 +131,8 @@ The simplest possible Ember application - a single LLM call wrapped in an operat
 
 ```python
 from typing import ClassVar
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.model.model_module import LMModule, LMModuleConfig
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.operator import Operator, Specification 
+from ember.api.models import EmberModel, LMModule, LMModuleConfig
 
 class SimpleInput(EmberModel):
     query: str
@@ -146,7 +142,7 @@ class SimpleOutput(EmberModel):
     
 class SimpleQASpecification(Specification):
     input_model = SimpleInput
-    output_model = SimpleOutput
+    structured_output = SimpleOutput
     prompt_template = "Please answer this question: {query}"
 
 class SimpleQA(Operator[SimpleInput, SimpleOutput]):
@@ -184,11 +180,10 @@ A more sophisticated example with multiple models and automatic optimization:
 
 ```python
 from typing import ClassVar, List
-from ember.core.registry.operator.base import Operator
-from ember.xcs.tracer import jit
-from ember.core import non
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.operator import Operator, Specification
+from ember.api.xcs import jit
+from ember.api.non import UniformEnsemble, MostCommon
+from ember.api.models import EmberModel
 
 class EnsembleInput(EmberModel):
     query: str
@@ -200,7 +195,7 @@ class EnsembleOutput(EmberModel):
     
 class EnsembleSpecification(Specification):
     input_model = EnsembleInput
-    output_model = EnsembleOutput
+    structured_output = EnsembleOutput
 
 @jit
 class QAEnsemble(Operator[EnsembleInput, EnsembleOutput]):
@@ -256,11 +251,9 @@ Demonstrates a multi-stage pipeline with different operators and automatic execu
 
 ```python
 from typing import ClassVar
-from ember.core.registry.operator.base import Operator
-from ember.xcs.tracer import jit, execution_options
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
-from ember.core.registry.model.model_module import LMModule, LMModuleConfig
+from ember.api.operator import Operator, Specification
+from ember.api.xcs import jit, execution_options
+from ember.api.models import EmberModel, LMModule, LMModuleConfig
 
 class DocumentInput(EmberModel):
     document: str
@@ -273,7 +266,7 @@ class DocumentOutput(EmberModel):
 
 class DocumentProcessorSpecification(Specification):
     input_model = DocumentInput
-    output_model = DocumentOutput
+    structured_output = DocumentOutput
     prompt_template = """Summarize the following text in {max_words} words or less:
     
 {document}
@@ -349,8 +342,7 @@ Ember's Model Registry provides a unified interface to various LLM providers wit
 
 ```python
 from ember import initialize_ember
-from ember.core.registry.model import ModelEnum
-from ember.core.registry.model.base.services import ModelService, UsageService
+from ember.api.models import ModelEnum, ModelService, UsageService
 
 # One-line initialization (quickest approach)
 service = initialize_ember(usage_tracking=True)
@@ -377,10 +369,8 @@ Operators are the fundamental building blocks in Ember, similar to PyTorch's `nn
 
 ```python
 from typing import ClassVar, List
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
-from ember.core.registry.model.model_module import LMModule, LMModuleConfig
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel, LMModule, LMModuleConfig
 
 # Define structured I/O models for type safety
 class SentimentInput(EmberModel):
@@ -439,9 +429,8 @@ Ember provides powerful components for building complex Networks of Networks (NO
 
 ```python
 from typing import ClassVar
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel
 from ember.core import non
 
 class NetworkInput(EmberModel):
@@ -452,7 +441,7 @@ class NetworkOutput(EmberModel):
     
 class SubNetworkSpecification(Specification):
     input_model = NetworkInput
-    output_model = NetworkOutput
+    structured_output = NetworkOutput
 
 class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     """SubNetwork that composes an ensemble with verification."""
@@ -533,12 +522,10 @@ Ember provides a powerful tracing system that automatically builds and optimizes
 
 ```python
 from typing import ClassVar, Dict, List
-from ember.xcs.tracer import jit
-from ember.xcs.engine import execution_options  
+from ember.api.xcs import jit, execution_options
 from ember.core import non
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel
 
 # Define our input and output types
 class PipelineInput(EmberModel):
@@ -549,7 +536,7 @@ class PipelineOutput(EmberModel):
 
 class PipelineSpecification(Specification):
     input_model = PipelineInput
-    output_model = PipelineOutput
+    structured_output = PipelineOutput
 
 @jit
 class ComplexPipeline(Operator[PipelineInput, PipelineOutput]):
@@ -603,8 +590,7 @@ print(f"Result: {result.answer}")
 Ember includes powerful tools for dataset handling and model evaluation:
 
 ```python
-from ember.core.utils.data import DataLoader, DataTransformer
-from ember.core.utils.eval import EvaluationPipeline, Evaluator
+from ember.api.data import DataLoader, DataTransformer, EvaluationPipeline, Evaluator
 
 # Load a dataset
 loader = DataLoader.from_registry("mmlu")
@@ -621,7 +607,7 @@ eval_pipeline = EvaluationPipeline([
 ])
 
 # Define the model to evaluate
-from ember.core.registry.model.model_module import LMModule, LMModuleConfig
+from ember.api.models import LMModule, LMModuleConfig
 model = LMModule(LMModuleConfig(model_name="openai:gpt-4o"))
 
 # Run evaluation
@@ -657,6 +643,8 @@ For comprehensive documentation, including tutorials, API reference, and advance
 - [Prompt Specifications Quickstart](docs/quickstart/specifications.md) - Type-safe prompt engineering
 - [NON Quickstart](docs/quickstart/non.md) - Networks of Networks patterns
 - [Data Quickstart](docs/quickstart/data.md) - Working with datasets and evaluation
+- [Configuration Quickstart](docs/quickstart/configuration.md) - Configure Ember for your needs
+- [Simplified Imports](SIMPLIFIED_IMPORTS.md) - Learn about the new streamlined import system
 
 ## Performance
 

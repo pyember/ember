@@ -20,8 +20,8 @@ from typing import Optional, Dict, ClassVar, Type, Any
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.config.manager import ConfigManager, create_config_manager
-from ember.core.registry.model.config.settings import initialize_ember
+from ember.core.config.manager import ConfigManager, create_default_config_manager
+from ember.core.registry.model.initialization import initialize_registry
 
 
 class EmberAppContext:
@@ -89,17 +89,17 @@ def create_ember_app(config_path: Optional[str] = None) -> EmberAppContext:
     logger = logging.getLogger("ember")
 
     # 1) Create the configuration manager
-    config_manager = create_config_manager(config_path=config_path, logger=logger)
+    config_manager = create_default_config_manager(config_path=config_path, logger=logger)
+    config_manager.load()
     logger.debug("Configuration manager initialized")
 
     # 2) Initialize API keys from environment variables
     _initialize_api_keys_from_env(config_manager)
 
     # 3) Create and initialize the model registry
-    model_registry = initialize_ember(
-        config_path=config_path, 
-        auto_discover=True, 
-        auto_register=True
+    model_registry = initialize_registry(
+        config_manager=config_manager,
+        auto_discover=True
     )
     logger.debug("Model registry initialized")
 

@@ -18,7 +18,8 @@ from ember.core.app_context import (
 )
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.configs.config import auto_register_known_models, initialize_api_keys
+from ember.core.app_context import _initialize_api_keys_from_env 
+from ember.core.registry.model.initialization import initialize_registry
 
 
 class TestEmberAppContext:
@@ -72,25 +73,24 @@ class TestCreateEmberApp:
     """Tests for the create_ember_app function."""
 
     @patch('ember.core.app_context.logging.getLogger')
-    @patch('ember.core.configs.config.ConfigManager')
-    @patch('ember.core.configs.config.initialize_api_keys')
-    @patch('ember.core.app_context.ModelRegistry')
-    @patch('ember.core.configs.config.auto_register_known_models')
+    @patch('ember.core.app_context.create_default_config_manager')
+    @patch('ember.core.app_context._initialize_api_keys_from_env')
+    @patch('ember.core.app_context.initialize_registry')
     @patch('ember.core.app_context.UsageService')
     def test_create_ember_app_with_default_config(
-        self, mock_usage_service, mock_auto_register, mock_model_registry,
-        mock_init_api_keys, mock_config_manager, mock_get_logger
+        self, mock_usage_service, mock_initialize_registry, 
+        mock_init_api_keys, mock_create_config_manager, mock_get_logger
     ):
         """Test creating an app context with default configuration."""
         # Setup mocks
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
         
-        mock_config = MagicMock()
-        mock_config_manager.return_value = mock_config
+        mock_config_manager = MagicMock()
+        mock_create_config_manager.return_value = mock_config_manager
         
         mock_registry = MagicMock()
-        mock_model_registry.return_value = mock_registry
+        mock_initialize_registry.return_value = mock_registry
         
         mock_usage = MagicMock()
         mock_usage_service.return_value = mock_usage
@@ -102,22 +102,19 @@ class TestCreateEmberApp:
         mock_get_logger.assert_called_once_with("ember")
         
         # Verify config manager creation
-        mock_config_manager.assert_called_once_with(
-            config_filename=None, 
+        mock_create_config_manager.assert_called_once_with(
+            config_path=None, 
             logger=mock_logger
         )
         
         # Verify API key initialization
-        mock_init_api_keys.assert_called_once_with(
-            mock_config, 
-            logger=mock_logger
-        )
+        mock_init_api_keys.assert_called_once_with(mock_config_manager)
         
         # Verify model registry creation and initialization
-        mock_model_registry.assert_called_once_with(logger=mock_logger)
-        mock_auto_register.assert_called_once_with(
-            registry=mock_registry,
-            config_manager=mock_config
+        mock_initialize_registry.assert_called_once_with(
+            config_path=None, 
+            auto_discover=True, 
+            auto_register=True
         )
         
         # Verify usage service creation
@@ -125,48 +122,54 @@ class TestCreateEmberApp:
         
         # Verify app context creation with all components
         assert isinstance(result, EmberAppContext)
-        assert result.config_manager is mock_config
+        assert result.config_manager is mock_config_manager
         assert result.model_registry is mock_registry
         assert result.usage_service is mock_usage
         assert result.logger is mock_logger
     
     @patch('ember.core.app_context.logging.getLogger')
-    @patch('ember.core.configs.config.ConfigManager')
-    @patch('ember.core.configs.config.initialize_api_keys')
-    @patch('ember.core.app_context.ModelRegistry')
-    @patch('ember.core.configs.config.auto_register_known_models')
+    @patch('ember.core.app_context.create_default_config_manager')
+    @patch('ember.core.app_context._initialize_api_keys_from_env')
+    @patch('ember.core.app_context.initialize_registry')
     @patch('ember.core.app_context.UsageService')
     def test_create_ember_app_with_custom_config(
-        self, mock_usage_service, mock_auto_register, mock_model_registry,
-        mock_init_api_keys, mock_config_manager, mock_get_logger
+        self, mock_usage_service, mock_initialize_registry, 
+        mock_init_api_keys, mock_create_config_manager, mock_get_logger
     ):
         """Test creating an app context with custom configuration."""
         # Setup mocks
         mock_logger = MagicMock()
         mock_get_logger.return_value = mock_logger
         
-        mock_config = MagicMock()
-        mock_config_manager.return_value = mock_config
+        mock_config_manager = MagicMock()
+        mock_create_config_manager.return_value = mock_config_manager
         
         mock_registry = MagicMock()
-        mock_model_registry.return_value = mock_registry
+        mock_initialize_registry.return_value = mock_registry
         
         mock_usage = MagicMock()
         mock_usage_service.return_value = mock_usage
         
         # Call the function with custom config path
-        custom_config = "test_config.ini"
-        result = create_ember_app(config_filename=custom_config)
+        custom_config = "test_config.yaml"
+        result = create_ember_app(config_path=custom_config)
         
         # Verify config manager creation with custom path
-        mock_config_manager.assert_called_once_with(
-            config_filename=custom_config, 
+        mock_create_config_manager.assert_called_once_with(
+            config_path=custom_config, 
             logger=mock_logger
+        )
+        
+        # Verify model registry initialization with the same path
+        mock_initialize_registry.assert_called_once_with(
+            config_path=custom_config,
+            auto_discover=True,
+            auto_register=True
         )
         
         # Other verifications remain the same
         assert isinstance(result, EmberAppContext)
-        assert result.config_manager is mock_config
+        assert result.config_manager is mock_config_manager
         assert result.model_registry is mock_registry
         assert result.usage_service is mock_usage
         assert result.logger is mock_logger

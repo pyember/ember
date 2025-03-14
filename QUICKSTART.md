@@ -31,7 +31,9 @@ poetry add ember-ai -E openai -E data
 poetry add ember-ai -E dev
 ```
 
-## Setting Up API Keys
+## Setting Up API Keys and Configuration
+
+### Option 1: Environment Variables
 
 Set your API keys as environment variables:
 
@@ -44,6 +46,21 @@ export ANTHROPIC_API_KEY="your-anthropic-key"
 $env:OPENAI_API_KEY="your-openai-key"
 $env:ANTHROPIC_API_KEY="your-anthropic-key"
 ```
+
+### Option 2: Configuration File
+
+Create a configuration file at `~/.ember/config.yaml` or in your project directory:
+
+```yaml
+model_registry:
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}  # Will use environment variable
+    anthropic:
+      api_key: "your-anthropic-key"  # Direct value
+```
+
+See [Configuration Quickstart](docs/quickstart/configuration.md) for more options.
 
 ## Basic Usage
 
@@ -67,10 +84,9 @@ Let's create a simple example that uses multiple models with parallelization:
 
 ```python
 from typing import ClassVar
-from ember.xcs.tracer import jit
-from ember.core.registry.operator.base import Operator
-from ember.core.registry.specification import Specification
-from ember.core.types.ember_model import EmberModel
+from ember.api.xcs import jit
+from ember.api.operator import Operator, Specification
+from ember.api.models import EmberModel
 from ember.core import non
 
 # Define structured input/output models
@@ -84,7 +100,7 @@ class QueryOutput(EmberModel):
 # Define the specification
 class QuerySpecification(Specification):
     input_model = QueryInput
-    output_model = QueryOutput
+    structured_output = QueryOutput
 
 # Create a compound system using the @jit decorator for optimization
 @jit
@@ -136,6 +152,15 @@ print(f"Confidence: {result.confidence:.2f}")
 - Learn about [Operators](docs/quickstart/operators.md) for building reusable components
 - Check out [Networks of Networks](docs/quickstart/non.md) for complex AI systems
 - Set up [Data Processing](docs/quickstart/data.md) for dataset handling
+- Configure your application with [Configuration](docs/quickstart/configuration.md)
+- Use [Simplified Imports](SIMPLIFIED_IMPORTS.md) for cleaner code
+
+To see Ember in action, explore these key examples:
+- [Minimal Example](src/ember/examples/minimal_example.py) - Get started with basic usage
+- [Model API Example](src/ember/examples/model_api_example.py) - Learn the models API
+- [Ensemble Operator Example](src/ember/examples/diverse_ensemble_operator_example.py) - Build parallel model ensembles
+- [API Operators Example](src/ember/examples/api_operators_example.py) - Use streamlined imports
+- [Enhanced JIT Example](src/ember/examples/enhanced_jit_example.py) - Optimize execution with JIT
 
 For a full walkthrough of Ember's capabilities, see the [Examples Directory](src/ember/examples).
 

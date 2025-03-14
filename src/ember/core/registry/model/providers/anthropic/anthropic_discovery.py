@@ -9,7 +9,8 @@ import os
 import logging
 from typing import Any, Dict, List, Optional, Protocol, cast, runtime_checkable
 
-from ..base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
+from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
+from ember.core.app_context import get_app_context
 
 # Logger for this module.
 logger = logging.getLogger(__name__)
@@ -123,10 +124,26 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
         if self._client is not None:
             return self._client
 
+        # Try to get API key from configuration if not provided
         if not self._api_key:
-            self._api_key = os.environ.get("ANTHROPIC_API_KEY")
+            try:
+                # Get from centralized config
+                app_context = get_app_context()
+                provider_config = app_context.config_manager.get_config().get_provider("anthropic")
+                if provider_config and provider_config.api_keys.get("default"):
+                    self._api_key = provider_config.api_keys["default"].key
+                    # Also get base_url if not already specified
+                    if not self._base_url and hasattr(provider_config, "base_url"):
+                        self._base_url = provider_config.base_url
+            except Exception as config_error:
+                logger.debug(f"Could not get API key from config: {config_error}")
+                
+            # Fallback to environment variable
             if not self._api_key:
-                logger.warning("ANTHROPIC_API_KEY environment variable is not set")
+                self._api_key = os.environ.get("ANTHROPIC_API_KEY")
+                
+            if not self._api_key:
+                logger.warning("No Anthropic API key found in config or environment variables")
                 return None
 
         try:

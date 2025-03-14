@@ -106,7 +106,18 @@ class ProviderConfig(BaseModel):
 
 
 class ModelRegistryConfig(BaseModel):
-    """Configuration for the model registry."""
+    """Configuration for the model registry.
+    
+    This centralized schema handles all model registry configuration including
+    discovery settings and provider configurations.
+    
+    Attributes:
+        auto_discover: Whether to automatically discover models from provider APIs
+        auto_register: Whether to automatically register models from configuration
+        cache_ttl: Time-to-live for discovery cache in seconds
+        providers: Dictionary of provider configurations keyed by name
+        included_configs: List of additional config files to include
+    """
     
     auto_discover: bool = True
     auto_register: bool = True
@@ -114,8 +125,36 @@ class ModelRegistryConfig(BaseModel):
     providers: Dict[str, ProviderConfig] = Field(default_factory=dict)
     included_configs: List[str] = Field(default_factory=list)
     
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
+    
+    def get_provider(self, name: str) -> Optional[ProviderConfig]:
+        """Get provider by name.
+        
+        Args:
+            name: Provider name (case-insensitive)
+            
+        Returns:
+            Provider configuration if found, None otherwise
+        """
+        return self.providers.get(name.lower())
+    
+    def get_model_config(self, model_id: str) -> Optional[ModelConfig]:
+        """Get model configuration by ID.
+        
+        Args:
+            model_id: Model identifier in "provider:model" format
+            
+        Returns:
+            Model configuration if found, None otherwise
+        """
+        if ":" in model_id:
+            provider_name, model_name = model_id.split(":", 1)
+            provider = self.get_provider(provider_name)
+            if provider:
+                for model in provider.models:
+                    if model.id == model_name or model.id == model_id:
+                        return model
+        return None
 
 
 class LoggingConfig(BaseModel):
@@ -125,8 +164,7 @@ class LoggingConfig(BaseModel):
     format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     handlers: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
 
 
 class DataPathsConfig(BaseModel):
@@ -135,19 +173,48 @@ class DataPathsConfig(BaseModel):
     datasets: str = "datasets"
     cache: str = ".cache"
     
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
 
 
 class EmberConfig(BaseModel):
-    """Main configuration schema for Ember."""
+    """Main configuration schema for Ember.
+    
+    This is the root configuration class that contains all settings for the
+    Ember framework, including model registry, logging, and data paths.
+    
+    Attributes:
+        model_registry: Model registry configuration
+        logging: Logging configuration
+        data_paths: Data paths configuration
+    """
     
     model_registry: ModelRegistryConfig = Field(default_factory=ModelRegistryConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     data_paths: DataPathsConfig = Field(default_factory=DataPathsConfig)
     
-    class Config:
-        extra = "allow"
+    model_config = {"extra": "allow"}
+    
+    def get_provider(self, name: str) -> Optional[ProviderConfig]:
+        """Get provider by name.
+        
+        Args:
+            name: Provider name (case-insensitive)
+            
+        Returns:
+            Provider configuration if found, None otherwise
+        """
+        return self.model_registry.get_provider(name)
+    
+    def get_model_config(self, model_id: str) -> Optional[ModelConfig]:
+        """Get model configuration by ID.
+        
+        Args:
+            model_id: Model identifier in "provider:model" format
+            
+        Returns:
+            Model configuration if found, None otherwise
+        """
+        return self.model_registry.get_model_config(model_id)
 
 
 # Default configuration used when no configuration file exists
