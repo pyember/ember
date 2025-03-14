@@ -5,7 +5,12 @@ This quickstart guide will help you integrate LLM models into your project using
 ## 1. Installation
 
 ```bash
-poetry add ember-ai
+# Clone the repository
+git clone https://github.com/pyember/ember.git
+cd ember
+
+# Install using Poetry
+poetry install
 ```
 
 ## 2. API Key Setup

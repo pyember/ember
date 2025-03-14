@@ -120,7 +120,7 @@ def main():
     # Custom dataset
     custom_dataset()
     
-    print("\nFor more information, see the documentation at https://pyember.org/data")
+    print("\nFor more information, see the documentation in the project repository")
 
 
 if __name__ == "__main__":

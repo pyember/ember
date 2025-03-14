@@ -105,4 +105,4 @@ XCS is accessible through two main import paths:
    from ember.api.xcs import jit, vmap, pmap
    ```
 
-For more information, see the [documentation](https://docs.pyember.org).
+For more information, see the documentation files in the project repository.

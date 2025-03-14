@@ -72,3 +72,50 @@ package.json
 package-lock.json
 tsconfig.json
 .eslintrc.js
+
+# Virtual environments
+ember_test_env/
+*_test_env/
+
+# Docker test environment
+docker-test/
+
+# Installation and testing guides (should be generated or in docs)
+INSTALLATION_GUIDE.md
+TESTING_INSTALLATION.md
+
+# Additional caches
+.mypy_cache/
+
+# Test configuration and artifacts
+test_config.yaml
+test_config.ini
+test_*.yaml
+test_*.ini
+.pytest_cache/
+
+# Configuration files that may contain API keys or secrets
+config.yaml
+.env
+.env.*
+*.env
+**/*.env
+.envrc
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.cer
+**/*_key
+**/*_keys
+**/*_secret
+**/*_secrets
+**/*_token
+**/*_password
+**/*_credentials
+**/*_config.yaml
+**/*_config.yml
+**/*_config.json
+!**/*.example
+!**/*.template
+!**/*.sample

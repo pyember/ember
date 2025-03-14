@@ -22,12 +22,14 @@ class XCSNode:
         inbound_edges: List of node IDs that connect to this node.
         outbound_edges: List of node IDs this node connects to.
         name: Optional human-readable name for the node.
+        metadata: Optional metadata for the node (cost estimates, etc.).
     """
     operator: Callable[..., Dict[str, Any]]
     node_id: str
     inbound_edges: List[str] = dataclasses.field(default_factory=list)
     outbound_edges: List[str] = dataclasses.field(default_factory=list)
     name: Optional[str] = None
+    metadata: Dict[str, Any] = dataclasses.field(default_factory=dict)
 
 # For backward compatibility
 XCSGraphNode = XCSNode
@@ -43,9 +45,11 @@ class XCSGraph:
     def __init__(self) -> None:
         """Initialize an empty XCS computation graph."""
         self.nodes: Dict[str, XCSNode] = {}
+        self.metadata: Dict[str, Any] = {}
 
     def add_node(
-        self, operator: Callable[..., Dict[str, Any]], node_id: Optional[str] = None, name: Optional[str] = None
+        self, operator: Callable[..., Dict[str, Any]], node_id: Optional[str] = None, 
+        name: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None
     ) -> str:
         """Add a node to the graph.
         
@@ -53,6 +57,7 @@ class XCSGraph:
             operator: The operator or function to add as a node.
             node_id: Unique identifier for the node (generated if not provided).
             name: Optional human-readable name for the node.
+            metadata: Optional metadata for the node (cost estimates, etc.).
             
         Returns:
             The ID of the added node.
@@ -69,7 +74,8 @@ class XCSGraph:
         self.nodes[node_id] = XCSNode(
             operator=operator,
             node_id=node_id,
-            name=name
+            name=name,
+            metadata=metadata or {}
         )
         return node_id
 

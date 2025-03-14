@@ -4,31 +4,16 @@ This guide will help you quickly get started with Ember, the compositional frame
 
 ## Installation
 
-### Option 1: Minimal Installation (OpenAI Only)
-
 ```bash
-# Install with Poetry, with OpenAI support only
-poetry add ember-ai -E minimal
-```
+# Clone the repository
+git clone https://github.com/pyember/ember.git
+cd ember
 
-### Option 2: Full Installation (All Features)
+# Install using Poetry
+poetry install
 
-```bash
-# Install with all providers and features
-poetry add ember-ai -E all
-```
-
-### Option 3: Custom Installation
-
-```bash
-# Install with specific providers
-poetry add ember-ai -E openai -E anthropic
-
-# Install with data processing capabilities
-poetry add ember-ai -E openai -E data
-
-# Install for developers
-poetry add ember-ai -E dev
+# For development dependencies
+poetry install --with dev
 ```
 
 ## Setting Up API Keys and Configuration
@@ -166,6 +151,6 @@ For a full walkthrough of Ember's capabilities, see the [Examples Directory](src
 
 ## Getting Help
 
-- Documentation: [https://docs.pyember.org](https://docs.pyember.org)
 - GitHub Issues: [https://github.com/pyember/ember/issues](https://github.com/pyember/ember/issues)
-- Discord Community: [https://discord.gg/ember-ai](https://discord.gg/ember-ai)
+- Documentation: See the documentation files in the `docs/` directory
+- Examples: Explore the examples in `src/ember/examples/`

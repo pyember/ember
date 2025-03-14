@@ -1,10 +1,10 @@
 # Simplified XCS Import Structure
 
-The XCS (eXecutable Computation System) module provides high-performance execution capabilities for computational graphs, just-in-time tracing, and parallel execution transformations.
+The XCS (Accelerated Compound Systems) module lays a groundwork for high-performance execution capabilities for operator graphs, just-in-time tracing, and parallel execution transformations.
 
 ## Before: Complex Import Paths
 
-Previously, users needed to remember specific import paths:
+Previously, we needed to remember specific import paths:
 
 ```python
 from ember.xcs.tracer.tracer_decorator import jit
@@ -14,16 +14,16 @@ from ember.xcs.transforms.vmap import vmap
 from ember.xcs.transforms.pmap import pmap
 ```
 
-## After: Clean, Intuitive Imports
+## After: Simpler, More Intuitive Imports
 
-Now, all functionality is available through a clean, top-level API:
+Now, all functionality is available through a top-level API:
 
 ```python
 # Simple function imports
-from ember.xcs import jit, vmap, pmap, autograph, execute
+from ember.api.xcs import jit, vmap, pmap, autograph, execute
 
 # Or use the unified API
-from ember.xcs import xcs
+from ember.api.xcs import xcs
 
 result = xcs.execute(graph, inputs={"query": "Example"})
 ```

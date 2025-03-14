@@ -85,7 +85,6 @@ class ExecutionOptions(Protocol):
 # -------------------------------------------------------------------
 # Import all our module components directly
 # -------------------------------------------------------------------
-# Output storage for diagnostics
 import_results = {}
 
 # Only define this class if we need to use it 
@@ -177,6 +176,16 @@ try:
         from .tracer.xcs_tracing import TracerContext, TraceRecord
         from .tracer._context_types import TraceContextData
         from .tracer.autograph import AutoGraphBuilder
+        # Try to import structural JIT if available
+        try:
+            from .tracer.structural_jit import structural_jit as _structural_jit
+            import_results['structural_jit'] = True
+        except ImportError:
+            import_results['structural_jit'] = False
+            # Stub implementation if needed
+            def _structural_jit(func=None, **kwargs):
+                """Fallback to regular JIT if structural_jit is not available."""
+                return _jit(func, **kwargs)
         import_results['tracer'] = True
     else:
         import_results['tracer'] = "Module not found"
@@ -220,6 +229,10 @@ except ImportError as e:
             def wrapper(*args, **kwargs):
                 return func(*args, **kwargs)
             return wrapper
+    
+    def _structural_jit(func=None, **kwargs):
+        """Stub implementation of structural_jit that falls back to regular jit."""
+        return _jit(func, **kwargs)
     
     @contextmanager
     def _autograph(*args: Any, **kwargs: Any) -> Any:
@@ -327,20 +340,51 @@ except ImportError as e:
 import os
 import sys
 
-in_test_env = ('PYTEST_CURRENT_TEST' in os.environ or                # pytest
-              os.environ.get('XCS_IMPORT_TEST') == '1' or         # explicit test flag
-              'unittest' in sys.modules or                   # unittest
-              any('pytest' in arg for arg in sys.argv))      # pytest from command line
+# Better test environment detection
+in_test_env = (
+    'PYTEST_CURRENT_TEST' in os.environ or                # pytest
+    os.environ.get('XCS_IMPORT_TEST') == '1' or           # explicit test flag
+    'unittest' in sys.modules or                          # unittest
+    any('pytest' in arg for arg in sys.argv) or           # pytest from command line
+    any('test' in arg.lower() for arg in sys.argv)        # any test runner
+)
 
+# Only print import results when explicitly requested
 if os.environ.get('XCS_IMPORT_TEST') == '1':
     print('Import results:', import_results)
 
 # Check if we have any failed imports and issue warning if needed
-have_failures = not all(result is True for result in import_results.values())
+have_failures = not all(result is True for result in import_results.values() 
+                        if isinstance(result, bool))
+
+# More informative import error reporting
 if have_failures and not in_test_env:
-    # Only warn in non-test environments where this would be unexpected
-    failed_modules = [module for module, result in import_results.items() if result is not True]
-    warnings.warn(f"XCS modules partially available. Issues with: {', '.join(failed_modules)}")
+    # Don't warn about structural_jit - it's optional
+    failed_modules = []
+    critical_failures = False
+    
+    for module, result in import_results.items():
+        if module == 'structural_jit' and result is False:
+            # Structural JIT is optional, not a critical failure
+            continue
+            
+        if result is not True:
+            if module in ['graph', 'engine', 'tracer']:
+                critical_failures = True
+            failed_modules.append(f"{module}: {result}")
+    
+    # Only warn if critical modules failed, with more specific messages
+    if critical_failures:
+        warnings.warn(
+            f"XCS core modules could not be imported. Some functionality will be limited:\n"
+            f"{chr(10).join(failed_modules)}"
+        )
+    elif failed_modules:
+        # Optional modules failure - less severe warning
+        warnings.warn(
+            f"Some optional XCS modules could not be imported:\n"
+            f"{chr(10).join(failed_modules)}"
+        )
 
 # -------------------------------------------------------------------
 # Public API Exports
@@ -411,7 +455,56 @@ def jit(func=None, *, sample_input=None, force_trace=False, recursive=True):
     else:
         # Parameterized decoration: @jit(...)
         def decorator(f):
-            return _jit(f)
+            return _jit(f, sample_input=sample_input, 
+                      force_trace=force_trace, recursive=recursive)
+        return decorator
+
+# Structural JIT compilation decorator
+def structural_jit(func=None, *, execution_strategy="auto", 
+                 parallel_threshold=5, max_workers=None, cache_graph=True):
+    """Advanced structural JIT compilation for operator classes.
+    
+    This decorator analyzes the structure of operators directly rather than through
+    execution tracing. It identifies nested operators and automatically parallelizes
+    independent operations for improved performance.
+    
+    Args:
+        func: The class to be decorated (automatically passed when used as @structural_jit)
+        execution_strategy: Strategy for parallel execution - "auto", "parallel", "sequential"
+        parallel_threshold: Minimum node count to trigger parallelization in auto mode
+        max_workers: Maximum worker threads for parallel execution
+        cache_graph: Whether to cache and reuse the compiled graph
+        
+    Returns:
+        A decorated class with structural optimization
+        
+    Example:
+        ```python
+        # Simple usage
+        @structural_jit
+        class CompositeOperator:
+            def __init__(self):
+                self.op1 = SubOperator1()
+                self.op2 = SubOperator2()
+                
+            def __call__(self, *, inputs):
+                result1 = self.op1(inputs=inputs)
+                result2 = self.op2(inputs=result1)
+                return result2
+        ```
+    """
+    # Call the actual implementation with parameters
+    # Support both @structural_jit and @structural_jit(...) patterns
+    if func is not None:
+        # Direct decoration: @structural_jit
+        return _structural_jit(func)
+    else:
+        # Parameterized decoration: @structural_jit(...)
+        def decorator(f):
+            return _structural_jit(f, execution_strategy=execution_strategy,
+                                 parallel_threshold=parallel_threshold,
+                                 max_workers=max_workers, 
+                                 cache_graph=cache_graph)
         return decorator
 
 # Vectorized mapping
@@ -507,7 +600,7 @@ def execute(graph: XCSGraph, output_nodes: Optional[List[str]] = None) -> Dict[s
         ```
     """
     # Don't pass output_nodes to work around the stub limitation
-    return _execute_graph(graph)
+    return _execute(graph, output_nodes)
 
 # Self-reference for import in api.xcs.py
 xcs = sys.modules[__name__]
@@ -520,6 +613,7 @@ __all__ = [
     'xcs',
     'autograph',
     'jit',
+    'structural_jit',
     'vmap',
     'pmap',
     'mesh_sharded',

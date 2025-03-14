@@ -14,6 +14,19 @@ Examples:
             # Complex computation here
             return result
     
+    # Using structural JIT for optimized execution
+    @xcs.structural_jit(execution_strategy="parallel")
+    class CompositeOperator(Operator):
+        def __init__(self):
+            self.op1 = SubOperator1()
+            self.op2 = SubOperator2()
+            
+        def __call__(self, *, inputs):
+            # Multi-step computation automatically parallelized
+            result1 = self.op1(inputs=inputs)
+            result2 = self.op2(inputs=inputs)
+            return combine(result1, result2)
+    
     # Using vectorized mapping
     @xcs.vmap(in_axes=(0, None))
     def process_batch(inputs, model):
@@ -32,6 +45,7 @@ from ember.xcs import (
     
     # Core functions
     jit,                     # Just-in-time compilation
+    structural_jit,          # Structural JIT compilation
     autograph,               # Automatic graph building
     execute,                 # Direct graph execution
     
@@ -63,9 +77,10 @@ __all__ = [
     
     # Core functions
     "jit",
+    "structural_jit",       # Advanced structure-aware JIT
     "autograph",
     "execute",
-    "execution_options",  # Essential for execution control
+    "execution_options",    # Essential for execution control
     
     # Transforms
     "vmap",

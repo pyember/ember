@@ -15,14 +15,37 @@ Ember is a powerful, extensible Python framework for building and orchestrating 
 - 📊 **Built-in Evaluation**: Comprehensive tools for measuring and analyzing model performance
 - 🔄 **Powerful Data Handling**: Extensible data pipeline integration with popular datasets
 
-## Quick Installation
+## Installation
 
 ```bash
-# Install using pip
-pip install ember-ai
+# Clone the repository
+git clone https://github.com/pyember/ember.git
+cd ember
 
-# Or using Poetry
-poetry add ember-ai
+# Install using Poetry
+poetry install
+```
+
+## Configuration & Security
+
+Ember requires API keys for LLM providers (OpenAI, Anthropic, etc.). Follow these security best practices:
+
+1. **Never commit API keys or secrets to the repository**
+   - Copy `config.yaml.example` to `config.yaml` (which is gitignored)
+   - Add your API keys only to the local copy
+
+2. **Use environment variables** (recommended approach)
+   - Set environment variables like `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.
+   - Ember will automatically detect and use environment variables referenced as `${ENV_VAR_NAME}` in config files
+
+3. **Configuration file security**
+   - All files named `config.yaml` or containing `_config.yaml` are excluded from git
+   - Test configuration files (`test_config.yaml`, `test_config.ini`) are also excluded
+
+```bash
+# Example of setting environment variables
+export OPENAI_API_KEY="your-api-key-here"
+export ANTHROPIC_API_KEY="your-api-key-here"
 ```
 
 ## Motivating Example: Sophisticated Multi-LLM Architecture
@@ -629,12 +652,11 @@ Ember is well-suited for complex AI pipelines such as:
 
 ## Documentation
 
-For comprehensive documentation, including tutorials, API reference, and advanced usage:
+For documentation, including architecture overview, guides, and examples:
 
-- [Ember Documentation](https://pyember.ai)
 - [Architecture Overview](ARCHITECTURE.md)
 - [Contributing Guide](CONTRIBUTING.md)
-- [Examples Directory](src/ember/examples) (moved from root /examples)
+- [Examples Directory](src/ember/examples)
 
 ### Quickstart Guides
 
@@ -660,7 +682,6 @@ Ember is designed for high-performance LLM orchestration:
 
 - [GitHub Issues](https://github.com/pyember/ember/issues): Bug reports and feature requests
 - [GitHub Discussions](https://github.com/pyember/ember/discussions): Questions and community support
-- [Discord](https://discord.gg/ember-ai): Join our community chat
 
 ## License
 
