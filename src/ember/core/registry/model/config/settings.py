@@ -1,15 +1,10 @@
 """Configuration module for Ember's model registry.
 
-This module provides backwards compatibility with the previous configuration system.
-It now serves as a bridge to the new centralized configuration in ember.core.configs.
-
-IMPORTANT: This module is maintained for backward compatibility only.
-New code should import directly from ember.core.configs and use the 
-initialize_registry() function from ember.core.registry.model.initialization.
+This module provides access to the centralized configuration system in ember.core.config.
 """
 
-# Import from new centralized config system
-from ember.core.configs.schema import EmberConfig as EmberSettings
+# Import from centralized config system
+from ember.core.config.schema import EmberConfig as EmberSettings
 
 import logging
 import os
@@ -24,9 +19,9 @@ from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
-# Import from new locations
-from ember.core.configs.schema import EmberConfig
-from ember.core.configs.config_manager import create_default_config_manager
+# Import from current locations
+from ember.core.config.schema import EmberConfig
+from ember.core.config.manager import create_config_manager
 from ember.core.registry.model.initialization import initialize_registry
 
 # Keep imports for compatibility with old code
@@ -249,8 +244,8 @@ def initialize_ember(
     )
     
     try:
-        # Use the new centralized configuration system via the bridge function
-        config_manager = create_default_config_manager(config_path=config_path)
+        # Use the centralized configuration system
+        config_manager = create_config_manager(config_path=config_path)
         return initialize_registry(
             config_manager=config_manager,
             auto_discover=auto_discover,

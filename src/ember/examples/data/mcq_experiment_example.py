@@ -30,7 +30,7 @@ from prettytable import PrettyTable
 from ember.core.non import UniformEnsemble, JudgeSynthesis, VariedEnsemble
 from ember.core.app_context import get_ember_context
 from ember.core import non
-from ember.core.configs.config import CONFIG, initialize_system
+from ember.core.config.manager import create_config_manager
 
 # For dataset usage:
 from ember.core.utils.data.base.models import DatasetEntry

@@ -28,7 +28,7 @@ from ember.core import (
     non,
 )  # Provides operators such as Ensemble, GetAnswer, JudgeSynthesis, VariedEnsemble
 from ember.core.app_context import get_ember_context
-from ember.core.configs.config import initialize_system
+from ember.core.config.manager import create_config_manager
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.examples.mcq_experiment_example import (
     EnsureValidChoiceOperator,

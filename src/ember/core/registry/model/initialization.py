@@ -132,15 +132,31 @@ def initialize_registry(
         discovery_enabled = (
             auto_discover 
             if auto_discover is not None 
-            else config.model_registry.auto_discover
+            else config.registry.auto_discover
         )
         
+        # Check for auto_register in config (may not exist in new schema)
+        auto_register_enabled = force_discovery
+        if hasattr(config.registry, "auto_register"):
+            auto_register_enabled = config.registry.auto_register or force_discovery
+        elif hasattr(config, "model_registry") and hasattr(config.model_registry, "auto_register"):
+            # Legacy schema support
+            auto_register_enabled = config.model_registry.auto_register or force_discovery
+        
         # Register models from configuration
-        if config.model_registry.auto_register or force_discovery:
+        if auto_register_enabled:
             registered_models = []
             
+            # Process each provider - handle both new and old schema
+            providers_dict = {}
+            if hasattr(config, "registry") and hasattr(config.registry, "providers"):
+                providers_dict = config.registry.providers
+            elif hasattr(config, "model_registry") and hasattr(config.model_registry, "providers"):
+                # Legacy schema support
+                providers_dict = config.model_registry.providers
+            
             # Process each provider
-            for provider_name, provider_config in config.model_registry.providers.items():
+            for provider_name, provider_config in providers_dict.items():
                 # Skip disabled providers
                 if not provider_config.enabled:
                     logger.info(f"Provider {provider_name} is disabled, skipping")
@@ -156,17 +172,33 @@ def initialize_registry(
                     logger.warning(f"No API key found for {provider_name}, skipping model registration")
                     continue
                 
-                # Register models for this provider
-                for model_config in provider_config.models:
+                # Register models for this provider - handle both dict and list formats
+                model_configs = []
+                
+                # Handle provider.models as a list (new schema)
+                if hasattr(provider_config, "models") and isinstance(provider_config.models, list):
+                    model_configs = [(None, m) for m in provider_config.models]
+                # Handle provider.models as a dict (old schema)
+                elif hasattr(provider_config, "models") and isinstance(provider_config.models, dict):
+                    model_configs = list(provider_config.models.items())
+                
+                for model_key, model_config in model_configs:
                     try:
                         # Generate model ID
                         if hasattr(model_config, "id"):
                             model_id = model_config.id
                             if ":" not in model_id:
                                 model_id = f"{provider_name}:{model_id}"
-                        else:
+                        elif model_key is not None:
+                            # Use the dictionary key as model name
+                            model_id = f"{provider_name}:{model_key}"
+                        elif hasattr(model_config, "name"):
                             # Fallback for schema changes
                             model_id = f"{provider_name}:{model_config.name}"
+                        else:
+                            # Cannot determine model ID
+                            logger.warning(f"Cannot determine model ID for {provider_name} model, skipping")
+                            continue
                         
                         # Skip already registered models
                         if registry.is_registered(model_id):

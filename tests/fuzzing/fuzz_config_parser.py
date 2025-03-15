@@ -16,7 +16,7 @@ from typing import Optional
 # Ensure Ember is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from ember.core.configs.config import ConfigManager
+from ember.core.config.manager import ConfigManager, create_config_manager
 
 
 def fuzz_config_file(data):
@@ -56,16 +56,16 @@ def fuzz_config_file(data):
             
             # Try to load it with ConfigManager
             try:
-                config_manager = ConfigManager(config_filename=temp_file.name)
+                config_manager = create_config_manager(config_path=temp_file.name)
                 
                 # Perform some operations to exercise the code
-                sections = config_manager._config.sections()
-                for section in sections:
-                    try:
-                        items = dict(config_manager._config.items(section))
-                    except configparser.InterpolationError:
-                        # This is an expected error for some malformed configs
-                        pass
+                config = config_manager.get_config()
+                # Access some attributes to exercise the code
+                if hasattr(config, 'registry'):
+                    providers = getattr(config.registry, 'providers', {})
+                    for provider_name, provider in providers.items():
+                        if hasattr(provider, 'models'):
+                            models = provider.models
             
             except Exception as e:
                 # We expect some exceptions due to malformed configs,
