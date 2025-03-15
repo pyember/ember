@@ -4,13 +4,13 @@
 
 ## Ember in a Nutshell
 
-Ember is what PyTorch and JAX were for neural networks, but for the era of compound AI systems - a compositional framework with both eager execution and graph optimization capabilities. It enables you to compose complex "Networks of Networks" (NONs) with automatic parallelization and optimization.
+Aspirationally, Ember is to Networks of Networks (NONs) Compound AI Systems development what PyTorch and XLA are to Neural Networks (NN) development. It's a compositional framework with both eager execution affordances and graph execution optimization capabilities. It enables users to compose complex NONs, and supports automatic parallelization and optimization of these.
 
-## Quick Example: Multi-Model Ensemble with Synthesis
+## Simple Example: `horizontal` inference-time scaling with best-of-N
 
 ```python
 from typing import ClassVar
-from ember.api.operator import Operator
+from ember.api.operator import Operator, Specification
 from ember.api.xcs import jit
 from ember.api import non
 from ember.api.models import EmberModel
@@ -23,22 +23,30 @@ class ReasonedOutput(EmberModel):
     answer: str
     confidence: float
 
+class ReasonerSpecification(Specification):
+    input_model = QueryInput
+    structured_output = ReasonedOutput
+
 @jit  # Automatically optimize execution
 class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
     """A multi-model ensemble with synthesis for robust reasoning."""
+    # Input/output specification
+    specification: Specification = ReasonerSpecification()
+
+    # Sub-operators
     ensemble: non.UniformEnsemble
     judge: non.JudgeSynthesis
     
-    def __init__(self):
+    def __init__(self, width: int = 3):
         # Create components for the reasoning pipeline
         self.ensemble = non.UniformEnsemble(
-            num_units=3,
+            num_units=width,
             model_name="openai:gpt-4o",
             temperature=0.7
         )
         
         self.judge = non.JudgeSynthesis(
-            model_name="anthropic:claude-3-sonnet",
+            model_name="anthropic:claude-3.5-sonnet",
             temperature=0.2
         )
     
@@ -67,9 +75,10 @@ print(f"Confidence: {result.confidence:.2f}")
 
 ## Core Elements
 
-1. **Composable Operators with rigorous specification**: Build richer compound AI systems (CAIS) from reusable components
-2. **Automatic Parallelization**: Across a full CAIS DAG Independent operations can execute concurrently
-3. **_Bonus (supplemental)_** **Multi-Provider Support** -- Unified API across OpenAI, Anthropic, Gemini, and more
+1. **Composable Operators with Rigorous Specification**: Build reliable compound AI systems from type-safe, reusable components with validated inputs and outputs
+2. **Automatic Parallelization**: Independent operations are automatically executed concurrently across a full computational graph
+3. **XCS Optimization Framework**: Just-in-time tracing and execution optimization inspired by JAX/XLA 
+4. **Multi-Provider Support**: Unified API across OpenAI, Anthropic, Claude, Gemini, and more with standardized usage tracking
 
 ## Installation
 
@@ -105,66 +114,114 @@ print(f"Total cost: ${usage.cost:.4f}")
 
 ## NON Patterns & Ensembling
 
-Compose more complex CAIS architectures using pre-built components:
+Build compound AI system architectures using the Network of Networks (NON) pattern with pre-built components:
 
 ```python
 from ember.api import non
 
-# Create an ensemble of 5 model instances that run in parallel
+# 1. Create an ensemble of 5 model instances that run in parallel
+# This improves statistical robustness through multiple independent samples
 ensemble = non.UniformEnsemble(
     num_units=5, 
     model_name="openai:gpt-4o-mini",
     temperature=0.7
 )
 
-# Create a verifier to check outputs
-verifier = non.Verifier(
+# 2. Create a judge to synthesize the ensemble responses
+# This combines multiple perspectives into a coherent, reasoned answer
+judge = non.JudgeSynthesis(
     model_name="anthropic:claude-3-sonnet",
-    verification_criteria=["factual_accuracy", "coherence"]
+    temperature=0.2
 )
 
-# Create an aggregator that selects the most common answer
-aggregator = non.MostCommon()
+# 3. Create a verifier to independently check the final output
+# This adds a quality control layer for factual accuracy and coherence
+verifier = non.Verifier(
+    model_name="anthropic:claude-3-haiku",
+    temperature=0.0
+)
 
-# These components can be composed in custom operators
+# 4. Chain components together in a sequential pipeline
+# Ember automatically optimizes the execution graph
+pipeline = non.Sequential(operators=[ensemble, judge, verifier])
+
+# Execute the entire pipeline with a single call
+result = pipeline(query="What causes tsunamis?")
 ```
 
-## Graph Optimization
+## Graph Optimization & Execution
 
-Ember's XCS system provides XLA-inspired tracing and optimization:
+Ember's XCS system provides JAX/XLA-inspired tracing, transformation, and automatic parallelization:
 
 ```python
-from ember.api.xcs import jit, execution_options
+from ember.api.xcs import jit, structural_jit, execution_options, vmap
 
-@jit  # Automatically optimize execution
-class ComplexPipeline(Operator):
+# Basic JIT compilation for simple optimization
+@jit
+class SimplePipeline(Operator):
     # ... operator implementation ...
+
+# Advanced structural JIT with parallel execution strategy
+@structural_jit(execution_strategy="parallel")
+class ComplexPipeline(Operator):
+    def __init__(self):
+        self.op1 = SubOperator1()
+        self.op2 = SubOperator2()
+        self.op3 = SubOperator3()
+    
+    def forward(self, *, inputs):
+        # These operations will be automatically parallelized
+        # when the execution graph is built
+        result1 = self.op1(inputs=inputs)
+        result2 = self.op2(inputs=inputs)
+        combined = self.op3(inputs={"r1": result1, "r2": result2})
+        return combined
 
 # Configure execution parameters
 with execution_options(max_workers=8):
     result = pipeline(query="Complex question...") 
+
+# Vectorized mapping for batch processing
+@vmap
+def process_batch(inputs, model):
+    return model(inputs)
 ```
 
 ## Data Handling & Evaluation
 
-Load, transform, and evaluate with standard datasets:
+Ember provides a comprehensive data processing and evaluation framework with pre-built datasets and metrics:
 
 ```python
-from ember.api.data import DataLoader, EvaluationPipeline, Evaluator
+from ember.api.data import DatasetBuilder, EvaluationPipeline, Evaluator
 
-# Load a dataset
-loader = DataLoader.from_registry("mmlu")
-dataset = loader.load(subset="physics", split="test")
+# Load a dataset with the builder pattern
+dataset = (DatasetBuilder()
+    .from_registry("mmlu")  # Use a registered dataset
+    .subset("physics")      # Select a specific subset
+    .split("test")          # Choose the test split
+    .sample(100)            # Random sample of 100 items
+    .transform(              # Apply transformations
+        lambda x: {"query": f"Question: {x['question']}"} 
+    )
+    .build())
 
-# Create an evaluation pipeline
+# Create a comprehensive evaluation pipeline
 eval_pipeline = EvaluationPipeline([
+    # Standard metrics
     Evaluator.from_registry("accuracy"),
-    Evaluator.from_registry("response_quality")
+    Evaluator.from_registry("response_quality"),
+    
+    # Custom evaluation metrics
+    Evaluator.from_function(
+        lambda prediction, reference: {"factual_accuracy": score_factual_content(prediction, reference)}
+    )
 ])
 
 # Evaluate a model or operator
 results = eval_pipeline.evaluate(my_model, dataset)
 print(f"Accuracy: {results['accuracy']:.2f}")
+print(f"Response Quality: {results['response_quality']:.2f}")
+print(f"Factual Accuracy: {results['factual_accuracy']:.2f}")
 ```
 
 ## Documentation & Examples
