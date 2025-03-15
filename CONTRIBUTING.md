@@ -4,7 +4,6 @@ Thank you for your interest in contributing to Ember! This document provides gui
 
 ## Table of Contents
 
-- [Code of Conduct](#code-of-conduct)
 - [Getting Started](#getting-started)
   - [Development Environment](#development-environment)
   - [Project Structure](#project-structure)
@@ -23,10 +22,7 @@ Thank you for your interest in contributing to Ember! This document provides gui
   - [Typed Code](#typed-code)
 - [Release Process](#release-process)
 - [Community](#community)
-
-## Code of Conduct
-
-We are committed to providing a friendly, safe, and welcoming environment for all contributors. Please read and follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+- [License](#license)
 
 ## Getting Started
 
@@ -60,7 +56,7 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 
 #### Note on Imports
 
-The project is set up with proper Python packaging, so you should import from `ember` directly:
+The project is set up with standard Python packaging, so you should import from `ember` directly, rather than from `src.` generally:
 
 ```python
 # Correct way to import
@@ -76,27 +72,55 @@ The Ember codebase is organized into the following structure:
 
 ```
 ember/
+├── core/               # Core framework modules (compatibility with src structure)
+│   ├── registry/       # Model registry components
+│   └── utils/          # Utility modules
 ├── docs/               # Documentation
-│   ├── cli/            # CLI documentation
 │   ├── design/         # Design documents
-│   └── quickstart/     # Quick start guides
+│   ├── quickstart/     # Quick start guides
+│   └── xcs/            # XCS documentation
 ├── src/                # Source code
-│   ├── cli/            # TypeScript CLI implementation
 │   └── ember/          # Main Python package
+│       ├── api/        # Public API interfaces
 │       ├── cli.py      # Python CLI entrypoint
 │       ├── core/       # Core framework
+│       │   ├── config/ # Configuration management
+│       │   ├── registry/ # Registry components
+│       │   │   ├── model/   # Model registry
+│       │   │   ├── operator/ # Operator registry
+│       │   │   └── specification/ # Specifications
+│       │   ├── types/  # Type definitions
+│       │   └── utils/  # Utility functions
+│       ├── examples/   # Example applications
+│       │   ├── advanced/ # Advanced examples
+│       │   ├── basic/  # Basic examples
+│       │   ├── data/   # Data handling examples
+│       │   ├── models/ # Model usage examples
+│       │   └── operators/ # Operator examples
 │       ├── xcs/        # Execution engine
-│       └── examples/   # Example applications
+│       │   ├── api/    # XCS API
+│       │   ├── engine/ # Engine components
+│       │   ├── graph/  # Graph representation
+│       │   ├── tracer/ # Tracing functionality
+│       │   ├── transforms/ # Transformation utilities
+│       │   └── utils/  # XCS utilities
+│       └── non.py      # Non-deterministic operations
 ├── tests/              # Test suite
-│   ├── cli/            # CLI tests
-│   ├── unit/           # Unit tests
+│   ├── helpers/        # Test helpers
 │   ├── integration/    # Integration tests
+│   │   ├── core/       # Core integration tests
+│   │   ├── performance/ # Performance tests
+│   │   ├── tracer/     # Tracer integration tests
+│   │   └── xcs/        # XCS integration tests
+│   ├── unit/           # Unit tests
+│   │   ├── core/       # Core unit tests
+│   │   ├── plugin_system/ # Plugin system tests
+│   │   └── xcs/        # XCS unit tests
 │   └── fuzzing/        # Fuzzing tests
-├── examples/           # Standalone examples 
-├── scripts/            # Development and CI scripts
 ├── pyproject.toml      # Python project configuration
-├── package.json        # Node.js project configuration
-├── tsconfig.json       # TypeScript configuration
+├── poetry.lock         # Poetry dependencies lock file
+├── pytest.ini          # Pytest configuration
+├── mypy.ini            # Type checking configuration
 └── README.md           # Project overview
 ```
 
@@ -178,9 +202,9 @@ When opening a new issue, please:
    ```
 
 2. **Make your changes**:
-   - Write clean, well-commented code
-   - Add/update tests to cover your changes
-   - Update documentation as needed
+   - Write clean, well-commented code. We attempt to adhere to the `Google Python Style Guide`. 
+   - Please add/update tests to cover your changes
+   - Remember to update documentation as needed
    - Ensure your code passes all tests and style checks
 
 3. **Commit your changes**:
@@ -211,11 +235,9 @@ When submitting a pull request:
 
 During code review:
 
-- Be responsive to feedback
-- Make requested changes promptly
-- Ask questions if something isn't clear
-- Be patient and respectful
-- Remember that the goal is to improve code quality
+- It is your responsibility to get your code reviewed. Feel free to `chase` reviewers as needed, respectfully of course.
+- Be patient and respectful. User error is not the default assumption -- assume any question is designer error (either in the implementation or the documentation)
+- Remember that the goal is to improve code quality for all of us.
 
 ## Development Guidelines
 
@@ -260,7 +282,7 @@ We strive for high test coverage:
 
 1. **Test Coverage**:
    - All new code should have corresponding tests
-   - We aim for at least 90% code coverage
+   - We aim for 90%+ code coverage
    - Critical paths should have 100% coverage
 
 2. **Test Types**:
@@ -277,7 +299,7 @@ We strive for high test coverage:
 
 4. **Test Quality**:
    - Tests should be deterministic and reliable
-   - Mock external dependencies appropriately
+   - Mock external dependencies appropriately, but not excessively
    - Test edge cases and error conditions
    - Include both positive and negative test cases
 
@@ -337,7 +359,7 @@ Our release process follows these steps:
 
 - **Discussions**: Join our [GitHub Discussions](https://github.com/pyember/ember/discussions) for questions and ideas
 - **Issues**: Use [GitHub Issues](https://github.com/pyember/ember/issues) for bug reports and feature requests
-- **Discord**: Join our [Discord server](https://discord.gg/ember-ai) for real-time discussion
+- **Slack**: Join our [Slack](https://join.slack.com/t/ember-y0w7887/shared_invite/zt-31nm1aqdz-JtFcRWaatNg11OiUVEhhUw) for real-time discussion
 
 ---
 

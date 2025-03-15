@@ -1,92 +1,92 @@
 # Ember Architecture
 
-This document describes Ember's architecture, core components, and design principles. It serves as both a high-level overview for users and a detailed guide for contributors.
+This document describes Ember's architecture, core components, and design principles. It serves as both a high-level overview for users and a detailed guide for core contributors.
 
 ## Design Philosophy
 
 Ember is built on these foundational principles:
 
-1. **Composability First**: The ability to combine, chain, and nest components is central to Ember's design
-2. **Type Safety**: Comprehensive type annotations ensure robustness and IDE support
-3. **Testability**: Components are designed for easy isolation and testing
-4. **Performance**: Parallel execution is built-in at the framework's core
-5. **Extensibility**: Registry-based design makes it simple to add new components
-6. **Developer Experience**: APIs follow familiar patterns from PyTorch/JAX
+1.  **Composability First**: The ability to combine, chain, and nest components (e.g. `Operator` components) is central to Ember's design
+2.  **Type Safety**: Comprehensive type annotations ensure robustness and IDE support
+3.  **Testability**: Components are designed with SOLID principles in mind, for easy isolation and testing
+4.  **Scalability**: support for Parallel execution is built-in at the framework's core. This is more Tensorflow/JAX, than classic Torch spiritually
+5.  **Extensibility**: Registry-based design makes it simple to add new components
+6.  **Skeurmophism**: APIs follow familiar patterns from PyTorch/JAX, to somewhat control the learning curve
+7.  **Simple-over-easy**: Minimal "magic" and a focus on explicitness
 
 ## System Architecture
 
 Ember's architecture follows a layered design with clear separations of concern:
-
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
-│                                       PUBLIC API LAYER                                     │
+│                                       PUBLIC API LAYER                                    │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  api.models             │  │  api.operator           │  │  api.xcs                │   │
-│  │                         │  │                         │  │                         │   │
-│  │  • LLM Interfaces       │  │  • Operator Base        │  │  • JIT Functions        │   │
-│  │  • Model Service        │  │  • Specification        │  │  • Execution Options    │   │
-│  │  • Model Registry       │  │  • Input/Output Models  │  │  • Graph Controls       │   │
-│  │  • Usage Tracking       │  │  • Operator Registry    │  │  • Transform Functions  │   │
-│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
-│                                                                                          │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐                                │
-│  │  api.data               │  │  api.non                │                                │
-│  │                         │  │                         │                                │
-│  │  • Dataset Access       │  │  • Ensemble Patterns    │                                │
-│  │  • Data Loaders         │  │  • Verification         │                                │
-│  │  • Transformers         │  │  • Synthesis            │                                │
-│  │  • Evaluators           │  │  • Composition Helpers  │                                │
-│  └─────────────────────────┘  └─────────────────────────┘                                │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐    │
+│  │  api.models             │  │  api.operator           │  │  api.xcs                │    │
+│  │                         │  │                         │  │                         │    │
+│  │  • LLM Interfaces       │  │  • Operator Base        │  │  • JIT Functions        │    │
+│  │  • Model Service        │  │  • Specification        │  │  • Execution Options    │    │
+│  │  • Model Registry       │  │  • Input/Output Models  │  │  • Graph Controls       │    │
+│  │  • Usage Tracking       │  │  • Operator Registry    │  │  • Transform Functions  │    │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘    │
+│                                                                                           │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐                                 │
+│  │  api.data               │  │  api.non                │                                 │
+│  │                         │  │                         │                                 │
+│  │  • Dataset Access       │  │  • Ensemble Patterns    │                                 │
+│  │  • Data Loaders         │  │  • Verification         │                                 │
+│  │  • Transformers         │  │  • Synthesis            │                                 │
+│  │  • Evaluators           │  │  • Composition Helpers  │                                 │
+│  └─────────────────────────┘  └─────────────────────────┘                                 │
 │                                                                                           │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
-│                                    APPLICATION LAYER                                       │
+│                                    APPLICATION LAYER                                      │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  NON Patterns           │  │  Auto Graph Builder     │  │  Enhanced JIT           │   │
-│  │                         │  │                         │  │                         │   │
-│  │  • UniformEnsemble      │  │  • Autograph            │  │  • Function Tracing     │   │
-│  │  • JudgeSynthesis       │  │  • Graph Construction   │  │  • Optimized Execution  │   │
-│  │  • Verifier             │  │  • Dependency Tracking  │  │  • Parallel Dispatch    │   │
-│  │  • VariedEnsemble       │  │  • Visualization        │  │  • Runtime Fusion       │   │
-│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐    │
+│  │  NON Patterns           │  │  Auto Graph Builder     │  │  Enhanced JIT           │    │
+│  │                         │  │                         │  │                         │    │
+│  │  • UniformEnsemble      │  │  • Autograph            │  │  • Function Tracing     │    │
+│  │  • JudgeSynthesis       │  │  • IR Graph Construct   │  │  • Optimized Execution  │    │
+│  │  • Verifier             │  │  • Dependency Tracking  │  │  • Parallel Dispatch    │    │ 
+│  │  • VariedEnsemble       │  │  • Visualization        │  │                         │    │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘    │
 │                                                                                           │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                      CORE COMPONENT LAYER                                 │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  Model Registry         │  │  Operator System        │  │  Prompt Specifications  │   │
-│  │                         │  │                         │  │                         │   │
-│  │  • ModelInfo            │  │  • Base Operator        │  │  • Template Rendering   │   │
-│  │  • ModelService         │  │  • Operator Registry    │  │  • Input Validation     │   │
-│  │  • UsageService         │  │  • Core Operators       │  │  • Output Validation    │   │
-│  │  • Provider Adapters    │  │  • Custom Operators     │  │  • Schema Generation    │   │
-│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐    │
+│  │  Model Registry         │  │  Operator System        │  │  Prompt Specifications  │    │
+│  │                         │  │                         │  │                         │    │
+│  │  • ModelInfo            │  │  • Base Operator        │  │  • Template Rendering   │    │
+│  │  • ModelService         │  │  • Operator Registry    │  │  • Input Validation     │    │
+│  │  • UsageService         │  │  • Core Operators       │  │  • Output Validation    │    │
+│  │  • Provider Adapters    │  │  • Custom Operators     │  │  • Schema Generation    │    │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘    │
 │                                                                                           │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  Data Processing        │  │  Evaluation Tools       │  │  Application Context    │   │
-│  │                         │  │                         │  │                         │   │
-│  │  • Dataset Loaders      │  │  • Evaluators           │  │  • Config Manager       │   │
-│  │  • Transformers         │  │  • Metrics              │  │  • Dependency Injection │   │
-│  │  • Samplers             │  │  • Result Analysis      │  │  • Service Registry     │   │
-│  │  • Benchmark Registry   │  │  • Visualization        │  │  • Logging              │   │
-│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐    │
+│  │  Data Processing        │  │  Evaluation Tools       │  │  Application Context    │    │
+│  │                         │  │                         │  │                         │    │
+│  │  • Dataset Loaders      │  │  • Evaluators           │  │  • Config Manager       │    │
+│  │  • Transformers         │  │  • Metrics              │  │  • Dependency Injection │    │
+│  │  • Samplers             │  │  • Result Analysis      │  │  • Service Registry     │    │
+│  │  • Dataset Registry     │  │  • Visualization        │  │  • Logging Config       │    │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘    │
 │                                                                                           │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                  EXECUTION ENGINE (XCS)                                   │
 ├───────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                           │
-│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐   │
-│  │  Graph Definition       │  │  Tracer System          │  │  Execution Engine       │   │
-│  │                         │  │                         │  │                         │   │
-│  │  • XCSGraph             │  │  • Function Tracing     │  │  • Schedulers           │   │
-│  │  • XCSNode              │  │  • Execution Recording  │  │  • Execution Plan       │   │
-│  │  • Edge Management      │  │  • JIT Compilation      │  │  • Parallel Dispatch    │   │
-│  │  • Graph Visualization  │  │  • Graph Optimization   │  │  • Error Handling       │   │
-│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘   │
+│  ┌─────────────────────────┐  ┌─────────────────────────┐  ┌─────────────────────────┐    │
+│  │  Graph Definition       │  │  Tracer System          │  │  Execution Engine       │    │
+│  │                         │  │                         │  │                         │    │
+│  │  • XCSGraph IR          │  │  • Function Tracing     │  │  • Schedulers           │    │
+│  │  • XCSNode Primitive    │  │  • Execution Recording  │  │  • Execution Plan       │    │
+│  │                         │  │  • JIT Compilation      │  │  • Parallel Dispatch    │    │
+│  │                         │  │  • Graph Optimization   │  │                         │    │
+│  └─────────────────────────┘  └─────────────────────────┘  └─────────────────────────┘    │
 │                                                                                           │
 └───────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -185,13 +185,13 @@ response = service("anthropic:claude-3-sonnet", "Hello Claude")
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │  ModelRegistry  │◄────►│  ModelFactory   │─────►│ Provider Models │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
-│           │                                                             │
+│           │                                                            │
 │           │               ┌─────────────────┐      ┌─────────────────┐ │
 │           └──────────────►│  ModelService   │◄────►│  UsageService   │ │
 │                           └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ OpenAI Provider │      │Anthropic Provider│      │ Other Providers │ │
+│  │ OpenAI Provider │      │Anthropic Provid.│      │ Other Providers │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -243,12 +243,12 @@ class SummarizerOperator(Operator[SummarizerInput, SummarizerOutput]):
 │  └─────────────────┘      └─────────────────┘      └────────┬────────┘ │
 │                                                              │         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌────────▼────────┐ │
-│  │  Base Operator  │◄─────┤ Prompt Specification │◄────►│   forward()    │ │
+│  │  Base Operator  │◄─────┤Prompt Spec.     │◄───► │   forward()     │ |
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
-│           │                                                             │
-│           ▼                                                             │
+│           │                                                            │
+│           ▼                                                            │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ Core Operators  │      │ Custom Operators │      │  NON Operators  │ │
+│  │ Core Operators  │      │ Custom Operators │      │  NON Operators │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -290,20 +290,20 @@ class QASpecification(Specification):
 #### Prompt Specification Component Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                          Prompt Specification System                       │
+│                          Prompt Specification System                   │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │    Specification    │──────┤   Input Model   │      │  Output Model   │ │
+│  │  Specification  │──────┤   Input Model   │      │  Output Model   │ │
 │  └────────┬────────┘      └─────────────────┘      └─────────────────┘ │
-│           │                                                             │
-│           ▼                                                             │
+│           │                                                            │
+│           ▼                                                            │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │Prompt Template  │─────►│Template Renderer │─────►│Input Validation │ │
+│  │Prompt Template  │─────►│Template Renderer │─────►│Input Val.      │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │Schema Generation│◄─────┤Output Validation │◄─────┤  Error Handling │ │
+│  │Schema Generation│◄─────┤Output Validation │◄─────┤  Error Handl.  │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -345,15 +345,15 @@ with execution_options(max_workers=3):
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │    XCSGraph     │─────►│    XCSNode      │◄─────┤      Edge       │ │
 │  └────────┬────────┘      └────────┬────────┘      └─────────────────┘ │
-│           │                        │                                    │
-│           ▼                        ▼                                    │
+│           │                        │                                   │
+│           ▼                        ▼                                   │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
 │  │  Graph Compiler │─────►│ Execution Plan  │─────►│    Scheduler    │ │
 │  └─────────────────┘      └────────┬────────┘      └────────┬────────┘ │
 │                                    │                         │         │
 │                                    ▼                         ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │  Input Mapping  │◄─────┤ Parallel Worker │◄─────┤ Output Collection│ │
+│  │  Input Mapping  │◄─────┤ Parallel Worker │◄─────┤Output Collection│ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -391,17 +391,17 @@ def complex_pipeline(query: str):
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │   JIT Decorator │─────►│Function Tracing  │─────►│ Graph Building  │ │
+│  │   JIT Decorator │─────►│Function Tracing │─────►│ Graph Building  │ │
 │  └────────┬────────┘      └────────┬────────┘      └────────┬────────┘ │
 │           │                        │                         │         │
 │           ▼                        ▼                         ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │   Call Cache    │◄─────┤ Graph Optimizer │◄─────┤Dependency Tracker│ │
+│  │   Call Cache    │◄─────┤ Graph Optimizer │◄─────┤  Dep.  Tracker  │ │
 │  └─────────────────┘      └────────┬────────┘      └─────────────────┘ │
-│                                    │                                    │
-│                                    ▼                                    │
+│                                    │                                   │
+│                                    ▼                                   │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │Parallel Dispatch│◄─────┤Execution Context│─────►│Result Collection │ │
+│  │Parallel Dispatch│◄─────┤Execution Context│─────►│Result Coll.     │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -437,7 +437,7 @@ mmlu_data = data_service.load_dataset(
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │  DataService    │─────►│ Dataset Registry │─────►│ Dataset Loaders│ │
+│  │  DataService    │─────►│ Dataset Reg.    │─────►│ Dataset Loaders │ │
 │  └────────┬────────┘      └─────────────────┘      └────────┬────────┘ │
 │           │                                                  │         │
 │           ▼                                                  ▼         │
@@ -496,7 +496,7 @@ print(f"Accuracy: {results.metrics['accuracy']:.2f}")
 │                                                              │         │
 │                                                              ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ Metric Calculator│◄────┤ Result Analyzer │◄─────┤ Report Generator│ │
+│  │Metric Calculator│◄─────┤ Result Analyzer │◄─────┤ Report Generator│ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
@@ -559,7 +559,7 @@ The diagram below illustrates the complete dependency flow between major compone
 │  │   Core Operators        │◄───►│     NON Patterns        │◄───►│   Evaluators        │  │
 │  └───────────┬─────────────┘     └───────────┬─────────────┘     └─────────────────────┘  │
 │              │                               │                                            │
-└─────────────┼───────────────────────────────┼────────────────────────────────────────────-┘
+└─────────────┼───────────────────────────────┼────────────────────────────────────────────┘
               │                               │
               ▼                               ▼
 ┌───────────────────────────────────────────────────────────────────────────────────────────┐
