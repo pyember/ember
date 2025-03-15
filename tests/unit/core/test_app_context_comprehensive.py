@@ -112,9 +112,8 @@ class TestCreateEmberApp:
         
         # Verify model registry creation and initialization
         mock_initialize_registry.assert_called_once_with(
-            config_path=None, 
-            auto_discover=True, 
-            auto_register=True
+            config_manager=mock_config_manager, 
+            auto_discover=True
         )
         
         # Verify usage service creation
@@ -162,9 +161,8 @@ class TestCreateEmberApp:
         
         # Verify model registry initialization with the same path
         mock_initialize_registry.assert_called_once_with(
-            config_path=custom_config,
-            auto_discover=True,
-            auto_register=True
+            config_manager=mock_config_manager,
+            auto_discover=True
         )
         
         # Other verifications remain the same
