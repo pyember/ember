@@ -38,11 +38,6 @@ export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
 export GOOGLE_API_KEY="your-google-key"
 
-# For Windows PowerShell
-$env:OPENAI_API_KEY="your-openai-key"
-$env:ANTHROPIC_API_KEY="your-anthropic-key"
-$env:GOOGLE_API_KEY="your-google-key"
-
 # For making environment variables persistent (add to your shell profile)
 echo 'export OPENAI_API_KEY="your-openai-key"' >> ~/.bashrc  # or ~/.zshrc
 ```
@@ -64,7 +59,7 @@ model_registry:
       api_key: ${OPENAI_API_KEY}  # Will use environment variable
       organization_id: "your-org-id"  # Optional organization ID
     anthropic:
-      api_key: "your-anthropic-key"  # Direct value
+      api_key: "your-anthropic-key"  # Direct value (example)
     google:
       api_key: ${GOOGLE_API_KEY}  # Will use environment variable
 ```
@@ -112,7 +107,7 @@ Here's how to get started with Ember in just a few lines of code:
 # Import the package
 import ember
 
-# Initialize and get the model service
+# Initialize and get the 'default' model service
 service = ember.init()
 
 # Make a simple model call
@@ -154,21 +149,22 @@ class ParallelQuerySystem(Operator[QueryInput, QueryOutput]):
     ensemble: non.UniformEnsemble
     aggregator: non.MostCommon
     
-    def __init__(self):
-        # Initialize fields
+    def __init__(self, parallel_calls: int = 3, model: str = 'openai: gpt-4o-mini', temp: float = 0.4):
+        # Init ensemble
         self.ensemble = non.UniformEnsemble(
-            num_units=3,  # Use 3 models in parallel
-            model_name="openai:gpt-4o-mini",
-            temperature=0.4
+            num_units=parallel_calls,
+            model_name=model,
+            temperature=temp
         )
         
-        self.aggregator = non.MostCommon()
+        # Aggregate ensemble responses with "Most Common", "voting-bsed" aggregation
+        self.aggregator = non.MostCommon() 
     
     def forward(self, *, inputs: QueryInput) -> QueryOutput:
         # Get responses from multiple models (automatically parallelized)
         ensemble_result = self.ensemble(inputs={"query": inputs.query})
         
-        # Aggregate the results
+        # Aggregate the results (input dict format for operator invocation, vs. kwargs format in README.md. Both are supported.)
         aggregated = self.aggregator(inputs={
             "query": inputs.query,
             "responses": ensemble_result["responses"]
