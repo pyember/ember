@@ -334,7 +334,7 @@ class TestDefaultConfigManager:
     
     def test_default_manager_with_custom_path(self):
         """Test default manager creation with custom path."""
-        manager = create_default_config_manager(config_path="custom_path.yaml")
+        manager = create_config_manager(config_path="custom_path.yaml")
         
         # YAML provider should use the custom path
         assert manager._providers[0].file_path == "custom_path.yaml"
