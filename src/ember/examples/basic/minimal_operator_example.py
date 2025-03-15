@@ -8,7 +8,7 @@ To run:
 """
 
 # Import the minimal example
-from ember.examples.minimal_example import MinimalOperator, MinimalInput, main
+from ember.examples.basic.minimal_example import MinimalOperator, MinimalInput, main
 
 if __name__ == "__main__":
     # Run the example from the minimal_example module

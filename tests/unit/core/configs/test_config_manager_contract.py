@@ -13,7 +13,7 @@ from unittest import mock
 import pytest
 from pydantic import BaseModel
 
-from src.ember.core.configs.config_manager import ConfigManager, create_default_config_manager
+from src.ember.core.configs.config_manager import ConfigManager, create_config_manager
 from src.ember.core.configs.providers import ConfigProvider, YamlFileProvider, EnvironmentProvider
 from src.ember.core.configs.transformer import ConfigTransformer
 from src.ember.core.configs.exceptions import ConfigError
@@ -306,11 +306,11 @@ class TestConfigManagerLifecycle:
 class TestDefaultConfigManager:
     """Tests for the default config manager factory."""
     
-    def test_create_default_config_manager(self):
+    def test_create_config_manager(self):
         """Test the default config manager creation."""
         # Create a default manager
         with mock.patch.dict(os.environ, {"EMBER_CONFIG": "nonexistent.yaml"}):
-            manager = create_default_config_manager()
+            manager = create_config_manager()
         
         # Should be a ConfigManager instance
         assert isinstance(manager, ConfigManager)

@@ -20,7 +20,7 @@ from typing import Optional, Dict, ClassVar, Type, Any
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.config.manager import ConfigManager, create_default_config_manager
+from ember.core.config.manager import ConfigManager, create_config_manager
 from ember.core.registry.model.initialization import initialize_registry
 
 
@@ -89,7 +89,7 @@ def create_ember_app(config_path: Optional[str] = None) -> EmberAppContext:
     logger = logging.getLogger("ember")
 
     # 1) Create the configuration manager
-    config_manager = create_default_config_manager(config_path=config_path, logger=logger)
+    config_manager = create_config_manager(config_path=config_path, logger=logger)
     config_manager.load()
     logger.debug("Configuration manager initialized")
 

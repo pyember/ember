@@ -9,14 +9,24 @@ This guide will help you quickly get started with Ember, the compositional frame
 git clone https://github.com/pyember/ember.git
 cd ember
 
-# Install using Poetry
+# Install using Poetry (creates a virtual environment automatically)
 poetry install
 
-# For development dependencies
-poetry install --with dev
+# Activate the Poetry-managed virtual environment
+poetry shell
+
+# Or run commands directly within the environment 
+poetry run python src/ember/examples/basic/minimal_example.py
 ```
 
+For detailed installation instructions including troubleshooting, please see:
+- [INSTALLATION_GUIDE.md](INSTALLATION_GUIDE.md) - Complete installation instructions
+- [ENVIRONMENT_MANAGEMENT.md](ENVIRONMENT_MANAGEMENT.md) - Guide to managing Python environments
+- [TESTING_INSTALLATION.md](TESTING_INSTALLATION.md) - Steps to verify your installation
+
 ## Setting Up API Keys and Configuration
+
+Ember supports multiple ways to configure API keys for LLM providers.
 
 ### Option 1: Environment Variables
 
@@ -26,26 +36,73 @@ Set your API keys as environment variables:
 # For bash/zsh
 export OPENAI_API_KEY="your-openai-key"
 export ANTHROPIC_API_KEY="your-anthropic-key"
+export GOOGLE_API_KEY="your-google-key"
 
 # For Windows PowerShell
 $env:OPENAI_API_KEY="your-openai-key"
 $env:ANTHROPIC_API_KEY="your-anthropic-key"
+$env:GOOGLE_API_KEY="your-google-key"
+
+# For making environment variables persistent (add to your shell profile)
+echo 'export OPENAI_API_KEY="your-openai-key"' >> ~/.bashrc  # or ~/.zshrc
 ```
 
 ### Option 2: Configuration File
 
-Create a configuration file at `~/.ember/config.yaml` or in your project directory:
+Create a configuration file at one of these locations (searched in order):
+
+1. Current directory: `./config.yaml`
+2. User home config: `~/.ember/config.yaml`
+3. System config: `/etc/ember/config.yaml`
+
+Example configuration file:
 
 ```yaml
 model_registry:
   providers:
     openai:
       api_key: ${OPENAI_API_KEY}  # Will use environment variable
+      organization_id: "your-org-id"  # Optional organization ID
     anthropic:
       api_key: "your-anthropic-key"  # Direct value
+    google:
+      api_key: ${GOOGLE_API_KEY}  # Will use environment variable
 ```
 
-See [Configuration Quickstart](docs/quickstart/configuration.md) for more options.
+### Option 3: Programmatic Configuration
+
+Set configuration values directly in your code:
+
+```python
+import ember
+from ember.core.config.manager import ConfigManager
+
+# Initialize with custom configuration
+config = ConfigManager()
+config.set("model_registry.providers.openai.api_key", "your-openai-key")
+config.set("model_registry.providers.anthropic.api_key", "your-anthropic-key")
+
+# Initialize Ember with this configuration
+service = ember.init(config=config)
+```
+
+### Setting Provider-Specific Options
+
+You can configure provider-specific options in your configuration file:
+
+```yaml
+model_registry:
+  providers:
+    openai:
+      api_key: ${OPENAI_API_KEY}
+      base_url: "https://api.openai.com/v1"  # Custom API endpoint
+      timeout: 30  # Timeout in seconds
+    anthropic:
+      api_key: ${ANTHROPIC_API_KEY}
+      max_retries: 3
+```
+
+See [Configuration Quickstart](docs/quickstart/configuration.md) for more options and detailed configuration examples.
 
 ## Basic Usage
 

@@ -10,7 +10,7 @@ import logging
 from typing import Dict, List, Optional, Set, Any
 
 from ember.core.exceptions import EmberError
-from ember.core.config.manager import ConfigManager, create_default_config_manager
+from ember.core.config.manager import ConfigManager, create_config_manager
 from ember.core.config.schema import EmberConfig
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
@@ -124,7 +124,7 @@ def initialize_registry(
         
         # Get configuration
         if config_manager is None:
-            config_manager = create_default_config_manager(config_path=config_path)
+            config_manager = create_config_manager(config_path=config_path)
             
         config = config_manager.get_config()
         

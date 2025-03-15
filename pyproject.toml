@@ -106,12 +106,13 @@ data = ["datasets", "scikit-learn", "scipy", "huggingface-hub", "pyarrow", "pyar
 viz = ["matplotlib", "prettytable"]
 
 # Developer extras
-dev = ["pytest", "parameterized", "jupyterlab", "ipykernel", "pytest-cov", "hypothesis", "mutmut", "tox", "black", "isort", "mypy", "pylint", "pre-commit", "ruff"]
+dev = ["pytest", "pytest-asyncio", "parameterized", "jupyterlab", "ipykernel", "pytest-cov", "hypothesis", "mutmut", "tox", "black", "isort", "mypy", "pylint", "pre-commit", "ruff"]
 docs = ["sphinx", "sphinx-rtd-theme", "nbsphinx", "myst-parser", "jupyter", "notebook"]
 
 [tool.poetry.group.dev.dependencies]
 # Testing
 pytest = "8.3.2"
+pytest-asyncio = "^0.23.4"
 parameterized = "0.9.0"
 pytest-cov = "4.1.0"
 hypothesis = "6.99.0"

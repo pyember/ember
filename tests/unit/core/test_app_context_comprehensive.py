@@ -73,7 +73,7 @@ class TestCreateEmberApp:
     """Tests for the create_ember_app function."""
 
     @patch('ember.core.app_context.logging.getLogger')
-    @patch('ember.core.app_context.create_default_config_manager')
+    @patch('ember.core.app_context.create_config_manager')
     @patch('ember.core.app_context._initialize_api_keys_from_env')
     @patch('ember.core.app_context.initialize_registry')
     @patch('ember.core.app_context.UsageService')
@@ -128,7 +128,7 @@ class TestCreateEmberApp:
         assert result.logger is mock_logger
     
     @patch('ember.core.app_context.logging.getLogger')
-    @patch('ember.core.app_context.create_default_config_manager')
+    @patch('ember.core.app_context.create_config_manager')
     @patch('ember.core.app_context._initialize_api_keys_from_env')
     @patch('ember.core.app_context.initialize_registry')
     @patch('ember.core.app_context.UsageService')
@@ -246,7 +246,7 @@ class TestEmberContext:
         context = EmberContext.initialize(config_path=config_path)
         
         # Verify create_ember_app was called with correct path
-        mock_create_app.assert_called_once_with(config_filename=config_path)
+        mock_create_app.assert_called_once_with(config_path=config_path)
         assert context._app_context is mock_app
     
     def test_initialize_with_app_context(self):
