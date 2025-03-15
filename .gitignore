@@ -66,6 +66,8 @@ CLAUDE.md
 
 # CLI related files (to be developed separately)
 src/cli/
+src/ember/cli.py
+tests/cli/
 /dist/
 /node_modules/
 package.json

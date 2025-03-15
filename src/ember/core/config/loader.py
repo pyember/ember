@@ -54,8 +54,22 @@ def resolve_env_vars(config: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(value, dict):
             result[key] = resolve_env_vars(value)
         elif isinstance(value, list):
-            result[key] = [resolve_env_vars(item) if isinstance(item, dict) else item 
-                          for item in value]
+            resolved_list = []
+            for item in value:
+                if isinstance(item, dict):
+                    resolved_list.append(resolve_env_vars(item))
+                elif isinstance(item, str) and "${" in item and "}" in item:
+                    # Handle environment variable substitution in string items
+                    pattern = r'\${([^}]+)}'
+                    matches = re.findall(pattern, item)
+                    result_value = item
+                    for var_name in matches:
+                        env_value = os.environ.get(var_name, "")
+                        result_value = result_value.replace(f"${{{var_name}}}", env_value)
+                    resolved_list.append(result_value)
+                else:
+                    resolved_list.append(item)
+            result[key] = resolved_list
         elif isinstance(value, str) and "${" in value and "}" in value:
             # Simple pattern matching for environment variables
             pattern = r'\${([^}]+)}'
@@ -103,6 +117,43 @@ def load_yaml_file(path: str) -> Dict[str, Any]:
         raise ConfigError(f"Error reading {path}: {e}")
 
 
+def _normalize_env_key(env_key: str) -> List[str]:
+    """Normalize environment variable key to configuration path.
+    
+    Args:
+        env_key: Environment variable key without prefix (e.g., "REGISTRY_AUTO_DISCOVER")
+        
+    Returns:
+        List of path segments (e.g., ["registry", "auto_discover"])
+    """
+    # Custom mapping for well-known keys
+    key_mappings = {
+        "REGISTRY_AUTO_DISCOVER": ["registry", "auto_discover"],
+        "LOGGING_LEVEL": ["logging", "level"]
+    }
+    
+    # Check for exact matches first
+    if env_key in key_mappings:
+        return key_mappings[env_key]
+    
+    # Default behavior: convert to lowercase and split by underscore
+    path = env_key.lower().split("_")
+    
+    # Handle compound words that should stay together
+    compound_words = ["auto_discover", "rate_limit", "api_key", "api_keys", "cost_input", "cost_output"]
+    
+    # Check if any adjacent elements in path should be merged
+    i = 0
+    while i < len(path) - 1:
+        combined = f"{path[i]}_{path[i+1]}"
+        if combined in compound_words:
+            path[i] = combined  # Replace first element with combined
+            path.pop(i+1)       # Remove second element
+        else:
+            i += 1
+    
+    return path
+
 def load_from_env(prefix: str = "EMBER") -> Dict[str, Any]:
     """Load configuration from environment variables with given prefix.
     
@@ -117,8 +168,11 @@ def load_from_env(prefix: str = "EMBER") -> Dict[str, Any]:
     
     for key, value in os.environ.items():
         if key.startswith(f"{prefix_upper}_"):
-            # Convert EMBER_REGISTRY_AUTO_DISCOVER=true → registry.auto_discover = true
-            path = key[len(prefix_upper) + 1:].lower().split("_")
+            # Get the key without prefix
+            env_key = key[len(prefix_upper) + 1:]
+            
+            # Normalize to config path
+            path = _normalize_env_key(env_key)
             
             # Convert value to appropriate type
             if value.lower() in ("true", "yes", "1"):
@@ -146,7 +200,7 @@ def load_from_env(prefix: str = "EMBER") -> Dict[str, Any]:
 
 
 def load_config(
-    config_path: Optional[str] = None,
+    file_path: Optional[str] = None,
     env_prefix: str = "EMBER"
 ) -> EmberConfig:
     """Load EmberConfig from file and environment.
@@ -163,7 +217,7 @@ def load_config(
     """
     try:
         # Determine config path
-        path = config_path or os.environ.get(f"{env_prefix}_CONFIG", "config.yaml")
+        path = file_path or os.environ.get(f"{env_prefix}_CONFIG", "config.yaml")
         
         # Start with default empty config
         config_data: Dict[str, Any] = {}

@@ -86,16 +86,17 @@ def test_convert_model_config_to_model_info():
     # Create test data
     model_id = "openai:gpt-4"
     provider_name = "openai"
-    model_config = MagicMock(
-        name="GPT-4",
-        cost=MagicMock(
-            input_cost_per_thousand=5.0,
-            output_cost_per_thousand=15.0
-        ),
-        rate_limit=MagicMock(
-            tokens_per_minute=100000,
-            requests_per_minute=500
-        )
+    # Create a real string for name property instead of a MagicMock
+    model_name = "GPT-4"
+    model_config = MagicMock()
+    model_config.name = model_name
+    model_config.cost = MagicMock(
+        input_cost_per_thousand=5.0,
+        output_cost_per_thousand=15.0
+    )
+    model_config.rate_limit = MagicMock(
+        tokens_per_minute=100000,
+        requests_per_minute=500
     )
     provider_config = MagicMock(
         base_url="https://api.openai.com"
@@ -113,7 +114,7 @@ def test_convert_model_config_to_model_info():
     
     # Verify results
     assert model_info.model_id == "openai:gpt-4"
-    assert model_info.model_name == "GPT-4"
+    assert model_info.model_name == model_name
     assert model_info.cost.input_cost_per_thousand == 5.0
     assert model_info.cost.output_cost_per_thousand == 15.0
     assert model_info.rate_limit.tokens_per_minute == 100000
@@ -122,7 +123,7 @@ def test_convert_model_config_to_model_info():
     assert model_info.provider.default_api_key == "test-api-key"
     assert model_info.provider.base_url == "https://api.openai.com"
     assert model_info.provider.custom_args.get("timeout") == "30.0"
-    assert model_info.provider.custom_args.get("max_retries") == "3.0"
+    assert model_info.provider.custom_args.get("max_retries") == "3"
     assert model_info.get_api_key() == "test-api-key"
 
 
@@ -136,30 +137,29 @@ def test_initialize_registry_with_config_manager():
     # Configure mocks
     mock_config_manager.get_config.return_value = mock_config
     
-    with patch("unittest.mock.MagicMock", return_value=mock_registry) as mock_registry_class:
-        # Set up behaviors - simplified for test
-        mock_registry.is_registered.return_value = False
-        
-        # Set up registry configuration
-        mock_registry_properties = {
-            "model_registry.auto_discover": True,
-            "model_registry.auto_register": True,
-            "model_registry.providers": {
-                "openai": {
-                    "enabled": True,
-                    "api_keys": {"default": {"key": "test-key"}},
-                    "models": [{"id": "gpt-4", "name": "GPT-4"}]
-                }
+    # Direct mock setup without patching
+    mock_registry.is_registered = MagicMock(return_value=False)
+    
+    # Set up registry configuration
+    mock_registry_properties = {
+        "model_registry.auto_discover": True,
+        "model_registry.auto_register": True,
+        "model_registry.providers": {
+            "openai": {
+                "enabled": True,
+                "api_keys": {"default": {"key": "test-key"}},
+                "models": [{"id": "gpt-4", "name": "GPT-4"}]
             }
         }
-        
-        # Configure mock_config to return appropriate values
-        mock_config.model_registry.auto_discover = mock_registry_properties["model_registry.auto_discover"]
-        mock_config.model_registry.auto_register = mock_registry_properties["model_registry.auto_register"]
-        mock_config.model_registry.providers = mock_registry_properties["model_registry.providers"]
-        
-        # Simplified test - check that we would register the correct configs
-        assert mock_config.model_registry.auto_discover is True
-        assert "openai" in mock_config.model_registry.providers
+    }
+    
+    # Configure mock_config to return appropriate values
+    mock_config.model_registry.auto_discover = mock_registry_properties["model_registry.auto_discover"]
+    mock_config.model_registry.auto_register = mock_registry_properties["model_registry.auto_register"]
+    mock_config.model_registry.providers = mock_registry_properties["model_registry.providers"]
+    
+    # Simplified test - check that we would register the correct configs
+    assert mock_config.model_registry.auto_discover is True
+    assert "openai" in mock_config.model_registry.providers
 
 

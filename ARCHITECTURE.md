@@ -367,21 +367,57 @@ Key components:
 
 ### Enhanced JIT System
 
-The JIT system enables automatic graph construction and optimization:
+Ember provides three complementary approaches to Just-In-Time optimization:
+
+#### 1. JIT Decorator (@jit)
+
+The `jit` decorator uses execution tracing to optimize operators:
 
 ```python
-from ember.xcs.tracer import jit
+from ember.api.xcs import jit
 
 @jit
-def complex_pipeline(query: str):
-    # Operations are automatically traced and optimized
-    ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o")
-    responses = ensemble({"query": query})
+class MyEnsemble(Operator):
+    def forward(self, *, inputs):
+        # Complex computation automatically traced and optimized
+        ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o")
+        responses = ensemble(inputs={"query": inputs.query})
+        return responses
+```
+
+#### 2. Structural JIT (@structural_jit)
+
+The `structural_jit` decorator analyzes operator composition without requiring execution:
+
+```python
+from ember.api.xcs import structural_jit
+
+@structural_jit(execution_strategy="parallel")
+class Pipeline(Operator):
+    def __init__(self):
+        self.refiner = QuestionRefinement()
+        self.ensemble = Ensemble()
+        self.aggregator = MostCommon()
+        
+    def forward(self, *, inputs):
+        refined = self.refiner(inputs=inputs)
+        answers = self.ensemble(inputs=refined)
+        return self.aggregator(inputs=answers)
+```
+
+#### 3. Autograph Context Manager
+
+For explicit graph construction:
+
+```python
+from ember.api.xcs import autograph, execute
+
+with autograph() as graph:
+    intermediate = op1(inputs={"query": "Example"})
+    result = op2(inputs=intermediate)
     
-    judge = JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
-    result = judge({"query": query, "responses": responses.responses})
-    
-    return result.final_answer
+# Execute the graph with optimized scheduling
+results = execute(graph)
 ```
 
 #### JIT System Component Architecture
@@ -396,22 +432,27 @@ def complex_pipeline(query: str):
 │           │                        │                         │         │
 │           ▼                        ▼                         ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │   Call Cache    │◄─────┤ Graph Optimizer │◄─────┤  Dep.  Tracker  │ │
-│  └─────────────────┘      └────────┬────────┘      └─────────────────┘ │
-│                                    │                                   │
-│                                    ▼                                   │
+│  │ Structural JIT  │─────►│Structure Analysis│────►│Hierarchical Deps│ │
+│  └────────┬────────┘      └────────┬────────┘      └────────┬────────┘ │
+│           │                        │                         │         │
+│           ▼                        ▼                         ▼         │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │Parallel Dispatch│◄─────┤Execution Context│─────►│Result Coll.     │ │
+│  │   Autograph     │─────►│ Execution Engine│─────►│Parallel Dispatch│ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 Key features:
-- Automatic graph construction
-- Function tracing
-- Parallelization of independent operations
-- Caching and optimization
+- Multiple approaches for different optimization needs:
+  - Trace-based JIT for dynamic execution patterns 
+  - Structural JIT for analyzing operator composition without execution
+  - Autograph for explicit graph construction when needed
+- Advanced dependency analysis with hierarchical operator support
+- Automatic parallelization of independent operations
+- Caching of execution plans for repeated invocations
+
+For a comprehensive explanation of the JIT system, see [JIT Overview](docs/xcs/JIT_OVERVIEW.md).
 
 ### Data Processing System
 

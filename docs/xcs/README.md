@@ -22,6 +22,8 @@ XCS is designed with a clean, modular architecture consisting of these key compo
 
 The system is built on functional programming principles and follows SOLID design patterns throughout its implementation.
 
+For a detailed explanation of the JIT system architecture and the relationship between autograph, jit, and structural_jit, see [JIT Overview](JIT_OVERVIEW.md).
+
 ## Usage Examples
 
 ### Just-In-Time Compilation

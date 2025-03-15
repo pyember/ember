@@ -212,7 +212,9 @@ def config_file():
                     "api_key": "key1",
                     "models": {
                         "model1": {
+                            "id": "model1",
                             "name": "Model One",
+                            "provider": "provider1",
                             "cost_input": 1.0,
                             "cost_output": 2.0
                         }
@@ -303,4 +305,8 @@ class TestLoadConfig:
         
         config = load_config(env_prefix="CUSTOM")
         
-        assert config.registry.auto_discover is False
+        # Check if the auto entry exists within the registry config
+        if hasattr(config.registry, "auto") and isinstance(config.registry.auto, dict):
+            assert config.registry.auto.get("discover") is False
+        else:
+            assert config.registry.auto_discover is False

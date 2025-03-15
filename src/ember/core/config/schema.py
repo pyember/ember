@@ -4,15 +4,15 @@ This module defines the data structures used for configuration in Ember.
 The schemas are designed to be minimal but extensible through Pydantic.
 """
 
-from typing import Dict, List, Optional, Any, ClassVar
+from typing import Dict, List, Optional, Any, ClassVar, Union
 from pydantic import BaseModel, Field, field_validator, computed_field, model_validator
 
 
 class Cost(BaseModel):
     """Value object for model cost calculations."""
     
-    input_cost: float = 0.0
-    output_cost: float = 0.0
+    input_cost_per_thousand: float = 0.0
+    output_cost_per_thousand: float = 0.0
     
     def calculate(self, input_tokens: int, output_tokens: int) -> float:
         """Calculate cost for given token counts.
@@ -24,9 +24,17 @@ class Cost(BaseModel):
         Returns:
             Calculated cost in currency units
         """
-        return (self.input_cost * input_tokens + 
-                self.output_cost * output_tokens) / 1000
+        return (self.input_cost_per_thousand * input_tokens + 
+                self.output_cost_per_thousand * output_tokens) / 1000
 
+
+class RateLimit(BaseModel):
+    """Rate limit configuration for models."""
+    
+    tokens_per_minute: int = 0
+    requests_per_minute: int = 0
+    
+    model_config = {"extra": "allow"}
 
 class Model(BaseModel):
     """Model configuration with minimal required fields.
@@ -35,17 +43,23 @@ class Model(BaseModel):
     while allowing arbitrary additional fields through Pydantic's extra="allow".
     
     Attributes:
+        id: Unique identifier for the model
         name: Human-readable name of the model
+        provider: Provider name
         cost_input: Cost per 1000 input tokens
         cost_output: Cost per 1000 output tokens
+        rate_limit: Optional rate limiting configuration
     """
     
     # Required fields
+    id: str
     name: str
+    provider: str
     
     # Optional fields with defaults
     cost_input: float = 0.0
     cost_output: float = 0.0
+    rate_limit: Optional[Union[Dict[str, int], RateLimit]] = None
     
     # Allow arbitrary extension
     model_config = {"extra": "allow"}
@@ -53,7 +67,14 @@ class Model(BaseModel):
     @computed_field
     def cost(self) -> Cost:
         """Get cost calculator for this model."""
-        return Cost(self.cost_input, self.cost_output)
+        # We can pass the input and output costs as named parameters
+        return Cost(input_cost_per_thousand=self.cost_input, output_cost_per_thousand=self.cost_output)
+        
+    def __init__(self, **data):
+        # Convert rate_limit dictionary to RateLimit model if it's a dict
+        if "rate_limit" in data and isinstance(data["rate_limit"], dict):
+            data["rate_limit"] = RateLimit(**data["rate_limit"])
+        super().__init__(**data)
 
 
 class Provider(BaseModel):
@@ -65,12 +86,14 @@ class Provider(BaseModel):
     Attributes:
         enabled: Whether this provider is enabled
         api_key: API key for authentication (falls back to environment)
-        models: Dictionary of model configurations keyed by name
+        api_keys: Dictionary of API keys for different environments/purposes
+        models: Dictionary of model configurations keyed by name or list of models
     """
     
     # Fields
     enabled: bool = True
     api_key: Optional[str] = None
+    api_keys: Dict[str, Dict[str, str]] = Field(default_factory=dict)
     models: Dict[str, Model] = Field(default_factory=dict)
     
     # Allow arbitrary extension
@@ -92,6 +115,12 @@ class Provider(BaseModel):
         return None
     
     def __init__(self, **data):
+        # Convert models list to dictionary if it's provided as a list
+        if "models" in data and isinstance(data["models"], list):
+            models_list = data["models"]
+            models_dict = {model.id: model for model in models_list}
+            data["models"] = models_dict
+            
         super().__init__(**data)
         # Store the root key this provider was initialized with
         self.__root_key__ = ""

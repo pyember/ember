@@ -135,8 +135,27 @@ class ModelDiscoveryService:
             # Attempt to fetch models from each provider
             for provider in self.providers:
                 try:
-                    provider_models = provider.fetch_models()
-                    aggregated_models.update(provider_models)
+                    # Set a timeout for fetch_models to prevent hanging
+                    import concurrent.futures
+                    import signal
+                    
+                    # Define a function to call fetch_models with a timeout
+                    def fetch_with_timeout():
+                        return provider.fetch_models()
+                    
+                    # Use ThreadPoolExecutor with a timeout to prevent hanging
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                        future = executor.submit(fetch_with_timeout)
+                        try:
+                            provider_models = future.result(timeout=30)  # 30 second timeout
+                            aggregated_models.update(provider_models)
+                        except concurrent.futures.TimeoutError:
+                            logger.error(
+                                "Timeout while fetching models from %s",
+                                provider.__class__.__name__,
+                            )
+                            errors.append(f"{provider.__class__.__name__}: Timeout after 30 seconds")
+                        
                 except Exception as e:
                     errors.append(f"{provider.__class__.__name__}: {e}")
                     logger.error(
@@ -181,9 +200,13 @@ class ModelDiscoveryService:
         settings = EmberSettings()
         
         # Get models from local configuration
-        local_models: Dict[str, Dict[str, Any]] = {
-            model.id: model.model_dump() for model in settings.registry.models
-        }
+        local_models: Dict[str, Dict[str, Any]] = {}
+        
+        # Check if registry has models attribute before accessing it
+        if hasattr(settings.registry, 'models'):
+            local_models = {
+                model.id: model.model_dump() for model in settings.registry.models
+            }
 
         # Map provider prefixes to their environment variable keys
         provider_api_keys: Dict[str, str] = {
@@ -307,12 +330,22 @@ class ModelDiscoveryService:
 
         async def fetch_from_provider(provider: BaseDiscoveryProvider) -> None:
             try:
-                # Each fetch is done in a thread; you could do direct async requests if the provider supports it.
-                provider_models = await asyncio.get_event_loop().run_in_executor(
-                    None, provider.fetch_models
-                )
-                with self._lock:
-                    aggregated_models.update(provider_models)
+                # Each fetch is done in a thread with timeout
+                try:
+                    # Create a task with a timeout
+                    fetch_task = asyncio.create_task(
+                        asyncio.get_event_loop().run_in_executor(None, provider.fetch_models)
+                    )
+                    provider_models = await asyncio.wait_for(fetch_task, timeout=30)  # 30 second timeout
+                    
+                    with self._lock:
+                        aggregated_models.update(provider_models)
+                except asyncio.TimeoutError:
+                    error_msg = f"{provider.__class__.__name__}: Timeout after 30 seconds"
+                    errors.append(error_msg)
+                    logger.error(
+                        "Timeout while fetching models from %s", provider.__class__.__name__
+                    )
             except Exception as e:
                 error_msg = f"{provider.__class__.__name__}: {e}"
                 errors.append(error_msg)

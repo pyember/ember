@@ -20,12 +20,25 @@ class DummyModel:
 def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
     """Patch genai.list_models to return a list with a dummy model."""
     monkeypatch.setattr(genai, "list_models", lambda: [DummyModel()])
+    # Mock environment to avoid app_context dependency
+    monkeypatch.setenv("GOOGLE_API_KEY", "test-key")
+    # Mock genai.configure to prevent actual API calls
+    monkeypatch.setattr(genai, "configure", lambda api_key: None)
 
 
-def test_deepmind_discovery_fetch_models() -> None:
-    """Test that DeepmindDiscovery.fetch_models returns a correctly prefixed model dict."""
+@pytest.fixture
+def discovery_instance():
+    """Return a preconfigured discovery instance."""
     discovery = DeepmindDiscovery()
-    models: Dict[str, Dict[str, Any]] = discovery.fetch_models()
+    discovery.configure(api_key="test-key")
+    # Mark as initialized to avoid app_context API key lookup
+    discovery._initialized = True
+    return discovery
+
+
+def test_deepmind_discovery_fetch_models(discovery_instance) -> None:
+    """Test that DeepmindDiscovery.fetch_models returns a correctly prefixed model dict."""
+    models: Dict[str, Dict[str, Any]] = discovery_instance.fetch_models()
     key = "google:gemini-1.5-pro"
     assert key in models
     entry = models[key]
@@ -33,11 +46,15 @@ def test_deepmind_discovery_fetch_models() -> None:
     assert entry.get("model_name") == "gemini-1.5-pro"
 
 
-def test_deepmind_discovery_fetch_models_error(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deepmind_discovery_fetch_models_error(discovery_instance, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that if genai.list_models throws an error, fetch_models handles it gracefully."""
     monkeypatch.setattr(
         genai, "list_models", lambda: (_ for _ in ()).throw(Exception("API error"))
     )
-    discovery = DeepmindDiscovery()
-    models = discovery.fetch_models()
-    assert models == {}
+    
+    # Check fallback behavior
+    models = discovery_instance.fetch_models()
+    assert len(models) > 0
+    # It should return fallback models
+    assert "google:gemini-1.5-pro" in models
+    assert "google:gemini-pro" in models

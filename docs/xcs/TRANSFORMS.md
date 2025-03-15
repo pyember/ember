@@ -174,6 +174,24 @@ The order of transforms matters:
 - `pmap(vmap(f))`: Each worker processes a batch (often more efficient)
 - `vmap(pmap(f))`: Each element processed in parallel (higher overhead, more parallelism)
 
+### Integration with JIT System
+
+Transforms can be combined with Ember's JIT system for additional optimizations:
+
+```python
+from ember.api.xcs import jit, vmap
+
+# JIT-compiled vectorized function
+@jit
+def process_item(x):
+    return expensive_computation(x)
+
+# Vectorized version with JIT optimization
+batch_process = vmap(process_item)
+```
+
+The relationship between transforms and the different JIT approaches (jit, structural_jit, autograph) is described in more detail in [JIT Overview](JIT_OVERVIEW.md).
+
 ## Transform Implementation Details
 
 ### vmap Implementation

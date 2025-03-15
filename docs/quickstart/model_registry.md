@@ -168,3 +168,33 @@ For more advanced usage, check out:
 - Multi-model ensembling
 - Prompt templating
 - Streaming responses
+
+## Provider Discovery System
+
+The model registry integrates a robust provider discovery mechanism with three key design principles:
+
+### 1. Resilience
+
+The discovery system ensures application stability through:
+- **Graceful degradation** - Fallback models when APIs are unreachable
+- **Timeout protection** - Automatic 30s timeout with ThreadPoolExecutor to prevent indefinite blocking
+- **Error isolation** - API failures in one provider don't affect others
+
+### 2. Testing Strategy
+
+Testing model discovery requires both:
+- **Unit tests** - Fast, deterministic verification with mocks
+- **Integration tests** - Selective API verification with real credentials
+
+Enable integration tests with environment flags:
+```bash
+RUN_PROVIDER_INTEGRATION_TESTS=1 pytest tests/integration/core/registry/test_provider_discovery.py -v
+```
+
+### 3. Design Patterns
+
+The discovery system employs:
+- **Adapter Pattern** - Unified interface across varying provider APIs
+- **Factory Pattern** - Dynamic provider instantiation based on available credentials
+- **Dependency Injection** - Explicit API key configuration to avoid global state
+- **Template Method** - Common discovery workflow with provider-specific implementations

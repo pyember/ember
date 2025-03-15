@@ -21,18 +21,18 @@ class TestCost:
     def test_creation(self):
         """Test creating a Cost object with default values."""
         cost = Cost()
-        assert cost.input_cost == 0.0
-        assert cost.output_cost == 0.0
+        assert cost.input_cost_per_thousand == 0.0
+        assert cost.output_cost_per_thousand == 0.0
         
     def test_creation_with_values(self):
         """Test creating a Cost object with custom values."""
-        cost = Cost(input_cost=1.5, output_cost=2.5)
-        assert cost.input_cost == 1.5
-        assert cost.output_cost == 2.5
+        cost = Cost(input_cost_per_thousand=1.5, output_cost_per_thousand=2.5)
+        assert cost.input_cost_per_thousand == 1.5
+        assert cost.output_cost_per_thousand == 2.5
         
     def test_calculate(self):
         """Test cost calculation."""
-        cost = Cost(input_cost=2.0, output_cost=3.0)
+        cost = Cost(input_cost_per_thousand=2.0, output_cost_per_thousand=3.0)
         calculated = cost.calculate(input_tokens=100, output_tokens=50)
         # (2.0 * 100 + 3.0 * 50) / 1000 = 0.35
         assert calculated == 0.35
@@ -47,6 +47,8 @@ class TestModel:
         assert model.id == "test"
         assert model.name == "Test Model"
         assert model.provider == "test-provider"
+        assert model.cost_input == 0.0
+        assert model.cost_output == 0.0
         assert model.cost.input_cost_per_thousand == 0.0
         assert model.cost.output_cost_per_thousand == 0.0
         
@@ -56,7 +58,8 @@ class TestModel:
             id="test",
             name="Test Model",
             provider="test-provider",
-            cost=Cost(input_cost_per_thousand=1.5, output_cost_per_thousand=2.5),
+            cost_input=1.5,
+            cost_output=2.5,
             rate_limit={"tokens_per_minute": 1000, "requests_per_minute": 100}
         )
         assert model.id == "test"
@@ -72,7 +75,8 @@ class TestModel:
             id="test",
             name="Test Model",
             provider="test-provider",
-            cost=Cost(input_cost_per_thousand=1.5, output_cost_per_thousand=2.5)
+            cost_input=1.5,
+            cost_output=2.5
         )
         assert isinstance(model.cost, Cost)
         assert model.cost.input_cost_per_thousand == 1.5
@@ -102,7 +106,7 @@ class TestProvider:
         provider = Provider()
         assert provider.enabled is True
         assert provider.api_keys == {}
-        assert provider.models == []
+        assert provider.models == {}
         
     def test_full_creation(self):
         """Test creating a Provider with all fields."""
@@ -116,9 +120,9 @@ class TestProvider:
             models=models
         )
         assert provider.enabled is True
-        assert provider.api_keys["default"].key == "test-api-key"
+        assert provider.api_keys["default"]["key"] == "test-api-key"
         assert len(provider.models) == 2
-        assert provider.models[0].name == "Model One"
+        assert provider.models["model1"].name == "Model One"
         
     def test_get_model_config(self):
         """Test get_model_config method."""
@@ -156,7 +160,7 @@ class TestProvider:
             timeout=30.0
         )
         assert provider.enabled is True
-        assert provider.api_keys["default"].key == "test-api-key"
+        assert provider.api_keys["default"]["key"] == "test-api-key"
         assert provider.base_url == "https://api.example.com"
         assert provider.timeout == 30.0
 
@@ -291,6 +295,6 @@ class TestEmberConfig:
             custom_section={"enabled": True, "value": 42},
             experimental_features=["feature1", "feature2"]
         )
-        assert config.custom_section.enabled is True
-        assert config.custom_section.value == 42
+        assert config.custom_section["enabled"] is True
+        assert config.custom_section["value"] == 42
         assert len(config.experimental_features) == 2

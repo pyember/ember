@@ -53,7 +53,7 @@ class ConfigManager:
         with self._lock:
             try:
                 self._logger.debug("Loading configuration...")
-                config = load_config(config_path=self._config_path)
+                config = load_config(file_path=self._config_path)
                 self._logger.debug("Configuration loaded successfully")
                 return config
             except Exception as e:

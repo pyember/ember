@@ -23,7 +23,7 @@ def main() -> None:
     print("    response = service('openai:gpt-4', 'Hello, world!')")
     print("    print(response.data)")
     
-    # Return non-zero exit code to indicate this is not a functional CLI
+    # Returning non-zero exit code to indicate this is not a functional CLI
     return 0
 
 

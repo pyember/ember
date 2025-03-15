@@ -11,6 +11,7 @@ from typing import (
     Type,
     TypeVar,
     Optional,
+    Union,
     get_type_hints,
     get_origin,
     get_args,
@@ -43,6 +44,10 @@ def validate_type(value: Any, expected_type: Type[T]) -> bool:
     # Get the origin type (for generics)
     origin = get_origin(expected_type)
     if origin is not None:
+        # Handle Union types (including Optional which is Union[T, None])
+        if origin is Union:
+            return any(validate_type(value, arg) for arg in get_args(expected_type))
+            
         # Handle generic types like List, Dict, etc.
         if origin is list:
             elem_type = get_args(expected_type)[0]
@@ -62,6 +67,9 @@ def validate_type(value: Any, expected_type: Type[T]) -> bool:
             if not isinstance(value, tuple) or len(value) != len(args):
                 return False
             return all(validate_type(v, t) for v, t in zip(value, args))
+            
+        # For other generic types, we can't use isinstance directly
+        return isinstance(value, origin)
 
     # Handle non-generic or primitive types
     return isinstance(value, expected_type)

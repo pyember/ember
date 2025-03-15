@@ -12,9 +12,13 @@ pip install -U ember
 
 ## Basic Usage
 
-### Simple JIT Compilation
+## XCS JIT System
 
-The simplest way to use XCS is with the `jit` decorator to optimize operator execution:
+Ember provides three complementary approaches to optimizing operator execution:
+
+### 1. JIT Compilation with @jit
+
+The `jit` decorator uses execution tracing to automatically optimize operators:
 
 ```python
 from ember.api.xcs import jit
@@ -31,11 +35,41 @@ result = op(inputs={"text": "hello world"})
 print(result)  # {"result": "HELLO WORLD"}
 ```
 
-The `jit` decorator automatically traces execution and compiles an optimized plan for future calls.
+The `jit` decorator:
+- Traces actual execution to identify dependencies
+- Builds optimized execution graphs
+- Caches compiled graphs for repeated use
+- Works best for operators with dynamic execution patterns
 
-### Automatic Graph Building
+### 2. Structural JIT for Complex Operator Compositions
 
-For more complex workflows, you can build execution graphs explicitly:
+For operators with known internal structure, the `structural_jit` decorator provides optimizations without requiring execution:
+
+```python
+from ember.api.xcs import structural_jit
+from ember.api.operator import Operator
+
+@structural_jit(execution_strategy="parallel")
+class CompositeOperator(Operator):
+    def __init__(self):
+        self.op1 = FirstOperator()
+        self.op2 = SecondOperator()
+        
+    def forward(self, *, inputs):
+        intermediate = self.op1(inputs=inputs)
+        result = self.op2(inputs=intermediate)
+        return result
+```
+
+The `structural_jit` decorator:
+- Analyzes operator structure directly
+- Identifies potential parallelism through structural analysis
+- Supports multiple execution strategies (auto, parallel, sequential)
+- Works best for complex composite operators
+
+### 3. Explicit Graph Building with autograph
+
+For maximum control, you can build execution graphs explicitly:
 
 ```python
 from ember.api.xcs import autograph, execute
@@ -186,6 +220,7 @@ results = batch_processor([item1, item2, item3, item4])
 ## Next Steps
 
 - See the [API Reference](API_REFERENCE.md) for detailed function documentation
+- Read the [JIT Overview](JIT_OVERVIEW.md) for a comprehensive explanation of the different JIT approaches
 - Check the [Architecture Overview](ARCHITECTURE.md) for system design details
 - Read the [Performance Guide](PERFORMANCE_GUIDE.md) for optimization tips
 - Explore the [Transforms Documentation](TRANSFORMS.md) for advanced parallelization

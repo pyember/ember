@@ -6,10 +6,16 @@ API:
     2) ParallelEnsemble: Leverages concurrency via a scheduling plan.
     3) JITEnsemble: Combines parallel execution with JIT tracing to cache the concurrency plan.
 
-It measures the total and per-query execution times for each approach.
+It measures the total and per-query execution times for each approach, highlighting the
+performance benefits of JIT compilation with the @jit decorator. This example focuses
+on the trace-based JIT approach, which is one of three complementary approaches in Ember's
+JIT system (the others being structural_jit and autograph).
+
+For a comprehensive explanation of the relationship between these approaches,
+see docs/xcs/JIT_OVERVIEW.md.
 
 To run:
-    poetry run python src/ember/examples/jit_example.py
+    poetry run python src/ember/examples/xcs/jit_example.py
 """
 
 import logging

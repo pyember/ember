@@ -15,11 +15,14 @@ class MyOperator(Operator):
         return processed_inputs
 ```
 
-The `jit` decorator enables just-in-time compilation for operators. It traces execution and compiles optimized execution plans.
+The `jit` decorator enables just-in-time compilation for operators. It traces execution and compiles optimized execution plans by analyzing the actual runtime behavior of the operator.
 
 **Parameters:**
 
 - `options` (Optional[JITOptions]): Configuration options for JIT compilation
+- `sample_input` (Dict[str, Any]): Sample input for pre-compilation during initialization
+- `force_trace` (bool): When True, always trace execution even for cached graphs
+- `recursive` (bool): Whether to trace and compile nested operator calls
 
 **Options:**
 
@@ -27,6 +30,11 @@ The `jit` decorator enables just-in-time compilation for operators. It traces ex
 - `sample_input` (Dict[str, Any]): Sample input for precompilation
 - `trace_level` (str): Tracing detail level ("minimal", "standard", "verbose")
 - `fallback` (bool): Whether to fall back to original function on errors
+
+**When to use:**
+- For most operator optimization needs
+- When execution patterns can vary based on inputs
+- When you need to optimize based on actual runtime behavior
 
 ### structural_jit
 
@@ -45,12 +53,20 @@ class CompositeOperator(Operator):
         return result
 ```
 
-The `structural_jit` decorator analyzes operator structure to optimize execution without requiring execution traces.
+The `structural_jit` decorator analyzes operator structure directly to optimize execution without requiring execution traces. It examines the composition relationships between operators to identify optimization opportunities.
 
 **Parameters:**
 
 - `execution_strategy` (str): Execution strategy ("auto", "parallel", "sequential")
-- `options` (Optional[JITOptions]): Additional JIT configuration options
+- `parallel_threshold` (int): Minimum number of nodes to trigger parallel execution in auto mode
+- `max_workers` (Optional[int]): Maximum number of worker threads for parallel execution
+- `cache_graph` (bool): Whether to cache and reuse the compiled graph
+
+**When to use:**
+- For complex composite operators with many subcomponents
+- When operator structure is known and static
+- For maximum optimization of operator composition
+- To parallelize independent operations in composite operators
 
 ### autograph
 
@@ -64,11 +80,19 @@ with autograph() as graph:
 results = execute(graph)
 ```
 
-The `autograph` context manager records operator calls to build a computational graph.
+The `autograph` context manager provides explicit control over graph construction by recording operator calls to build a computational graph. Unlike the decorators, this approach requires manual graph building and execution.
 
 **Returns:**
 
 - `XCSGraph`: A computational graph representing the recorded operations
+
+**When to use:**
+- When you need explicit control over graph construction
+- For debugging execution paths
+- When you want to construct a graph once and execute it multiple times
+- To create execution graphs for visualization or analysis
+
+> **Note:** For a comprehensive comparison and detailed explanation of the relationship between these approaches, see [JIT_OVERVIEW.md](JIT_OVERVIEW.md).
 
 ### execute
 

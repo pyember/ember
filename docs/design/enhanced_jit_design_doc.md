@@ -4,7 +4,13 @@
 
 This document describes the design for an enhanced JIT (Just-In-Time) compilation API for Ember, providing a cleaner, more JAX-like user experience for building and executing complex operator DAGs.
 
-> **Note**: This document describes the future vision. The current implementation includes the JIT tracing foundation, but users still need to manually build graphs and jit each operator separately.
+> **Note**: This document describes the JIT compilation vision for Ember. The current implementation includes three complementary approaches:
+>
+> 1. **autograph** - A context manager for explicit graph building when maximum control is needed
+> 2. **jit** - A decorator that traces execution and automatically builds graphs from observed behavior
+> 3. **structural_jit** - An advanced decorator that analyzes operator composition without execution tracing
+>
+> Together, these provide a JAX-like experience where operators can be composed naturally with automatic parallelization. The system handles most common use cases, but some advanced features (like complete transforms integration and advanced optimization) are still being developed. See `src/ember/xcs/tracer/PROPOSED_IMPROVEMENTS.md` for planned enhancements.
 
 ## Goals
 
@@ -12,7 +18,7 @@ This document describes the design for an enhanced JIT (Just-In-Time) compilatio
 2. Eliminate the need for manual graph construction in common cases
 3. Enable transparent caching and reuse of execution plans
 4. Allow flexible configuration of execution parameters
-5. Match the elegance of JAX-like systems while preserving Ember's power
+5. Match the elegance of JAX-like systems while preserving Ember's eager-mode compatible UX
 
 ## Implementation Components
 
@@ -58,12 +64,12 @@ Internal utilities that automatically convert traces to execution graphs:
 ```python
 # Define a JIT-enabled operator
 @jit()
-class MyEnsemble(Ensemble):
+class Ensemble(Operator):
     # ...implementation...
     pass
 
 # Create and use it - no manual graph building required
-ensemble = MyEnsemble(num_units=5, model_name="gpt-4o")
+ensemble = Ensemble(num_units=5, model_name="gpt-4o")
 result = ensemble(inputs={"query": "What is machine learning?"})
 ```
 
@@ -107,7 +113,7 @@ def pipeline(inputs):
 result = pipeline(inputs)
 
 # With custom execution options
-with execution_options(scheduler="sequential"):
+with execution_options(scheduler="topo_sort_parallel_dispatch"):
     result = pipeline(inputs)
 ```
 
@@ -116,9 +122,8 @@ with execution_options(scheduler="sequential"):
 The enhanced JIT system offers several performance advantages:
 
 1. **Reduced overhead**: Only build graphs once, reuse for subsequent calls
-2. **Automatic parallelism**: Intelligently schedule operations in parallel
-3. **Optimized memory usage**: Minimize redundant data copying
-4. **Smart dependency analysis**: Avoids false dependencies with nested operators
+2. **Automatic parallelism**: Intelligently schedule operations in parallel, based on topo sort of Operator DAG. 
+3. **Optimized memory usage**: Minimize redundant data copying, and optionally cache calls
 
 ## Implementation Details
 
@@ -136,11 +141,11 @@ The core implementation accomplishes several key technical goals:
 
 The implementation adheres to several key design principles:
 
-1. **SOLID**: Single responsibility, Open-closed, Liskov substitution, Interface segregation, Dependency inversion
+1. **SOLID**: SOLID adherence for modularity and extensibility. People should be able to add custom schedulers. 
 2. **Minimalism**: Keep the API surface small and focused
-3. **Composability**: Enable building complex pipelines from simple components
-4. **Pythonic**: Follow Python idioms and feel natural to Python developers
-5. **Progressive disclosure**: Easy for beginners, powerful for experts
+3. **Composability**: Enable building gnarly, complex pipelines from simple components
+4. **Pythonic**: Follow Python idioms and feel natural to Python developers with an ML research background
+5. **Progressive disclosure**: Easy for beginners, whilst powerful for experts (tensegrity)
 
 ## Current Status
 

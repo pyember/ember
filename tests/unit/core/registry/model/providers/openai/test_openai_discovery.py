@@ -25,12 +25,21 @@ def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
         }
 
     monkeypatch.setattr(openai.Model, "list", mock_model_list)
+    # Mock app_context to avoid circular dependency
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
 
-def test_openai_discovery_fetch_models() -> None:
-    """Test that OpenAIDiscovery fetches and standardizes model metadata."""
+@pytest.fixture
+def discovery_instance():
+    """Return a preconfigured discovery instance to avoid app_context access."""
     discovery = OpenAIDiscovery()
-    models = discovery.fetch_models()
+    discovery.configure(api_key="test-key")
+    return discovery
+
+
+def test_openai_discovery_fetch_models(discovery_instance) -> None:
+    """Test that OpenAIDiscovery fetches and standardizes model metadata."""
+    models = discovery_instance.fetch_models()
     for expected_key in ["openai:gpt-4o", "openai:gpt-4o-mini"]:
         assert expected_key in models
         assert models[expected_key]["model_id"] == expected_key

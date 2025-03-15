@@ -1,9 +1,17 @@
 """Enhanced JIT API Demonstration.
 
 This script demonstrates nested operator analysis using the enhanced JIT system.
+It shows how the hierarchical analysis in the AutoGraphBuilder correctly identifies
+dependencies between operators while respecting their hierarchical relationships.
+
+This is a key component of both the @jit decorator (which uses trace-based graph building)
+and the @structural_jit decorator (which uses structure-based graph building).
+
+For a comprehensive explanation of the relationship between these approaches,
+see docs/xcs/JIT_OVERVIEW.md.
 
 To run:
-    poetry run python src/ember/examples/enhanced_jit_example.py
+    poetry run python src/ember/examples/xcs/enhanced_jit_example.py
 """
 
 import logging

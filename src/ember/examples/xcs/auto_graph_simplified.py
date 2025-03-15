@@ -1,10 +1,20 @@
 """Simplified Automatic Graph Building Example.
 
 This example demonstrates the enhanced JIT API with automatic graph building
-without requiring LLM API calls.
+without requiring LLM API calls. It shows how the @jit decorator can automatically
+optimize operator execution by tracing execution patterns and building optimized
+execution graphs.
+
+This example highlights the trace-based JIT approach using the @jit decorator,
+which is one of three complementary approaches in Ember's JIT system (the others
+being structural_jit for structure-based analysis and autograph for manual graph
+construction).
+
+For a comprehensive explanation of the relationship between these approaches,
+see docs/xcs/JIT_OVERVIEW.md.
 
 To run:
-    poetry run python src/ember/examples/auto_graph_simplified.py
+    poetry run python src/ember/examples/xcs/auto_graph_simplified.py
 """
 
 import logging

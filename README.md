@@ -27,7 +27,7 @@ class ReasonerSpecification(Specification):
     input_model = QueryInput
     structured_output = ReasonedOutput
 
-@jit  # Automatically optimize execution
+@jit  # Automatically optimize execution with JIT compilation
 class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
     """A multi-model ensemble with synthesis for robust reasoning."""
     # Input/output specification

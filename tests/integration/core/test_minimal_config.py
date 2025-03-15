@@ -212,19 +212,21 @@ def test_centralized_config_schema():
     """Test the centralized configuration schema objects."""
     # Create basic configuration objects
     cost = Cost(
-        input_cost=5.0,
-        output_cost=15.0
+        input_cost_per_thousand=5.0,
+        output_cost_per_thousand=15.0
     )
-    assert cost.input_cost == 5.0
-    assert cost.output_cost == 15.0
+    assert cost.input_cost_per_thousand == 5.0
+    assert cost.output_cost_per_thousand == 15.0
     
     # Calculate cost
     calculated_cost = cost.calculate(1000, 1000)
     assert calculated_cost == 20.0  # (5.0 + 15.0) * 1000/1000
     
-    # Create model
+    # Create model - include all required fields
     model = Model(
+        id="test-model",
         name="GPT-4",
+        provider="openai",
         cost_input=5.0,
         cost_output=15.0
     )
