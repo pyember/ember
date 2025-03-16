@@ -13,9 +13,14 @@ cd ember
 poetry install
 
 # Activate the Poetry-managed virtual environment
+# For Poetry 2.0+
+poetry env use python3
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# For Poetry 1.x
 poetry shell
 
-# Or run commands directly within the environment 
+# Or run commands directly within the environment without activation
 poetry run python src/ember/examples/basic/minimal_example.py
 ```
 

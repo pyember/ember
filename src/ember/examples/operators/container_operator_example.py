@@ -45,8 +45,8 @@ class QuestionAnsweringOutput(EmberModel):
 class QuestionAnsweringSpecification(Specification):
     """Specification for question answering pipeline."""
 
-    input_model = QuestionAnsweringInput
-    output_model = QuestionAnsweringOutput
+    input_model: Type[EmberModel] = QuestionAnsweringInput
+    structured_output: Type[EmberModel] = QuestionAnsweringOutput
 
 
 ###############################################################################
@@ -72,7 +72,7 @@ class QuestionAnsweringPipeline(
     model_name: str
     num_units: int
     temperature: float
-    ensemble: non.Ensemble
+    ensemble: non.UniformEnsemble
     aggregator: non.MostCommon
 
     def __init__(
@@ -90,7 +90,7 @@ class QuestionAnsweringPipeline(
         self.temperature = temperature
 
         # Create internal operators
-        self.ensemble = non.Ensemble(
+        self.ensemble = non.UniformEnsemble(
             num_units=self.num_units,
             model_name=self.model_name,
             temperature=self.temperature,
@@ -136,7 +136,7 @@ def main() -> None:
     print("\n=== Container Operator with JIT ===\n")
 
     # Create the pipeline
-    pipeline = QuestionAnsweringPipeline(model_name="openai:gpt-4o-mini", num_units=5)
+    pipeline = QuestionAnsweringPipeline(model_name="openai:gpt-4o-mini", num_units=3)
 
     # Example queries
     queries = [

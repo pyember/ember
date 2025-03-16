@@ -208,8 +208,11 @@ class OpenAIModel(BaseProviderModel):
         )
 
         try:
+            # Use the timeout parameter from the request or the default from BaseChatParameters
+            timeout = openai_kwargs.pop("timeout", 30)
             response: Any = self.client.chat.completions.create(
                 model=self.model_info.name,
+                timeout=timeout,
                 **openai_kwargs,
             )
             content: str = response.choices[0].message.content.strip()

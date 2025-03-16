@@ -90,6 +90,16 @@ pip install ember-ai
 git clone https://github.com/pyember/ember.git
 cd ember
 poetry install
+
+# Activate the virtual environment (Poetry 2.0+)
+poetry env use python3
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Or for Poetry 1.x
+poetry shell
+
+# Alternatively, run commands directly in the environment
+poetry run python src/ember/examples/basic/minimal_example.py
 ```
 
 ## Model Registry & Provider Integration

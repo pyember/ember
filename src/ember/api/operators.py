@@ -44,6 +44,7 @@ Examples:
 
 # Core imports from operator base
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel, Field
 
 # Define improved type variables with explicit bounds and variance
@@ -69,6 +70,7 @@ from typing import List, Dict, Any, Optional, Union, TypeVar
 __all__ = [
     # Base classes
     "Operator",  # Base operator class for extension
+    "Specification",  # Specification for operators
     "EmberModel",  # Base model class for inputs/outputs
     "Field",  # Field definition for model attributes
     "InputT",

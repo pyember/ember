@@ -74,6 +74,9 @@ from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatResponse as ModelResponse,
 )
 
+# Language model module classes
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+
 # Configuration and enums
 from ember.core.registry.model.config.model_enum import ModelEnum
 
@@ -86,6 +89,9 @@ __all__ = [
     "ModelService",  # Service for invoking models
     "UsageService",  # Service for tracking usage
     "BaseProviderModel",  # Base class for provider models
+    # Model modules
+    "LMModule",  # Language model module for direct model invocation
+    "LMModuleConfig",  # Configuration for language model module
     # Model information and configuration
     "ModelInfo",  # Model metadata
     "ModelCost",  # Cost information

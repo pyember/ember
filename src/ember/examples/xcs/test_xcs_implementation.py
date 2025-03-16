@@ -146,8 +146,8 @@ def main():
     print(f"  Parallel execution time: {parallel_time:.6f} seconds")
     print(f"  Speed improvement: {sequential_time / parallel_time:.2f}x")
 
-    # Test autograph for automatic graph building
-    print("\nTesting Automatic Graph Building (autograph):")
+    # Test graph building with XCSGraph directly
+    print("\nTesting Graph Building:")
 
     def add(a: int, b: int) -> int:
         """Add two numbers."""
@@ -157,16 +157,25 @@ def main():
         """Multiply two numbers."""
         return a * b
 
-    with xcs.autograph() as graph:
-        # These operations are recorded, not executed immediately
-        sum_result = add(5, 3)  # node1
-        product = multiply(sum_result, 2)  # node2
+    from ember.xcs.graph.xcs_graph import XCSGraph
+    from ember.xcs.engine.xcs_engine import compile_graph, XCSNoOpScheduler
+
+    # Create a graph directly
+    graph = XCSGraph()
+    graph.add_node(operator=lambda inputs: add(5, 3), node_id="node1")
+    graph.add_node(
+        operator=lambda inputs, node1_result=None: multiply(node1_result, 2),
+        node_id="node2", 
+        dependencies=["node1"]
+    )
 
     print("  Graph built successfully")
     print("  Executing graph...")
 
-    # Execute the graph
-    results = xcs.execute(graph)
+    # Compile and execute the graph
+    plan = compile_graph(graph=graph)
+    scheduler = XCSNoOpScheduler()
+    results = scheduler.run_plan(plan=plan, global_input={}, graph=graph)
     print(f"  Graph execution results: {results}")
 
     print("\nXCS Implementation Test Complete!")

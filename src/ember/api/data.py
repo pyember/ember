@@ -194,8 +194,8 @@ def datasets(
     """
     from ember.core.utils.data.service import DatasetService
     from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-    from ember.core.utils.data.base.validators import BasicDatasetValidator
-    from ember.core.utils.data.base.samplers import RandomDatasetSampler
+    from ember.core.utils.data.base.validators import DatasetValidator
+    from ember.core.utils.data.base.samplers import DatasetSampler
     from ember.core.utils.data.base.transformers import NoOpTransformer
 
     # Get dataset registration info from the unified registry
@@ -208,8 +208,8 @@ def datasets(
     # Create the data service pipeline
     service = DatasetService(
         loader=HuggingFaceDatasetLoader(),
-        validator=BasicDatasetValidator(),
-        sampler=RandomDatasetSampler(),
+        validator=DatasetValidator(),
+        sampler=DatasetSampler(),
         transformers=[NoOpTransformer()],
     )
 

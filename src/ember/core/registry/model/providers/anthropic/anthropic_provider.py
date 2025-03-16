@@ -250,11 +250,15 @@ class AnthropicModel(BaseProviderModel):
         try:
             # Convert to messages API format
             messages = [{"role": "user", "content": anthro_kwargs.pop("prompt", "")}]
-
+            
+            # Extract timeout from parameters or use default
+            timeout = anthro_kwargs.pop("timeout", 30)
+            
             response: Any = self.client.messages.create(
                 model=final_model_name,
                 messages=messages,
                 max_tokens=anthro_kwargs.pop("max_tokens_to_sample", 768),
+                timeout=timeout,
                 **anthro_kwargs,
             )
             # New API returns content array, join if multiple parts

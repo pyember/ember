@@ -22,6 +22,11 @@ cd ember
 poetry install
 
 # Enter the virtual environment
+# For Poetry 2.0+
+poetry env use python3
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# For Poetry 1.x
 poetry shell
 
 # Run commands within the environment without activation
@@ -49,9 +54,11 @@ poetry install
 
 1. **Always use virtual environments** - Never install Ember in your global Python environment
 2. **Let Poetry handle environments when possible** - It manages dependency resolution better
-3. **Use `poetry shell` for interactive work** - Creates a subshell with the environment activated
+3. **For interactive work**:
+   - **Poetry 2.0+**: Use `poetry env use python3` followed by `source .venv/bin/activate`
+   - **Poetry 1.x**: Use `poetry shell` which creates a subshell with the environment activated
 4. **Use `poetry run` for single commands** - Runs a command in the environment without activation
-5. **Be aware of Poetry's environment location** - By default, it's in `{cache-dir}/virtualenvs/`
+5. **Be aware of Poetry's environment location** - By default, it's in `{cache-dir}/virtualenvs/` or in a local `.venv` directory
 
 ## Common Environment Commands
 
@@ -90,7 +97,25 @@ poetry env use /path/to/python
 
 ### Environment Activation Issues
 
-If `poetry shell` fails:
+#### Poetry 2.0+ Environments
+
+In Poetry 2.0+, the `shell` command is not installed by default. Instead, use:
+
+```bash
+# Set up the environment with your Python interpreter
+poetry env use python3
+
+# Activate the environment directly (recommended)
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Or get the activation command from Poetry
+source $(poetry env info --path)/bin/activate
+
+# Check that you're in the correct environment
+which python  # Should point to the Poetry environment
+```
+
+#### If `poetry shell` Fails in Poetry 1.x:
 
 ```bash
 # Alternative 1: Manually activate

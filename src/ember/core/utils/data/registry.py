@@ -192,7 +192,7 @@ class UnifiedDatasetRegistry:
         return dataset.info if dataset is not None else None
 
     def register_with_decorator(
-        self, *, name: str, source: str, task_type: TaskType
+        self, *, name: str, source: str, task_type: TaskType, description: str = "Custom dataset"
     ) -> Callable[[Type[Any]], Type[Any]]:
         """Decorator for registering a dataset class.
 
@@ -200,6 +200,7 @@ class UnifiedDatasetRegistry:
             name: Name of the dataset.
             source: Source of the dataset.
             task_type: Type of task the dataset is for.
+            description: Description of the dataset.
 
         Returns:
             Decorator function that registers the decorated class.
@@ -216,7 +217,7 @@ class UnifiedDatasetRegistry:
             """
             if not hasattr(cls, "info"):
                 cls.info = LegacyDatasetInfo(
-                    name=name, source=source, task_type=task_type
+                    name=name, source=source, task_type=task_type, description=description
                 )
             self.register_new(name=name, dataset_cls=cls, info=cls.info)
             return cls
@@ -236,7 +237,7 @@ UNIFIED_REGISTRY: UnifiedDatasetRegistry = UnifiedDatasetRegistry()
 
 # Decorator for registering datasets
 def register(
-    name: str, *, source: str, task_type: TaskType, description: str = ""
+    name: str, *, source: str, task_type: TaskType, description: str = "Custom dataset"
 ) -> Callable[[Type[Any]], Type[Any]]:
     """Decorator for registering a dataset class with the registry.
 
@@ -250,7 +251,7 @@ def register(
         Decorator function that registers the decorated class.
     """
     return UNIFIED_REGISTRY.register_with_decorator(
-        name=name, source=source, task_type=task_type
+        name=name, source=source, task_type=task_type, description=description
     )
 
 
@@ -278,7 +279,7 @@ def initialize_registry() -> None:
     UNIFIED_REGISTRY.register_metadata(
         name="mmlu",
         description="Massive Multitask Language Understanding dataset",
-        source="mmlu",
+        source="cais/mmlu",
         task_type=TaskType.MULTIPLE_CHOICE,
         prepper_class=mmlu.MMLUPrepper,
     )
@@ -294,7 +295,7 @@ def initialize_registry() -> None:
     UNIFIED_REGISTRY.register_metadata(
         name="halueval",
         description="HaluEval dataset",
-        source="halueval",
+        source="pminervini/HaluEval",
         task_type=TaskType.MULTIPLE_CHOICE,
         prepper_class=halueval.HaluEvalPrepper,
     )

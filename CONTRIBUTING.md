@@ -45,6 +45,11 @@ Thank you for your interest in contributing to Ember! This document provides gui
 
 4. **Activate the virtual environment**:
    ```bash
+   # For Poetry 2.0+
+   poetry env use python3
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   
+   # For Poetry 1.x
    poetry shell
    ```
 

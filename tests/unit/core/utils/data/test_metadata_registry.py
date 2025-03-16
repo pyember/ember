@@ -272,6 +272,7 @@ class TestRegisterDecorator(unittest.TestCase):
                 name="test_dataset",
                 source="test_source",
                 task_type=TaskType.MULTIPLE_CHOICE,
+                description="Test dataset",
             )
 
             # Verify the decorator returned our class

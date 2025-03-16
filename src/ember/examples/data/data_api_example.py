@@ -7,19 +7,82 @@ To run:
     poetry run python src/ember/examples/data/data_api_example.py
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Any, Type
+from abc import ABC, abstractmethod
 
-from ember.api import DatasetBuilder, DatasetEntry, TaskType, datasets, register
+from ember.api import DatasetBuilder, DatasetEntry, TaskType, register
+from ember.core.utils.data.registry import initialize_registry, UNIFIED_REGISTRY
+from ember.core.utils.data.base.loaders import IDatasetLoader
+from ember.core.utils.data.service import DatasetService
+from ember.core.utils.data.base.validators import DatasetValidator
+from ember.core.utils.data.base.samplers import DatasetSampler
+from ember.core.utils.data.base.transformers import NoOpTransformer
+from ember.core.utils.data.base.models import DatasetInfo
+from datasets import Dataset, DatasetDict
 
+# Initialize the registry with predefined datasets
+initialize_registry()
+
+# Define a custom dataset class registry to store the class implementations
+custom_dataset_registry = {}
+
+
+def register_mock_dataset() -> None:
+    """Register a mock dataset for demonstration purposes."""
+    @register("mock_qa", source="custom/mock_qa", task_type=TaskType.MULTIPLE_CHOICE, description="A mock dataset for multiple choice QA examples")
+    class MockQADataset:
+        """A mock QA dataset for demonstration purposes."""
+        
+        def __init__(self) -> None:
+            """Initialize the dataset."""
+            pass
+        
+        def load(self, config: Optional[Dict] = None) -> List[DatasetEntry]:
+            """Load the mock dataset.
+            
+            Args:
+                config: Optional configuration for loading
+                
+            Returns:
+                List of dataset entries
+            """
+            # In a real implementation, this would load from a real source
+            return [
+                DatasetEntry(
+                    content={
+                        "question": "What is the capital of France?",
+                        "choices": ["Berlin", "Madrid", "Paris", "Rome"],
+                        "answer": 2  # Paris (0-indexed)
+                    },
+                    metadata={"category": "geography", "difficulty": "easy"}
+                ),
+                DatasetEntry(
+                    content={
+                        "question": "Which of these is a mammal?",
+                        "choices": ["Shark", "Snake", "Eagle", "Dolphin"],
+                        "answer": 3  # Dolphin (0-indexed)
+                    },
+                    metadata={"category": "biology", "difficulty": "medium"}
+                ),
+                DatasetEntry(
+                    content={
+                        "question": "What is the square root of 144?",
+                        "choices": ["10", "12", "14", "16"],
+                        "answer": 1  # 12 (0-indexed)
+                    },
+                    metadata={"category": "mathematics", "difficulty": "easy"}
+                )
+            ]
 
 def basic_usage() -> None:
     """Demonstrate basic dataset usage with direct loading."""
-    # Direct loading by dataset name
-    mmlu_dataset = datasets("mmlu")
-    print(f"Loaded MMLU dataset with {len(mmlu_dataset)} entries")
+    # Register and load our mock dataset
+    register_mock_dataset()
+    qa_dataset = datasets("mock_qa")
+    print(f"Loaded mock QA dataset with {len(qa_dataset)} entries")
 
     # Print the first two entries for demonstration
-    for i, entry in enumerate(mmlu_dataset):
+    for i, entry in enumerate(qa_dataset):
         if i >= 2:  # Just show a couple of examples
             break
 
@@ -53,13 +116,12 @@ def advanced_usage() -> None:
     # Use the builder pattern for configuration
     dataset = (
         DatasetBuilder()
-        .split("test")  # Specify the dataset split
         .sample(1)  # Take only one sample
         .seed(42)  # Set random seed for reproducibility
-        .build("mmlu")  # Build the configured dataset
+        .build("mock_qa")  # Build the configured dataset
     )
 
-    print(f"\nLoaded 1 sample from MMLU test split:")
+    print(f"\nLoaded 1 sample from mock QA dataset:")
     if len(dataset) > 0:
         entry = dataset[0]
 
@@ -79,8 +141,9 @@ def advanced_usage() -> None:
         else:
             print("Answer: Not available")
 
-        # Get domain from metadata with fallback
-        print(f"Domain: {entry.metadata.get('domain', 'unknown')}")
+        # Get category from metadata with fallback
+        print(f"Category: {entry.metadata.get('category', 'unknown')}")
+        print(f"Difficulty: {entry.metadata.get('difficulty', 'unknown')}")
 
 
 def cli_usage() -> None:
@@ -100,9 +163,9 @@ def custom_dataset() -> None:
     """Demonstrate how to create and register a custom dataset."""
 
     # Register a custom dataset (for demonstration only)
-    @register("custom_qa", source="custom/qa", task_type=TaskType.SHORT_ANSWER)
-    class CustomQADataset:
-        """A custom QA dataset for demonstration purposes."""
+    @register("short_answer_qa", source="custom/short_answer", task_type=TaskType.SHORT_ANSWER, description="A custom dataset for short answer QA examples")
+    class ShortAnswerQADataset:
+        """A custom short answer QA dataset for demonstration purposes."""
 
         def __init__(self) -> None:
             """Initialize the dataset."""
@@ -127,20 +190,24 @@ def custom_dataset() -> None:
                     query="What is the largest mammal?",
                     metadata={"category": "biology", "answer": "Blue whale"},
                 ),
+                DatasetEntry(
+                    query="Who wrote Romeo and Juliet?",
+                    metadata={"category": "literature", "answer": "William Shakespeare"},
+                ),
             ]
 
     # Now we can use our custom dataset
     try:
-        custom_data = datasets("custom_qa")
-        print(f"\nLoaded custom dataset with {len(custom_data)} entries")
+        short_answer_data = datasets("short_answer_qa")
+        print(f"\nLoaded short answer dataset with {len(short_answer_data)} entries")
 
-        for entry in custom_data:
+        for entry in short_answer_data:
             # Safely access fields with appropriate error handling
             print(f"\nQuestion: {entry.query}")
             print(f"Answer: {entry.metadata.get('answer', 'Unknown')}")
             print(f"Category: {entry.metadata.get('category', 'Uncategorized')}")
     except Exception as e:
-        print(f"Error loading custom dataset: {str(e)}")
+        print(f"Error loading short answer dataset: {str(e)}")
 
 
 def main() -> None:

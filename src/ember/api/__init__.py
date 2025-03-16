@@ -31,8 +31,12 @@ Examples:
 
 
 # Import module namespaces
-# import ember.api.non as non                      # Network of Networks patterns
+import ember.api.non as non                      # Network of Networks patterns
 # import ember.api.xcs as xcs                      # Execution optimization
+import ember.api.operators as operators            # Operator system
+
+# Make operators available as both singular and plural for backward compatibility
+operator = operators
 
 # Import direct data API components
 from ember.api.data import (
@@ -45,7 +49,11 @@ from ember.api.data import (
     register,  # Dataset registration decorator
     list_available_datasets,  # List available datasets
     get_dataset_info,  # Get dataset metadata
+    datasets,  # Function to load datasets
 )
+
+# Import types API
+import ember.api.types as types
 
 # Public interface - export facades, modules, and direct API components
 __all__ = [
@@ -53,8 +61,11 @@ __all__ = [
     # "models",                # Model access (models.openai.gpt4, etc.)
     "datasets",  # Dataset access (datasets("mmlu"), etc.)
     # Module namespaces
-    # "non",                   # Network of Networks patterns
+    "non",                    # Network of Networks patterns
     # "xcs",                   # Execution optimization
+    "operators",              # Operator system (plural)
+    "operator",               # Operator system (singular, for backward compatibility)
+    "types",                  # Types system for Ember models and operators
     # Data API components
     "DatasetBuilder",  # Builder pattern for dataset loading
     "Dataset",  # Dataset container class

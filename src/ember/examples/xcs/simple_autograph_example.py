@@ -14,7 +14,7 @@ from typing import Any, Dict, List
 
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
-from ember.xcs.tracer.structural_jit import jit
+from ember.api.xcs import jit
 from ember.xcs.engine.execution_options import execution_options
 
 

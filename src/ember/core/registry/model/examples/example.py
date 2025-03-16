@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import List
 
 from ember import initialize_ember  # Use top-level function
@@ -7,6 +8,9 @@ from ember.core.registry.model.base.services.model_service import ModelService
 
 logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)
+
+# Get timeout from environment or use default
+DEFAULT_TIMEOUT = int(os.environ.get("TIMEOUT", "30"))
 
 
 def main() -> None:
@@ -20,8 +24,8 @@ def main() -> None:
         Exception: Propagates any unhandled initialization errors.
     """
     try:
-        # Initialize the registry of models from the merged YAML configuration.
-        registry = initialize_ember(auto_discover=True, initialize_context=False)
+        # Skip discovery to make example faster
+        registry = initialize_ember(auto_discover=False, initialize_context=False)
 
         # Create a ModelService instance.
         service = ModelService(registry=registry)
@@ -45,6 +49,7 @@ def main() -> None:
                 service_response: ChatResponse = service.invoke_model(
                     model_id=model_id,
                     prompt="Explain quantum computing in 50 words",
+                    timeout=DEFAULT_TIMEOUT,
                 )
                 print(
                     f"🛎️ Service response from {model_id}:\n{service_response.data}\n"
@@ -53,7 +58,8 @@ def main() -> None:
                 # 2. Direct model instance usage: Useful for more granular or PyTorch-like workflows.
                 model = load_model(model_id=model_id, registry=registry)
                 direct_response: ChatResponse = model(
-                    prompt="What's the capital of France?"
+                    prompt="What's the capital of France?",
+                    timeout=DEFAULT_TIMEOUT
                 )
                 print(f"🎯 Direct response from {model_id}:\n{direct_response.data}\n")
 

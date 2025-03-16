@@ -14,7 +14,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-from ember.xcs.tracer.structural_jit import jit
+from ember.xcs.tracer.tracer_decorator import jit
 from pydantic import Field
 
 

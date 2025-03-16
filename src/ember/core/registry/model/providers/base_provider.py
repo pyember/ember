@@ -29,6 +29,7 @@ class BaseChatParameters(BaseModel):
     - context: Optional system context that provides additional information or instructions
     - temperature: Controls randomness/creativity (0.0 = deterministic, 2.0 = maximum randomness)
     - max_tokens: Optional limit on response length
+    - timeout: API request timeout in seconds, defaults to 30 seconds
 
     Usage:
     Provider-specific implementations should inherit from this class:
@@ -44,12 +45,14 @@ class BaseChatParameters(BaseModel):
         context (Optional[str]): Additional context to be prepended to the prompt.
         temperature (Optional[float]): Sampling temperature with a value between 0.0 and 2.0.
         max_tokens (Optional[int]): Optional maximum token count for responses.
+        timeout (Optional[int]): API request timeout in seconds to prevent hanging requests.
     """
 
     prompt: str
     context: Optional[str] = None
     temperature: Optional[float] = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: Optional[int] = None
+    timeout: Optional[int] = Field(default=30, ge=1)
 
     def build_prompt(self) -> str:
         """Build the final prompt by combining context and the user prompt.

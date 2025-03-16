@@ -8,11 +8,13 @@ To run:
     poetry run python src/ember/examples/example_simplified_xcs.py
 """
 
-from ember.api.operator import Operator
-from ember.api.xcs import jit, vmap, pmap, autograph, execute
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.api.xcs import jit, vmap, pmap
+from ember.xcs.tracer.autograph import autograph
+from ember.xcs.engine.execution_options import execution_options
 
 # Import the API for advanced configuration
-from ember.api.xcs import XCSExecutionOptions, JITOptions
+from ember.xcs.tracer.tracer_decorator import JITOptions
 
 
 # Create a simple operator
@@ -75,7 +77,7 @@ def main():
 
     # Show execution options
     print("\nExecution Options Example:")
-    print("  with XCSExecutionOptions(scheduler='parallel'):")
+    print("  with execution_options(scheduler='parallel'):")
     print("      result = my_complex_operation(data)")
 
     print("\nXCS API import example complete!")

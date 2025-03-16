@@ -193,9 +193,7 @@ def run_operator_queries(
     total_start_time: float = time.perf_counter()
 
     # Set the execution options based on the mode
-    ctx_manager = execution_options(scheduler=mode)
-
-    with ctx_manager:
+    with execution_options(scheduler=mode):
         for query in queries:
             query_start_time: float = time.perf_counter()
             result = operator_instance(inputs={"query": query})

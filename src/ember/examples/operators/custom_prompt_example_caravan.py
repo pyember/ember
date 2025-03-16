@@ -22,9 +22,7 @@ import logging
 import os
 import sys
 from typing import ClassVar, Dict, Optional, Union, List, Type
-
-from pydantic import Field
-from ember.core.types.ember_model import EmberModel
+from ember.core.types.ember_model import EmberModel, Field
 
 # ------------------------------------------------------------------------------------
 # Logging Setup
@@ -192,7 +190,7 @@ class CaravanLabelingSpecification(Specification):
     """
 
     input_model: Type[EmberModel] = CaravanLabelingInputs
-    output_model: Type[EmberModel] = CaravanLabelingOutput
+    structured_output: Type[EmberModel] = CaravanLabelingOutput
     prompt_template: str = CARAVAN_PROMPT_FULL
 
 
@@ -226,7 +224,7 @@ class SimplePromptSpecification(Specification):
     """
 
     input_model: Type[EmberModel] = SimplePromptInputs
-    output_model: Type[EmberModel] = SimplePromptOutput
+    structured_output: Type[EmberModel] = SimplePromptOutput
     prompt_template: str = (
         "Provide a concise single-sentence answer to the following question:\n"
         "QUESTION: {question}\n"
