@@ -14,7 +14,7 @@ from ember.core.utils.data import load_dataset_entries
 
 class TestLoadDatasetEntriesBasic(unittest.TestCase):
     """Basic tests for the load_dataset_entries function that don't need complex mocking."""
-    
+
     def test_load_dataset_entries_with_named_params(self) -> None:
         """load_dataset_entries() should require named parameters."""
         # Arrange & Act & Assert

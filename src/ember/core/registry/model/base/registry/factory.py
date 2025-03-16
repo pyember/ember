@@ -121,7 +121,7 @@ class ModelFactory:
     """
 
     _provider_cache: Optional[Dict[str, Type[BaseProviderModel]]] = None
-    
+
     # Flag to control provider registry behavior in testing environments
     _testing_mode: bool = False
 
@@ -183,25 +183,25 @@ class ModelFactory:
             cls._get_providers()  # Initialize the provider cache.
         cls._provider_cache[provider_name] = provider_class
         LOGGER.info("Registered custom provider: %s", provider_name)
-        
+
     @classmethod
     def enable_testing_mode(cls) -> None:
         """Enable testing mode.
-        
+
         This modifies the factory's behavior to better support testing:
         - Skips dynamic provider discovery to avoid import issues
         - Relies solely on explicitly registered providers
-        
+
         This method should be called before any test that involves model creation.
         """
         cls._testing_mode = True
         # Reset provider cache to ensure it's rebuilt with testing settings
         cls._provider_cache = None
-        
+
     @classmethod
     def disable_testing_mode(cls) -> None:
         """Disable testing mode.
-        
+
         Restores normal provider discovery behavior for production use.
         """
         cls._testing_mode = False

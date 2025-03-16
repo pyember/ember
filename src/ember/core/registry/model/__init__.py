@@ -103,7 +103,7 @@ def initialize_ember(
     force_discovery: bool = False,
 ) -> ModelRegistry:
     """Initialize the Ember model registry.
-    
+
     DEPRECATED: Use initialize_registry from ember.core.registry.model.initialization instead.
 
     Args:
@@ -116,20 +116,20 @@ def initialize_ember(
         Initialized ModelRegistry instance
     """
     import warnings
-    
+
     warnings.warn(
         "initialize_ember() is deprecated. Use initialize_registry() from "
         "ember.core.registry.model.initialization instead.",
         DeprecationWarning,
         stacklevel=2,
     )
-    
+
     from ember.core.registry.model.initialization import initialize_registry
     from ember.core.config.manager import create_config_manager
-    
+
     config_manager = create_config_manager(config_path=config_path)
     return initialize_registry(
-        config_manager=config_manager, 
+        config_manager=config_manager,
         auto_discover=auto_discover,
         force_discovery=force_discovery,
     )

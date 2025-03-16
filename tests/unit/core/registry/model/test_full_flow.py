@@ -104,9 +104,7 @@ def test_full_flow_concurrent_invocations(tmp_path, monkeypatch):
     """Ensure the registry handles concurrent invocations correctly."""
     config_path = create_dummy_config(tmp_path)
     config_manager = create_config_manager(config_path=str(config_path))
-    registry = initialize_registry(
-        config_manager=config_manager, auto_discover=False
-    )
+    registry = initialize_registry(config_manager=config_manager, auto_discover=False)
 
     # Ensure model is registered
     if "openai:gpt-4o" not in registry.list_models():

@@ -95,11 +95,21 @@ class TestDatasetInitialization(unittest.TestCase):
             }
 
             # Verify prepper classes by name instead of direct equality due to import remapping
-            self.assertEqual(TruthfulQAPrepper.__name__, prepper_class_map["truthful_qa"].__name__)
+            self.assertEqual(
+                TruthfulQAPrepper.__name__, prepper_class_map["truthful_qa"].__name__
+            )
             self.assertEqual(MMLUPrepper.__name__, prepper_class_map["mmlu"].__name__)
-            self.assertEqual(CommonsenseQAPrepper.__name__, prepper_class_map["commonsense_qa"].__name__)
-            self.assertEqual(HaluEvalPrepper.__name__, prepper_class_map["halueval"].__name__)
-            self.assertEqual(ShortAnswerPrepper.__name__, prepper_class_map["my_shortanswer_ds"].__name__)
+            self.assertEqual(
+                CommonsenseQAPrepper.__name__,
+                prepper_class_map["commonsense_qa"].__name__,
+            )
+            self.assertEqual(
+                HaluEvalPrepper.__name__, prepper_class_map["halueval"].__name__
+            )
+            self.assertEqual(
+                ShortAnswerPrepper.__name__,
+                prepper_class_map["my_shortanswer_ds"].__name__,
+            )
 
     def test_legacy_initialization_compatibility(self) -> None:
         """Test that the legacy initialization function works with the unified registry."""

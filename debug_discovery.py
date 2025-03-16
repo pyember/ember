@@ -18,6 +18,7 @@ from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
     AnthropicDiscovery,
 )
 
+
 @pytest.mark.discovery
 def test_individual_discovery_providers():
     """Test individual model discovery providers."""
@@ -50,12 +51,15 @@ def test_individual_discovery_providers():
     # Test whether these are from API or fallbacks
     print("\nChecking if Anthropic models are from API or fallbacks...")
     fallback_models = anthropic_discovery._get_fallback_models()
-    api_discovered = any(model_id not in fallback_models for model_id in anthropic_models)
+    api_discovered = any(
+        model_id not in fallback_models for model_id in anthropic_models
+    )
     print(f"Contains non-fallback models: {api_discovered}")
 
     # Basic validation
     assert isinstance(openai_models, dict), "OpenAI models should be a dictionary"
     assert isinstance(anthropic_models, dict), "Anthropic models should be a dictionary"
+
 
 @pytest.mark.discovery
 def test_discovery_service():
@@ -86,6 +90,8 @@ def test_discovery_service():
         print("\nAnthropic models:")
         for model_id in anthropic_ids:
             print(f"  - {model_id}")
-    
+
     # Basic validation
-    assert isinstance(discovered_models, dict), "Discovered models should be a dictionary"
+    assert isinstance(
+        discovered_models, dict
+    ), "Discovered models should be a dictionary"

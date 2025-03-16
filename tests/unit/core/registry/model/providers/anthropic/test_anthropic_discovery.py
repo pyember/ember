@@ -36,7 +36,7 @@ from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
 def create_test_discovery():
     """Create a customized AnthropicDiscovery for testing."""
     discovery = AnthropicDiscovery()
-    
+
     # Override the _get_client method
     def custom_get_client(self):
         """Override to avoid app_context access."""
@@ -51,9 +51,10 @@ def create_test_discovery():
             return self._client
         except Exception:
             return None
-            
+
     # Use monkeypatching to override the method
     import types
+
     discovery._get_client = types.MethodType(custom_get_client, discovery)
     return discovery
 

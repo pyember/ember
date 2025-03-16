@@ -23,45 +23,47 @@ except ImportError:
     # If that fails, import the XCS module directly
     project_root = Path(__file__).parent.parent.parent.parent
     xcs_path = project_root / "src" / "ember" / "xcs" / "__init__.py"
-    
+
     # Add a fallback if the file doesn't exist
     if not xcs_path.exists():
         # Create a minimal mock implementation
         import types
+
         xcs = types.ModuleType("xcs")
-        
+
         # Add basic functions
         def jit(fn=None, **kwargs):
             if fn is None:
                 return lambda f: f
             return fn
-            
+
         def vmap(fn, *args, **kwargs):
             def wrapper(xs, *wargs, **wkwargs):
                 if isinstance(xs, list):
                     return [fn(x, *wargs, **wkwargs) for x in xs]
                 return fn(xs, *wargs, **wkwargs)
+
             return wrapper
-            
+
         def pmap(fn, **kwargs):
             return vmap(fn)
-            
+
         class GraphContext:
             def __init__(self):
                 self.results = {}
-                
+
             def add_node(self, name, func, *args, **kwargs):
                 return 0
-                
+
             def execute(self, output_nodes=None):
                 return {}
-                
+
         def autograph():
             return GraphContext()
-            
+
         def execute(graph, output_nodes=None):
             return {}
-            
+
         # Add them to the module
         xcs.jit = jit
         xcs.vmap = vmap
@@ -73,7 +75,7 @@ except ImportError:
         spec = importlib.util.spec_from_file_location("ember.xcs", xcs_path)
         xcs = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(xcs)
-        
+
     # Extract the needed functions
     jit = xcs.jit
     vmap = xcs.vmap

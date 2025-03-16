@@ -361,9 +361,15 @@ class TestCompatibilityLayer(unittest.TestCase):
 
         # Due to import remapping during testing, we can't directly check the exact class
         # Just verify they are all the correct type by checking their class names instead
-        self.assertEqual(self.DatasetRegistry.__class__.__name__, "UnifiedDatasetRegistry")
-        self.assertEqual(self.DatasetRegistryManager.__class__.__name__, "UnifiedDatasetRegistry")
-        self.assertEqual(self.DatasetMetadataRegistry.__class__.__name__, "UnifiedDatasetRegistry")
+        self.assertEqual(
+            self.DatasetRegistry.__class__.__name__, "UnifiedDatasetRegistry"
+        )
+        self.assertEqual(
+            self.DatasetRegistryManager.__class__.__name__, "UnifiedDatasetRegistry"
+        )
+        self.assertEqual(
+            self.DatasetMetadataRegistry.__class__.__name__, "UnifiedDatasetRegistry"
+        )
 
     def test_register_dataset_function_works(self) -> None:
         """Test that the legacy register_dataset function works."""

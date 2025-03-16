@@ -246,16 +246,21 @@ def test_multi_stage_pipeline_integration() -> None:
 
 
 from ember.core.registry.model.providers.base_provider import BaseProviderModel
-from ember.core.registry.model.base.schemas.chat_schemas import ChatRequest, ChatResponse
+from ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
+
 
 class FailingProvider(BaseProviderModel):
     """Provider implementation that simulates API failures."""
+
     PROVIDER_NAME = "FailingProvider"
-    
+
     def create_client(self) -> Any:
         """Return a simple mock client."""
         return self
-        
+
     def forward(self, request: ChatRequest) -> ChatResponse:
         """Always raises an error when called."""
         raise RuntimeError("API failure")
@@ -279,13 +284,13 @@ def failing_registry():
     # Create registry and model info
     registry = ModelRegistry()
     model_info = create_dummy_model_info("failing:model")
-    
+
     # Register the model
     registry.register_model(model_info)
-    
+
     # Directly inject a failing model instance
     registry._models["failing:model"] = FailingProvider(model_info=model_info)
-    
+
     return registry
 
 
