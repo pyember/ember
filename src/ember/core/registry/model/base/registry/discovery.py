@@ -35,38 +35,54 @@ class ModelDiscoveryService:
         """
         # Load discovery providers dynamically based on available API keys
         self.providers: List[BaseDiscoveryProvider] = self._initialize_providers()
-        
+
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: float = 0.0
         self.ttl: int = ttl
-        self._lock: threading.RLock = threading.RLock()  # Added reentrant lock for thread safety
-        
+        self._lock: threading.RLock = (
+            threading.RLock()
+        )  # Added reentrant lock for thread safety
+
     def _initialize_providers(self) -> List[BaseDiscoveryProvider]:
         """Initialize discovery providers based on available API keys.
-        
+
         This method creates provider instances with appropriate configuration:
         1. Checks for required API keys for each provider
         2. Only initializes providers with valid credentials
         3. Configures providers with appropriate settings
-        
+
         Returns:
             List[BaseDiscoveryProvider]: A list of initialized discovery providers.
         """
         from typing import Dict, Tuple, Optional, Type, Callable
-        
+
         # Define provider configurations
-        ProviderConfig = Tuple[Type[BaseDiscoveryProvider], str, Optional[Callable[[], Dict[str, str]]]]
-        
+        ProviderConfig = Tuple[
+            Type[BaseDiscoveryProvider], str, Optional[Callable[[], Dict[str, str]]]
+        ]
+
         provider_configs: List[ProviderConfig] = [
             # Provider class, env var name, optional config function
-            (OpenAIDiscovery, "OPENAI_API_KEY", lambda: {"api_key": os.environ.get("OPENAI_API_KEY", "")}),
-            (AnthropicDiscovery, "ANTHROPIC_API_KEY", lambda: {"api_key": os.environ.get("ANTHROPIC_API_KEY", "")}),
-            (DeepmindDiscovery, "GOOGLE_API_KEY", lambda: {"api_key": os.environ.get("GOOGLE_API_KEY", "")})
+            (
+                OpenAIDiscovery,
+                "OPENAI_API_KEY",
+                lambda: {"api_key": os.environ.get("OPENAI_API_KEY", "")},
+            ),
+            (
+                AnthropicDiscovery,
+                "ANTHROPIC_API_KEY",
+                lambda: {"api_key": os.environ.get("ANTHROPIC_API_KEY", "")},
+            ),
+            (
+                DeepmindDiscovery,
+                "GOOGLE_API_KEY",
+                lambda: {"api_key": os.environ.get("GOOGLE_API_KEY", "")},
+            ),
         ]
-        
+
         # Initialize providers with available credentials
         providers: List[BaseDiscoveryProvider] = []
-        
+
         for provider_class, env_var_name, config_fn in provider_configs:
             api_key = os.environ.get(env_var_name)
             if api_key:
@@ -85,32 +101,30 @@ class ModelDiscoveryService:
                     else:
                         # Simple initialization without config
                         providers.append(provider_class())
-                    
+
                     logger.debug(
-                        "%s found, initialized %s successfully", 
-                        env_var_name, 
-                        provider_class.__name__
+                        "%s found, initialized %s successfully",
+                        env_var_name,
+                        provider_class.__name__,
                     )
                 except Exception as init_error:
                     logger.error(
-                        "Failed to initialize %s: %s", 
-                        provider_class.__name__, 
-                        init_error
+                        "Failed to initialize %s: %s",
+                        provider_class.__name__,
+                        init_error,
                     )
             else:
                 logger.info(
-                    "%s not found, skipping %s", 
-                    env_var_name, 
-                    provider_class.__name__
+                    "%s not found, skipping %s", env_var_name, provider_class.__name__
                 )
-        
+
         if not providers:
             logger.warning(
                 "No API keys found for any providers. "
                 "Set one of %s environment variables to enable discovery.",
-                ", ".join(env_var for _, env_var, _ in provider_configs)
+                ", ".join(env_var for _, env_var, _ in provider_configs),
             )
-        
+
         return providers
 
     def discover_models(self) -> Dict[str, Dict[str, Any]]:
@@ -138,24 +152,30 @@ class ModelDiscoveryService:
                     # Set a timeout for fetch_models to prevent hanging
                     import concurrent.futures
                     import signal
-                    
+
                     # Define a function to call fetch_models with a timeout
                     def fetch_with_timeout():
                         return provider.fetch_models()
-                    
+
                     # Use ThreadPoolExecutor with a timeout to prevent hanging
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=1
+                    ) as executor:
                         future = executor.submit(fetch_with_timeout)
                         try:
-                            provider_models = future.result(timeout=30)  # 30 second timeout
+                            provider_models = future.result(
+                                timeout=30
+                            )  # 30 second timeout
                             aggregated_models.update(provider_models)
                         except concurrent.futures.TimeoutError:
                             logger.error(
                                 "Timeout while fetching models from %s",
                                 provider.__class__.__name__,
                             )
-                            errors.append(f"{provider.__class__.__name__}: Timeout after 30 seconds")
-                        
+                            errors.append(
+                                f"{provider.__class__.__name__}: Timeout after 30 seconds"
+                            )
+
                 except Exception as e:
                     errors.append(f"{provider.__class__.__name__}: {e}")
                     logger.error(
@@ -198,12 +218,12 @@ class ModelDiscoveryService:
         from ember.core.registry.model.config.settings import EmberSettings
 
         settings = EmberSettings()
-        
+
         # Get models from local configuration
         local_models: Dict[str, Dict[str, Any]] = {}
-        
+
         # Check if registry has models attribute before accessing it
-        if hasattr(settings.registry, 'models'):
+        if hasattr(settings.registry, "models"):
             local_models = {
                 model.id: model.model_dump() for model in settings.registry.models
             }
@@ -215,26 +235,28 @@ class ModelDiscoveryService:
             "google": os.environ.get("GOOGLE_API_KEY", ""),
             "deepmind": os.environ.get("GOOGLE_API_KEY", ""),  # Uses same key as Google
         }
-        
+
         def get_provider_from_model_id(model_id: str) -> str:
             """Extract provider name from model ID."""
             if ":" in model_id:
                 return model_id.split(":", 1)[0].lower()
             return "unknown"
-        
+
         merged_models: Dict[str, ModelInfo] = {}
-        
+
         for model_id, api_metadata in discovered.items():
             provider_name = get_provider_from_model_id(model_id)
             api_key = provider_api_keys.get(provider_name, "")
-            
+
             if model_id in local_models:
                 # Local configuration overrides API metadata except for API keys
                 # which we take from environment if available.
                 merged_data: Dict[str, Any] = {**api_metadata, **local_models[model_id]}
-                
+
                 # Override with environment API key if available and not explicitly set
-                if api_key and not merged_data.get("provider", {}).get("default_api_key"):
+                if api_key and not merged_data.get("provider", {}).get(
+                    "default_api_key"
+                ):
                     if "provider" not in merged_data:
                         merged_data["provider"] = {}
                     if isinstance(merged_data["provider"], dict):
@@ -245,13 +267,15 @@ class ModelDiscoveryService:
                     "Model %s discovered via API but not in local config; using defaults with environment API key.",
                     model_id,
                 )
-                
+
                 # Extract provider prefix from model ID
                 provider_prefix = provider_name.capitalize()
-                
+
                 merged_data = {
                     "id": model_id,
-                    "name": api_metadata.get("model_name", api_metadata.get("name", model_id.split(":")[-1])),
+                    "name": api_metadata.get(
+                        "model_name", api_metadata.get("name", model_id.split(":")[-1])
+                    ),
                     "cost": {
                         "input_cost_per_thousand": 0.0,
                         "output_cost_per_thousand": 0.0,
@@ -262,35 +286,32 @@ class ModelDiscoveryService:
                         "default_api_key": api_key,
                     },
                 }
-                
+
             # Validate model info and add to results if valid
             try:
                 # Skip models without API keys - they can't be used anyway
                 if not merged_data.get("provider", {}).get("default_api_key"):
                     logger.warning(
-                        "Skipping model %s because no API key is available", 
-                        model_id
+                        "Skipping model %s because no API key is available", model_id
                     )
                     continue
-                    
+
                 # Create ModelInfo instance
                 model_info = ModelInfo(**merged_data)
                 merged_models[model_id] = model_info
                 logger.debug("Successfully merged model info for %s", model_id)
-                
+
             except Exception as validation_error:
                 logger.error(
-                    "Failed to merge model info for %s: %s", 
-                    model_id, 
-                    validation_error
+                    "Failed to merge model info for %s: %s", model_id, validation_error
                 )
-                
+
         if not merged_models:
             logger.warning(
                 "No valid models found after merging with configuration. "
                 "Check that API keys are set in environment variables and model schemas are valid."
             )
-            
+
         return merged_models
 
     def refresh(self) -> Dict[str, ModelInfo]:
@@ -330,21 +351,37 @@ class ModelDiscoveryService:
 
         async def fetch_from_provider(provider: BaseDiscoveryProvider) -> None:
             try:
-                # Each fetch is done in a thread with timeout
+                # Each fetch is done with timeout
                 try:
-                    # Create a task with a timeout
-                    fetch_task = asyncio.create_task(
-                        asyncio.get_event_loop().run_in_executor(None, provider.fetch_models)
-                    )
-                    provider_models = await asyncio.wait_for(fetch_task, timeout=30)  # 30 second timeout
-                    
+                    # Check if the provider has an async implementation
+                    if hasattr(provider, "fetch_models_async") and callable(
+                        provider.fetch_models_async
+                    ):
+                        # Use the async implementation directly
+                        provider_models = await asyncio.wait_for(
+                            provider.fetch_models_async(), timeout=30
+                        )
+                    else:
+                        # Fall back to running the sync version in a thread pool
+                        fetch_task = asyncio.create_task(
+                            asyncio.get_event_loop().run_in_executor(
+                                None, provider.fetch_models
+                            )
+                        )
+                        provider_models = await asyncio.wait_for(
+                            fetch_task, timeout=30
+                        )  # 30 second timeout
+
                     with self._lock:
                         aggregated_models.update(provider_models)
                 except asyncio.TimeoutError:
-                    error_msg = f"{provider.__class__.__name__}: Timeout after 30 seconds"
+                    error_msg = (
+                        f"{provider.__class__.__name__}: Timeout after 30 seconds"
+                    )
                     errors.append(error_msg)
                     logger.error(
-                        "Timeout while fetching models from %s", provider.__class__.__name__
+                        "Timeout while fetching models from %s",
+                        provider.__class__.__name__,
                     )
             except Exception as e:
                 error_msg = f"{provider.__class__.__name__}: {e}"

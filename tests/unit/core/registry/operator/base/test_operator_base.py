@@ -19,19 +19,20 @@ from ember.core.registry.operator.exceptions import OperatorExecutionError
 from ember.core.registry.specification.specification import Specification
 
 # Create type variables similar to the ones in the real code
-T_in = TypeVar('T_in', bound=BaseModel)
-T_out = TypeVar('T_out', bound=BaseModel)
+T_in = TypeVar("T_in", bound=BaseModel)
+T_out = TypeVar("T_out", bound=BaseModel)
+
 
 # Create a completely independent mock Operator that doesn't depend on EmberModule
 class Operator(Generic[T_in, T_out]):
     """Mock of the Operator class for testing."""
-    
+
     specification = None
-    
+
     def forward(self, *, inputs):
         """Implements the core computational logic of the operator."""
         return inputs
-        
+
     def __call__(self, *, inputs=None, **kwargs):
         """Executes the operator with validation and error handling."""
         try:
@@ -39,7 +40,7 @@ class Operator(Generic[T_in, T_out]):
                 raise OperatorExecutionError(
                     message=f"Error executing operator {self.__class__.__name__}: 'NoneType' object has no attribute 'validate_inputs'"
                 )
-                
+
             # Validate and convert inputs using specification
             validated_inputs = None
             if inputs is not None:
@@ -49,16 +50,16 @@ class Operator(Generic[T_in, T_out]):
                     validated_inputs = inputs
             else:
                 validated_inputs = kwargs if kwargs else {}
-                
+
             # Execute the core computation
             result = self.forward(inputs=validated_inputs)
-            
+
             # Validate output if needed
-            if hasattr(self.specification, 'validate_output'):
+            if hasattr(self.specification, "validate_output"):
                 result = self.specification.validate_output(output=result)
-                
+
             return result
-            
+
         except Exception as e:
             if not isinstance(e, OperatorExecutionError):
                 raise OperatorExecutionError(
@@ -73,7 +74,8 @@ class DummyInput(BaseModel):
     Attributes:
         value (int): The numerical value provided as input.
     """
-    model_config = ConfigDict(extra='forbid')
+
+    model_config = ConfigDict(extra="forbid")
     value: int
 
 
@@ -83,7 +85,8 @@ class DummyOutput(BaseModel):
     Attributes:
         result (int): The resulting value computed by the operator.
     """
-    model_config = ConfigDict(extra='forbid')
+
+    model_config = ConfigDict(extra="forbid")
     result: int
 
 

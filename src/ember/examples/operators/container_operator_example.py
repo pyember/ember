@@ -67,7 +67,7 @@ class QuestionAnsweringPipeline(
 
     # Class-level specification declaration
     specification: ClassVar[Specification] = QuestionAnsweringSpecification()
-    
+
     # Class-level field declarations
     model_name: str
     num_units: int

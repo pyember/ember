@@ -368,29 +368,33 @@ class DatasetService:
         return entries
 
 
-def load_dataset_entries(dataset_name: str, config: Optional[Dict[str, Any]] = None) -> List[DatasetEntry]:
+def load_dataset_entries(
+    dataset_name: str, config: Optional[Dict[str, Any]] = None
+) -> List[DatasetEntry]:
     """Legacy function to load dataset entries.
-    
+
     Args:
         dataset_name: The name of the dataset to load.
         config: The configuration for loading the dataset.
-        
+
     Returns:
         A list of dataset entries.
-        
+
     Raises:
         ValueError: If the dataset is not found.
     """
     # Create an instance of the DatasetMetadataRegistry
     registry = DatasetMetadataRegistry()
-    
+
     # Get the dataset info from the registry
     if dataset_name not in registry.available_datasets:
         raise ValueError(f"Dataset {dataset_name} not found")
-    
+
     dataset_info = registry.get_dataset_info(dataset_name)
-    
+
     # Load and prepare the dataset
     # For now, we'll return an empty list as a placeholder
-    logger.warning("Legacy dataset loading not fully implemented, returning empty dataset")
+    logger.warning(
+        "Legacy dataset loading not fully implemented, returning empty dataset"
+    )
     return []

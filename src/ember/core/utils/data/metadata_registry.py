@@ -10,9 +10,9 @@ from typing import Dict, Tuple, Optional, List, Type
 from ember.core.utils.data.base.models import DatasetInfo
 from ember.core.utils.data.base.preppers import IDatasetPrepper
 from ember.core.utils.data.registry import (
-    UNIFIED_REGISTRY, 
+    UNIFIED_REGISTRY,
     register as unified_register,
-    initialize_registry
+    initialize_registry,
 )
 
 # Removed explicit warning since this is an internal module

@@ -47,7 +47,7 @@ def validate_type(value: Any, expected_type: Type[T]) -> bool:
         # Handle Union types (including Optional which is Union[T, None])
         if origin is Union:
             return any(validate_type(value, arg) for arg in get_args(expected_type))
-            
+
         # Handle generic types like List, Dict, etc.
         if origin is list:
             elem_type = get_args(expected_type)[0]
@@ -67,7 +67,7 @@ def validate_type(value: Any, expected_type: Type[T]) -> bool:
             if not isinstance(value, tuple) or len(value) != len(args):
                 return False
             return all(validate_type(v, t) for v, t in zip(value, args))
-            
+
         # For other generic types, we can't use isinstance directly
         return isinstance(value, origin)
 

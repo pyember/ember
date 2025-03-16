@@ -21,7 +21,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # to ensure the data flow detection works properly
         test_output1 = "this is a unique output string from op1"
         test_output2 = "this is a unique output string from op2"
-        
+
         records = [
             TraceRecord(
                 operator_name="Op1",
@@ -62,7 +62,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # 2. Verify that the nodes exist in the graph
         self.assertIsNotNone(graph.nodes.get("Op2_1", None))
         self.assertIsNotNone(graph.nodes.get("Op3_2", None))
-        
+
         # Due to changes in the implementation, just verify that the graph was created properly
         # without checking specific dependencies which depend on the internal data flow analysis
 
@@ -75,7 +75,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         test_output1 = "distinctive output from op1 with unique signature"
         test_output2a = "distinctive output from op2a branch"
         test_output2b = "distinctive output from op2b branch"
-        
+
         records = [
             TraceRecord(
                 operator_name="Op1",
@@ -101,7 +101,10 @@ class TestAutoGraphBuilder(unittest.TestCase):
             TraceRecord(
                 operator_name="Op3",
                 node_id="3",
-                inputs={"branch_a": test_output2a, "branch_b": test_output2b},  # Match with outputs
+                inputs={
+                    "branch_a": test_output2a,
+                    "branch_b": test_output2b,
+                },  # Match with outputs
                 outputs={"final": "output3"},
                 timestamp=3.0,
             ),
@@ -119,7 +122,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         self.assertIsNotNone(graph.nodes.get("Op2a_1", None))
         self.assertIsNotNone(graph.nodes.get("Op2b_2", None))
         self.assertIsNotNone(graph.nodes.get("Op3_3", None))
-        
+
         # Due to changes in the implementation, just verify that the graph was created properly
         # without checking specific dependencies which depend on the internal data flow analysis
 
@@ -134,7 +137,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         parent_output = "unique parent operator output value"
         child1_output = "unique child1 operator output value"
         child2_output = "unique child2 operator output value"
-        
+
         records = [
             TraceRecord(
                 operator_name="ParentOp",
@@ -183,7 +186,7 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # NextOp should depend on ParentOp, not on the child ops
         self.assertIn("next1", builder.dependency_map)
         self.assertIn("parent1", builder.dependency_map["next1"])
-        
+
         # Verify that NextOp does not directly depend on children
         self.assertNotIn("child1", builder.dependency_map["next1"])
         self.assertNotIn("child2", builder.dependency_map["next1"])
@@ -195,30 +198,30 @@ class TestAutoGraphBuilder(unittest.TestCase):
         # Test dictionary value dependency with the new data flow matching approach
         inputs = {"x": 1, "y": "output_from_previous"}
         outputs = {"result": "output_from_previous"}
-        
+
         # Generate signatures for the test data
         input_sigs = builder._generate_data_signatures(inputs)
         output_sigs = builder._generate_data_signatures(outputs)
-        
+
         # Use the new matching method directly
         matches = builder._find_matching_data(
-            input_sigs=input_sigs, 
+            input_sigs=input_sigs,
             output_sigs=output_sigs,
             inputs=inputs,
-            outputs=outputs
+            outputs=outputs,
         )
-        
+
         # Check for matches indicating a dependency
         self.assertTrue(len(matches) > 0)
-        
+
         # Test no dependency case
         inputs_no_match = {"x": 1, "y": "no_match"}
         input_sigs_no_match = builder._generate_data_signatures(inputs_no_match)
         matches_no_match = builder._find_matching_data(
-            input_sigs=input_sigs_no_match, 
+            input_sigs=input_sigs_no_match,
             output_sigs=output_sigs,
             inputs=inputs_no_match,
-            outputs=outputs
+            outputs=outputs,
         )
         self.assertEqual(len(matches_no_match), 0)
 

@@ -1,5 +1,6 @@
-"""
-Model Registry Usage Example - Demonstrates patterns for integrating LLMs.
+"""Model Registry Usage Example
+
+Demonstrates patterns for integrating LLMs using the Ember model registry.
 
 This example shows:
 1. The one-line initialization pattern 
@@ -14,19 +15,25 @@ For comprehensive documentation, see:
 docs/quickstart/model_registry.md
 
 To run:
-    poetry run python src/ember/examples/model_registry_example.py
+    poetry run python src/ember/examples/models/model_registry_example.py
 """
 
-import os
 import logging
-from typing import Dict, Any, List
+import os
 import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
 
 from ember.api import models
 from ember.api.models import (
-    ModelService, UsageService, ModelRegistry, 
-    ModelInfo, ModelCost, RateLimit, UsageStats, ModelEnum
+    ModelCost,
+    ModelEnum,
+    ModelInfo,
+    ModelRegistry,
+    ModelService,
+    RateLimit,
+    UsageService,
+    UsageStats,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -34,10 +41,14 @@ logger = logging.getLogger(__name__)
 
 
 def one_line_pattern():
-    """Demonstrates the simplest one-line initialization pattern."""
+    """Demonstrates the simplest one-line initialization pattern.
+
+    Returns:
+        The models API object for reuse, or None if an error occurs
+    """
     # With the new API, we don't need to initialize anything
     # Just use the models API directly
-    
+
     try:
         # Direct model invocation
         response = models.openai.gpt4o("What is the capital of France?")
@@ -45,16 +56,20 @@ def one_line_pattern():
         print(response.text)
         return models  # Return for reuse in other examples
     except Exception as e:
-        logger.exception(f"Error in one-line pattern: {e}")
+        logger.exception("Error in one-line pattern: %s", str(e))
         return None
 
 
 def standard_pattern():
-    """Demonstrates the standard initialization pattern with more control."""
+    """Demonstrates the standard initialization pattern with more control.
+
+    Returns:
+        The configured model instance, or None if an error occurs
+    """
     try:
         # With the new API, we can create a model instance with more control
-        from ember.api.models import ModelBuilder
-        
+        from ember.api.models import ModelBuilder, ModelAPI
+
         # Create a model with specific parameters
         model = (
             ModelBuilder()
@@ -62,92 +77,114 @@ def standard_pattern():
             .max_tokens(100)
             .build("anthropic:claude-3.5-sonnet")
         )
-        
+
         # Use the model
-        response = model.generate(
-            prompt="Explain quantum computing in one sentence."
-        )
-        
+        response = model.generate(prompt="Explain quantum computing in one sentence.")
+
         print("\n=== Standard pattern result ===")
         print(f"Response: {response.text}")
-        
+
         # Check usage statistics
         print(f"Total tokens used: {response.token_count}")
         print(f"Estimated cost: available through the models.usage API")
-        
+
         return model
     except Exception as e:
-        logger.exception(f"Error in standard pattern: {e}")
+        logger.exception("Error in standard pattern: %s", str(e))
         return None
 
 
 def direct_model_pattern():
-    """Demonstrates direct model access (PyTorch-like pattern)."""
+    """Demonstrates direct model access (PyTorch-like pattern).
+
+    Returns:
+        The models API object for reuse, or None if an error occurs
+    """
     try:
         # With the new API, we can use models directly
-        
+
         # Use the direct model ID pattern
         response = models("openai:gpt-4o", "What is the tallest mountain in the world?")
-        
+
         print("\n=== Direct model pattern result ===")
         print(response.text)
-        
+
         return models
     except Exception as e:
-        logger.exception(f"Error in direct model pattern: {e}")
+        logger.exception("Error in direct model pattern: %s", str(e))
         return None
 
 
-def type_safe_enum_pattern():
+def type_safe_enum_pattern() -> None:
     """Demonstrates using ModelEnum for type-safe model references."""
     try:
         # With the new API, we can use enums directly with models
         from ember.api.models import ModelAPI
-        
+
         # Use enum instead of string literals
         model = ModelAPI.from_enum(ModelEnum.OPENAI_GPT4O)
         response = model.generate(
             prompt="What's your favorite programming language and why?"
         )
-        
+
         print("\n=== Type-safe enum pattern result ===")
-        print(f"Response: {response.text[:150]}...")  # Truncated for readability
-        
+        # Safely truncate long text
+        truncated_text = (
+            response.text[:150] + "..." if len(response.text) > 150 else response.text
+        )
+        print(f"Response: {truncated_text}")
+
         # Access model metadata
         model_info = models.registry.get_model_info(ModelEnum.OPENAI_GPT4O)
         print("\nModel metadata:")
         print(f"Name: {model_info.name}")
         print(f"Provider: {model_info.provider['name']}")
-        print(f"Input cost per 1K tokens: ${model_info.cost.input_cost_per_thousand:.4f}")
-        print(f"Output cost per 1K tokens: ${model_info.cost.output_cost_per_thousand:.4f}")
+        print(
+            f"Input cost per 1K tokens: ${model_info.cost.input_cost_per_thousand:.4f}"
+        )
+        print(
+            f"Output cost per 1K tokens: ${model_info.cost.output_cost_per_thousand:.4f}"
+        )
         print(f"Context window: {model_info.context_window} tokens")
-        print(f"Version: {model_info.version if hasattr(model_info, 'version') else 'N/A'}")
+
+        # Get version safely using get() instead of hasattr
+        version = getattr(model_info, "version", "N/A")
+        print(f"Version: {version}")
+
     except Exception as e:
-        logger.exception(f"Error in type-safe enum pattern: {e}")
+        logger.exception("Error in type-safe enum pattern: %s", str(e))
 
 
-def batch_processing_pattern():
+def batch_processing_pattern() -> None:
     """Demonstrates batch processing with multiple models."""
     try:
         from ember.api.models import ModelAPI
-        
+
         # Define prompts and models
         prompts = [
             "What is machine learning?",
             "Explain the concept of a neural network.",
             "What is transfer learning?",
-            "Describe reinforcement learning."
+            "Describe reinforcement learning.",
         ]
-        
+
         model_ids = [
             "openai:gpt-4o",
             "openai:gpt-4o-mini",
             "anthropic:claude-3-sonnet",
-            "anthropic:claude-3-haiku"
+            "anthropic:claude-3-haiku",
         ]
-        
-        # Process in parallel
-        def process_prompt(args):
+
+        # Process in parallel with proper typing
+        def process_prompt(args: tuple[str, str]) -> tuple[str, str, str, float]:
+            """Process a single prompt with the specified model.
+
+            Args:
+                args: Tuple of (model_id, prompt)
+
+            Returns:
+                Tuple of (model_id, prompt, result_text, duration)
+            """
             model_id, prompt = args
             try:
                 model = ModelAPI.from_id(model_id)
@@ -156,80 +193,104 @@ def batch_processing_pattern():
                 duration = time.time() - start_time
                 return model_id, prompt, response.text, duration
             except Exception as e:
-                return model_id, prompt, f"Error: {str(e)}", 0
-        
+                logger.warning(
+                    "Error processing prompt with model %s: %s", model_id, str(e)
+                )
+                return model_id, prompt, f"Error: {str(e)}", 0.0
+
         print("\n=== Batch processing results ===")
         tasks = list(zip(model_ids, prompts))
-        
+        results = []
+
+        # Use context manager for ThreadPoolExecutor for proper resource cleanup
         with ThreadPoolExecutor(max_workers=4) as executor:
+            # Collect results as they complete
             results = list(executor.map(process_prompt, tasks))
-        
+
         # Print results
         for i, (model, prompt, result, duration) in enumerate(results):
             print(f"\nTask {i+1}:")
             print(f"Model: {model}")
             print(f"Prompt: {prompt}")
             print(f"Duration: {duration:.2f} seconds")
-            print(f"Result: {result[:100]}..." if len(result) > 100 else f"Result: {result}")
-        
+            # Safely truncate long results
+            truncated_result = (
+                result[:100] + "..." if result and len(result) > 100 else result
+            )
+            print(f"Result: {truncated_result}")
+
         # Calculate and show aggregate stats
         total_duration = sum(duration for _, _, _, duration in results)
         avg_duration = total_duration / len(results) if results else 0
-        completed_tasks = sum(1 for _, _, result, _ in results if not result.startswith("Error:"))
-        
+        # Check for error state in a more robust way
+        completed_tasks = sum(
+            1
+            for _, _, result, _ in results
+            if result and not result.startswith("Error:")
+        )
+
         print("\n=== Batch Processing Statistics ===")
         print(f"Total tasks: {len(results)}")
         print(f"Successfully completed: {completed_tasks}")
         print(f"Failed: {len(results) - completed_tasks}")
         print(f"Total processing time: {total_duration:.2f} seconds")
         print(f"Average response time: {avg_duration:.2f} seconds per task")
-        print(f"Effective throughput: {len(results) / total_duration:.2f} tasks per second")
-        
+
+        if total_duration > 0:
+            print(
+                f"Effective throughput: {len(results) / total_duration:.2f} tasks per second"
+            )
+        else:
+            print("Effective throughput: N/A (no time elapsed)")
+
         # Usage tracking with new API
-        print("\nTotal usage across all batch operations is available through models.usage API")
+        print(
+            "\nTotal usage across all batch operations is available through models.usage API"
+        )
     except Exception as e:
-        logger.exception(f"Error in batch processing pattern: {e}")
+        logger.exception("Error in batch processing pattern: %s", str(e))
 
 
-def custom_model_pattern():
+def custom_model_pattern() -> None:
     """Demonstrates adding custom models to the registry."""
     try:
         # With the new API, we register models directly with the registry
         from ember.api.models import register_model
-        
+
         # Register a custom model with realistic values
         custom_model = ModelInfo(
             id="custom:my-advanced-llm",
             name="MyOrg Advanced LLM",
             cost=ModelCost(
                 input_cost_per_thousand=0.0015,  # $0.0015 per 1K input tokens
-                output_cost_per_thousand=0.002   # $0.002 per 1K output tokens
+                output_cost_per_thousand=0.002,  # $0.002 per 1K output tokens
             ),
             rate_limit=RateLimit(
-                tokens_per_minute=100000,      # 100K tokens per minute
-                requests_per_minute=3000       # 3K requests per minute
+                tokens_per_minute=100000,  # 100K tokens per minute
+                requests_per_minute=3000,  # 3K requests per minute
             ),
-            context_window=128000,            # 128K context window
+            context_window=128000,  # 128K context window
             provider={
                 "name": "MyOrg AI",
                 "default_api_key": "${MYORG_API_KEY}",
-                "api_base": "https://api.myorg-ai.example.com/v1"
-            }
+                "api_base": "https://api.myorg-ai.example.com/v1",
+            },
         )
-        
+
         # Register the model
         register_model(custom_model)
-        
+
         # List all models
         model_ids = models.registry.list_models()
-        
+
         print("\n=== Custom model registration ===")
         print(f"Registered models: {model_ids}")
-        
+
         # Check model exists and get info
-        exists = models.registry.model_exists("custom:my-advanced-llm")
+        model_id = "custom:my-advanced-llm"
+        exists = models.registry.model_exists(model_id)
         if exists:
-            info = models.registry.get_model_info("custom:my-advanced-llm")
+            info = models.registry.get_model_info(model_id)
             print("\nCustom model details:")
             print(f"ID: {info.id}")
             print(f"Name: {info.name}")
@@ -237,29 +298,33 @@ def custom_model_pattern():
             print(f"API Base URL: {info.provider.get('api_base', 'N/A')}")
             print(f"Context window: {info.context_window} tokens")
             print(f"Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
-            print(f"Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens")
-            print(f"Rate limits: {info.rate_limit.tokens_per_minute} tokens/min, {info.rate_limit.requests_per_minute} req/min")
+            print(
+                f"Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens"
+            )
+            print(
+                f"Rate limits: {info.rate_limit.tokens_per_minute} tokens/min, {info.rate_limit.requests_per_minute} req/min"
+            )
         else:
             print("Custom model registration failed!")
     except Exception as e:
-        logger.exception(f"Error in custom model pattern: {e}")
+        logger.exception("Error in custom model pattern: %s", str(e))
 
 
-def main():
+def main() -> None:
     """Run all example patterns."""
     print("Running Model Registry examples with the new API...\n")
     print("Make sure you have set up your API keys in environment variables:")
     print("  - OPENAI_API_KEY")
     print("  - ANTHROPIC_API_KEY")
     print("  - GOOGLE_API_KEY (if using Gemini models)")
-    
+
     # Run each pattern
     one_line_pattern()
     standard_pattern()
     direct_model_pattern()
     type_safe_enum_pattern()
     custom_model_pattern()
-    
+
     # Only run batch processing if we have API keys configured
     keys_needed = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY"]
     missing_keys = [key for key in keys_needed if os.environ.get(key) is None]
@@ -267,7 +332,7 @@ def main():
         batch_processing_pattern()
     else:
         print("\nSkipping batch processing example due to missing API keys.")
-    
+
     print("\nAll examples completed!")
 
 

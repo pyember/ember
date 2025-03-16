@@ -58,14 +58,14 @@ T_out = OutputT
 class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
     """
     Abstract base class for all computational operators in Ember.
-    
+
     Operators are immutable, validated transformations from typed inputs to typed outputs.
     Subclasses implement the forward() method with their core logic, while this base
     class handles input/output validation and error management.
-    
+
     The class uses a Template Method pattern: __call__() orchestrates execution flow
     while forward() provides the specific implementation.
-    
+
     Attributes:
         specification: ClassVar[Specification[InputT, OutputT]]: Defines the input/output contract
             that all subclasses must provide.
@@ -78,39 +78,39 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
     def forward(self, *, inputs: InputT) -> OutputT:
         """
         Implements the core computational logic of the operator.
-        
+
         This abstract method represents the heart of the Template Method pattern,
         defining the customization point for concrete operator implementations.
         Subclasses must implement this method to provide their specific computational
         logic while inheriting the standardized validation and execution flow from
         the base class.
-        
+
         The forward method is guaranteed to receive validated inputs that conform
         to the operator's input model specification, removing the need for defensive
         validation code within implementations. Similarly, the return value will be
         automatically validated against the output model specification, ensuring
         consistent interface contracts.
-        
+
         Implementation Requirements:
         1. Must be stateless - no modification of instance variables
         2. Must be idempotent - repeated calls with same inputs yield same outputs
         3. Must not have side effects - computation only affects return value
         4. Must handle all input fields defined in specification.input_model
         5. Must return value conforming to specification.output_model
-        
+
         Optimizations:
         - forward() can assume inputs are valid (already validated by __call__)
         - Type conversions should happen here rather than in caller
         - Complex computations can be memoized (though instances should remain immutable)
-        
+
         Args:
             inputs: Validated input data guaranteed to conform to the operator's
                   input model specification. Never null or invalid.
-                  
+
         Returns:
             The computation result, which will be automatically validated against
             the operator's output model specification before being returned to caller.
-            
+
         Raises:
             NotImplementedError: Abstract method that must be implemented by subclasses.
             OperatorExecutionError: For any errors during computation (will be caught and wrapped)
@@ -122,39 +122,39 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
     ) -> OutputT:
         """
         Executes the operator with comprehensive validation and error handling.
-        
+
         This method implements the Template Method pattern, providing a standardized
         execution flow surrounding the subclass-specific forward() implementation.
         It manages the complete lifecycle of an operator invocation:
-        
+
         1. Input Resolution: Determines the input format and normalizes it
         2. Input Validation: Ensures inputs conform to the specification
         3. Computation: Delegates to forward() for the core logic
         4. Output Validation: Ensures results conform to the specification
         5. Error Handling: Catches and wraps all execution errors
-        
+
         The design supports multiple invocation patterns for flexibility:
-        
+
         A. Pre-validated model invocation:
            ```python
            model = MyInputModel(field1="value", field2=123)
            result = operator(inputs=model)
            ```
-        
+
         B. Dictionary-based invocation with validation:
            ```python
            result = operator(inputs={"field1": "value", "field2": 123})
            ```
-        
+
         C. Keyword argument invocation:
            ```python
            result = operator(field1="value", field2=123)
            ```
-        
+
         This flexibility maintains type safety while accommodating different
         calling patterns, enabling both strongly-typed programming and
         convenient dynamic usage.
-        
+
         Args:
             inputs: Either a pre-validated input model instance, or a dictionary
                   of values to be validated against the input model schema.
@@ -162,11 +162,11 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
             **kwargs: Key-value pairs representing the input fields. Only used
                      when inputs parameter is None. Provides a more Pythonic
                      calling convention for simple cases.
-        
+
         Returns:
             The validated computation result conforming to the output model specification.
             Type checking guarantees this will be an instance of OutputT.
-            
+
         Raises:
             OperatorSpecificationNotDefinedError: If the operator class does not define
                                                 a valid specification class variable.
@@ -188,12 +188,16 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
             if inputs is not None:
                 # Traditional 'inputs' parameter provided
                 if isinstance(inputs, dict):
-                    validated_inputs = cast(InputT, specification.validate_inputs(inputs=inputs))
+                    validated_inputs = cast(
+                        InputT, specification.validate_inputs(inputs=inputs)
+                    )
                 else:
                     validated_inputs = cast(InputT, inputs)
             elif kwargs and specification.input_model:
                 # Using kwargs directly as input fields
-                input_model_type: Type[InputT] = cast(Type[InputT], specification.input_model)
+                input_model_type: Type[InputT] = cast(
+                    Type[InputT], specification.input_model
+                )
                 validated_inputs = input_model_type(**kwargs)
             else:
                 # Empty inputs or no input model defined
@@ -209,11 +213,15 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
                 and hasattr(specification, "structured_output")
                 and specification.structured_output
             ):
-                output_model_type: Type[OutputT] = cast(Type[OutputT], specification.structured_output)
+                output_model_type: Type[OutputT] = cast(
+                    Type[OutputT], specification.structured_output
+                )
                 operator_output = output_model_type.model_validate(operator_output)
 
             # Final validation to ensure type consistency
-            validated_output: OutputT = cast(OutputT, specification.validate_output(output=operator_output))
+            validated_output: OutputT = cast(
+                OutputT, specification.validate_output(output=operator_output)
+            )
             return validated_output
 
         except Exception as e:
@@ -228,30 +236,30 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
     def specification(self) -> Specification[InputT, OutputT]:
         """
         Retrieves the operator's specification with runtime validation.
-        
+
         This property accessor provides a safe, verified reference to the operator's
         specification, ensuring that all operations that depend on the specification
         will fail safely if it has not been properly defined. The implementation
         inspects the class hierarchy to find the concrete specification, checking
         that it has been correctly overridden by the subclass.
-        
+
         The accessor implements defensive programming by:
         1. Looking up the specification in the concrete class's dictionary
         2. Verifying it is not None or the abstract base class definition
         3. Raising a descriptive error if the specification is missing or invalid
-        
+
         This strict validation prevents subtle bugs that could occur if an operator
         was mistakenly defined without a proper specification.
-        
+
         Technical Implementation Notes:
         - Uses type(self).__dict__ to inspect only the concrete class's attributes
         - Compares against Operator.__dict__ to check for proper override
         - Raises specific, descriptive exception for easy debugging
-        
+
         Returns:
             The operator's concrete specification instance, guaranteed to be
             a valid Specification instance defined by the concrete subclass.
-            
+
         Raises:
             OperatorSpecificationNotDefinedError: If the subclass has not properly
                 defined the specification class variable, or if it mistakenly
@@ -261,7 +269,9 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
         subclass_spec = type(self).__dict__.get("specification", None)
 
         # Comprehensive validation of proper specification definition
-        if subclass_spec is None or subclass_spec is Operator.__dict__.get("specification"):
+        if subclass_spec is None or subclass_spec is Operator.__dict__.get(
+            "specification"
+        ):
             raise OperatorSpecificationNotDefinedError(
                 message="Operator specification must be explicitly defined in the concrete class."
             )

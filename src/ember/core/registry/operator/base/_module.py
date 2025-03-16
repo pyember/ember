@@ -24,7 +24,19 @@ import logging
 import threading
 import weakref
 from dataclasses import Field, field
-from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, Type, TypeVar, final, Final
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    TypeVar,
+    final,
+    Final,
+)
 
 from ember.core.registry.operator.exceptions import (
     BoundMethodNotInitializedError,
@@ -45,30 +57,30 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class ModuleCache:
     """Thread-safe, memory-efficient LRU cache for EmberModule flattening.
-    
+
     This class provides a thread-isolated caching system optimized for
     transformation operations on EmberModule instances. It uses thread-local
     storage with identity-based keys (object IDs) to eliminate dependencies on
     hash or equality methods, preventing recursion issues when flattening objects
     that might themselves use the cache.
-    
+
     The implementation offers:
     1. Thread isolation: Each thread has its own independent cache
-    2. Memory safety: Tracking object lifetimes without circular dependencies 
+    2. Memory safety: Tracking object lifetimes without circular dependencies
     3. Bounded growth: LRU eviction prevents unbounded memory consumption
     4. High performance: O(1) lookups and updates for common operations
-    
+
     Technical details:
     - Uses thread.local() for thread isolation without lock contention
     - Implements the LRU algorithm using OrderedDict for O(1) reordering
     - Uses object identity (id) as cache keys to avoid hash method dependencies
     - Handles lifetime management through explicit API rather than weak references
-    
+
     Thread-safety guarantees:
     - Thread-safe for all operations without locks (thread isolation)
     - No race conditions for cache updates within a thread
     - No shared state between threads, eliminating concurrency issues
-    
+
     This cache is specifically optimized for transformation systems that apply
     the same operations to the same modules without creating circular dependencies.
     """
@@ -78,7 +90,7 @@ class ModuleCache:
 
     def __init__(self, max_cache_size: Optional[int] = None) -> None:
         """Initialize a new module cache with specified capacity.
-        
+
         Args:
             max_cache_size: Maximum number of entries to store in each thread's cache.
                 If None, uses DEFAULT_MAX_CACHE_SIZE (1000).
@@ -86,32 +98,36 @@ class ModuleCache:
         self._thread_local = threading.local()
         self._max_cache_size: int = max_cache_size or self.DEFAULT_MAX_CACHE_SIZE
 
-    def _get_cache(self) -> Tuple[Dict[int, Tuple[List[object], Dict[str, object]]], collections.OrderedDict]:
+    def _get_cache(
+        self,
+    ) -> Tuple[
+        Dict[int, Tuple[List[object], Dict[str, object]]], collections.OrderedDict
+    ]:
         """Initializes and returns the thread-local cache structures.
-        
+
         Creates the thread-local cache structures if they don't exist yet.
         Uses a regular dictionary with object IDs as keys for the main cache to avoid
         relying on object hash methods, and OrderedDict to track LRU order.
-        
+
         Returns:
             A tuple containing (flatten_cache, lru_order) for the current thread.
         """
         if not hasattr(self._thread_local, "flatten_cache"):
             self._thread_local.flatten_cache = {}
             self._thread_local.lru_order = collections.OrderedDict()
-        
+
         return (self._thread_local.flatten_cache, self._thread_local.lru_order)
 
     def get(self, instance: object) -> Optional[Tuple[List[object], Dict[str, object]]]:
         """Retrieves a cached flattened representation if available.
-        
+
         Implements the read path of the cache with LRU update. If the requested
         instance is in the cache, it's moved to the most-recently-used position
         in the LRU order before returning the cached value.
-        
+
         Args:
             instance: The EmberModule instance to look up.
-            
+
         Returns:
             The cached flattened representation as (dynamic_fields, static_fields),
             or None if the instance is not in the cache.
@@ -119,24 +135,22 @@ class ModuleCache:
         cache, lru_order = self._get_cache()
         instance_id = id(instance)
         result = cache.get(instance_id)
-        
+
         if result is not None:
             # Update LRU order - move to end (most recently used position)
             lru_order.move_to_end(instance_id)
-        
+
         return result
 
     def set(
-        self, 
-        instance: object, 
-        value: Tuple[List[object], Dict[str, object]]
+        self, instance: object, value: Tuple[List[object], Dict[str, object]]
     ) -> None:
         """Stores a flattened representation in the cache.
-        
+
         Implements the write path of the cache with LRU management. If adding this
         entry would exceed the maximum cache size, the least recently used entry
         is evicted before adding the new entry.
-        
+
         Args:
             instance: The EmberModule instance to use as the cache key.
             value: The flattened representation to cache as (dynamic_fields, static_fields).
@@ -153,7 +167,7 @@ class ModuleCache:
                 # Evict least recently used item (first item in OrderedDict)
                 oldest_id, _ = lru_order.popitem(last=False)
                 cache.pop(oldest_id, None)
-            
+
             # Add to LRU tracking (value is irrelevant, only keys matter)
             lru_order[instance_id] = None
 
@@ -162,17 +176,17 @@ class ModuleCache:
 
     def clear(self, instance: Optional[object] = None) -> None:
         """Clears entries from the cache.
-        
+
         Selectively clears either a specific entry or the entire cache for
         the current thread. This provides explicit control over cache contents
         for advanced memory management scenarios.
-        
+
         Args:
             instance: If provided, only this instance's entry is cleared.
                      If None, the entire cache for the current thread is cleared.
         """
         cache, lru_order = self._get_cache()
-        
+
         if instance is not None:
             # Clear specific entry
             instance_id = id(instance)
@@ -185,21 +199,23 @@ class ModuleCache:
 
     def size(self) -> int:
         """Returns the current size of the thread-local cache.
-        
+
         Provides visibility into the current cache utilization for the calling thread.
         This is useful for diagnostics and monitoring memory usage.
-        
+
         Returns:
             The number of entries in the current thread's cache.
         """
         cache, _ = self._get_cache()
         return len(cache)
-        
-    def iter_entries(self) -> Iterator[Tuple[int, Tuple[List[object], Dict[str, object]]]]:
+
+    def iter_entries(
+        self,
+    ) -> Iterator[Tuple[int, Tuple[List[object], Dict[str, object]]]]:
         """Iterates over all cache entries in LRU order (least recently used first).
-        
+
         This method is primarily intended for diagnostics and debugging.
-        
+
         Returns:
             An iterator yielding (instance_id, cached_value) pairs in LRU order.
         """
@@ -220,7 +236,7 @@ def static_field(*, default: object = dataclasses.MISSING, **kwargs: Any) -> Fie
     that should not be transformed by operations like JIT compilation or function mapping.
     These fields are preserved during tree transformation but are not passed through
     transformation functions.
-    
+
     Example use cases:
     - Configuration dictionaries
     - Hyperparameters like learning rates or thresholds
@@ -233,7 +249,7 @@ def static_field(*, default: object = dataclasses.MISSING, **kwargs: Any) -> Fie
     class MyOperator(EmberModule):
         # Static field with default
         config: Dict[str, Any] = static_field(default_factory=dict)
-        
+
         # Static field with specific default
         threshold: float = static_field(default=0.5)
     ```
@@ -262,32 +278,32 @@ def ember_field(
     """Creates a dataclass field with Ember-specific functionality.
 
     This field provides enhanced capabilities for EmberModule fields, including:
-    
+
     1. Value conversion: Apply transformations to field values during initialization
     2. Static marking: Control whether fields participate in tree transformations
     3. Default values: Standard dataclass field defaults and factories
     4. Initialization control: Configure whether fields appear in __init__ signatures
-    
+
     The field converters run after instance initialization but before the instance
     is frozen, allowing for value validation, normalization, or type conversion.
-    
+
     Example:
     ```python
     @dataclass
     class MyOperator(EmberModule):
         # Dynamic field (included in transformations)
         params: np.ndarray = ember_field()
-        
+
         # Static field with converter
         config: Dict[str, Any] = ember_field(
             static=True,
             default_factory=dict,
             converter=lambda d: {**{'scale': 1.0}, **d}
         )
-        
+
         # Computed field not included in initialization
         stats: Dict[str, float] = ember_field(init=False, default_factory=dict)
-        
+
         def __post_init__(self):
             # Computed field example
             self._init_field(field_name="stats", value={"sum": sum(self.params)})
@@ -327,16 +343,16 @@ def _make_initable_wrapper(cls: Type[T]) -> Type[T]:
     attributes during the initialization phase. It creates a subclass that temporarily
     overrides __setattr__ to allow mutation during initialization, enabling proper
     field setup in __init__ and __post_init__ methods.
-    
+
     The approach preserves the benefits of immutability while eliminating the main
     drawback – the inability to easily initialize computed fields or perform validation
     during initialization.
-    
+
     Technical implementation:
     - Creates a dynamic subclass with an overridden __setattr__ method
     - Preserves all class metadata (name, module, qualname) for proper reflection
     - The original __call__ method later swaps the instance back to the frozen class
-    
+
     This design pattern is inspired by functional programming principles where
     initialization and mutation are strictly separated from the object's normal lifecycle.
 
@@ -367,36 +383,35 @@ def _make_initable_wrapper(cls: Type[T]) -> Type[T]:
 
 
 def _flatten_ember_module(
-    instance: EmberModule,
-    max_cache_size: Optional[int] = None
+    instance: EmberModule, max_cache_size: Optional[int] = None
 ) -> Tuple[List[object], Dict[str, object]]:
     """Flattens an EmberModule instance into dynamic and static components.
-    
+
     This function transforms an EmberModule instance into a representation suitable
     for tree-based transformations (like those in JAX), separating field values into
     dynamic fields (which participate in transformations) and static fields (which
     remain unchanged during transformations).
-    
+
     The implementation uses thread-local caching to optimize performance for repeated
     flattening operations on the same instance, which is common in transformation
     systems. The cache is keyed by instance identity and uses weak references to
     prevent memory leaks.
-    
+
     Performance characteristics:
     - First flatten: O(n) where n is the number of fields
     - Subsequent flattens of the same instance: O(1) due to caching
     - Memory usage: Bounded by the cache size limit
-    
+
     Args:
         instance: The EmberModule instance to flatten.
         max_cache_size: Optional maximum size for the thread-local cache.
                      If None, uses the default cache size.
-                     
+
     Returns:
         A tuple containing:
         - List of dynamic field values (which participate in transformations)
         - Dictionary mapping static field names to their values (preserved)
-        
+
     Raises:
         FlattenError: If field access fails or any other error occurs during flattening.
     """
@@ -415,8 +430,10 @@ def _flatten_ember_module(
             try:
                 value: object = getattr(instance, field_info.name)
             except AttributeError as e:
-                raise FlattenError(f"Field '{field_info.name}' missing in instance") from e
-                
+                raise FlattenError(
+                    f"Field '{field_info.name}' missing in instance"
+                ) from e
+
             # Sort fields into dynamic (transformable) or static (preserved)
             if field_info.metadata.get("static", False):
                 static_fields[field_info.name] = value
@@ -443,17 +460,17 @@ def _unflatten_ember_module(
     This function reconstructs an EmberModule instance from its flattened representation
     without invoking the normal initialization process. It's used by transformation systems
     to recreate modules after applying transformations to their dynamic fields.
-    
+
     The reconstruction process:
     1. Identifies the names of dynamic fields from the class definition
     2. Validates that the number of dynamic fields matches the provided children
     3. Creates a new instance without calling __init__
     4. Sets dynamic fields from the transformed children values
     5. Sets static fields from the preserved auxiliary dictionary
-    
+
     This low-level function is primarily used by tree transformation systems and
     should rarely be called directly.
-    
+
     Implementation notes:
     - Bypasses normal initialization for efficiency and correctness after transformations
     - Preserves the exact order of dynamic fields for correct reconstruction
@@ -503,27 +520,27 @@ class EmberModuleMeta(abc.ABCMeta):
     """Metaclass for EmberModule providing automatic registration and initialization.
 
     This metaclass orchestrates several critical aspects of the EmberModule system:
-    
+
     1. Dataclass automation: It ensures all EmberModule subclasses are properly
        decorated as frozen dataclasses, even if the developer forgets to apply
        the @dataclass decorator.
-       
+
     2. Tree system registration: It automatically registers all EmberModule
        subclasses with the transformation tree system, enabling operations
        like JIT compilation to work transparently.
-       
+
     3. Initialization framework: It manages a sophisticated initialization
        process that allows mutation during initialization but ensures
        immutability afterward, eliminating a common pain point with
        frozen dataclasses.
-       
+
     4. Field conversion: It provides a post-initialization phase where field
        converters are applied, enabling validation and normalization.
-       
+
     The metaclass uses a novel technique to temporarily make frozen classes
     mutable during initialization by swapping the class of the instance
     during the initialization phase.
-    
+
     Advanced implementation notes:
     - Uses custom __call__ to override the standard instance creation process
     - Creates a temporary mutable subclass for the initialization phase
@@ -680,49 +697,49 @@ class EmberModule(metaclass=EmberModuleMeta):
     and vectorization. It combines Python's dataclass system with custom initialization
     and tree traversal mechanisms to create a framework optimized for transformation-based
     computation.
-    
+
     Architectural principles:
-    
+
     1. Immutability: Instances are frozen after initialization to prevent unexpected
        state mutations, improving reasoning about code and enabling parallel execution.
-       
+
     2. Tree transformability: Automatic registration with the tree transformation system
        enables higher-order operations like JIT compilation.
-       
+
     3. Static/dynamic field separation: Fields can be marked as static (excluded from
        transformations) or dynamic (included in transformations).
-       
+
     4. Field conversion: Values can be automatically converted during initialization
        through field converters.
-       
+
     5. Memory efficiency: Thread-safe caching with lifecycle management prevents
        memory leaks in long-running applications.
 
     Usage:
-    
+
     ```python
     from dataclasses import dataclass
     from ember.core.registry.operator.base._module import EmberModule, ember_field, static_field
-    
+
     @dataclass
     class MyModule(EmberModule):
         # Dynamic field - included in transformations
         weights: torch.Tensor = ember_field()
-        
+
         # Static field - excluded from transformations
         config: Dict[str, float] = static_field(default_factory=dict)
-        
+
         def __post_init__(self):
             if 'scale' not in self.config:
-                self._init_field(field_name='config', 
+                self._init_field(field_name='config',
                                 value={**self.config, 'scale': 1.0})
-                
+
         def forward(self, x: torch.Tensor) -> torch.Tensor:
             return x @ self.weights * self.config['scale']
     ```
-    
+
     Quick notes on performance character:
-    
+
     - Initialization: O(n) where n is the number of fields
     - Flattening: O(1) with caching after first operation
     - Field access: O(1) native Python attribute access
@@ -735,7 +752,7 @@ class EmberModule(metaclass=EmberModuleMeta):
         This method provides a safe way to initialize or update fields during the
         module's initialization phase (typically within __post_init__). It bypasses
         the frozen state of the dataclass, but is only effective during initialization.
-        
+
         Implementation notes:
         - Uses object.__setattr__ to bypass dataclass immutability
         - Only works during initialization before the instance is frozen
@@ -749,29 +766,29 @@ class EmberModule(metaclass=EmberModuleMeta):
 
     # Thread-local storage for recursion detection
     _hash_recursion_detection = threading.local()
-    
+
     def __hash__(self) -> int:
         """Computes hash value based on dynamic field values.
 
         Provides hash-based container compatibility (sets, dict keys) based on
         the module's dynamic field values. Static fields are excluded from hash
         computation as they don't affect the module's transformation identity.
-        
+
         Includes recursion detection to prevent infinite loops when flattening
         involves hash-based operations.
-        
+
         Returns:
             Hash value derived from dynamic fields only, or object ID if recursion detected.
         """
         # Initialize recursion set if needed
-        if not hasattr(self._hash_recursion_detection, 'objects'):
+        if not hasattr(self._hash_recursion_detection, "objects"):
             self._hash_recursion_detection.objects = set()
-            
+
         # Check if we're already computing hash for this object
         if id(self) in self._hash_recursion_detection.objects:
             # Recursion detected, use object identity as fallback
             return hash(id(self))
-            
+
         # Set recursion flag and compute hash
         self._hash_recursion_detection.objects.add(id(self))
         try:
@@ -787,7 +804,7 @@ class EmberModule(metaclass=EmberModuleMeta):
         Two EmberModule instances are considered equal if:
         1. They are instances of compatible types
         2. Their dynamic fields have equivalent values
-        
+
         Static fields are intentionally excluded from equality checks to align
         with transformation semantics.
 
@@ -811,10 +828,10 @@ class EmberModule(metaclass=EmberModuleMeta):
             String representation of format "ClassName(field1=value1, field2=value2, ...)"
         """
         return f"{self.__class__.__name__}({dataclasses.asdict(self)})"
-    
+
     def __del__(self) -> None:
         """Cleans up resources when the instance is garbage collected.
-        
+
         Automatically removes this instance from the flattening cache
         to prevent memory leaks in long-running applications.
         """
@@ -823,7 +840,7 @@ class EmberModule(metaclass=EmberModuleMeta):
         except:
             # Ignore exceptions during interpreter shutdown
             pass
-    
+
     def __pytree_flatten__(self) -> Tuple[List[object], Dict[str, object]]:
         """Implements the JAX PyTree flattening protocol.
 
@@ -840,9 +857,7 @@ class EmberModule(metaclass=EmberModuleMeta):
 
     @classmethod
     def __pytree_unflatten__(
-        cls: Type[EmberT], 
-        aux: Dict[str, object], 
-        children: List[object]
+        cls: Type[EmberT], aux: Dict[str, object], children: List[object]
     ) -> EmberT:
         """Implements the JAX PyTree unflattening protocol.
 
@@ -859,15 +874,15 @@ class EmberModule(metaclass=EmberModuleMeta):
             Reconstructed EmberModule instance with transformed values.
         """
         return _unflatten_ember_module(cls=cls, aux=aux, children=children)
-    
+
     @classmethod
     def clear_cache(cls, instance: Optional[object] = None) -> None:
         """Explicitly clears entries from the module flattening cache.
-        
+
         This method provides direct control over the caching system for
         advanced memory management scenarios. It can selectively clear
         a specific instance's cache entry or the entire thread-local cache.
-        
+
         Args:
             instance: If provided, only this instance's cache entry is cleared.
                      If None, the entire cache for the current thread is cleared.
@@ -877,22 +892,24 @@ class EmberModule(metaclass=EmberModuleMeta):
     @classmethod
     def get_cache_size(cls) -> int:
         """Returns the current size of the thread-local flattening cache.
-        
+
         This diagnostic method is useful for monitoring memory usage and
         debugging cache-related performance issues.
-        
+
         Returns:
             Number of entries in the current thread's cache.
         """
         return _module_cache.size()
-        
+
     @classmethod
-    def iter_cache_entries(cls) -> Iterator[Tuple[object, Tuple[List[object], Dict[str, object]]]]:
+    def iter_cache_entries(
+        cls,
+    ) -> Iterator[Tuple[object, Tuple[List[object], Dict[str, object]]]]:
         """Iterates over all cache entries in LRU order.
-        
+
         This advanced debugging method provides visibility into the cache contents
         and ordering, which can be useful for diagnosing complex caching issues.
-        
+
         Returns:
             Iterator yielding (instance, cached_value) pairs in LRU order.
         """
@@ -907,18 +924,18 @@ class BoundMethod(EmberModule, Generic[EmberT, FuncT]):
     can participate in tree transformations. It enables transformation systems to track and
     transform methods bound to module instances, which is essential for higher-order
     operations like JIT compilation of instance methods.
-    
+
     This class implements the descriptor protocol to allow method-like invocation
     while preserving transformability. When called, it delegates to the bound function
     with the bound instance as the first argument, mimicking Python's standard method
     binding behavior.
-    
+
     Design rationale:
     - Uses EmberModule as base class to participate in tree transformations
     - Implements __call__ for direct invocation (mimicking bound methods)
     - Provides __wrapped__ property for introspection and unwrapping
     - Maintains immutability guarantees through EmberModule inheritance
-    
+
     Technical details:
     - __func__ is marked as static since it shouldn't be transformed
     - __self__ is dynamic to allow transformations of the bound instance
@@ -934,11 +951,11 @@ class BoundMethod(EmberModule, Generic[EmberT, FuncT]):
 
     def __call__(self, *args: object, **kwargs: object) -> object:
         """Invokes the bound method with the specified arguments.
-        
+
         This implementation mimics Python's standard bound method behavior by
         inserting the bound instance (__self__) as the first argument to the
         function (__func__) and passing through all other arguments.
-        
+
         Args:
             *args: Positional arguments to pass after the bound instance.
             **kwargs: Keyword arguments to pass to the function.
@@ -958,12 +975,12 @@ class BoundMethod(EmberModule, Generic[EmberT, FuncT]):
     @property
     def __wrapped__(self) -> Callable[..., object]:
         """Retrieves the standard Python bound method equivalent.
-        
+
         This property provides access to the standard Python bound method
         equivalent of this BoundMethod instance, which is useful for introspection,
         debugging, and interoperability with libraries that expect standard
         bound methods.
-        
+
         Implementation note: Uses Python's descriptor protocol __get__ to create
         a standard bound method from the function and instance.
 
@@ -971,16 +988,20 @@ class BoundMethod(EmberModule, Generic[EmberT, FuncT]):
             The equivalent standard Python bound method.
         """
         return self.__func__.__get__(self.__self__, type(self.__self__))
-        
+
     def __repr__(self) -> str:
         """Returns a string representation of the BoundMethod.
-        
+
         Provides a human-readable representation showing the bound function
         and instance, useful for debugging.
-        
+
         Returns:
             String representation in the format "BoundMethod(func=<function>, self=<instance>)"
         """
         func_name = getattr(self.__func__, "__name__", str(self.__func__))
-        self_repr = getattr(self.__self__, "__class__", None).__name__ if self.__self__ else "None"
+        self_repr = (
+            getattr(self.__self__, "__class__", None).__name__
+            if self.__self__
+            else "None"
+        )
         return f"BoundMethod(func={func_name}, self={self_repr})"

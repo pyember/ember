@@ -501,7 +501,9 @@ def test_module_cache_initialization() -> None:
     ModuleCache should initialize a thread-local instance for caching.
     """
     cache = ModuleCache()
-    assert hasattr(cache, "_thread_local"), "ModuleCache should have a _thread_local attribute"
+    assert hasattr(
+        cache, "_thread_local"
+    ), "ModuleCache should have a _thread_local attribute"
     assert isinstance(
         cache._thread_local, threading.local
     ), "_thread_local should be an instance of threading.local"

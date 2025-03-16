@@ -100,21 +100,36 @@ def initialize_ember(
     config_path: str | None = None,
     auto_register: bool = True,
     auto_discover: bool = True,
+    force_discovery: bool = False,
 ) -> ModelRegistry:
     """Initialize the Ember model registry.
+    
+    DEPRECATED: Use initialize_registry from ember.core.registry.model.initialization instead.
 
     Args:
         config_path (str | None): Optional path to config file
         auto_register (bool): Automatically register models from config
         auto_discover (bool): Enable provider model discovery
+        force_discovery (bool): Force model discovery even if auto_discover is False
 
     Returns:
         Initialized ModelRegistry instance
     """
-    from ember.core.registry.model.config.settings import initialize_ember as _init
-
-    return _init(
-        config_path=config_path,
-        auto_register=auto_register,
+    import warnings
+    
+    warnings.warn(
+        "initialize_ember() is deprecated. Use initialize_registry() from "
+        "ember.core.registry.model.initialization instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    
+    from ember.core.registry.model.initialization import initialize_registry
+    from ember.core.config.manager import create_config_manager
+    
+    config_manager = create_config_manager(config_path=config_path)
+    return initialize_registry(
+        config_manager=config_manager, 
         auto_discover=auto_discover,
+        force_discovery=force_discovery,
     )

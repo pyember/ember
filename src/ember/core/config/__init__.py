@@ -48,18 +48,15 @@ __all__ = [
     "Provider",
     "Model",
     "Cost",
-    "RegistryConfig", 
+    "RegistryConfig",
     "LoggingConfig",
-    
     # Loader functions
     "load_config",
     "merge_dicts",
     "resolve_env_vars",
-    
     # Manager classes
     "ConfigManager",
     "create_config_manager",
-    
     # Exceptions
     "ConfigError",
 ]

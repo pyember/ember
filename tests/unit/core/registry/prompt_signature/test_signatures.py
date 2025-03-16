@@ -150,7 +150,9 @@ def test_render_prompt_with_no_template_but_input_model() -> None:
         check_all_placeholders: bool = False
 
     no_template_specification = NoTemplateSpecification()
-    rendered_prompt: str = no_template_specification.render_prompt(inputs={"name": "Test"})
+    rendered_prompt: str = no_template_specification.render_prompt(
+        inputs={"name": "Test"}
+    )
     assert "Test" in rendered_prompt
 
 

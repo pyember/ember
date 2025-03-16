@@ -122,24 +122,32 @@ def build_graph_example() -> None:
     # Analyze both graphs to find actual differences
     basic_deps = {}
     enhanced_deps = {}
-    
+
     for node_id, node in basic_graph.nodes.items():
         basic_deps[node_id] = list(node.inbound_edges)
-        
+
     for node_id, node in enhanced_graph.nodes.items():
         enhanced_deps[node_id] = list(node.inbound_edges)
-    
+
     print("\n--- ACTUAL DIFFERENCES DETECTED ---")
     for node_id in basic_deps.keys():
         basic_deps_set = set(basic_deps.get(node_id, []))
         enhanced_deps_set = set(enhanced_deps.get(node_id, []))
-        
+
         if basic_deps_set != enhanced_deps_set:
             print(f"Node: {node_id}")
-            print(f"  Basic dependencies: {', '.join(basic_deps_set) if basic_deps_set else 'None'}")
-            print(f"  Enhanced dependencies: {', '.join(enhanced_deps_set) if enhanced_deps_set else 'None'}")
-            print(f"  Removed in enhanced: {', '.join(basic_deps_set - enhanced_deps_set) if basic_deps_set - enhanced_deps_set else 'None'}")
-            print(f"  Added in enhanced: {', '.join(enhanced_deps_set - basic_deps_set) if enhanced_deps_set - basic_deps_set else 'None'}")
+            print(
+                f"  Basic dependencies: {', '.join(basic_deps_set) if basic_deps_set else 'None'}"
+            )
+            print(
+                f"  Enhanced dependencies: {', '.join(enhanced_deps_set) if enhanced_deps_set else 'None'}"
+            )
+            print(
+                f"  Removed in enhanced: {', '.join(basic_deps_set - enhanced_deps_set) if basic_deps_set - enhanced_deps_set else 'None'}"
+            )
+            print(
+                f"  Added in enhanced: {', '.join(enhanced_deps_set - basic_deps_set) if enhanced_deps_set - basic_deps_set else 'None'}"
+            )
             print()
 
 

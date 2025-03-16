@@ -57,12 +57,19 @@ def load_dataset_entries(
         ValueError: If the dataset metadata or its corresponding prepper cannot be found.
         TypeError: If arguments are not provided as named parameters.
     """
-    # Initialize the metadata registry and loader factory.
-    metadata_registry: DatasetMetadataRegistry = DatasetMetadataRegistry()
+    # Use the UNIFIED_REGISTRY singleton directly from the registry module 
+    from ember.core.utils.data.registry import UNIFIED_REGISTRY
+    metadata_registry = UNIFIED_REGISTRY
+    
+    # Initialize the loader factory
     loader_factory: DatasetLoaderFactory = DatasetLoaderFactory()
+    
+    # Initialize the registry 
     initialize_dataset_registry(
         metadata_registry=metadata_registry, loader_factory=loader_factory
     )
+    
+    # Discover available plugins
     loader_factory.discover_and_register_plugins()
 
     # Retrieve dataset metadata and the corresponding prepper class.

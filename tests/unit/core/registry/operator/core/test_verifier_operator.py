@@ -2,50 +2,59 @@ import pytest
 from typing import Optional
 from tests.helpers.simplified_imports import EmberModel
 
+
 # Create test stubs
 class VerifierOperatorInputs(EmberModel):
     """Test input model."""
+
     query: str
     candidate_answer: str
 
+
 class VerifierOperatorOutputs(EmberModel):
     """Test output model."""
+
     verdict: int
     explanation: str
     revised_answer: Optional[str] = None
-    
+
+
 class VerifierOperator:
     """Test operator implementation."""
-    
+
     def __init__(self, *, lm_module):
         self.lm_module = lm_module
-        
+
     def __call__(self, *, inputs):
         return self.forward(inputs=inputs)
-        
+
     def forward(self, *, inputs):
         """Process the verification."""
-        raw_output = self.lm_module(prompt=f"Query: {inputs.query}\nCandidate: {inputs.candidate_answer}")
-        
+        raw_output = self.lm_module(
+            prompt=f"Query: {inputs.query}\nCandidate: {inputs.candidate_answer}"
+        )
+
         # Initialize default values
         verdict = 0
         explanation = ""
         revised_answer = None
-        
+
         # Parse the response
         for line in raw_output.splitlines():
             if line.startswith("Verdict:"):
                 verdict_text = line.replace("Verdict:", "").strip()
-                verdict = 1 if "1" in verdict_text or "correct" in verdict_text.lower() else 0
+                verdict = (
+                    1 if "1" in verdict_text or "correct" in verdict_text.lower() else 0
+                )
             elif line.startswith("Explanation:"):
                 explanation = line.replace("Explanation:", "").strip()
             elif line.startswith("Revised Answer:"):
                 revised_answer = line.replace("Revised Answer:", "").strip()
-                
+
         return VerifierOperatorOutputs(
             verdict=verdict,
             explanation=explanation,
-            revised_answer=revised_answer or None
+            revised_answer=revised_answer or None,
         )
 
 

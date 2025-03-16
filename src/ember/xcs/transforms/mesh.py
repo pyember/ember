@@ -11,15 +11,26 @@ import itertools
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union, Protocol, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+    Protocol,
+    runtime_checkable,
+)
 
 import numpy as np
+
 
 # Use a placeholder class to avoid circular imports
 @runtime_checkable
 class Operator(Protocol):
     """Stub Operator protocol to avoid circular imports."""
-    
+
     def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Call protocol for operators."""
         ...
@@ -150,7 +161,7 @@ def _distribute_inputs(
     Returns:
         Dict[Tuple[int, ...], Dict[str, Any]]: A dictionary that maps each device's coordinates to its input chunk.
     """
-    # For tests that look for specific patterns, we'll handle simpler cases without the 
+    # For tests that look for specific patterns, we'll handle simpler cases without the
     # optimization to avoid duplicates
     # In test mode, we want to simplify the distribution to focus on correctness
     if "_TEST_MODE" in os.environ:
@@ -158,34 +169,39 @@ def _distribute_inputs(
         distributed: Dict[Tuple[int, ...], Dict[str, Any]] = {}
         partition_specs = partition_specs or {}
         mesh_shape: Tuple[int, ...] = mesh.shape
-        
+
         # Handle the special case of empty or scalar inputs
-        if not any(isinstance(value, list) and len(value) > 0 for value in inputs.values()):
+        if not any(
+            isinstance(value, list) and len(value) > 0 for value in inputs.values()
+        ):
             # For non-list inputs, just use the first device
             distributed[(0,) * len(mesh_shape)] = inputs.copy()
             return distributed
-            
+
         # Find all the keys containing lists that can be sharded
-        list_keys = [key for key, value in inputs.items() 
-                     if isinstance(value, list) and len(value) > 0]
-        
+        list_keys = [
+            key
+            for key, value in inputs.items()
+            if isinstance(value, list) and len(value) > 0
+        ]
+
         if not list_keys:
             # No shardable keys, use first device only
             distributed[(0,) * len(mesh_shape)] = inputs.copy()
             return distributed
-            
+
         # Use the first list key for sharding
         primary_key = list_keys[0]
         values = inputs[primary_key]
         num_items = len(values)
-        
+
         # For each item in the primary key's list
         for i in range(num_items):
             # Map to specific device (using modulo to handle uneven distribution)
             device_idx = i % np.prod(mesh_shape)
             # Convert flat index to mesh coordinates
             coords = np.unravel_index(device_idx, mesh_shape)
-            
+
             # If this is the first time seeing this device, initialize its inputs
             if coords not in distributed:
                 distributed[coords] = {k: [] for k in inputs}
@@ -193,14 +209,14 @@ def _distribute_inputs(
                 for k, v in inputs.items():
                     if not isinstance(v, list):
                         distributed[coords][k] = v
-            
+
             # Add the item to all list inputs on this device
             for key in list_keys:
                 if i < len(inputs[key]):  # Handle lists of different lengths
                     distributed[coords][key].append(inputs[key][i])
-            
+
         return distributed
-    
+
     # Normal code path for production - avoid duplicates
     distributed: Dict[Tuple[int, ...], Dict[str, Any]] = {}
     partition_specs = partition_specs or {}
@@ -216,7 +232,7 @@ def _distribute_inputs(
     for coords in itertools.product(*mesh_indices):
         device_inputs: Dict[str, Any] = {}
         is_processing_device = False  # Track if this device should process data
-        
+
         for key, value in inputs.items():
             if key in partition_specs and isinstance(value, list) and value:
                 spec: PartitionSpec = partition_specs[key]
@@ -232,17 +248,21 @@ def _distribute_inputs(
                         else:
                             device_inputs[key] = []  # Empty for other devices
                         continue
-                        
+
                     dim_size: int = mesh_shape[mesh_dim]
                     device_coord: int = coords[mesh_dim]
-                    
+
                     # For second dimension sharding
                     if mesh_dim == 1:
                         # For PartitionSpec(None, 1) - shard along second dim
                         if coords[0] == 0:  # Only use first row of devices
                             chunk_size: int = max(1, len(value) // dim_size)
                             start: int = device_coord * chunk_size
-                            end: int = start + chunk_size if device_coord < dim_size - 1 else len(value)
+                            end: int = (
+                                start + chunk_size
+                                if device_coord < dim_size - 1
+                                else len(value)
+                            )
                             device_inputs[key] = value[start:end]
                             is_processing_device = True
                         else:
@@ -251,10 +271,14 @@ def _distribute_inputs(
                         # For PartitionSpec(0, None) - shard along first dim
                         chunk_size: int = max(1, len(value) // dim_size)
                         start: int = device_coord * chunk_size
-                        end: int = start + chunk_size if device_coord < dim_size - 1 else len(value)
+                        end: int = (
+                            start + chunk_size
+                            if device_coord < dim_size - 1
+                            else len(value)
+                        )
                         device_inputs[key] = value[start:end]
                         is_processing_device = True
-                        
+
                 elif spec.mesh_axes == (None, None):
                     # Full replication - only use one device to avoid duplicates
                     if coords == (0,) * len(mesh_shape):  # Only use first device
@@ -272,15 +296,15 @@ def _distribute_inputs(
             else:
                 # Non-shardable inputs - add to all devices that are processing
                 device_inputs[key] = value
-                
+
         # Only include this device if it's processing some data
         if is_processing_device:
             distributed[coords] = device_inputs
-            
+
     # If we somehow ended up with no devices, use the first one
     if not distributed:
         distributed[(0,) * len(mesh_shape)] = inputs.copy()
-        
+
     return distributed
 
 
@@ -303,13 +327,17 @@ def _collect_outputs(
         return {}
 
     sample_output: Any = next(iter(outputs.values()))
-    
+
     # Handle non-dictionary outputs by wrapping them in a results list
     if not isinstance(sample_output, dict):
         return {"results": list(outputs.values())}
 
     # Special case for scalar inputs (like single strings) - ensure we don't duplicate
-    if "results" in sample_output and len(outputs) == 1 and not isinstance(sample_output["results"], list):
+    if (
+        "results" in sample_output
+        and len(outputs) == 1
+        and not isinstance(sample_output["results"], list)
+    ):
         return {"results": [sample_output["results"]]}
 
     # Process dictionary outputs with proper aggregation
@@ -324,11 +352,11 @@ def _collect_outputs(
                 else:
                     values.append(output_value)
         aggregated[key] = values
-    
+
     # Ensure we have at least an empty list for results if none were generated
     if "results" not in aggregated:
         aggregated["results"] = []
-        
+
     return aggregated
 
 
@@ -365,6 +393,7 @@ def mesh_sharded(
         # Execute with automatic sharding.
         results = sharded_op(inputs={"prompts": ["Hello", "Hi", "Hey", "Howdy"]})
     """
+
     def _execute_sharded(
         op: Callable[..., Any],
         inputs_to_distribute: Dict[Tuple[int, ...], Dict[str, Any]],
@@ -389,25 +418,35 @@ def mesh_sharded(
         return _collect_outputs(mesh_results, mesh_obj, out_spec)
 
     if isinstance(operator_or_fn, Operator):
+
         @wraps(operator_or_fn.__call__)
         def sharded_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = _distribute_inputs(
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
                 inputs=inputs,
                 mesh=mesh,
                 partition_specs=in_partition,
             )
-            return _execute_sharded(operator_or_fn, distributed_inputs, mesh, out_partition)
+            return _execute_sharded(
+                operator_or_fn, distributed_inputs, mesh, out_partition
+            )
 
         operator_or_fn.mesh_sharded = sharded_operator  # type: ignore
         return sharded_operator
     else:
+
         @wraps(operator_or_fn)
         def sharded_fn(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = _distribute_inputs(
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
                 inputs=inputs,
                 mesh=mesh,
                 partition_specs=in_partition,
             )
-            return _execute_sharded(operator_or_fn, distributed_inputs, mesh, out_partition)
+            return _execute_sharded(
+                operator_or_fn, distributed_inputs, mesh, out_partition
+            )
 
         return sharded_fn

@@ -83,7 +83,7 @@ class QuestionRefinementSpecification(Specification):
 class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOutputs]):
     """Operator that refines a user question to make it more precise."""
 
-    specification = QuestionRefinementSpecification()
+    specification: ClassVar[Specification] = QuestionRefinementSpecification()
     model_name: str
     temperature: float
 
@@ -102,11 +102,12 @@ class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOu
     def forward(self, *, inputs: QuestionRefinementInputs) -> Dict[str, Any]:
         prompt = self.specification.render_prompt(inputs=inputs)
         response = self.lm_module(prompt=prompt)
-        
+
         # Extract text from response
         from ember.api.types import extract_value
+
         refined_query = extract_value(response, "text", "").strip()
-        
+
         return {"refined_query": refined_query}
 
 
@@ -151,7 +152,9 @@ class NestedPipeline(Operator[Dict[str, Any], Dict[str, Any]]):
 
     def __init__(self, *, model_name: str) -> None:
         self.refiner = QuestionRefinement(model_name=model_name)
-        self.ensemble = non.UniformEnsemble(num_units=3, model_name=model_name, temperature=0.7)
+        self.ensemble = non.UniformEnsemble(
+            num_units=3, model_name=model_name, temperature=0.7
+        )
         self.aggregator = non.MostCommon()
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -230,7 +233,7 @@ def main() -> None:
     table = PrettyTable()
     table.field_names = ["Pipeline", "Time (s)", "Result"]
     table.align = "l"
-    
+
     # Process questions with each pipeline
     print("\n=== Functional Composition Pipeline ===")
     for question in questions[:1]:  # Use first question only for brevity
@@ -238,19 +241,28 @@ def main() -> None:
         start_time = time.perf_counter()
         result = functional_pipeline({"query": question})
         elapsed = time.perf_counter() - start_time
-        
+
         # Show details of pipeline execution
-        print(f"Original query: \"{question}\"")
+        print(f'Original query: "{question}"')
         if "refined_query" in result:
             print(f"Refined query: \"{result['refined_query']}\"")
-        print(f"Final answer: \"{result['final_answer'][:150]}...\"" 
-              if len(result['final_answer']) > 150 
-              else f"Final answer: \"{result['final_answer']}\"")
+        print(
+            f"Final answer: \"{result['final_answer'][:150]}...\""
+            if len(result["final_answer"]) > 150
+            else f"Final answer: \"{result['final_answer']}\""
+        )
         print(f"Time: {elapsed:.4f}s")
-        
+
         # Store in table
-        table.add_row(["Functional", f"{elapsed:.4f}", 
-                     result['final_answer'][:50] + "..." if len(result['final_answer']) > 50 else result['final_answer']])
+        table.add_row(
+            [
+                "Functional",
+                f"{elapsed:.4f}",
+                result["final_answer"][:50] + "..."
+                if len(result["final_answer"]) > 50
+                else result["final_answer"],
+            ]
+        )
 
     print("\n=== Nested Pipeline ===")
     for question in questions[:1]:
@@ -258,16 +270,25 @@ def main() -> None:
         start_time = time.perf_counter()
         result = nested_pipeline(inputs={"query": question})
         elapsed = time.perf_counter() - start_time
-        
+
         # Show details of pipeline execution
-        print(f"Final answer: \"{result['final_answer'][:150]}...\"" 
-              if len(result['final_answer']) > 150 
-              else f"Final answer: \"{result['final_answer']}\"")
+        print(
+            f"Final answer: \"{result['final_answer'][:150]}...\""
+            if len(result["final_answer"]) > 150
+            else f"Final answer: \"{result['final_answer']}\""
+        )
         print(f"Time: {elapsed:.4f}s")
-        
+
         # Store in table
-        table.add_row(["Nested", f"{elapsed:.4f}", 
-                     result['final_answer'][:50] + "..." if len(result['final_answer']) > 50 else result['final_answer']])
+        table.add_row(
+            [
+                "Nested",
+                f"{elapsed:.4f}",
+                result["final_answer"][:50] + "..."
+                if len(result["final_answer"]) > 50
+                else result["final_answer"],
+            ]
+        )
 
     print("\n=== Sequential Pipeline ===")
     for question in questions[:1]:
@@ -275,16 +296,25 @@ def main() -> None:
         start_time = time.perf_counter()
         result = sequential_pipeline({"query": question})
         elapsed = time.perf_counter() - start_time
-        
+
         # Show details of pipeline execution
-        print(f"Final answer: \"{result['final_answer'][:150]}...\"" 
-              if len(result['final_answer']) > 150 
-              else f"Final answer: \"{result['final_answer']}\"")
+        print(
+            f"Final answer: \"{result['final_answer'][:150]}...\""
+            if len(result["final_answer"]) > 150
+            else f"Final answer: \"{result['final_answer']}\""
+        )
         print(f"Time: {elapsed:.4f}s")
-        
+
         # Store in table
-        table.add_row(["Sequential", f"{elapsed:.4f}", 
-                     result['final_answer'][:50] + "..." if len(result['final_answer']) > 50 else result['final_answer']])
+        table.add_row(
+            [
+                "Sequential",
+                f"{elapsed:.4f}",
+                result["final_answer"][:50] + "..."
+                if len(result["final_answer"]) > 50
+                else result["final_answer"],
+            ]
+        )
 
     # Demonstrate execution options with the nested pipeline
     print("\n=== Nested Pipeline with Sequential Execution ===")
@@ -294,31 +324,40 @@ def main() -> None:
             start_time = time.perf_counter()
             result = nested_pipeline(inputs={"query": question})
             elapsed = time.perf_counter() - start_time
-            
+
             # Show details of pipeline execution
-            print(f"Final answer: \"{result['final_answer'][:150]}...\"" 
-                if len(result['final_answer']) > 150 
-                else f"Final answer: \"{result['final_answer']}\"")
+            print(
+                f"Final answer: \"{result['final_answer'][:150]}...\""
+                if len(result["final_answer"]) > 150
+                else f"Final answer: \"{result['final_answer']}\""
+            )
             print(f"Time: {elapsed:.4f}s")
             print(f"Execution mode: Sequential scheduler")
-            
+
             # Store in table
-            table.add_row(["Nested (Sequential)", f"{elapsed:.4f}", 
-                        result['final_answer'][:50] + "..." if len(result['final_answer']) > 50 else result['final_answer']])
-    
+            table.add_row(
+                [
+                    "Nested (Sequential)",
+                    f"{elapsed:.4f}",
+                    result["final_answer"][:50] + "..."
+                    if len(result["final_answer"]) > 50
+                    else result["final_answer"],
+                ]
+            )
+
     # Display performance comparison
     print("\n=== Performance Comparison ===")
     print(table)
-    
+
     print("\n=== Pipeline Pattern Comparison ===")
     print("1. Functional Composition:")
     print("   • Advantages: Clean separation of concerns, explicit data flow")
     print("   • Use cases: When components need to be reused separately")
-    
+
     print("\n2. Nested Pipeline:")
     print("   • Advantages: Benefits from JIT optimization, cleaner code structure")
     print("   • Use cases: Complex pipelines where performance matters")
-    
+
     print("\n3. Sequential Pipeline:")
     print("   • Advantages: Simplicity, flexibility for custom logic")
     print("   • Use cases: Prototyping or simpler workflows")

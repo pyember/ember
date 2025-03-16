@@ -57,7 +57,7 @@ def test_scheduler_error_propagation() -> None:
     graph.exit_node = "fail"
     plan = compile_graph(graph=graph)
     scheduler = XCSScheduler()
-    
+
     # Our current implementation catches errors and stores them in the results
     # rather than raising them, so we check for that behavior
     results = scheduler.run_plan(plan=plan, global_input={}, graph=graph)

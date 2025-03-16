@@ -59,16 +59,21 @@ Examples:
 from __future__ import annotations
 
 import importlib.metadata
-from typing import Optional
+from typing import Optional, Dict, Any, Union
 
 # Import primary API components - these are the only public interfaces
 from ember.api import (
-    models,    # Language model access (models.openai.gpt4, etc.)
+    models,  # Language model access (models.openai.gpt4, etc.)
     data,  # Dataset access (datasets("mmlu"), etc.)
-    operators, # Operator registry (operators.get_operator(), etc.)
-    non,       # Network of Networks patterns (non.UniformEnsemble, etc.)
-    xcs        # Execution optimization (xcs.jit, etc.)
+    operators,  # Operator registry (operators.get_operator(), etc.)
+    non,  # Network of Networks patterns (non.UniformEnsemble, etc.)
+    xcs,  # Execution optimization (xcs.jit, etc.)
 )
+
+# Import necessary components for initialization
+from ember.core.app_context import create_ember_app, EmberContext, EmberAppContext
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.config.manager import ConfigManager, create_config_manager
 
 # Version detection
 try:
@@ -83,12 +88,93 @@ _PACKAGE_METADATA = {
     "description": "Compositional framework for building and orchestrating Compound AI Systems and Networks of Networks (NONs).",
 }
 
+
+def initialize_ember(
+    config_path: Optional[str] = None,
+    auto_discover: bool = True,
+    force_discovery: bool = False,
+    api_keys: Optional[Dict[str, str]] = None,
+    env_prefix: str = "EMBER_",
+    initialize_context: bool = True,
+) -> Union[ModelRegistry, EmberAppContext]:
+    """Initialize the Ember framework with a single, unified call.
+    
+    This function provides a high-level entry point for initializing all Ember
+    components in a single operation, abstracting away the complexity of the
+    underlying architecture. It intelligently coordinates between the configuration
+    system, model registry, and application context.
+    
+    The initialization follows a clear, predictable sequence:
+    1. Configuration loading and validation (with environment variable support)
+    2. API key acquisition from multiple sources with proper precedence
+    3. Model registry preparation with provider discovery
+    4. Application context initialization (when requested)
+    
+    Args:
+        config_path: Optional path to a YAML configuration file. If not provided,
+                   standard locations will be searched and environment variables used.
+        auto_discover: Whether to automatically discover available models from 
+                     connected provider APIs. Defaults to True.
+        force_discovery: Force model discovery even if auto_discover is False.
+                       Useful when you need an explicit refresh of available models.
+        api_keys: Optional dictionary of provider API keys (e.g., {"openai": "sk-..."}).
+                These take precedence over config file and environment variables.
+        env_prefix: Prefix for environment variables to consider. Defaults to "EMBER_".
+        initialize_context: Whether to initialize the global application context.
+                          Set to False to only initialize the model registry.
+    
+    Returns:
+        If initialize_context is True: A fully initialized EmberAppContext containing
+        all core services (recommended for most applications).
+        If initialize_context is False: The initialized ModelRegistry only.
+    
+    Examples:
+        # Full initialization with default settings
+        app = initialize_ember()
+        
+        # Initialize with custom configuration
+        app = initialize_ember(config_path="/path/to/config.yaml")
+        
+        # Initialize with explicit API keys
+        app = initialize_ember(api_keys={"openai": "sk-...", "anthropic": "sk-..."})
+        
+        # Get only the model registry without initializing the global context
+        registry = initialize_ember(initialize_context=False)
+        model = registry.get_model("openai:gpt-4")
+    """
+    # 1. Create the configuration manager with the provided config path
+    config_manager = create_config_manager(config_path=config_path)
+    
+    # 2. Apply API keys if provided (highest precedence)
+    if api_keys:
+        for provider, api_key in api_keys.items():
+            config_manager.set_provider_api_key(provider, api_key)
+    
+    # 3. Initialize the model registry
+    registry = models.initialize_registry(
+        config_manager=config_manager,
+        auto_discover=auto_discover,
+        force_discovery=force_discovery,
+    )
+    
+    # 4. Initialize application context if requested
+    if initialize_context:
+        app_context = create_ember_app(config_path=config_path)
+        # Set the unified ember context as global
+        EmberContext.initialize(app_context=app_context)
+        return app_context
+    
+    # Return just the registry if global context isn't needed
+    return registry
+
+
 # Public interface - only export the main API components
 __all__ = [
-    "models",    # Language model access
+    "models",  # Language model access
     "data",  # Dataset access
-    "operators", # Operator registry
-    "non",       # Network of Networks patterns
-    "xcs",       # Execution optimization
-    "__version__"
+    "operators",  # Operator registry
+    "non",  # Network of Networks patterns
+    "xcs",  # Execution optimization
+    "initialize_ember",  # Global initialization function
+    "__version__",
 ]

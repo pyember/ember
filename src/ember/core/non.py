@@ -35,36 +35,48 @@ from typing import Any, List, Optional, Type, Generic
 from pydantic import BaseModel
 
 # Ember package imports: use direct imports to avoid circular dependencies
-# Access the operator base directly to avoid circular imports 
+# Access the operator base directly to avoid circular imports
 # These paths need to be fixed for proper resolution
 import sys
 import types
 from typing import TypeVar
 
 # Create placeholder type variables to avoid circular imports
-T_in = TypeVar('T_in')
-T_out = TypeVar('T_out')
+T_in = TypeVar("T_in")
+T_out = TypeVar("T_out")
+
 
 # Create a minimal Operator class that will be replaced at runtime
 # This is a temporary workaround to fix the import cycle
 class Operator(Generic[T_in, T_out]):
     """Placeholder for Operator class to avoid circular imports."""
+
     pass
+
 
 # Ensure modules are available
 if "ember.core.registry.operator.base" not in sys.modules:
-    sys.modules["ember.core.registry.operator.base"] = types.ModuleType("ember.core.registry.operator.base")
+    sys.modules["ember.core.registry.operator.base"] = types.ModuleType(
+        "ember.core.registry.operator.base"
+    )
+
 
 # Create minimal EmberModule and ember_field
 class EmberModule:
     """Placeholder for EmberModule class to avoid circular imports."""
+
     pass
+
 
 def ember_field(init=False):
     """Placeholder for ember_field decorator to avoid circular imports."""
+
     def decorator(func):
         return func
+
     return decorator
+
+
 from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
@@ -108,16 +120,16 @@ VerifierOutputs = VerifierOperatorOutputs
 class UniformEnsemble(Operator[EnsembleInputs, EnsembleOperatorOutputs]):
     """
     Generates multiple model responses using identical LLM configurations.
-    
-    Creates a set of parallel model instances with the same configuration, 
+
+    Creates a set of parallel model instances with the same configuration,
     sends the same prompt to each, and returns all responses. This helps
     mitigate non-determinism through statistical aggregation.
-    
+
     Usage Notes:
     - Typically paired with MostCommon or JudgeSynthesis for aggregation
     - Higher num_units improves robustness but increases cost
     - Higher temperature increases response diversity
-    
+
     Example:
         ensemble = UniformEnsemble(
             num_units=3,
@@ -178,38 +190,38 @@ class UniformEnsemble(Operator[EnsembleInputs, EnsembleOperatorOutputs]):
 class MostCommon(Operator[MostCommonInputs, MostCommonAnswerSelectorOutputs]):
     """
     Statistical consensus aggregator implementing a majority-vote decision strategy.
-    
+
     MostCommon implements a robust, non-parametric approach to ensemble aggregation
     based on frequency counting. This operator identifies the most frequently occurring
     response in a collection, making it ideal for ensemble decision-making without
     introducing additional model-based bias.
-    
+
     The algorithm employs a sophisticated frequency analysis that:
     1. Identifies exact matches through string equality
     2. Counts occurrence frequencies across all responses
     3. Selects the most frequent response as the consensus answer
     4. Handles ties deterministically (first occurrence wins)
-    
+
     This approach offers several key advantages:
     - Model-agnostic aggregation (no additional inference needed)
     - Deterministic behavior with consistent outputs
     - Low computational overhead for high-performance workflows
     - Transparent decision mechanisms for interpretability
-    
+
     The implementation abides by functional programming principles:
     - Pure function semantics with no side effects
     - Immutability of both the operator and processed data
     - Explicit input/output contract without hidden state
-    
+
     Use this operator as the final stage in ensemble pipelines when:
     - You need statistical robustness against model hallucinations
     - Deterministic aggregation is more important than nuanced synthesis
     - The responses are expected to contain a clear majority answer
-    
+
     Example:
         aggregator = MostCommon()
         output = aggregator(inputs=MostCommonInputs(
-            query="What is 2+2?", 
+            query="What is 2+2?",
             responses=["4", "4", "3", "4", "5"]
         ))
         # output.final_answer will be "4" (occurring 3 times)
@@ -234,38 +246,38 @@ class MostCommon(Operator[MostCommonInputs, MostCommonAnswerSelectorOutputs]):
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """
     Intelligent meta-reasoning engine for synthesizing multiple model responses.
-    
-    JudgeSynthesis represents a sophisticated approach to ensemble aggregation that 
-    leverages a "judge" LLM to analyze, evaluate, and synthesize multiple candidate 
+
+    JudgeSynthesis represents a sophisticated approach to ensemble aggregation that
+    leverages a "judge" LLM to analyze, evaluate, and synthesize multiple candidate
     responses. Unlike statistical approaches, this operator applies reasoning capabilities
     to generate a superior answer that may incorporate elements from multiple responses
     or provide novel insights that resolve conflicts between them.
-    
+
     The synthesis process follows a principled methodology:
     1. Candidate analysis - Each response is individually evaluated for quality and relevance
-    2. Comparative assessment - Responses are compared and contrasted to identify patterns 
+    2. Comparative assessment - Responses are compared and contrasted to identify patterns
     3. Critical evaluation - Factual correctness and reasoning quality are assessed
     4. Reasoned synthesis - A new response is generated that represents the best integrated answer
-    
+
     This approach implements a meta-learning paradigm where:
     - A higher-quality model can supervise and improve outputs from other models
     - Conflicting information across responses can be resolved through reasoning
     - The final answer can exceed the quality of any individual input response
     - The synthesis provides both a final answer and an explanation of the reasoning
-    
+
     Implementation follows SOLID principles through:
     - Single Responsibility - Focused solely on response synthesis
     - Open/Closed - Extensible design with configurable model selection
     - Liskov Substitution - Properly typed interfaces enable seamless composition
     - Interface Segregation - Minimal, focused API for synthesis operations
     - Dependency Inversion - Configuration injected through constructor
-    
+
     This pattern is ideal for mission-critical applications where:
     - Response quality and correctness are paramount concerns
     - You need reasoning-based aggregation rather than simple statistics
     - The task involves complex, nuanced judgments requiring critical thinking
     - A trace of meta-reasoning about the decision process is valuable
-    
+
     Example:
         judge = JudgeSynthesis(model_name="anthropic:claude-3-opus")
         result = judge(inputs=JudgeSynthesisInputs(
@@ -318,44 +330,44 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
 class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     """
     Autonomous verification and correction system for answer quality assurance.
-    
+
     The Verifier operator implements a critical quality control mechanism for LLM outputs,
     functioning as an independent verification layer that scrutinizes candidate answers
     for correctness, completeness, and coherence. This pattern follows established
     software engineering principles of separation of concerns by isolating the verification
     process from answer generation.
-    
+
     The verification process employs a structured methodology:
     1. Correctness assessment - Evaluates factual accuracy and logical consistency
     2. Error identification - Pinpoints specific issues in the candidate answer
     3. Detailed explanation - Provides comprehensive reasoning for the verdict
     4. Correction formulation - When errors are found, generates an improved answer
-    
+
     This implementation offers several architectural advantages:
     - Decoupled verification logic from answer generation
     - Independent error detection and correction capabilities
     - Auditable decision process with explicit reasoning
     - Strong type safety with comprehensive validation
-    
+
     The design follows robust software engineering principles:
     - Single Responsibility - Focused exclusively on verification and correction
     - Interface Segregation - Clean, minimal interface for verification operations
     - Dependency Inversion - Model configuration injected via constructor
     - Open for Extension - Easily extended for domain-specific verification
-    
+
     Verification represents a crucial pattern for mission-critical applications where:
     - Answer correctness is paramount (e.g., medical, legal, or financial domains)
     - Independent quality control is required for regulatory compliance
     - Explainable AI principles must be followed with reasoning transparency
     - Automatic error correction capabilities provide fault tolerance
-    
+
     Example:
         verifier = Verifier(model_name="anthropic:claude-3-opus")
         result = verifier(inputs=VerifierInputs(
-            query="What is the boiling point of water?", 
+            query="What is the boiling point of water?",
             candidate_answer="Water boils at 90 degrees Celsius at sea level."
         ))
-        
+
         verdict = result.verdict           # "incorrect"
         explanation = result.explanation   # Detailed explanation of the error
         revised = result.revised_answer    # "Water boils at 100 degrees Celsius at sea level."
@@ -475,18 +487,18 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 class Sequential(Operator[T_in, T_out]):
     """
     Chains multiple operators together, passing outputs from one to the next.
-    
+
     This operator executes a sequence of operators in order, where each operator's
     output becomes the input to the next operator. The result is a single combined
     operator that can be used wherever any individual operator is expected.
-    
+
     Example:
         pipeline = Sequential(operators=[
             UniformEnsemble(num_units=3, model_name="gpt-4o"),
             JudgeSynthesis(model_name="claude-3-opus"),
             Verifier(model_name="gpt-4o")
         ])
-        
+
         result = pipeline(inputs={"query": "What causes climate change?"})
     """
 

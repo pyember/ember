@@ -175,7 +175,7 @@ final_result = judge(inputs={
 
 1. **Type Everything**: Define proper EmberModel classes for inputs and outputs
 2. **Class-Level Fields**: Declare operator fields at the class level with type hints
-3. **ClassVar for Specifications**: Use `specification: ClassVar[Specification]` for specification declarations
+3. **Specifications**: Always declare `specification: ClassVar[Specification]` for consistency with the core API; this indicates the specification belongs to the class, not the instance
 4. **Use kwargs Format**: Use dict-style inputs with `inputs={"key": value}` for cleaner code
 5. **Return Model Instances**: Return properly typed model instances from forward methods
 6. **Error Handling**: Robustly handle parsing errors and LLM failures
@@ -201,7 +201,7 @@ O = TypeVar('O', bound=EmberModel)
 def with_retry(max_attempts=3):
     def decorator(op_class: Type[Operator[I, O]]) -> Type[Operator[I, O]]:
         class RetryOperator(op_class):
-            # Maintain the specification
+            # Maintain the specification using ClassVar for consistency
             specification: ClassVar[Specification] = op_class.specification
             
             def forward(self, *, inputs: I) -> O:
@@ -223,7 +223,7 @@ class ReliableClassifier(TextClassifierOperator):
 # Create a JIT-compiled pipeline with the reliable classifier
 @jit
 class AnalysisPipeline(Operator[ClassifierInput, ClassifierOutput]):
-    # Class-level specification declaration
+    # Class-level specification declaration with ClassVar
     specification: ClassVar[Specification] = AnalysisSpecification()
     
     # Class-level field declarations

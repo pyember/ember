@@ -10,7 +10,10 @@ import logging
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
+from ember.core.registry.model.providers.base_discovery import (
+    BaseDiscoveryProvider,
+    ModelDiscoveryError,
+)
 
 # Module-level logger.
 logger = logging.getLogger(__name__)
@@ -47,7 +50,10 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
         self._base_url: Optional[str] = None
         self._client: Optional[OpenAIClientProtocol] = None
         self._model_filter_prefixes: List[str] = [
-            "gpt-4", "gpt-3.5", "text-embedding", "dall-e"
+            "gpt-4",
+            "gpt-3.5",
+            "text-embedding",
+            "dall-e",
         ]
 
     def configure(self, api_key: str, base_url: Optional[str] = None) -> None:
@@ -81,8 +87,11 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             try:
                 # Get from centralized config
                 from ember.core.app_context import get_app_context
+
                 app_context = get_app_context()
-                provider_config = app_context.config_manager.get_config().get_provider("openai")
+                provider_config = app_context.config_manager.get_config().get_provider(
+                    "openai"
+                )
                 if provider_config and provider_config.api_keys.get("default"):
                     self._api_key = provider_config.api_keys["default"].key
                     # Also get base_url if not already specified
@@ -90,13 +99,15 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
                         self._base_url = provider_config.base_url
             except Exception as config_error:
                 logger.debug(f"Could not get API key from config: {config_error}")
-                
+
             # Fallback to environment variable
             if not self._api_key:
                 self._api_key = os.environ.get("OPENAI_API_KEY")
-                
+
             if not self._api_key:
-                raise ModelDiscoveryError("OpenAI API key is not set in config or environment")
+                raise ModelDiscoveryError(
+                    "OpenAI API key is not set in config or environment"
+                )
 
         try:
             self._client = self._create_modern_client()
@@ -114,8 +125,12 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             logger.error("No compatible OpenAI SDK found: %s", imp_err)
             raise ModelDiscoveryError("No compatible OpenAI SDK found")
         except Exception as unexpected_err:
-            logger.exception("Unexpected error initializing OpenAI client: %s", unexpected_err)
-            raise ModelDiscoveryError(f"OpenAI client initialization failed: {unexpected_err}")
+            logger.exception(
+                "Unexpected error initializing OpenAI client: %s", unexpected_err
+            )
+            raise ModelDiscoveryError(
+                f"OpenAI client initialization failed: {unexpected_err}"
+            )
 
     def _create_modern_client(self) -> OpenAIClientProtocol:
         """Create an OpenAI client using the modern SDK (v1+).
@@ -128,6 +143,7 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             ImportError: If the modern OpenAI SDK is not installed.
         """
         from openai import OpenAI, APIError  # May raise ImportError.
+
         client_kwargs: Dict[str, Any] = {"api_key": self._api_key}
         if self._base_url is not None:
             client_kwargs["base_url"] = self._base_url
@@ -170,6 +186,7 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             ImportError: If the legacy OpenAI SDK is not installed.
         """
         import openai  # May raise ImportError.
+
         openai.api_key = self._api_key
         if self._base_url is not None:
             openai.api_base = self._base_url
@@ -211,8 +228,7 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             if hasattr(response, "data") and isinstance(response.data, list):
                 # Modern SDK response format.
                 model_list = [
-                    {"id": model.id, "object": model.object}
-                    for model in response.data
+                    {"id": model.id, "object": model.object} for model in response.data
                 ]
             elif isinstance(response, dict) and "data" in response:
                 # Legacy SDK response format.
@@ -222,19 +238,25 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
                 return {}
 
             logger.debug("Fetched %d models from OpenAI API", len(model_list))
-            filtered_models: List[Dict[str, Any]] = self._filter_models(models=model_list)
+            filtered_models: List[Dict[str, Any]] = self._filter_models(
+                models=model_list
+            )
             logger.debug("Filtered to %d relevant models", len(filtered_models))
 
             standardized_models: Dict[str, Dict[str, Any]] = {}
             for raw_model in filtered_models:
                 raw_model_id: str = raw_model.get("id", "")
-                standardized_id: str = self._generate_model_id(raw_model_id=raw_model_id)
+                standardized_id: str = self._generate_model_id(
+                    raw_model_id=raw_model_id
+                )
                 standardized_models[standardized_id] = self._build_model_entry(
                     model_id=standardized_id, model_data=raw_model
                 )
 
             if not standardized_models:
-                logger.info("No OpenAI models found after filtering; adding fallback models")
+                logger.info(
+                    "No OpenAI models found after filtering; adding fallback models"
+                )
                 self._add_fallback_models(models_dict=standardized_models)
 
             return standardized_models
@@ -243,7 +265,9 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             logger.error("OpenAI model discovery error: %s", disc_err)
             return self._get_fallback_models()
         except Exception as unexpected_err:
-            logger.exception("Unexpected error fetching OpenAI models: %s", unexpected_err)
+            logger.exception(
+                "Unexpected error fetching OpenAI models: %s", unexpected_err
+            )
             return self._get_fallback_models()
 
     def _filter_models(self, models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -256,8 +280,12 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             List[Dict[str, Any]]: Filtered list of model dictionaries.
         """
         return [
-            model for model in models
-            if any(model.get("id", "").startswith(prefix) for prefix in self._model_filter_prefixes)
+            model
+            for model in models
+            if any(
+                model.get("id", "").startswith(prefix)
+                for prefix in self._model_filter_prefixes
+            )
         ]
 
     def _generate_model_id(self, raw_model_id: str) -> str:
@@ -271,7 +299,9 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
         """
         return f"openai:{raw_model_id}"
 
-    def _build_model_entry(self, model_id: str, model_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _build_model_entry(
+        self, model_id: str, model_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Construct a standardized model entry.
 
         Args:
@@ -308,16 +338,16 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             "openai:gpt-4o": {
                 "model_id": "openai:gpt-4o",
                 "model_name": "gpt-4o",
-                "api_data": {"object": "model"}
+                "api_data": {"object": "model"},
             },
             "openai:gpt-4o-mini": {
                 "model_id": "openai:gpt-4o-mini",
                 "model_name": "gpt-4o-mini",
-                "api_data": {"object": "model"}
+                "api_data": {"object": "model"},
             },
             "openai:gpt-3.5-turbo": {
                 "model_id": "openai:gpt-3.5-turbo",
                 "model_name": "gpt-3.5-turbo",
-                "api_data": {"object": "model"}
-            }
+                "api_data": {"object": "model"},
+            },
         }

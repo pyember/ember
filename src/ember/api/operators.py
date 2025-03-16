@@ -51,12 +51,14 @@ from typing import TypeVar
 
 # Contravariant for inputs (accepts superclasses of the specified type)
 # Covariant for outputs (accepts the specified type and its subclasses)
-InputT = TypeVar('InputT', bound=EmberModel, contravariant=True)
-OutputT = TypeVar('OutputT', bound=EmberModel, covariant=True)
+InputT = TypeVar("InputT", bound=EmberModel, contravariant=True)
+OutputT = TypeVar("OutputT", bound=EmberModel, covariant=True)
 
 # Core operator implementations
 from ember.core.registry.operator.core.ensemble import EnsembleOperator
-from ember.core.registry.operator.core.most_common import MostCommonAnswerSelectorOperator as MostCommonAnswerSelector
+from ember.core.registry.operator.core.most_common import (
+    MostCommonAnswerSelectorOperator as MostCommonAnswerSelector,
+)
 from ember.core.registry.operator.core.verifier import VerifierOperator
 from ember.core.registry.operator.core.selector_judge import SelectorJudgeOperator
 from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
@@ -64,20 +66,24 @@ from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOper
 # Re-export useful types
 from typing import List, Dict, Any, Optional, Union, TypeVar
 
-__all__ = [    
+__all__ = [
     # Base classes
-    "Operator",             # Base operator class for extension
-    "EmberModel",           # Base model class for inputs/outputs
-    "Field",                # Field definition for model attributes
-    "InputT", "OutputT",    # Type variables for generics
-    
+    "Operator",  # Base operator class for extension
+    "EmberModel",  # Base model class for inputs/outputs
+    "Field",  # Field definition for model attributes
+    "InputT",
+    "OutputT",  # Type variables for generics
     # Built-in operators
-    "EnsembleOperator",     # Runs multiple operators in parallel
+    "EnsembleOperator",  # Runs multiple operators in parallel
     "MostCommonAnswerSelector",  # Selects most frequent answer
-    "VerifierOperator",     # Verifies candidate answers
-    "SelectorJudgeOperator",     # Selects best answer using a judge
-    "JudgeSynthesisOperator",    # Synthesizes a response from multiple answers
-    
+    "VerifierOperator",  # Verifies candidate answers
+    "SelectorJudgeOperator",  # Selects best answer using a judge
+    "JudgeSynthesisOperator",  # Synthesizes a response from multiple answers
     # Useful types
-    "List", "Dict", "Any", "Optional", "Union", "TypeVar",
+    "List",
+    "Dict",
+    "Any",
+    "Optional",
+    "Union",
+    "TypeVar",
 ]

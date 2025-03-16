@@ -36,35 +36,33 @@ Examples:
 
 # Import direct data API components
 from ember.api.data import (
-    DatasetBuilder,      # Builder pattern for dataset configuration
-    Dataset,             # Dataset container class
-    DatasetConfig,       # Configuration for dataset loading
-    TaskType,            # Enum of dataset task types
-    DatasetInfo,         # Dataset metadata
-    DatasetEntry,        # Individual dataset entry
-    register,            # Dataset registration decorator
+    DatasetBuilder,  # Builder pattern for dataset configuration
+    Dataset,  # Dataset container class
+    DatasetConfig,  # Configuration for dataset loading
+    TaskType,  # Enum of dataset task types
+    DatasetInfo,  # Dataset metadata
+    DatasetEntry,  # Individual dataset entry
+    register,  # Dataset registration decorator
     list_available_datasets,  # List available datasets
-    get_dataset_info     # Get dataset metadata
+    get_dataset_info,  # Get dataset metadata
 )
 
 # Public interface - export facades, modules, and direct API components
 __all__ = [
     # Main facade objects
     # "models",                # Model access (models.openai.gpt4, etc.)
-    "datasets",              # Dataset access (datasets("mmlu"), etc.)
-    
+    "datasets",  # Dataset access (datasets("mmlu"), etc.)
     # Module namespaces
     # "non",                   # Network of Networks patterns
     # "xcs",                   # Execution optimization
-    
     # Data API components
-    "DatasetBuilder",        # Builder pattern for dataset loading
-    "Dataset",               # Dataset container class
-    "DatasetConfig",         # Configuration for dataset loading
-    "TaskType",              # Enum of dataset task types
-    "DatasetInfo",           # Dataset metadata
-    "DatasetEntry",          # Individual dataset entry
-    "register",              # Dataset registration decorator
-    "list_available_datasets", # List available datasets
-    "get_dataset_info"       # Get dataset metadata
+    "DatasetBuilder",  # Builder pattern for dataset loading
+    "Dataset",  # Dataset container class
+    "DatasetConfig",  # Configuration for dataset loading
+    "TaskType",  # Enum of dataset task types
+    "DatasetInfo",  # Dataset metadata
+    "DatasetEntry",  # Individual dataset entry
+    "register",  # Dataset registration decorator
+    "list_available_datasets",  # List available datasets
+    "get_dataset_info",  # Get dataset metadata
 ]

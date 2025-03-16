@@ -62,13 +62,15 @@ OperatorDecorator = Callable[[Type[OperatorType]], Type[OperatorType]]
 # Use a Protocol for Operator to avoid circular imports
 from typing import Protocol, runtime_checkable
 
+
 @runtime_checkable
 class Operator(Protocol):
     """Protocol defining the expected interface for Operators."""
-    
+
     def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the operator with provided inputs."""
         ...
+
 
 # Forward import execution components to avoid circular imports
 from ember.xcs.graph.xcs_graph import XCSGraph
@@ -95,7 +97,7 @@ def jit(
     1. First execution triggers tracing to capture the full execution graph
     2. The traced operations are compiled into an optimized execution plan
     3. Subsequent calls reuse this plan without re-tracing (unless force_trace=True)
-    
+
     Pre-compilation via sample_input is available for performance-critical paths where
     even the first execution needs to be fast. This implements an "eager" JIT pattern
     where compilation happens at initialization time rather than first execution time.
@@ -114,7 +116,7 @@ def jit(
                     Recommended for performance-critical initialization paths.
         force_trace: When True, disables caching and traces every invocation.
                     This is valuable for debugging and for operators whose execution
-                    pattern varies significantly based on input values. 
+                    pattern varies significantly based on input values.
                     Performance impact: Significant, as caching benefits are disabled.
         recursive: Controls whether nested operator calls are also traced and compiled.
                  Currently limited to direct child operators observed during tracing.
@@ -128,14 +130,14 @@ def jit(
         TypeError: If applied to a class that doesn't inherit from Operator.
                   The decorator strictly enforces type safety to prevent
                   incorrect usage on unsupported class types.
-    
+
     Example:
         # Direct decoration (no parameters)
         @jit
         class SimpleOperator(Operator):
             def __call__(self, *, inputs):
                 return process(inputs)
-            
+
         # Parameterized decoration
         @jit(sample_input={"text": "example"})
         class ProcessorOperator(Operator):
@@ -160,7 +162,9 @@ def jit(
         try:
             if not issubclass(cls, Operator):
                 # Check for duck typing - if it has a __call__ method with the right signature
-                if not (hasattr(cls, "__call__") and callable(getattr(cls, "__call__"))):
+                if not (
+                    hasattr(cls, "__call__") and callable(getattr(cls, "__call__"))
+                ):
                     raise TypeError(
                         "@jit decorator can only be applied to an Operator-like class with a __call__ method."
                     )

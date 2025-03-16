@@ -31,21 +31,28 @@ try:
     from ember.core.config.exceptions import ConfigError
 except ImportError:
     # Fallbacks for environments without the old modules
-    class Provider: pass
-    class Model: pass
-    class ConfigError(Exception): pass
-    def load_config(config_path=None): 
+    class Provider:
+        pass
+
+    class Model:
+        pass
+
+    class ConfigError(Exception):
+        pass
+
+    def load_config(config_path=None):
         return EmberConfig()
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _get_provider_api_key(provider):
     """Extract API key from different provider schema versions.
-    
+
     Args:
         provider: Provider configuration object
-        
+
     Returns:
         API key string or None
     """
@@ -55,26 +62,24 @@ def _get_provider_api_key(provider):
             return provider.api_keys.get("default", {}).get("key")
         except (AttributeError, TypeError):
             pass
-    
+
     # Old schema uses api_key directly
     if hasattr(provider, "api_key"):
         return provider.api_key
-    
+
     return None
 
 
 def _register_provider_models(
-    registry: ModelRegistry,
-    provider_name: str,
-    provider
+    registry: ModelRegistry, provider_name: str, provider
 ) -> None:
     """Register models for a specific provider based on configuration.
-    
+
     Args:
         registry: Model registry instance
         provider_name: Provider identifier
         provider: Provider configuration
-        
+
     Raises:
         EmberError: If model registration fails
     """
@@ -82,16 +87,18 @@ def _register_provider_models(
     if hasattr(provider, "enabled") and not provider.enabled:
         logger.info(f"Provider {provider_name} is disabled, skipping registration")
         return
-    
+
     # Check API key
     api_key = _get_provider_api_key(provider)
     if not api_key:
-        logger.warning(f"No API key found for provider {provider_name}, skipping model registration")
+        logger.warning(
+            f"No API key found for provider {provider_name}, skipping model registration"
+        )
         return
-    
+
     # Get provider-specific configuration
     base_url = getattr(provider, "base_url", None)
-    
+
     # Handle different ways of storing models
     if hasattr(provider, "models"):
         if isinstance(provider.models, dict):
@@ -99,22 +106,26 @@ def _register_provider_models(
             model_configs = provider.models.items()
         elif isinstance(provider.models, list):
             # New schema: list of model configs
-            model_configs = [(m.id.split(":")[-1], m) for m in provider.models if hasattr(m, "id")]
+            model_configs = [
+                (m.id.split(":")[-1], m) for m in provider.models if hasattr(m, "id")
+            ]
         else:
             logger.warning(f"Unsupported models format for provider {provider_name}")
             return
     else:
         logger.warning(f"No models found for provider {provider_name}")
         return
-    
+
     # Register models
     for model_name, model_config in model_configs:
         try:
             # Create model ID
             model_id = f"{provider_name}:{model_name}"
-            
+
             # Handle cost - different schemas
-            if hasattr(model_config, "cost") and isinstance(model_config.cost, ModelCost):
+            if hasattr(model_config, "cost") and isinstance(
+                model_config.cost, ModelCost
+            ):
                 # New schema has ModelCost object
                 cost = model_config.cost
             else:
@@ -123,15 +134,15 @@ def _register_provider_models(
                 cost_output = getattr(model_config, "cost_output", 0.0)
                 cost = ModelCost(
                     input_cost_per_thousand=cost_input,
-                    output_cost_per_thousand=cost_output
+                    output_cost_per_thousand=cost_output,
                 )
-            
+
             # Create rate limit config
             rate_limit = RateLimit(
                 tokens_per_minute=getattr(model_config, "tokens_per_minute", 0),
-                requests_per_minute=getattr(model_config, "requests_per_minute", 0)
+                requests_per_minute=getattr(model_config, "requests_per_minute", 0),
             )
-            
+
             # Get model name from different schemas
             if hasattr(model_config, "model_name"):
                 model_name_str = model_config.model_name
@@ -139,24 +150,26 @@ def _register_provider_models(
                 model_name_str = model_config.name
             else:
                 model_name_str = model_name
-            
+
             # Create provider info with custom args from extended fields
             provider_info = ProviderInfo(
                 name=provider_name.capitalize(),
                 default_api_key=api_key,
-                base_url=base_url
+                base_url=base_url,
             )
-            
+
             # Try to add custom provider arguments if model_dump exists
             if hasattr(provider, "model_dump") and callable(provider.model_dump):
                 try:
                     exclude_fields = {"enabled", "api_key", "api_keys", "models"}
-                    for key, value in provider.model_dump(exclude=exclude_fields).items():
+                    for key, value in provider.model_dump(
+                        exclude=exclude_fields
+                    ).items():
                         if key not in ["__root_key__"]:
                             provider_info.custom_args[key] = str(value)
                 except Exception as dump_error:
                     logger.debug(f"Error extracting custom args: {dump_error}")
-            
+
             # Create model info
             model_info = ModelInfo(
                 model_id=model_id,
@@ -164,36 +177,36 @@ def _register_provider_models(
                 cost=cost,
                 rate_limit=rate_limit,
                 provider=provider_info,
-                api_key=api_key
+                api_key=api_key,
             )
-            
+
             # Register model if not already registered
             if not registry.is_registered(model_id):
                 registry.register_model(model_info=model_info)
                 logger.info(f"Registered model from config: {model_id}")
             else:
                 logger.debug(f"Model {model_id} already registered, skipping")
-                
+
         except Exception as e:
             logger.error(f"Failed to register model {model_name}: {e}")
 
 
 def _get_registry_config(config):
     """Extract registry configuration from config.
-    
+
     Args:
         config: Configuration object
-        
+
     Returns:
         Tuple of (registry_config, auto_discover_flag)
     """
     registry_config = None
     auto_discover = True  # Default value
-    
+
     # Get registry configuration
     if hasattr(config, "registry"):
         registry_config = config.registry
-        
+
         # Registry might be a dictionary in some test scenarios
         if isinstance(registry_config, dict):
             auto_discover = registry_config.get("auto_discover", True)
@@ -208,7 +221,7 @@ def _get_registry_config(config):
         # Default to empty registry with auto-discovery enabled
         logger.info("No registry configuration found, using defaults")
         return None, True
-    
+
     logger.debug(f"Using registry with auto_discover={auto_discover}")
     return registry_config, auto_discover
 
@@ -220,41 +233,41 @@ def initialize_ember(
     force_discovery: bool = False,
 ) -> ModelRegistry:
     """Initialize Ember's model registry using the configuration system.
-    
+
     DEPRECATED: This function is maintained for backward compatibility.
     New code should use initialize_registry() from ember.core.registry.model.initialization.
-    
+
     Args:
         config_path: Custom path to configuration file
         auto_discover: Override auto_discover setting from config
         auto_register: Override auto_register setting from config
         force_discovery: Force model discovery even if auto_discover is False
-        
+
     Returns:
         ModelRegistry: Fully configured model registry
-        
+
     Raises:
         EmberError: If initialization fails
     """
     warnings.warn(
         "initialize_ember() is deprecated. Use initialize_registry() from "
         "ember.core.registry.model.initialization instead.",
-        DeprecationWarning, 
-        stacklevel=2
+        DeprecationWarning,
+        stacklevel=2,
     )
-    
+
     try:
         # Use the centralized configuration system
         config_manager = create_config_manager(config_path=config_path)
         return initialize_registry(
             config_manager=config_manager,
             auto_discover=auto_discover,
-            force_discovery=force_discovery
+            force_discovery=force_discovery,
         )
     except Exception as e:
         logger.error(f"Error during initialization: {e}")
         raise EmberError(f"Failed to initialize Ember: {e}") from e
-    
+
     # The following implementation is kept for reference but is not used
     """
     registry = ModelRegistry(logger=logger)

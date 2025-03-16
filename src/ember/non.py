@@ -96,6 +96,7 @@ except ImportError:
         explanation: str
         revised_answer: str
 
+
 # Then, import the implementation modules which might have dependencies on the types
 try:
     from ember.core.non import (
@@ -106,7 +107,6 @@ try:
         Verifier,
         Sequential,
         VariedEnsemble,
-        
         # Additional input types for VariedEnsemble
         VariedEnsembleInputs,
         VariedEnsembleOutputs,
@@ -115,64 +115,80 @@ except ImportError:
     # Stub implementations for tests
     from typing import Dict, Any, List, Optional
     from pydantic import BaseModel
-    
+
     class UniformEnsemble:
         """Stub UniformEnsemble for tests."""
+
         def __init__(self, num_units=3, model_name=None, temperature=1.0):
             self.num_units = num_units
             self.model_name = model_name
             self.temperature = temperature
-            
+
         def __call__(self, *, inputs):
             return {"responses": ["stub response"] * self.num_units}
-    
+
     class MostCommon:
         """Stub MostCommon for tests."""
+
         def __init__(self):
             pass
-            
+
         def __call__(self, *, inputs):
             return {"final_answer": "stub answer"}
-    
+
     class JudgeSynthesis:
         """Stub JudgeSynthesis for tests."""
+
         def __init__(self, model_name=None):
             self.model_name = model_name
-            
+
         def __call__(self, *, inputs):
-            return {"synthesized_response": "stub synthesis", "reasoning": "stub reasoning"}
-    
+            return {
+                "synthesized_response": "stub synthesis",
+                "reasoning": "stub reasoning",
+            }
+
     class Verifier:
         """Stub Verifier for tests."""
+
         def __init__(self, model_name=None):
             self.model_name = model_name
-            
+
         def __call__(self, *, inputs):
-            return {"verdict": "valid", "explanation": "stub explanation", "revised_answer": "stub revision"}
-    
+            return {
+                "verdict": "valid",
+                "explanation": "stub explanation",
+                "revised_answer": "stub revision",
+            }
+
     class Sequential:
         """Stub Sequential for tests."""
+
         def __init__(self, operators=None):
             self.operators = operators or []
-            
+
         def __call__(self, *, inputs):
             return {"result": "stub sequential result"}
-    
+
     class VariedEnsemble:
         """Stub VariedEnsemble for tests."""
+
         def __init__(self, models=None):
             self.models = models or []
-            
+
         def __call__(self, *, inputs):
             return {"responses": ["stub varied response"] * len(self.models)}
-    
+
     class VariedEnsembleInputs(BaseModel):
         """Stub VariedEnsembleInputs for tests."""
+
         query: str
-        
+
     class VariedEnsembleOutputs(BaseModel):
         """Stub VariedEnsembleOutputs for tests."""
+
         responses: List[str]
+
 
 __all__ = [
     # Core operators
@@ -182,7 +198,6 @@ __all__ = [
     "Verifier",
     "Sequential",
     "VariedEnsemble",
-    
     # Input/output types
     "EnsembleInputs",
     "EnsembleOperatorOutputs",

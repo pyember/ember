@@ -142,7 +142,7 @@ class QuerySpecification(Specification):
 # Create a compound system using the @jit decorator for optimization
 @jit
 class ParallelQuerySystem(Operator[QueryInput, QueryOutput]):
-    # Class-level specification declaration
+    # Class-level specification declaration with ClassVar
     specification: ClassVar[Specification] = QuerySpecification()
     
     # Class-level field declarations

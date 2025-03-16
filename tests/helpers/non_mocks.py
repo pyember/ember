@@ -30,12 +30,18 @@ T_out = TypeVar("T_out", bound=EmberModel)
 # Mock Model Components
 # -------------------------------------------------------------------------
 
+
 class LMModuleConfig:
     """Configuration for LM modules."""
-    
-    def __init__(self, model_name: str, temperature: float = 0.7, max_tokens: Optional[int] = None):
+
+    def __init__(
+        self,
+        model_name: str,
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+    ):
         """Initialize LM module configuration.
-        
+
         Args:
             model_name: Name of the model to use
             temperature: Sampling temperature
@@ -45,58 +51,67 @@ class LMModuleConfig:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+
 class LMModule:
     """Mock implementation of a language model module."""
-    
+
     def __init__(self, config: LMModuleConfig):
         """Initialize with configuration.
-        
+
         Args:
             config: Configuration for the language model
         """
         self.config = config
-    
+
     def __call__(self, *, prompt: str) -> str:
         """Execute the language model on a prompt.
-        
+
         Args:
             prompt: The input prompt
-            
+
         Returns:
             Generated text response
         """
         # For testing, just return a simple transformation of the prompt
-        return f"Response to: {prompt[:30]}..." if len(prompt) > 30 else f"Response to: {prompt}"
+        return (
+            f"Response to: {prompt[:30]}..."
+            if len(prompt) > 30
+            else f"Response to: {prompt}"
+        )
+
 
 # -------------------------------------------------------------------------
 # Ensemble Components
 # -------------------------------------------------------------------------
 
+
 class EnsembleOperatorInputs(EmberModel):
     """Inputs for ensemble operators."""
-    
+
     query: str
+
 
 class EnsembleOperatorOutputs(EmberModel):
     """Outputs from ensemble operators."""
-    
+
     responses: List[str]
+
 
 class EnsembleSpecification(Specification):
     """Specification for ensemble operations."""
-    
+
     def __init__(self):
         """Initialize with appropriate models."""
         super().__init__(
-            input_model=EnsembleOperatorInputs,
-            output_model=EnsembleOperatorOutputs
+            input_model=EnsembleOperatorInputs, output_model=EnsembleOperatorOutputs
         )
+
 
 class UniformEnsemble(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]):
     """Mock implementation of the UniformEnsemble operator."""
-    
+
     specification: ClassVar[Specification] = EnsembleSpecification()
-    
+
     def __init__(
         self,
         *,
@@ -106,7 +121,7 @@ class UniformEnsemble(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs])
         max_tokens: Optional[int] = None,
     ):
         """Initialize the ensemble.
-        
+
         Args:
             num_units: Number of model instances to use
             model_name: Name of the model to use
@@ -118,72 +133,74 @@ class UniformEnsemble(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs])
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
-        
+
         # Create LM modules
         self.lm_modules = [
             LMModule(
                 config=LMModuleConfig(
                     model_name=model_name,
                     temperature=temperature,
-                    max_tokens=max_tokens
+                    max_tokens=max_tokens,
                 )
             )
             for _ in range(num_units)
         ]
-    
+
     def forward(self, *, inputs: EnsembleOperatorInputs) -> EnsembleOperatorOutputs:
         """Execute the ensemble.
-        
+
         Args:
             inputs: Input data containing the query
-            
+
         Returns:
             Output data containing the responses
         """
         # Render prompt
         query = inputs.query
-        
+
         # Execute on all models
         responses = [lm(prompt=query) for lm in self.lm_modules]
-        
+
         return EnsembleOperatorOutputs(responses=responses)
+
 
 # -------------------------------------------------------------------------
 # MostCommon Components
 # -------------------------------------------------------------------------
 
+
 class MostCommonInputs(EmberModel):
     """Inputs for MostCommon operator."""
-    
+
     responses: List[str]
+
 
 class MostCommonOutputs(EmberModel):
     """Outputs from MostCommon operator."""
-    
+
     most_common: str
     counts: Dict[str, int]
 
+
 class MostCommonSpecification(Specification):
     """Specification for MostCommon operations."""
-    
+
     def __init__(self):
         """Initialize with appropriate models."""
-        super().__init__(
-            input_model=MostCommonInputs,
-            output_model=MostCommonOutputs
-        )
+        super().__init__(input_model=MostCommonInputs, output_model=MostCommonOutputs)
+
 
 class MostCommon(Operator[MostCommonInputs, MostCommonOutputs]):
     """Mock implementation of the MostCommon operator."""
-    
+
     specification: ClassVar[Specification] = MostCommonSpecification()
-    
+
     def forward(self, *, inputs: MostCommonInputs) -> MostCommonOutputs:
         """Find the most common response.
-        
+
         Args:
             inputs: Input data containing responses
-            
+
         Returns:
             Output data with the most common response and counts
         """
@@ -191,44 +208,46 @@ class MostCommon(Operator[MostCommonInputs, MostCommonOutputs]):
         counts: Dict[str, int] = {}
         for response in inputs.responses:
             counts[response] = counts.get(response, 0) + 1
-        
+
         # Find most common
         most_common = max(counts.items(), key=lambda x: x[1])[0] if counts else ""
-        
+
         return MostCommonOutputs(most_common=most_common, counts=counts)
+
 
 # -------------------------------------------------------------------------
 # Verifier Components
 # -------------------------------------------------------------------------
 
+
 class VerifierInputs(EmberModel):
     """Inputs for Verifier operator."""
-    
+
     query: str
     candidate_answer: str
 
+
 class VerifierOutputs(EmberModel):
     """Outputs from Verifier operator."""
-    
+
     verdict: str
     explanation: str
     revised_answer: Optional[str] = None
 
+
 class VerifierSpecification(Specification):
     """Specification for Verifier operations."""
-    
+
     def __init__(self):
         """Initialize with appropriate models."""
-        super().__init__(
-            input_model=VerifierInputs,
-            output_model=VerifierOutputs
-        )
+        super().__init__(input_model=VerifierInputs, output_model=VerifierOutputs)
+
 
 class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     """Mock implementation of the Verifier operator."""
-    
+
     specification: ClassVar[Specification] = VerifierSpecification()
-    
+
     def __init__(
         self,
         *,
@@ -237,7 +256,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         max_tokens: Optional[int] = None,
     ):
         """Initialize the verifier.
-        
+
         Args:
             model_name: Name of the model to use
             temperature: Sampling temperature
@@ -247,22 +266,20 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
-        
+
         # Create LM module
         self.lm_module = LMModule(
             config=LMModuleConfig(
-                model_name=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens
+                model_name=model_name, temperature=temperature, max_tokens=max_tokens
             )
         )
-    
+
     def forward(self, *, inputs: VerifierInputs) -> VerifierOutputs:
         """Verify a candidate answer.
-        
+
         Args:
             inputs: Input data containing query and candidate answer
-            
+
         Returns:
             Output data with verification results
         """
@@ -275,44 +292,46 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
             verdict = "correct"
             explanation = "Answer is adequate"
             revised_answer = None
-        
+
         return VerifierOutputs(
-            verdict=verdict,
-            explanation=explanation,
-            revised_answer=revised_answer
+            verdict=verdict, explanation=explanation, revised_answer=revised_answer
         )
+
 
 # -------------------------------------------------------------------------
 # JudgeSynthesis Components
 # -------------------------------------------------------------------------
 
+
 class JudgeSynthesisInputs(EmberModel):
     """Inputs for JudgeSynthesis operator."""
-    
+
     query: str
     responses: List[str]
 
+
 class JudgeSynthesisOutputs(EmberModel):
     """Outputs from JudgeSynthesis operator."""
-    
+
     synthesized_response: str
     reasoning: str
 
+
 class JudgeSynthesisSpecification(Specification):
     """Specification for JudgeSynthesis operations."""
-    
+
     def __init__(self):
         """Initialize with appropriate models."""
         super().__init__(
-            input_model=JudgeSynthesisInputs,
-            output_model=JudgeSynthesisOutputs
+            input_model=JudgeSynthesisInputs, output_model=JudgeSynthesisOutputs
         )
+
 
 class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
     """Mock implementation of the JudgeSynthesis operator."""
-    
+
     specification: ClassVar[Specification] = JudgeSynthesisSpecification()
-    
+
     def __init__(
         self,
         *,
@@ -321,7 +340,7 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         max_tokens: Optional[int] = None,
     ):
         """Initialize the judge.
-        
+
         Args:
             model_name: Name of the model to use
             temperature: Sampling temperature
@@ -331,59 +350,60 @@ class JudgeSynthesis(Operator[JudgeSynthesisInputs, JudgeSynthesisOutputs]):
         self.model_name = model_name
         self.temperature = temperature
         self.max_tokens = max_tokens
-        
+
         # Create LM module
         self.lm_module = LMModule(
             config=LMModuleConfig(
-                model_name=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens
+                model_name=model_name, temperature=temperature, max_tokens=max_tokens
             )
         )
-    
+
     def forward(self, *, inputs: JudgeSynthesisInputs) -> JudgeSynthesisOutputs:
         """Synthesize responses.
-        
+
         Args:
             inputs: Input data containing query and responses
-            
+
         Returns:
             Output data with synthesized response and reasoning
         """
         # For testing, simple synthesis logic
         query = inputs.query
         responses = inputs.responses
-        
+
         synthesized = f"Synthesized answer to: {query}"
-        reasoning = f"Considered {len(responses)} responses and selected the best elements"
-        
-        return JudgeSynthesisOutputs(
-            synthesized_response=synthesized,
-            reasoning=reasoning
+        reasoning = (
+            f"Considered {len(responses)} responses and selected the best elements"
         )
+
+        return JudgeSynthesisOutputs(
+            synthesized_response=synthesized, reasoning=reasoning
+        )
+
 
 # -------------------------------------------------------------------------
 # Sequential Component
 # -------------------------------------------------------------------------
 
+
 class Sequential(Operator[T_in, T_out]):
     """Mock implementation of the Sequential operator."""
-    
+
     def __init__(self, *, operators: List[Operator[Any, Any]]):
         """Initialize with a list of operators.
-        
+
         Args:
             operators: List of operators to execute sequentially
         """
         super().__init__()
         self.operators = operators
-    
+
     def forward(self, *, inputs: T_in) -> T_out:
         """Execute operators sequentially.
-        
+
         Args:
             inputs: Input data for the first operator
-            
+
         Returns:
             Output data from the last operator
         """
@@ -392,21 +412,22 @@ class Sequential(Operator[T_in, T_out]):
             result = operator(inputs=result)
         return result
 
+
 # Export all components
 __all__ = [
-    'LMModuleConfig',
-    'LMModule',
-    'EnsembleOperatorInputs',
-    'EnsembleOperatorOutputs',
-    'UniformEnsemble',
-    'MostCommonInputs',
-    'MostCommonOutputs',
-    'MostCommon',
-    'VerifierInputs',
-    'VerifierOutputs',
-    'Verifier',
-    'JudgeSynthesisInputs',
-    'JudgeSynthesisOutputs',
-    'JudgeSynthesis',
-    'Sequential',
+    "LMModuleConfig",
+    "LMModule",
+    "EnsembleOperatorInputs",
+    "EnsembleOperatorOutputs",
+    "UniformEnsemble",
+    "MostCommonInputs",
+    "MostCommonOutputs",
+    "MostCommon",
+    "VerifierInputs",
+    "VerifierOutputs",
+    "Verifier",
+    "JudgeSynthesisInputs",
+    "JudgeSynthesisOutputs",
+    "JudgeSynthesis",
+    "Sequential",
 ]

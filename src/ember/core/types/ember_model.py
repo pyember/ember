@@ -23,17 +23,19 @@ from .protocols import TypeInfo, EmberTyped, EmberSerializable
 
 T = TypeVar("T", bound="EmberModel")
 
+
 class EmberModel(BaseModel):
     """
     A unified model for Ember input/output types that combines BaseModel validation
     with flexible serialization to dict, JSON, and potentially other formats.
-    
+
     This class supports both attribute access (model.attr) and dictionary access (model["attr"])
     patterns for maximum flexibility and backward compatibility.
-    
+
     It implements EmberTyped and EmberSerializable protocols to provide consistent
     type information and serialization capabilities.
     """
+
     # Use the new ConfigDict style instead of class Config
     model_config = ConfigDict()
 
@@ -136,21 +138,21 @@ class EmberModel(BaseModel):
         field_definitions = {}
         for k, v in fields.items():
             field_definitions[k] = (v, ...)  # All fields are required by default
-            
+
         # Use dict-based approach to work around typing limitations
         # This approach creates the model directly with appropriate base class
         # without using create_model which has typing constraints
         model_attrs = {
             "__annotations__": {k: v for k, v in fields.items()},
             "__module__": __name__,
-            "__doc__": f"Dynamically generated EmberModel: {name}"
+            "__doc__": f"Dynamically generated EmberModel: {name}",
         }
-        
+
         # Create the model class directly as a subclass
         model_class = type(name, (cls,), model_attrs)
 
         # Set the output format
-        setattr(model_class, '__output_format__', output_format)
-        
+        setattr(model_class, "__output_format__", output_format)
+
         # Explicitly cast to the correct return type
         return cast(Type["EmberModel"], model_class)

@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from ember import initialize_ember
+from ember import initialize_ember  # Use top-level function
 from ember.core.registry.model import load_model, ChatResponse
 from ember.core.registry.model.base.services.model_service import ModelService
 
@@ -21,7 +21,7 @@ def main() -> None:
     """
     try:
         # Initialize the registry of models from the merged YAML configuration.
-        registry = initialize_ember(auto_register=True, auto_discover=True)
+        registry = initialize_ember(auto_discover=True, initialize_context=False)
 
         # Create a ModelService instance.
         service = ModelService(registry=registry)
@@ -46,7 +46,9 @@ def main() -> None:
                     model_id=model_id,
                     prompt="Explain quantum computing in 50 words",
                 )
-                print(f"🛎️ Service response from {model_id}:\n{service_response.data}\n")
+                print(
+                    f"🛎️ Service response from {model_id}:\n{service_response.data}\n"
+                )
 
                 # 2. Direct model instance usage: Useful for more granular or PyTorch-like workflows.
                 model = load_model(model_id=model_id, registry=registry)

@@ -28,7 +28,7 @@ class EmberAppContext:
     """
     Core dependency container for Ember's service architecture.
 
-    The EmberAppContext serves as the composition root for the entire framework, 
+    The EmberAppContext serves as the composition root for the entire framework,
     centralizing all service dependencies and their lifecycle management. It implements
     the Dependency Inversion Principle by decoupling service consumers from their
     concrete implementations, enabling flexible configuration, testing, and extension.
@@ -98,8 +98,7 @@ def create_ember_app(config_path: Optional[str] = None) -> EmberAppContext:
 
     # 3) Create and initialize the model registry
     model_registry = initialize_registry(
-        config_manager=config_manager,
-        auto_discover=True
+        config_manager=config_manager, auto_discover=True
     )
     logger.debug("Model registry initialized")
 
@@ -118,17 +117,17 @@ def create_ember_app(config_path: Optional[str] = None) -> EmberAppContext:
 def _initialize_api_keys_from_env(config_manager: ConfigManager) -> None:
     """
     Initialize API keys from environment variables.
-    
+
     Args:
         config_manager: Configuration manager to update
     """
     # Common API keys to check for
     env_keys = {
         "OPENAI_API_KEY": "openai",
-        "ANTHROPIC_API_KEY": "anthropic", 
-        "GOOGLE_API_KEY": "google"
+        "ANTHROPIC_API_KEY": "anthropic",
+        "GOOGLE_API_KEY": "google",
     }
-    
+
     # Set API keys from environment if available
     for env_var, provider in env_keys.items():
         api_key = os.environ.get(env_var)
@@ -140,27 +139,27 @@ class EmberContext:
     """
     Thread-safe global access point for Ember's core service architecture.
 
-    The EmberContext combines three critical design patterns to provide a robust 
+    The EmberContext combines three critical design patterns to provide a robust
     foundation for the framework:
-    
+
     1. Singleton Pattern: Guarantees a single global instance in standard usage,
        ensuring consistent state and memory efficiency
-    
+
     2. Lazy Initialization: Defers resource creation until first access, avoiding
        circular dependencies and reducing startup overhead
-    
+
     3. Test Mode Pattern: Provides a configurable escape hatch from the singleton
        constraint specifically for testing scenarios, enabling isolated test contexts
-    
+
     This hybrid approach satisfies both production needs (centralized, consistent access)
     and testing requirements (isolation, deterministic setup/teardown). All operations
     are thread-safe through careful lock management, making the context suitable for
     concurrent applications.
-    
+
     The EmberContext implements the Facade pattern, providing simplified access to
     the underlying service architecture through property accessors while encapsulating
     all initialization complexity.
-    
+
     For internal use, consider direct dependency injection. This global context
     is primarily intended for application code that cannot easily receive injected
     dependencies.
@@ -179,32 +178,32 @@ class EmberContext:
     def enable_test_mode(cls) -> None:
         """
         Enables isolated context instances for concurrent testing environments.
-        
+
         This method reconfigures the EmberContext to bypass its singleton constraint,
         allowing each test to create completely isolated instances without interference.
         After enabling test mode, calls to EmberContext() will produce independent contexts
         with separate service instances and configurations.
-        
+
         Test mode is critical for:
         - Parallel test execution without shared state contamination
         - Dependency isolation for deterministic test outcomes
         - Preventing test order dependencies
         - Avoiding deadlocks from concurrent singleton access
-        
+
         Important implementation notes:
         - This is a class-level operation affecting all future instantiations
         - Existing instances are not affected, but their references are cleared
         - Thread-local storage is reset to prevent cross-test leakage
-        
+
         This method should typically be called in test setup fixtures or
         at the beginning of test modules.
         """
         cls._test_mode = True
         # Clear instance to ensure fresh instances even after a previous singleton was created
         cls._instance = None
-        if hasattr(cls._thread_local, 'instances'):
-            delattr(cls._thread_local, 'instances')
-    
+        if hasattr(cls._thread_local, "instances"):
+            delattr(cls._thread_local, "instances")
+
     @classmethod
     def disable_test_mode(cls) -> None:
         """
@@ -212,9 +211,9 @@ class EmberContext:
         """
         cls._test_mode = False
         cls._instance = None
-        if hasattr(cls._thread_local, 'instances'):
-            delattr(cls._thread_local, 'instances')
-            
+        if hasattr(cls._thread_local, "instances"):
+            delattr(cls._thread_local, "instances")
+
     @classmethod
     def clear_test_context(cls) -> None:
         """
@@ -252,7 +251,7 @@ class EmberContext:
             instance = super().__new__(cls)
             instance._app_context = None
             return instance
-            
+
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super().__new__(cls)
@@ -282,7 +281,7 @@ class EmberContext:
         - Standard usage: EmberContext.initialize()
         - Custom config: EmberContext.initialize(config_path="/path/to/config.yaml")
         - Mock services: EmberContext.initialize(app_context=mock_context)
-        
+
         Thread safety is guaranteed through careful lock management, making this
         method safe to call from concurrent initialization code.
 
@@ -301,15 +300,15 @@ class EmberContext:
         if cls._test_mode:
             # In test mode, create a new instance
             instance = cls()
-            
+
             # Set app_context or create a new one
             if app_context is not None:
                 instance._app_context = app_context
             else:
                 instance._app_context = create_ember_app(config_path=config_path)
-                
+
             return instance
-            
+
         with cls._lock:
             if cls._instance is None:
                 cls._instance = cls()
@@ -334,7 +333,7 @@ class EmberContext:
         if cls._test_mode:
             # In test mode, create a new instance
             return cls.initialize()
-            
+
         with cls._lock:
             if cls._instance is None:
                 return cls.initialize()
@@ -374,17 +373,17 @@ class EmberContext:
     def logger(self) -> logging.Logger:
         """Access the logger instance."""
         return self.app_context.logger
-        
+
     @classmethod
     def reset(cls) -> None:
         """
         Reset the EmberContext to its initial state.
-        
+
         This is primarily useful for testing to ensure a clean state.
         """
         cls._instance = None
-        if hasattr(cls._thread_local, 'instances'):
-            delattr(cls._thread_local, 'instances')
+        if hasattr(cls._thread_local, "instances"):
+            delattr(cls._thread_local, "instances")
 
 
 def get_ember_context() -> EmberContext:
@@ -401,7 +400,7 @@ def get_ember_context() -> EmberContext:
     - Consistent thread-safety guarantees
     - Support for both singleton and test modes
     - Zero configuration required for standard usage
-    
+
     This function implements the Service Locator pattern in its most disciplined form,
     providing centralized access while minimizing the drawbacks typically associated
     with service location. It should be used in application code that cannot easily

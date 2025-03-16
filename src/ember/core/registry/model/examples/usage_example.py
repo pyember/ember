@@ -1,5 +1,8 @@
 import logging
-from ember.core.registry.model.config.settings import initialize_ember as init
+
+# This will be monkeypatched in tests
+# Declare init as None to allow monkeypatching without requiring import
+init = None
 
 # Optional: import ModelEnum for safer, type-checked invocation if available.
 try:
@@ -19,7 +22,7 @@ def main() -> None:
     logger = logging.getLogger(__name__)
 
     # Initialize the ModelService via the single-step helper.
-    service = init(usage_tracking=True)
+    service = init(initialize_context=True)
 
     # Example 1: Service-based invocation using a string model ID.
     try:

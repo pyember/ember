@@ -12,8 +12,10 @@ import logging
 import time
 from typing import Any, Dict, List
 
-from ember.api.operator import Operator, Specification
-from ember.api.xcs import jit, execution_options
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.xcs.tracer.structural_jit import jit
+from ember.xcs.engine.execution_options import execution_options
 
 
 ###############################################################################
@@ -127,7 +129,7 @@ def main() -> None:
 
     print("First run - expect graph building overhead:")
     first_run_times = []
-    
+
     for i, inp in enumerate(inputs):
         print(f"\nInput {i+1}: {inp}")
 
@@ -139,10 +141,12 @@ def main() -> None:
         # Show calculation steps
         input_value = inp["value"]
         expected_value = (input_value + 10) * 3  # add_value=10, multiply_value=3
-        
+
         print(f"Result: {result}")
         print(f"Value: {result['value']}")
-        print(f"Expected calculation: {input_value} + 10 = {input_value + 10}, then × 3 = {expected_value}")
+        print(
+            f"Expected calculation: {input_value} + 10 = {input_value + 10}, then × 3 = {expected_value}"
+        )
         print(f"Time: {elapsed:.4f}s")
 
     # Cached execution demonstration
@@ -154,7 +158,7 @@ def main() -> None:
     print(f"Result: {result}")
     print(f"Value: {result['value']}")
     print(f"Time: {cached_time:.4f}s")
-    
+
     # Calculate speedup
     speedup = (first_run_times[0] - cached_time) / first_run_times[0]
     print(f"Speedup from caching: {speedup:.1%} faster")
@@ -170,7 +174,7 @@ def main() -> None:
         print(f"Value: {result['value']}")
         print(f"Expected calculation: 20 + 10 = 30, then × 3 = 90")
         print(f"Time: {sequential_time:.4f}s (sequential execution)")
-    
+
     # Add a summary
     print("\n=== Summary ===")
     print(f"First run time: {first_run_times[0]:.4f}s (includes tracing overhead)")

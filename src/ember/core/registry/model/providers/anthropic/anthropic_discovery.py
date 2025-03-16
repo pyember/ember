@@ -9,7 +9,10 @@ import os
 import logging
 from typing import Any, Dict, List, Optional, Protocol, cast, runtime_checkable
 
-from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider, ModelDiscoveryError
+from ember.core.registry.model.providers.base_discovery import (
+    BaseDiscoveryProvider,
+    ModelDiscoveryError,
+)
 from ember.core.app_context import get_app_context
 
 # Logger for this module.
@@ -129,32 +132,43 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
             try:
                 # Get from centralized config
                 app_context = get_app_context()
-                provider_config = app_context.config_manager.get_config().get_provider("anthropic")
+                provider_config = app_context.config_manager.get_config().get_provider(
+                    "anthropic"
+                )
                 if provider_config and provider_config.api_keys.get("default"):
-                    self._api_key = provider_config.api_keys["default"].key
+                    # Access the key attribute from the API key object
+                    default_key = provider_config.api_keys["default"]
+                    if hasattr(default_key, "key"):
+                        self._api_key = default_key.key
                     # Also get base_url if not already specified
                     if not self._base_url and hasattr(provider_config, "base_url"):
                         self._base_url = provider_config.base_url
             except Exception as config_error:
                 logger.debug(f"Could not get API key from config: {config_error}")
-                
+
             # Fallback to environment variable
             if not self._api_key:
                 self._api_key = os.environ.get("ANTHROPIC_API_KEY")
-                
+
             if not self._api_key:
-                logger.warning("No Anthropic API key found in config or environment variables")
+                logger.warning(
+                    "No Anthropic API key found in config or environment variables"
+                )
                 return None
 
         try:
-            self._client = _AnthropicClientAdapter(api_key=self._api_key, base_url=self._base_url)
+            self._client = _AnthropicClientAdapter(
+                api_key=self._api_key, base_url=self._base_url
+            )
             logger.debug("Created Anthropic client adapter (using static model list)")
             return self._client
         except ImportError:
             logger.debug("Anthropic SDK not available")
             return None
         except Exception as unexpected_error:
-            logger.exception("Unexpected error initializing Anthropic client: %s", unexpected_error)
+            logger.exception(
+                "Unexpected error initializing Anthropic client: %s", unexpected_error
+            )
             return None
 
     def fetch_models(self) -> Dict[str, ModelDict]:
@@ -175,15 +189,22 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
                     if isinstance(response, dict) and "data" in response:
                         models_data = cast(List[ModelDict], response["data"])
                     else:
-                        logger.warning("Unexpected response format from Anthropic client: %s", response)
+                        logger.warning(
+                            "Unexpected response format from Anthropic client: %s",
+                            response,
+                        )
                 except Exception as client_error:
-                    logger.error("Error fetching models from Anthropic client: %s", client_error)
+                    logger.error(
+                        "Error fetching models from Anthropic client: %s", client_error
+                    )
 
             standardized_models: Dict[str, ModelDict] = {}
             for model in models_data:
                 model_id_raw: str = model.get("id", "")
                 if model_id_raw:
-                    canonical_id: str = self._generate_model_id(raw_model_id=model_id_raw)
+                    canonical_id: str = self._generate_model_id(
+                        raw_model_id=model_id_raw
+                    )
                     standardized_models[canonical_id] = self._build_model_entry(
                         model_id=canonical_id, model_data=model
                     )
@@ -192,7 +213,7 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
             logger.debug(
                 "Returning %d Anthropic models: %s",
                 len(standardized_models),
-                list(standardized_models.keys())
+                list(standardized_models.keys()),
             )
             return standardized_models
 

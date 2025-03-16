@@ -46,12 +46,14 @@ def test_deepmind_discovery_fetch_models(discovery_instance) -> None:
     assert entry.get("model_name") == "gemini-1.5-pro"
 
 
-def test_deepmind_discovery_fetch_models_error(discovery_instance, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_deepmind_discovery_fetch_models_error(
+    discovery_instance, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Test that if genai.list_models throws an error, fetch_models handles it gracefully."""
     monkeypatch.setattr(
         genai, "list_models", lambda: (_ for _ in ()).throw(Exception("API error"))
     )
-    
+
     # Check fallback behavior
     models = discovery_instance.fetch_models()
     assert len(models) > 0

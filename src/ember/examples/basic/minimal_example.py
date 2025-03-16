@@ -2,18 +2,19 @@
 
 This module demonstrates the simplest possible Ember operator.
 
-Follows best practices from high-quality OSS projects like JAX and PyTorch
-while maintaining simplicity and type safety.
+This example illustrates how the Ember `Operator` construct provides a minimal 
+foundation that can be used for language-model transformations or to wrap 
+arbitrary function logic.
 
 To run:
-    poetry run python src/ember/examples/minimal_example.py
+    poetry run python src/ember/examples/basic/minimal_example.py
 """
 
-from typing import ClassVar, Type, Dict, Any, Optional, List
+from typing import Any, ClassVar, Dict, List, Optional, Type
 
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.types.ember_model import EmberModel, Field
 from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel, Field
 
 
 class MinimalInput(EmberModel):
@@ -74,7 +75,7 @@ class MinimalOperator(Operator[MinimalInput, MinimalOutput]):
         multiplier: The value to multiply by after incrementing
     """
     # Class-level specification (immutable)
-    specification: ClassVar[Specification] = MinimalSpecification()
+    specification: Specification = MinimalSpecification()
     
     # Instance attributes with type hints
     increment: int

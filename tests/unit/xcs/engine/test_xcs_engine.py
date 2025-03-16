@@ -48,14 +48,14 @@ def test_topological_scheduler() -> None:
     node_a = graph.add_node(operator=dummy_operator, node_id="A")
     node_b = graph.add_node(operator=dummy_operator, node_id="B")
     node_c = graph.add_node(operator=dummy_operator, node_id="C")
-    
+
     graph.add_edge(from_id=node_a, to_id=node_b)
     graph.add_edge(from_id=node_b, to_id=node_c)
-    
+
     # Schedule the graph
     scheduler = TopologicalScheduler()
     waves = scheduler.schedule(graph)
-    
+
     # Verify the waves - should be [[A], [B], [C]] for a linear chain
     assert len(waves) == 3, f"Expected 3 waves, got {len(waves)}"
     assert waves[0] == [node_a], f"First wave should be [A], got {waves[0]}"
@@ -80,22 +80,26 @@ def test_execute_graph_simple() -> None:
     node1 = graph.add_node(operator=dummy_operator, node_id="node1")
     node2 = graph.add_node(operator=dummy_operator, node_id="node2")
     graph.add_edge(from_id=node1, to_id=node2)
-    
+
     # Execute the graph
     input_data = {"value": "test_input"}
     results = execute_graph(graph=graph, global_input=input_data)
-    
+
     # Verify results
     assert len(results) == 2, f"Expected results for 2 nodes, got {len(results)}"
     assert "node1" in results, "Results missing for node1"
     assert "node2" in results, "Results missing for node2"
-    
+
     # Verify node1 received the global input
-    assert results["node1"]["value"] == "test_input", "Node1 didn't receive correct input"
+    assert (
+        results["node1"]["value"] == "test_input"
+    ), "Node1 didn't receive correct input"
     assert results["node1"]["executed"] == True, "Node1 wasn't executed"
-    
+
     # Verify node2 received node1's output (which includes the global input)
-    assert results["node2"]["value"] == "test_input", "Node2 didn't receive node1's output"
+    assert (
+        results["node2"]["value"] == "test_input"
+    ), "Node2 didn't receive node1's output"
     assert results["node2"]["executed"] == True, "Node2 wasn't executed"
 
 
@@ -117,37 +121,39 @@ def test_execute_graph_with_parallel_scheduler() -> None:
     node2a = graph.add_node(operator=dummy_operator, node_id="node2a")
     node2b = graph.add_node(operator=dummy_operator, node_id="node2b")
     node3 = graph.add_node(operator=dummy_operator, node_id="node3")
-    
+
     graph.add_edge(from_id=node1, to_id=node2a)
     graph.add_edge(from_id=node1, to_id=node2b)
     graph.add_edge(from_id=node2a, to_id=node3)
     graph.add_edge(from_id=node2b, to_id=node3)
-    
+
     # Execute with parallel scheduler
     scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=2)
     input_data = {"value": "parallel_test"}
     results = execute_graph(graph=graph, global_input=input_data, scheduler=scheduler)
-    
+
     # Verify all nodes executed
     for node_id in [node1, node2a, node2b, node3]:
         assert node_id in results, f"Results missing for {node_id}"
         assert results[node_id]["executed"] == True, f"Node {node_id} wasn't executed"
-    
+
     # Verify node3 received outputs from both node2a and node2b
     # In the current implementation, later nodes in the same wave overwrite earlier ones
     # so we just verify node3 was executed with some input
-    assert results[node3]["value"] == "parallel_test", "Node3 didn't receive correct input"
+    assert (
+        results[node3]["value"] == "parallel_test"
+    ), "Node3 didn't receive correct input"
 
 
 class ErrorOperator:
     """An operator that raises an exception during execution."""
-    
+
     def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Raise an exception when called.
-        
+
         Args:
             inputs: Input data (not used)
-            
+
         Raises:
             RuntimeError: Always raises this error
         """
@@ -156,12 +162,12 @@ class ErrorOperator:
 
 def test_execute_graph_error_handling() -> None:
     """Test error handling during graph execution.
-    
+
     This test verifies:
     - Errors in node execution are caught and don't crash the entire process
     - The execution results include error information for failed nodes
     - Nodes that depend on failed nodes are still attempted with available inputs
-    
+
     Raises:
         AssertionError: If error handling doesn't work as expected.
     """
@@ -170,22 +176,24 @@ def test_execute_graph_error_handling() -> None:
     node1 = graph.add_node(operator=dummy_operator, node_id="node1")
     error_node = graph.add_node(operator=ErrorOperator(), node_id="error_node")
     node3 = graph.add_node(operator=dummy_operator, node_id="node3")
-    
+
     graph.add_edge(from_id=node1, to_id=error_node)
     graph.add_edge(from_id=error_node, to_id=node3)
-    
+
     # Execute the graph
     input_data = {"value": "error_test"}
     results = execute_graph(graph=graph, global_input=input_data)
-    
+
     # Verify normal node executed
     assert node1 in results, "Results missing for node1"
     assert results[node1]["executed"] == True, "Node1 wasn't executed"
-    
+
     # Verify error was captured for error_node
     assert error_node in results, "Results missing for error_node"
     assert "error" in results[error_node], "Error not captured in results"
-    assert "Intentional test error" in results[error_node]["error"], "Wrong error message"
-    
+    assert (
+        "Intentional test error" in results[error_node]["error"]
+    ), "Wrong error message"
+
     # Verify node3 attempted execution with available inputs
     assert node3 in results, "Results missing for node3"

@@ -48,12 +48,14 @@ class OperatorSpecificationNotDefinedError(OperatorError):
 
     def __init__(self, message: str = "Operator specification must be defined."):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
-        
+
+
 class OperatorSpecificationNotDefinedError(OperatorSpecificationNotDefinedError):
-    """Legacy exception for backward compatibility. 
-    
+    """Legacy exception for backward compatibility.
+
     This is an alias for OperatorSpecificationNotDefinedError.
     """
+
     pass
 
 
@@ -64,12 +66,14 @@ class SpecificationValidationError(OperatorError):
 
     def __init__(self, message: str = "Specification validation error occurred."):
         super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
-        
+
+
 class SpecificationValidationError(SpecificationValidationError):
     """Legacy exception for backward compatibility.
-    
+
     This is an alias for SpecificationValidationError.
     """
+
     pass
 
 

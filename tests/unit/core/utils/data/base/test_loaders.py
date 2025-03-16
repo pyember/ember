@@ -12,6 +12,7 @@ from ember.core.utils.data.base.loaders import (
     IDatasetLoader,
     HuggingFaceDatasetLoader,
 )
+from ember.core.utils.data.base.models import DatasetInfo
 
 
 class TestIDatasetLoader(unittest.TestCase):

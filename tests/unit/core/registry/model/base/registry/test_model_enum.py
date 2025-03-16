@@ -16,7 +16,9 @@ def test_model_enum_creation() -> None:
     """Test that ModelEnum combines models from all provider enums."""
     # Verify at least one model from each provider is in the aggregated enum
     assert OpenAIModelEnum.GPT_4O.value in [item.value for item in ModelEnum]
-    assert AnthropicModelEnum.CLAUDE_3_5_SONNET.value in [item.value for item in ModelEnum]
+    assert AnthropicModelEnum.CLAUDE_3_5_SONNET.value in [
+        item.value for item in ModelEnum
+    ]
     assert DeepmindModelEnum.GEMINI_1_5_PRO.value in [item.value for item in ModelEnum]
 
 

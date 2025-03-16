@@ -32,40 +32,46 @@ Example:
 
 from functools import wraps
 from typing import (
-    TypeVar, 
-    Callable, 
-    Dict, 
-    List, 
-    Union, 
-    Mapping, 
-    Sequence, 
-    Optional, 
-    Generic, 
+    TypeVar,
+    Callable,
+    Dict,
+    List,
+    Union,
+    Mapping,
+    Sequence,
+    Optional,
+    Generic,
     cast,
     Iterator,
     Iterable,
-    Any
+    Any,
 )
 from typing_extensions import TypedDict, Protocol
 
 # Use stub classes to avoid import errors
 from typing import TypeVar, Dict, Any
 
+
 # Stub class for Operator to avoid circular imports
 class Operator:
     """Temporary Operator stub class to avoid import errors."""
+
     def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Placeholder for calling an operator."""
         return {}
 
+
 # Use TypeVar for NodeInputT and NodeOutputT
-NodeInputT = TypeVar('NodeInputT', bound=Dict[str, Any])
-NodeOutputT = TypeVar('NodeOutputT', bound=Dict[str, Any])
+NodeInputT = TypeVar("NodeInputT", bound=Dict[str, Any])
+NodeOutputT = TypeVar("NodeOutputT", bound=Dict[str, Any])
+
 
 # Stub class for EmberModel
 class EmberModel:
     """Temporary EmberModel stub class to avoid import errors."""
+
     pass
+
 
 # Define more specific type variables
 InputItemT = TypeVar("InputItemT")
@@ -74,18 +80,24 @@ BatchInputT = TypeVar("BatchInputT", bound=Mapping[str, object])
 BatchOutputT = TypeVar("BatchOutputT", bound=Mapping[str, object])
 
 
-ItemT_co = TypeVar("ItemT_co", covariant=True)  # Type of item in a batchable container (covariant)
+ItemT_co = TypeVar(
+    "ItemT_co", covariant=True
+)  # Type of item in a batchable container (covariant)
+
 
 class BatchableInput(Protocol[ItemT_co]):
     """Protocol for types that can be batched."""
-    
-    def __len__(self) -> int: ...
-    def __getitem__(self, index: int) -> ItemT_co: ...
+
+    def __len__(self) -> int:
+        ...
+
+    def __getitem__(self, index: int) -> ItemT_co:
+        ...
 
 
 class BatchAxis(TypedDict, total=False):
     """Configuration for batch axis settings."""
-    
+
     axis: int
     stack_results: bool
     preserve_batch_dim: bool
@@ -93,7 +105,7 @@ class BatchAxis(TypedDict, total=False):
 
 class VMapConfig(TypedDict, total=False):
     """Configuration for vmap operation."""
-    
+
     strict_batch_size: bool
     check_batch_consistency: bool
     error_on_empty_batch: bool
@@ -101,8 +113,7 @@ class VMapConfig(TypedDict, total=False):
 
 
 def _get_batch_size(
-    inputs: Mapping[str, object], 
-    in_axes: Union[int, Mapping[str, int]]
+    inputs: Mapping[str, object], in_axes: Union[int, Mapping[str, int]]
 ) -> int:
     """Determines the consistent batch size from a dictionary of inputs.
 
@@ -142,7 +153,7 @@ def _get_batch_size(
         for key, value in inputs.items():
             if key in in_axes and isinstance(value, (list, tuple)):
                 batch_sizes.append(len(value))
-    
+
     if batch_sizes:
         unique_sizes = set(batch_sizes)
         if len(unique_sizes) > 1:
@@ -190,28 +201,27 @@ def _prepare_batched_inputs(
         if isinstance(in_axes, dict) and key not in in_axes:
             result[key] = [value] * batch_size
             continue
-            
+
         if not isinstance(value, (list, tuple)):
             result[key] = [value] * batch_size
             continue
-            
+
         if len(value) == 0 and batch_size > 0:
             result[key] = [cast(List[object], [])] * batch_size
             continue
-            
+
         value_list = list(value)
         if len(value_list) != batch_size:
             raise ValueError(
                 f"Input '{key}' has length {len(value_list)}, but batch size is {batch_size}."
             )
         result[key] = value_list
-    
+
     return result
 
 
 def _combine_outputs(
-    results: Sequence[object], 
-    out_axes: Union[int, Mapping[str, int]] = 0
+    results: Sequence[object], out_axes: Union[int, Mapping[str, int]] = 0
 ) -> Dict[str, object]:
     """Merges individual outputs from batch processing into a consolidated result.
 
@@ -226,7 +236,7 @@ def _combine_outputs(
        - Single-item lists are automatically unwrapped for cleaner results
     2. If outputs are not all dictionaries:
        - All results are collected into a list under the key "result"
-    
+
     This adaptability ensures that the vectorized operator maintains semantics
     similar to the original, just with batched inputs and outputs.
 
@@ -243,12 +253,12 @@ def _combine_outputs(
     """
     if not results:
         return {}
-        
+
     # If all results are mappings (dictionaries), combine them by key
     if all(isinstance(r, Mapping) for r in results):
         combined: Dict[str, object] = {}
         first_result = cast(Mapping[str, object], results[0])
-        
+
         for key in first_result.keys():
             values: List[object] = []
             for result in results:
@@ -262,15 +272,14 @@ def _combine_outputs(
                         values.append(value)
             combined[key] = values
         return combined
-        
+
     # Otherwise, return all results under the "result" key
     return {"result": list(results)}
 
 
 def vmap(
     operator_or_fn: Union[
-        Operator, 
-        Callable[[Mapping[str, object]], Mapping[str, object]]
+        Operator, Callable[[Mapping[str, object]], Mapping[str, object]]
     ],
     in_axes: Union[int, Dict[str, int]] = 0,
     out_axes: Union[int, Dict[str, int]] = 0,
@@ -312,10 +321,10 @@ def vmap(
         class Translator(Operator):
             def __call__(self, *, inputs):
                 return {"translated": translate(inputs["text"])}
-        
+
         # Create vectorized version
         batch_translator = vmap(Translator())
-        
+
         # Process a batch of texts in a single call
         results = batch_translator(inputs={
             "text": ["Hello", "World", "Example"],
@@ -323,11 +332,10 @@ def vmap(
         })
         # results == {"translated": ["Hola", "Mundo", "Ejemplo"]}
     """
+
     # Type-specialized execution function to handle different callables
     def _execute_vectorized_op(
-        fn: Callable[..., object], 
-        *, 
-        inputs: Mapping[str, object]
+        fn: Callable[..., object], *, inputs: Mapping[str, object]
     ) -> Dict[str, object]:
         """Execute the operator/function in a batched manner.
 
@@ -342,55 +350,56 @@ def vmap(
             The combined batched outputs.
         """
         batch_size: int = _get_batch_size(inputs=inputs, in_axes=in_axes)
-        
+
         # Handle empty prompt batch case
         if "prompts" not in inputs or (
-            isinstance(inputs.get("prompts"), (list, tuple)) and not inputs.get("prompts")
+            isinstance(inputs.get("prompts"), (list, tuple))
+            and not inputs.get("prompts")
         ):
             return {"results": []}
-            
+
         batched_inputs = _prepare_batched_inputs(
             inputs=inputs, in_axes=in_axes, batch_size=batch_size
         )
-        
+
         batch_results: List[object] = []
         for i in range(batch_size):
             # Create a single batch element input
             batch_element = {key: value[i] for key, value in batched_inputs.items()}
-            
+
             # Process the individual batch element - handle both calling styles
             if isinstance(fn, Operator):
                 item_result = fn(inputs=batch_element)
             else:
                 # For regular functions, follow their expected calling convention
                 item_result = fn(inputs=batch_element)
-            
+
             batch_results.append(item_result)
-            
+
         return _combine_outputs(results=batch_results, out_axes=out_axes)
 
     # Create a generic vectorized callable type - works for both operator and function case
     VectorizedCallable = Callable[[Mapping[str, object]], Dict[str, object]]
-    
+
     # Handle Operator case
     if isinstance(operator_or_fn, Operator):
         # Create the wrapper function with the correct signature
         def vectorized_operator(*, inputs: Mapping[str, object]) -> Dict[str, object]:
             return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
-        
+
         # Preserve the name and docstring
         vectorized_operator.__name__ = f"vectorized_{operator_or_fn.__class__.__name__}"
         vectorized_operator.__doc__ = operator_or_fn.__doc__
-        
+
         # Attach the vectorized version to the operator for reference
-        setattr(operator_or_fn, 'vectorized', vectorized_operator)
+        setattr(operator_or_fn, "vectorized", vectorized_operator)
         return cast(VectorizedCallable, vectorized_operator)
 
     # Handle plain function case
     # Create the wrapper function with the correct signature
     def vectorized_fn(*, inputs: Mapping[str, object]) -> Dict[str, object]:
         return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
-    
+
     # Preserve the name and docstring
     if hasattr(operator_or_fn, "__name__"):
         vectorized_fn.__name__ = f"vectorized_{operator_or_fn.__name__}"

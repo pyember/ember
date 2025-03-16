@@ -29,7 +29,9 @@ class OpTestOutput(EmberModel):
 class NoSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
     """Test operator that doesn't call super().__init__()."""
 
-    specification = Specification(input_model=OpTestInput, structured_output=OpTestOutput)
+    specification = Specification(
+        input_model=OpTestInput, structured_output=OpTestOutput
+    )
     multiplier: int
     computed_field: str = ember_field(init=False)
 
@@ -46,7 +48,9 @@ class NoSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
 class WithSuperInitOperator(Operator[OpTestInput, OpTestOutput]):
     """Test operator that does call super().__init__()."""
 
-    specification = Specification(input_model=OpTestInput, structured_output=OpTestOutput)
+    specification = Specification(
+        input_model=OpTestInput, structured_output=OpTestOutput
+    )
     multiplier: int
     computed_field: str = ember_field(init=False)
 

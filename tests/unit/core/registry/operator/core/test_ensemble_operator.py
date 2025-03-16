@@ -1,50 +1,60 @@
 import pytest
 from tests.helpers.simplified_imports import EmberModel
 
+
 # Define local versions of the classes needed for testing
 class Specification:
     """Simplified test Specification class."""
-    
-    def __init__(self, *, input_model=None, prompt_template=None, structured_output=None):
+
+    def __init__(
+        self, *, input_model=None, prompt_template=None, structured_output=None
+    ):
         self.input_model = input_model
         self.prompt_template = prompt_template
         self.structured_output = structured_output
-        
+
     def render_prompt(self, *, inputs):
         """Simple prompt rendering."""
         if self.prompt_template:
-            if hasattr(inputs, 'query'):
+            if hasattr(inputs, "query"):
                 return self.prompt_template.format(query=inputs.query)
             return self.prompt_template
         return f"Default prompt for: {inputs}"
-        
+
     def validate_inputs(self, inputs):
         """No-op input validation for tests."""
         return inputs
-        
+
     def validate_output(self, output):
         """No-op output validation for tests."""
         return output
 
+
 class EnsembleOperatorInputs(EmberModel):
     """Simple input model for testing."""
+
     query: str
-    
+
+
 class EnsembleOperatorOutputs(EmberModel):
     """Simple output model for testing."""
+
     responses: list[str]
-    
+
+
 class EnsembleOperator:
     """Simplified test implementation."""
-    
-    specification = Specification(input_model=EnsembleOperatorInputs, structured_output=EnsembleOperatorOutputs)
-    
+
+    specification = Specification(
+        input_model=EnsembleOperatorInputs, structured_output=EnsembleOperatorOutputs
+    )
+
     def __init__(self, *, lm_modules):
         self.lm_modules = lm_modules
-        
+
     def __call__(self, *, inputs):
         return self.forward(inputs=inputs)
-        
+
     def forward(self, *, inputs):
         """Execute the ensemble operation."""
         rendered_prompt = self.specification.render_prompt(inputs=inputs)

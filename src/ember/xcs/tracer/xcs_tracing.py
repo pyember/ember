@@ -97,11 +97,11 @@ class TracerContext(ContextDecorator):
 
     def track_call(self, operator: Any, inputs: Dict[str, Any]) -> str:
         """Track an operator call in the context.
-        
+
         Args:
             operator: The operator being called
             inputs: The inputs to the operator
-            
+
         Returns:
             A unique ID for this call
         """
@@ -111,17 +111,17 @@ class TracerContext(ContextDecorator):
             node_id=call_id,
             inputs=inputs,
             outputs=None,
-            operator=operator
+            operator=operator,
         )
         self.calls[call_id] = record
         return call_id
-        
+
     def get_call(self, call_id: str) -> Optional[TraceRecord]:
         """Get a tracked call by ID.
-        
+
         Args:
             call_id: The call ID to look up
-            
+
         Returns:
             The TraceRecord for the call, or None if not found
         """
@@ -151,10 +151,10 @@ class TracerContext(ContextDecorator):
 
 def get_tracing_context() -> Optional[TracerContext]:
     """Get the current active tracing context.
-    
+
     This is a helper function that simply delegates to TracerContext.get_current()
     for convenience.
-    
+
     Returns:
         The current active tracing context, or None if no context is active.
     """
@@ -172,10 +172,10 @@ _ORIGINAL_METHODS: Dict[int, Any] = {}
 
 def patch_operator(operator: Any, new_method: Any) -> None:
     """Replace an operator's __call__ method with a new implementation.
-    
+
     This function is primarily used for testing and debugging purposes
     to intercept operator calls.
-    
+
     Args:
         operator: The operator to patch
         new_method: The new __call__ method implementation
@@ -183,14 +183,14 @@ def patch_operator(operator: Any, new_method: Any) -> None:
     # Store the original method
     operator_id = id(operator)
     _ORIGINAL_METHODS[operator_id] = operator.__call__
-    
+
     # Apply the patch
     operator.__call__ = new_method
 
 
 def restore_operator(operator: Any) -> None:
     """Restore an operator's original __call__ method after patching.
-    
+
     Args:
         operator: The operator to restore
     """

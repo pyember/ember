@@ -37,14 +37,14 @@ def create_dummy_anthropic_model_info() -> ModelInfo:
 
 @pytest.fixture(autouse=True)
 def patch_anthropic_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    class DummyCompletions:
+    class DummyMessages:
         def create(self, **kwargs: Any) -> Any:
             return DummyAnthropicResponse()
 
     class DummyClient:
-        completions = DummyCompletions()
+        messages = DummyMessages()
 
-    monkeypatch.setattr(anthropic, "Client", lambda api_key: DummyClient())
+    monkeypatch.setattr(anthropic, "Anthropic", lambda api_key: DummyClient())
 
 
 def test_anthropic_forward(monkeypatch: pytest.MonkeyPatch) -> None:

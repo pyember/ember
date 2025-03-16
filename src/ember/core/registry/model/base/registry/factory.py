@@ -42,9 +42,9 @@ def discover_providers_in_package(
 ) -> Dict[str, Type[BaseProviderModel]]:
     """Discover and load provider model classes within the specified package.
 
-    Performs dynamic provider discovery by traversing all modules in the given package 
+    Performs dynamic provider discovery by traversing all modules in the given package
     directory and inspecting each module for valid provider model implementations.
-    
+
     Discovery process:
     1. Walks through all modules in the given package
     2. Skips packages themselves (recursive discovery not supported) and special modules
@@ -60,9 +60,9 @@ def discover_providers_in_package(
         package_path (str): The filesystem path corresponding to the package.
 
     Returns:
-        Dict[str, Type[BaseProviderModel]]: A mapping from provider names (e.g., "openai", 
+        Dict[str, Type[BaseProviderModel]]: A mapping from provider names (e.g., "openai",
                                            "anthropic") to their respective provider classes.
-    
+
     Example:
         >>> providers = discover_providers_in_package(
         ...     package_name="ember.core.registry.model.providers",
@@ -101,26 +101,29 @@ class ModelFactory:
     The ModelFactory serves as the central component for instantiating provider models
     in the Ember framework. It handles model identifier validation, dynamic provider
     discovery, and proper instantiation of provider-specific model implementations.
-    
+
     Key features:
     - Thread-safe provider class caching with lazy initialization
     - Provider autodiscovery from the providers package
     - Support for explicit provider registration
     - Validation of model identifiers before instantiation
     - Informative error messages for configuration issues
-    
+
     Usage flow:
     1. The factory lazily discovers and caches provider implementations on first use
     2. When a model is requested, it validates the model ID format
     3. It finds the appropriate provider class based on the provider name
     4. The provider-specific model is instantiated with the given ModelInfo
-    
+
     Thread safety:
     The class-level provider cache is initialized exactly once in a thread-safe manner
     via the lazy initialization pattern in the _get_providers method.
     """
 
     _provider_cache: Optional[Dict[str, Type[BaseProviderModel]]] = None
+    
+    # Flag to control provider registry behavior in testing environments
+    _testing_mode: bool = False
 
     @classmethod
     def _get_providers(cls) -> Dict[str, Type[BaseProviderModel]]:
@@ -135,23 +138,26 @@ class ModelFactory:
         # Initialize provider cache with explicitly registered providers.
         cls._provider_cache = PROVIDER_REGISTRY.copy()
 
-        try:
-            provider_module: ModuleType = importlib.import_module(
-                "src.ember.core.registry.model.providers"
-            )
-            provider_package_name: str = provider_module.__name__
-            provider_package_path: str = os.path.dirname(provider_module.__file__)
-            dynamic_providers: Dict[str, Type[BaseProviderModel]] = (
-                discover_providers_in_package(
+        # Skip dynamic discovery in testing mode to avoid import issues
+        if not cls._testing_mode:
+            try:
+                # Use proper absolute import from ember namespace
+                provider_module: ModuleType = importlib.import_module(
+                    "ember.core.registry.model.providers"
+                )
+                provider_package_name: str = provider_module.__name__
+                provider_package_path: str = os.path.dirname(provider_module.__file__)
+                dynamic_providers: Dict[
+                    str, Type[BaseProviderModel]
+                ] = discover_providers_in_package(
                     package_name=provider_package_name,
                     package_path=provider_package_path,
                 )
-            )
-            for name, provider_class in dynamic_providers.items():
-                if name not in cls._provider_cache:
-                    cls._provider_cache[name] = provider_class
-        except Exception as exc:
-            LOGGER.error("Failed to discover providers: %s", exc)
+                for name, provider_class in dynamic_providers.items():
+                    if name not in cls._provider_cache:
+                        cls._provider_cache[name] = provider_class
+            except Exception as exc:
+                LOGGER.error("Failed to discover providers: %s", exc)
 
         return cls._provider_cache
 
@@ -177,6 +183,30 @@ class ModelFactory:
             cls._get_providers()  # Initialize the provider cache.
         cls._provider_cache[provider_name] = provider_class
         LOGGER.info("Registered custom provider: %s", provider_name)
+        
+    @classmethod
+    def enable_testing_mode(cls) -> None:
+        """Enable testing mode.
+        
+        This modifies the factory's behavior to better support testing:
+        - Skips dynamic provider discovery to avoid import issues
+        - Relies solely on explicitly registered providers
+        
+        This method should be called before any test that involves model creation.
+        """
+        cls._testing_mode = True
+        # Reset provider cache to ensure it's rebuilt with testing settings
+        cls._provider_cache = None
+        
+    @classmethod
+    def disable_testing_mode(cls) -> None:
+        """Disable testing mode.
+        
+        Restores normal provider discovery behavior for production use.
+        """
+        cls._testing_mode = False
+        # Reset provider cache to ensure it's rebuilt with normal settings
+        cls._provider_cache = None
 
     @staticmethod
     def create_model_from_info(*, model_info: ModelInfo) -> BaseProviderModel:
@@ -203,9 +233,9 @@ class ModelFactory:
             ) from error
 
         provider_name: str = model_info.provider.name
-        discovered_providers: Dict[str, Type[BaseProviderModel]] = (
-            ModelFactory._get_providers()
-        )
+        discovered_providers: Dict[
+            str, Type[BaseProviderModel]
+        ] = ModelFactory._get_providers()
         provider_class: Optional[Type[BaseProviderModel]] = discovered_providers.get(
             provider_name
         )

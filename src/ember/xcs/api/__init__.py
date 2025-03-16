@@ -16,7 +16,7 @@ from ember.xcs.api.types import (
     ExecutionResult,
     GraphBuilder,
     JITOptions,
-    TransformOptions
+    TransformOptions,
 )
 
 # Create a singleton instance
@@ -29,5 +29,5 @@ __all__ = [
     "ExecutionResult",
     "GraphBuilder",
     "JITOptions",
-    "TransformOptions"
+    "TransformOptions",
 ]

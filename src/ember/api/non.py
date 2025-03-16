@@ -23,18 +23,20 @@ Examples:
 # Import from the implementation
 from ember.core.non import (
     # Operator patterns
-    UniformEnsemble,     # Generate multiple responses with identical models
-    MostCommon,          # Select most common answer from ensemble
-    JudgeSynthesis,      # Use a judge to synthesize multiple responses
-    Verifier,            # Verify answers for correctness
-    Sequential,          # Chain operators in sequence
-    VariedEnsemble,      # Generate responses with varied model configurations
-    
+    UniformEnsemble,  # Generate multiple responses with identical models
+    MostCommon,  # Select most common answer from ensemble
+    JudgeSynthesis,  # Use a judge to synthesize multiple responses
+    Verifier,  # Verify answers for correctness
+    Sequential,  # Chain operators in sequence
+    VariedEnsemble,  # Generate responses with varied model configurations
     # Input/Output types
-    EnsembleInputs,      # Inputs for ensemble operators
-    JudgeSynthesisInputs, JudgeSynthesisOutputs,  # Judge I/O
-    VerifierInputs, VerifierOutputs,              # Verifier I/O
-    VariedEnsembleInputs, VariedEnsembleOutputs   # Varied Ensemble I/O
+    EnsembleInputs,  # Inputs for ensemble operators
+    JudgeSynthesisInputs,
+    JudgeSynthesisOutputs,  # Judge I/O
+    VerifierInputs,
+    VerifierOutputs,  # Verifier I/O
+    VariedEnsembleInputs,
+    VariedEnsembleOutputs,  # Varied Ensemble I/O
 )
 
 __all__ = [
@@ -45,10 +47,12 @@ __all__ = [
     "Verifier",
     "Sequential",
     "VariedEnsemble",
-    
     # Input/Output types
     "EnsembleInputs",
-    "JudgeSynthesisInputs", "JudgeSynthesisOutputs",
-    "VerifierInputs", "VerifierOutputs",
-    "VariedEnsembleInputs", "VariedEnsembleOutputs"
+    "JudgeSynthesisInputs",
+    "JudgeSynthesisOutputs",
+    "VerifierInputs",
+    "VerifierOutputs",
+    "VariedEnsembleInputs",
+    "VariedEnsembleOutputs",
 ]

@@ -44,6 +44,7 @@ Replace `example_name.py` with the desired example file.
 
 ## XCS Core Concepts
 
+
 The XCS system provides several key capabilities:
 
 - **Just-In-Time Compilation**: Three approaches for different use cases

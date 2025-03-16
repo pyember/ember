@@ -49,10 +49,10 @@ def get_default_model_service() -> ModelService:
     Instead of relying on a global registry, we explicitly call initialize_ember()
     so that the registry is built from the current configuration.
     """
-    from ember.core.registry.model.config.settings import initialize_ember
+    from ember.core.registry.model.initialization import initialize_registry
 
-    # Initialize the registry (with default flags; these can be adjusted as needed).
-    registry = initialize_ember(auto_register=True, auto_discover=True)
+    # Initialize the registry (with auto_discover enabled).
+    registry = initialize_registry(auto_discover=True, force_discovery=True)
     usage_service = (
         UsageService()
     )  # Optionally, you might inject a custom usage service.

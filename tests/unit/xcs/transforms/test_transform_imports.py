@@ -15,8 +15,8 @@ __all__ = [
     "vmap",
     "pmap",
     "pjit",
-    "DeviceMesh", 
+    "DeviceMesh",
     "PartitionSpec",
     "mesh_sharded",
-    "OperatorProtocol"
+    "OperatorProtocol",
 ]

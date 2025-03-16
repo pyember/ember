@@ -51,17 +51,17 @@ class ChatRequest(BaseModel):
     ChatRequest provides a unified interface for sending prompts to any supported language
     model provider. It encapsulates the common parameters used across all providers while
     also allowing provider-specific parameters through the provider_params field.
-    
+
     This class is part of Ember's abstraction layer that enables seamless switching between
     different LLM providers without changing application code. Provider implementations
     translate this universal format into their specific API formats.
-    
+
     Core design principles:
     - Provider-agnostic interface for consistent application code
     - Support for common parameters across all providers
     - Extensibility for provider-specific parameters
     - Type safety through Pydantic validation
-    
+
     Flow:
     1. Application code creates a ChatRequest
     2. The request is passed to a model via ModelRegistry
@@ -73,7 +73,7 @@ class ChatRequest(BaseModel):
     ```python
     # Simple request
     request = ChatRequest(prompt="Explain quantum computing")
-    
+
     # Request with additional parameters
     request = ChatRequest(
         prompt="Write a poem about spring",
@@ -110,30 +110,30 @@ class ChatResponse(BaseModel):
     ChatResponse provides a consistent structure for handling responses from any language
     model provider integrated with Ember. It normalizes the diverse response formats from
     different providers into a unified interface that applications can rely on.
-    
+
     Key features:
     - Standardized access to generated text across all providers
     - Preservation of raw provider output for advanced use cases
     - Optional usage tracking for cost management and monitoring
     - Pydantic validation for type safety
-    
+
     Design patterns:
     - Adapter Pattern: Converts provider-specific responses to a universal format
     - Facade Pattern: Simplifies the complex provider responses into a clean interface
     - Data Transfer Object: Encapsulates all response data in a single value object
-    
+
     Usage flow:
     1. Provider implementation receives raw response from API
     2. Provider converts the raw response into a ChatResponse
     3. Application code receives a consistent structure regardless of provider
     4. Application can access normalized text data or inspect raw provider output
-    
+
     Example:
     ```python
     # Using a response
     response = model("Tell me about quantum computing")
     print(response.data)  # Access the generated text
-    
+
     # Working with usage statistics
     if response.usage:
         print(f"Input tokens: {response.usage.prompt_tokens}")

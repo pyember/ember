@@ -28,7 +28,9 @@ class CaravanLabelingInputs(EmberModel):
     flow: str
 
 
-class CaravanLabelingSpecification(Specification[CaravanLabelingInputs, CaravanLabelsOutput]):
+class CaravanLabelingSpecification(
+    Specification[CaravanLabelingInputs, CaravanLabelsOutput]
+):
     """
     Specification for labeling network flows as benign or malicious.
 

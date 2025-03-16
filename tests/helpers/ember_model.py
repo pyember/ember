@@ -25,27 +25,29 @@ from typing import (
 )
 from pydantic import BaseModel
 
+
 # Define the protocols first (simplified versions)
 @runtime_checkable
 class EmberSerializable(Protocol):
     """Protocol for objects that can be serialized to/from dict and JSON formats."""
-    
+
     def as_dict(self) -> Dict[str, object]:
         """Convert to a dictionary representation."""
         ...
-        
+
     def as_json(self) -> str:
         """Convert to a JSON string."""
         ...
-        
+
     @classmethod
     def from_dict(cls, data: Dict[str, object]) -> "EmberSerializable":
         """Create an instance from a dictionary."""
         ...
 
+
 class TypeInfo:
     """Information about a type for Ember type system."""
-    
+
     def __init__(
         self,
         origin_type: Type,
@@ -58,22 +60,25 @@ class TypeInfo:
         self.is_container = is_container
         self.is_optional = is_optional
 
+
 @runtime_checkable
 class EmberTyped(Protocol):
     """Protocol for objects that provide type information."""
-    
+
     def get_type_info(self) -> TypeInfo:
         """Return type metadata for this object."""
         ...
 
+
 # Create the EmberModel stub
 T = TypeVar("T", bound="EmberModel")
+
 
 class EmberModel(BaseModel):
     """
     A unified model for Ember input/output types that combines BaseModel validation
     with flexible serialization to dict, JSON, and potentially other formats.
-    
+
     This is a stub implementation for testing.
     """
 

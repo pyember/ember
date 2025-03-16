@@ -32,7 +32,7 @@ def usage_example() -> None:
     example_prefixes: List[str] = [
         "Analyze this from a scientific perspective:",
         "Consider this from a philosophical angle:",
-        "Provide a practical approach to:"
+        "Provide a practical approach to:",
     ]
 
     # Create LM modules with different models for diversity
@@ -51,7 +51,7 @@ def usage_example() -> None:
             config=LMModuleConfig(
                 model_name="anthropic:claude-3-haiku", temperature=0.3, max_tokens=256
             )
-        )
+        ),
     ]
 
     # Instantiate the operator with named parameters.
@@ -70,18 +70,20 @@ def usage_example() -> None:
     result = operator(inputs=inputs)
 
     # Display structured results
-    print(f"Original query: \"{inputs.query}\"")
+    print(f'Original query: "{inputs.query}"')
     print(f"\nNumber of responses: {len(result.responses)}")
-    
+
     # Display each response with its corresponding prefix
     for i, (prefix, response) in enumerate(zip(example_prefixes, result.responses), 1):
         # Show the prefix and a truncated response for readability
         truncated = response[:100] + "..." if len(response) > 100 else response
         print(f"\nResponse {i}:")
-        print(f"  Prefix: \"{prefix}\"")
-        print(f"  Response: \"{truncated}\"")
-    
-    print("\nNote: In a real application, these responses would be further processed or aggregated.")
+        print(f'  Prefix: "{prefix}"')
+        print(f'  Response: "{truncated}"')
+
+    print(
+        "\nNote: In a real application, these responses would be further processed or aggregated."
+    )
 
 
 class MultiPrefixOperatorInputs(EmberModel):
@@ -165,7 +167,7 @@ class MultiPrefixEnsembleOperator(
 
             # Extract text from response
             text = extract_value(response, "text", "")
-            
+
             # Guard against None responses
             if text is None:
                 text = ""

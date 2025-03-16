@@ -54,7 +54,9 @@ class AutoGraphPipeline(Operator):
     automatically, building a graph based on the actual execution trace.
     """
 
-    specification = None  # Define a minimal specification to satisfy Operator requirements
+    specification = (
+        None  # Define a minimal specification to satisfy Operator requirements
+    )
 
     def __init__(
         self,

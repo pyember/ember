@@ -17,13 +17,13 @@ class BaseChatParameters(BaseModel):
     establishing a standardized interface for chat request configuration. Provider-specific
     implementations should extend this class to add or customize parameters according to
     their API requirements.
-    
+
     Design principles:
     - Common parameters are standardized across providers
     - Sensible defaults reduce configuration burden
     - Validation built-in through Pydantic
     - Helper methods for common operations like prompt building
-    
+
     Parameter semantics:
     - prompt: The core user input text to send to the model
     - context: Optional system context that provides additional information or instructions
@@ -66,29 +66,29 @@ class BaseChatParameters(BaseModel):
 
 class BaseProviderModel(abc.ABC):
     """Abstract base class defining the contract for all LLM provider implementations.
-    
-    This class establishes the core interface that all language model providers 
+
+    This class establishes the core interface that all language model providers
     (OpenAI, Anthropic, etc.) must implement to integrate with the Ember framework.
     It serves as the foundation of the provider abstraction layer, enabling a unified
     interface for working with different language models.
-    
+
     Provider architecture:
     - Each provider must implement client creation and request handling
     - Models are instantiated with metadata through ModelInfo
     - Providers handle translating Ember's universal ChatRequest format into provider-specific formats
     - Responses are normalized back to Ember's ChatResponse format
-    
+
     Lifecycle:
-    1. Provider class is discovered and instantiated via ModelFactory 
+    1. Provider class is discovered and instantiated via ModelFactory
     2. Provider creates its specific API client in create_client()
     3. Chat requests are processed through forward() or direct __call__
-    
+
     Implementation requirements:
     - Subclasses must provide PROVIDER_NAME as a class attribute
     - Subclasses must implement create_client() and forward() methods
     - Client creation should handle authentication and configuration
     - Forward method must translate between Ember and provider-specific formats
-    
+
     Usage example:
     ```python
     # Direct usage (prefer using ModelRegistry instead)

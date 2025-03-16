@@ -55,11 +55,14 @@ Examples:
 """
 
 # Core initialization and registry
-from ember.core.registry.model.config.settings import initialize_ember as initialize_registry
+from ember.core.registry.model.initialization import initialize_registry
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 # Service and provider model access
-from ember.core.registry.model.base.services.model_service import ModelService, create_model_service
+from ember.core.registry.model.base.services.model_service import (
+    ModelService,
+    create_model_service,
+)
 from ember.core.registry.model.base.services.usage_service import UsageService
 from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
@@ -68,7 +71,7 @@ from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatResponse as ModelResponse
+    ChatResponse as ModelResponse,
 )
 
 # Configuration and enums
@@ -76,24 +79,20 @@ from ember.core.registry.model.config.model_enum import ModelEnum
 
 __all__ = [
     # Primary initialization and access
-    "initialize_registry",     # Initialize the model registry
-    "create_model_service",    # Create model service for easier access
-    
+    "initialize_registry",  # Initialize the model registry
+    "create_model_service",  # Create model service for easier access
     # Core classes
-    "ModelRegistry",           # Registry for model management
-    "ModelService",            # Service for invoking models
-    "UsageService",            # Service for tracking usage
-    "BaseProviderModel",       # Base class for provider models
-    
+    "ModelRegistry",  # Registry for model management
+    "ModelService",  # Service for invoking models
+    "UsageService",  # Service for tracking usage
+    "BaseProviderModel",  # Base class for provider models
     # Model information and configuration
-    "ModelInfo",               # Model metadata
-    "ModelCost",               # Cost information
-    "RateLimit",               # Rate limiting configuration
-    "UsageStats",              # Usage statistics
-    
+    "ModelInfo",  # Model metadata
+    "ModelCost",  # Cost information
+    "RateLimit",  # Rate limiting configuration
+    "UsageStats",  # Usage statistics
     # Response types
-    "ModelResponse",           # Standard response format
-    
+    "ModelResponse",  # Standard response format
     # Constants and enums
-    "ModelEnum",               # Type-safe model references
+    "ModelEnum",  # Type-safe model references
 ]

@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, List, Tuple, Type
 from pydantic import BaseModel
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
+
 # Note: Unused import removed to adhere to clean code practices.
 from ember.xcs.transforms import (
     vmap,
@@ -48,22 +49,25 @@ def _time_function_call(
 
 class SimpleInput(BaseModel):
     prompts: Any  # Accept any type for prompts
-    
+
+
 class SimpleOutput(BaseModel):
     results: List[str]
+
 
 class SimpleSpecification(Specification):
     input_model: Type[BaseModel] = SimpleInput
     output_model: Type[BaseModel] = SimpleOutput
+
 
 class SimpleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     """A simple operator that processes input prompts by appending a suffix.
 
     This operator simulates a processing delay and returns the processed results.
     """
-    
+
     specification = SimpleSpecification()
-    
+
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Process the provided inputs by concatenating a processing suffix.
 
@@ -80,7 +84,9 @@ class SimpleOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         # Simulate processing delay.
         time.sleep(0.1)
         if isinstance(prompts, list):
-            processed_results: List[str] = [f"{prompt} -> processed" for prompt in prompts]
+            processed_results: List[str] = [
+                f"{prompt} -> processed" for prompt in prompts
+            ]
         else:
             processed_results = [f"{prompts} -> processed"]
         return {"results": processed_results}
@@ -109,7 +115,8 @@ def demonstrate_vmap() -> None:
     # Time sequential processing: apply the operator separately for each prompt.
     start_seq: float = perf_counter()
     sequential_results: List[Dict[str, Any]] = [
-        simple_operator(inputs={"prompts": prompt}) for prompt in batch_inputs["prompts"]
+        simple_operator(inputs={"prompts": prompt})
+        for prompt in batch_inputs["prompts"]
     ]
     sequential_time: float = perf_counter() - start_seq
     print(f"Sequential processing time: {sequential_time:.4f}s")
