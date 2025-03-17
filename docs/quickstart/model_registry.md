@@ -52,11 +52,11 @@ print(response.data)
 
 ```python
 from ember.core.registry.model.initialization import initialize_registry
-from ember.core.configs.config_manager import create_default_config_manager
+from ember.core.config.manager import create_config_manager
 from ember.core.registry.model.base.services.model_service import ModelService
 
 # Initialize the configuration and registry
-config_manager = create_default_config_manager()
+config_manager = create_config_manager()
 registry = initialize_registry(config_manager=config_manager)
 
 # Create a service instance
@@ -85,12 +85,12 @@ print(response.data)
 
 ```python
 from ember.core.registry.model.initialization import initialize_registry
-from ember.core.configs.config_manager import create_default_config_manager
+from ember.core.config.manager import create_config_manager
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
 
 # Initialize configuration and registry with usage tracking
-config_manager = create_default_config_manager()
+config_manager = create_config_manager()
 registry = initialize_registry(config_manager=config_manager)
 usage_service = UsageService()
 service = ModelService(registry=registry, usage_service=usage_service)
@@ -149,11 +149,11 @@ registry.register_model(custom_model)
 
 ```python
 from ember.core.registry.model.initialization import initialize_registry  
-from ember.core.configs.config_manager import create_default_config_manager
+from ember.core.config.manager import create_config_manager
 from ember.core.registry.model.config.model_enum import ModelEnum
 
 # Initialize the registry with configuration
-config_manager = create_default_config_manager()
+config_manager = create_config_manager()
 service = initialize_registry(config_manager=config_manager)
 
 # Use enum for type-safety
