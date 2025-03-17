@@ -122,3 +122,13 @@ config.yaml
 !**/*.example
 !**/*.template
 !**/*.sample
+
+# Examples folders except basic
+src/ember/examples/advanced/
+src/ember/examples/data/
+src/ember/examples/integration/
+src/ember/examples/models/
+src/ember/examples/operators/
+src/ember/examples/xcs/
+# Keep basic examples
+!src/ember/examples/basic/
