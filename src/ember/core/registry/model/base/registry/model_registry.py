@@ -44,7 +44,7 @@ class ModelRegistry(Generic[M]):
     # Create a registry
     registry = ModelRegistry()
 
-    # Register a model
+    # Register a model (simple version with minimal required fields)
     model_info = ModelInfo(
         id="openai:gpt-4",
         provider=ProviderInfo(name="openai", default_api_key="YOUR_API_KEY")

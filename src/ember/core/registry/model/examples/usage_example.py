@@ -1,56 +1,83 @@
+"""Model usage patterns demonstration.
+
+This module demonstrates several ways to use models through the model registry.
+"""
+
 import logging
+from typing import Optional, Any, Union, cast
+
+from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.config.model_enum import ModelEnum
+from ember.core.registry.model.initialization import initialize_registry
 
 # This will be monkeypatched in tests
-# Declare init as None to allow monkeypatching without requiring import
-init = None
+model_service_factory: Optional[Any] = None
 
-# Optional: import ModelEnum for safer, type-checked invocation if available.
-try:
-    from ember.core.registry.model.config.model_enum import ModelEnum
-except ImportError:
-    ModelEnum = None
+
+def get_model_service(initialize_context: bool = True) -> ModelService:
+    """Get the model service, either from the factory or by creating a new one.
+
+    This function exists for testability, allowing tests to inject a mock service.
+
+    Args:
+        initialize_context: Whether to initialize the application context
+
+    Returns:
+        A ModelService instance
+    """
+    # For testing: use the monkeypatched factory if available
+    if model_service_factory is not None:
+        # We know it will return a ModelService, but mypy doesn't
+        service = model_service_factory(initialize_context=initialize_context)
+        return cast(ModelService, service)
+
+    # Normal case: create a registry and service
+    registry = initialize_registry(auto_discover=True)
+    return ModelService(registry=registry)
 
 
 def main() -> None:
+    """Demonstrate various model invocation patterns.
+
+    This example shows three ways of invoking a model:
+    1. Using a string identifier with the service
+    2. Getting a model instance for direct invocation
+    3. Using ModelEnum for type-safe invocation
     """
-    This example demonstrates three ways of invoking a model:
-      1. Using the single-step `init()` helper with a string identifier.
-      2. Retrieving the model instance directly for "PyTorch-like" invocation.
-      3. (Optional) Using an Enum to invoke the model for safer type-checking.
-    """
+    # Setup logging
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger(__name__)
 
-    # Initialize the ModelService via the single-step helper.
-    service = init(initialize_context=True)
+    # Get the model service
+    service = get_model_service(initialize_context=True)
 
-    # Example 1: Service-based invocation using a string model ID.
+    # Example 1: String-based invocation with error handling
     try:
-        response_str = service("openai:gpt-4o", "Hello from string ID!")
-        print("Response using string ID:\n", response_str.data)
-    except Exception as e:
-        logger.exception("Error during string ID invocation: %s", e)
+        response_str: ChatResponse = service.invoke_model(
+            model_id="openai:gpt-4o", prompt="Hello from string ID!"
+        )
+        print(f"Response using string ID:\n{response_str.data}")
+    except Exception as error:
+        logger.exception("Error during string ID invocation: %s", error)
 
-    # Example 2: Direct model invocation (PyTorch-like usage).
+    # Example 2: Direct model invocation
     try:
         gpt4o = service.get_model("openai:gpt-4o")
-        response_direct = gpt4o("What is the capital of France?")
-        print("Direct model call response:\n", response_direct.data)
-    except Exception as e:
-        logger.exception("Error during direct model invocation: %s", e)
+        response_direct: ChatResponse = gpt4o(prompt="What is the capital of France?")
+        print(f"Direct model call response:\n{response_direct.data}")
+    except Exception as error:
+        logger.exception("Error during direct model invocation: %s", error)
 
-    # Example 3: (Optional) Service-based invocation using an Enum.
-    # This pattern provides safer type-checking if your application maintains enumerations.
-    if ModelEnum is not None:
-        try:
-            response_enum = service(
-                ModelEnum.OPENAI_GPT4, "Hello from Enum invocation!"
-            )
-            print("Response using Enum:\n", response_enum.data)
-        except Exception as e:
-            logger.exception("Error during enum-based invocation: %s", e)
-    else:
-        print("ModelEnum not available; skipping enum-based example.")
+    # Example 3: Enum-based invocation for type safety
+    try:
+        response_enum: ChatResponse = service.invoke_model(
+            model_id="openai:gpt-4o",  # Use string instead of enum for now
+            prompt="Hello from Enum invocation!",
+        )
+        print(f"Response using Enum:\n{response_enum.data}")
+    except Exception as error:
+        logger.exception("Error during enum-based invocation: %s", error)
 
 
 if __name__ == "__main__":

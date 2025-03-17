@@ -1,3 +1,68 @@
+"""Anthropic Claude provider implementation for the Ember framework.
+
+This module provides a comprehensive integration with Anthropic's Claude language models,
+implementing the provider interface defined by the Ember framework. It handles
+all aspects of communicating with the Anthropic API, including auth, request formatting,
+response parsing, error handling, and usage tracking.
+
+The implementation conforms to Anthropic's "best practices" for API integration,
+supporting both the legacy Claude prompt format and the modern messages API format.
+It handles automatic retries for transient errors, detailed logging, and
+error handling to ensure reliability in prod environments.
+
+Key classes:
+    AnthropicProviderParams: TypedDict for Anthropic-specific parameters
+    AnthropicConfig: Helper for loading and caching model configuration
+    AnthropicChatParameters: Parameter conversion for Anthropic chat requests
+    AnthropicModel: Core provider implementation for Anthropic models
+
+Details:
+    - Authentication and client configuration for Anthropic API
+    - Parameter validation and transformation
+    - Structured error handling with detailed logging
+    - Usage statistics calculation for cost tracking
+    - Automatic retries with exponential backoff
+    - Thread-safe implementation for concurrent requests
+    - Support for both legacy and modern Anthropic API endpoints
+    - Uses the official Anthropic Python SDK
+    - Handles API versioning and compatibility
+    - Provides fallback mechanisms for configuration errors
+    - Implements proper timeout handling to prevent hanging requests
+    - Calculates token usage for cost estimation and monitoring
+
+Usage example:
+    ```python
+    # Direct usage (prefer using ModelRegistry or API)
+    from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
+    
+    # Configure model information
+    model_info = ModelInfo(
+        id="anthropic:claude-3-sonnet",
+        name="claude-3-sonnet",
+        provider=ProviderInfo(name="Anthropic", api_key="sk-ant-...")
+    )
+    
+    # Initialize the model
+    model = AnthropicModel(model_info)
+    
+    # Generate a response
+    response = model("What is the Ember framework?")
+    print(response.data)  # The model's response text
+    
+    # Access usage statistics
+    print(f"Used {response.usage.total_tokens} tokens")
+    ```
+
+For higher-level usage, prefer the model registry or API interfaces:
+    ```python
+    from ember.api.models import models
+    
+    # Using the models API (automatically handles authentication)
+    response = models.anthropic.claude_3_sonnet("Tell me about Ember")
+    print(response.data)
+    ```
+"""
+
 import logging
 import os
 import uuid
@@ -7,6 +72,7 @@ import anthropic
 import yaml
 from pydantic import Field, field_validator
 from tenacity import retry, stop_after_attempt, wait_exponential
+from typing_extensions import TypedDict
 
 from ember.plugin_system import provider
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
@@ -20,8 +86,63 @@ from ember.core.registry.model.providers.base_provider import (
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
+    ProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
+
+
+class AnthropicProviderParams(ProviderParams):
+    """Anthropic-specific provider parameters for fine-tuning API requests.
+
+    This TypedDict defines additional parameters that can be passed to Anthropic API
+    calls beyond the standard parameters defined in BaseChatParameters. These parameters
+    provide fine-grained control over the model's generation behavior.
+
+    The parameters align with Anthropic's API specification and allow for precise
+    control over text generation characteristics including diversity, stopping
+    conditions, and sampling strategies. Each parameter affects the generation
+    process in specific ways and can be combined to achieve desired output
+    characteristics.
+
+    Parameters can be provided in the provider_params field of a ChatRequest:
+    ```python
+    request = ChatRequest(
+        prompt="Tell me about Claude models",
+        provider_params={
+            "top_p": 0.9,
+            "top_k": 40,
+            "stop_sequences": ["END"]
+        }
+    )
+    ```
+
+    Attributes:
+        top_k: Optional integer limiting the number of most likely tokens to consider
+            at each generation step. Controls diversity by restricting the token
+            selection pool. Typical values range from 1 (greedy decoding) to 40.
+            Lower values make output more focused and deterministic.
+
+        top_p: Optional float between 0 and 1 for nucleus sampling, controlling the
+            cumulative probability threshold for token selection. Lower values (e.g., 0.1)
+            make output more focused and deterministic, while higher values (e.g., 0.9)
+            increase diversity. Often used together with temperature.
+
+        stop_sequences: Optional list of strings that will cause the model to stop
+            generating when encountered. Useful for controlling response length or
+            format. The model will stop at the first occurrence of any sequence
+            in the list. Example: ["Human:", "END", "STOP"].
+
+        stream: Optional boolean to enable streaming responses instead of waiting
+            for the complete response. When enabled, tokens are sent as they are
+            generated rather than waiting for the complete response. Useful for
+            real-time applications and gradual UI updates.
+    """
+
+    top_k: Optional[int]
+    top_p: Optional[float]
+    stop_sequences: Optional[list[str]]
+    stream: Optional[bool]
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -29,7 +150,19 @@ logger: logging.Logger = logging.getLogger(__name__)
 class AnthropicConfig:
     """Helper class to load and cache Anthropic configuration from a YAML file.
 
-    This class provides methods to load, cache, and retrieve configuration data for Anthropic models.
+    This class provides methods to load, cache, and retrieve configuration data for
+    Anthropic models. It implements a simple caching mechanism to avoid repeated
+    disk reads, improving performance for subsequent accesses.
+
+    The configuration file should contain model registry information, including
+    supported model names and their capabilities. If the configuration file cannot
+    be found or parsed, the class falls back to default values.
+
+    Implementation details:
+    - Uses a class-level cache for efficient access
+    - Loads configuration from an anthropic_config.yaml file in the same directory
+    - Provides helper methods to retrieve valid models and default model names
+    - Handles missing or invalid configuration gracefully with fallback values
     """
 
     _config_cache: Optional[Dict[str, Any]] = None
@@ -96,10 +229,58 @@ class AnthropicConfig:
 
 
 class AnthropicChatParameters(BaseChatParameters):
-    """Parameters for Anthropic chat requests.
+    """Parameters for Anthropic chat requests with validation and conversion logic.
 
-    This class converts a universal ChatRequest into parameters compliant with the Anthropic API.
-    The API requires a positive integer for 'max_tokens_to_sample', defaulting to 768.
+    This class extends BaseChatParameters to provide Anthropic-specific parameter
+    handling and validation. It ensures that parameters are correctly formatted
+    for the Anthropic API, handling the conversion between Ember's universal
+    parameter format and Anthropic's API requirements.
+
+    The class implements robust parameter validation, default value handling,
+    and conversion logic to ensure that all requests to the Anthropic API are
+    properly formatted according to Anthropic's expectations. It handles the
+    differences between Ember's framework-agnostic parameter names and Anthropic's
+    specific parameter naming conventions.
+
+    Key features:
+        - Enforces a minimum value for max_tokens (required by Anthropic API)
+        - Provides sensible defaults for required parameters (768 tokens)
+        - Validates that max_tokens is a positive integer with clear error messages
+        - Converts Ember's universal parameter format to Anthropic's expected format
+        - Formats the prompt according to Anthropic's Human/Assistant convention
+        - Handles context integration with proper formatting and spacing
+        - Supports both legacy prompt format and modern messages API
+
+    Implementation details:
+        - Uses Pydantic's field validation for type safety and constraints
+        - Provides clear error messages for invalid parameter values
+        - Uses consistent parameter defaults aligned with Anthropic recommendations
+        - Formats prompts for compatibility with all Claude model versions
+        - Maintains backward compatibility with test suite through hybrid approach
+
+    Example:
+        ```python
+        # Creating parameters with defaults
+        params = AnthropicChatParameters(prompt="Tell me about Claude models")
+
+        # Converting to Anthropic kwargs
+        anthropic_kwargs = params.to_anthropic_kwargs()
+        # Result:
+        # {
+        #     "prompt": "\\n\\nHuman: Tell me about Claude models\\n\\nAssistant:",
+        #     "max_tokens_to_sample": 768,
+        #     "temperature": 0.7
+        # }
+
+        # With context
+        params = AnthropicChatParameters(
+            prompt="Explain quantum computing",
+            context="You are an expert in physics",
+            max_tokens=1024,
+            temperature=0.5
+        )
+        # The context is properly integrated into the prompt format
+        ```
     """
 
     max_tokens: Optional[int] = Field(default=None)
@@ -159,7 +340,35 @@ class AnthropicChatParameters(BaseChatParameters):
 class AnthropicModel(BaseProviderModel):
     """Concrete implementation for interacting with Anthropic models (e.g., Claude).
 
-    This class provides methods to create an Anthropic client, forward chat requests, and compute usage statistics.
+    This class provides the full implementation of BaseProviderModel for Anthropic's
+    Claude language models. It handles client creation, request processing, response
+    handling, and usage calculation. The implementation supports all Claude model
+    variants including Claude 3, Claude 3.5, and future versions.
+
+    The class provides three core functions:
+    1. Creating and configuring the Anthropic API client
+    2. Processing chat requests through the forward method
+    3. Calculating usage statistics for billing and monitoring
+
+    Key features:
+        - Model name normalization against configuration
+        - Automatic retry with exponential backoff for transient errors
+        - Comprehensive error handling for API failures
+        - Support for both legacy prompt format and modern messages API
+        - Detailed logging for monitoring and debugging
+        - Usage statistics calculation for cost estimation
+
+    Implementation details:
+        - Uses the official Anthropic Python SDK
+        - Implements tenacity-based retry logic
+        - Properly handles API timeouts to prevent hanging
+        - Provides cross-version compatibility for API changes
+        - Calculates usage statistics based on available data
+
+    Attributes:
+        PROVIDER_NAME: The canonical name of this provider for registration.
+        model_info: Model metadata including credentials and cost schema.
+        client: The configured Anthropic API client instance.
     """
 
     PROVIDER_NAME: str = "Anthropic"
@@ -250,10 +459,10 @@ class AnthropicModel(BaseProviderModel):
         try:
             # Convert to messages API format
             messages = [{"role": "user", "content": anthro_kwargs.pop("prompt", "")}]
-            
+
             # Extract timeout from parameters or use default
             timeout = anthro_kwargs.pop("timeout", 30)
-            
+
             response: Any = self.client.messages.create(
                 model=final_model_name,
                 messages=messages,

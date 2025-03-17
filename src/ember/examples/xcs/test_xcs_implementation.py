@@ -165,8 +165,8 @@ def main():
     graph.add_node(operator=lambda inputs: add(5, 3), node_id="node1")
     graph.add_node(
         operator=lambda inputs, node1_result=None: multiply(node1_result, 2),
-        node_id="node2", 
-        dependencies=["node1"]
+        node_id="node2",
+        dependencies=["node1"],
     )
 
     print("  Graph built successfully")

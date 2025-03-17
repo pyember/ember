@@ -29,20 +29,26 @@ custom_dataset_registry = {}
 
 def register_mock_dataset() -> None:
     """Register a mock dataset for demonstration purposes."""
-    @register("mock_qa", source="custom/mock_qa", task_type=TaskType.MULTIPLE_CHOICE, description="A mock dataset for multiple choice QA examples")
+
+    @register(
+        "mock_qa",
+        source="custom/mock_qa",
+        task_type=TaskType.MULTIPLE_CHOICE,
+        description="A mock dataset for multiple choice QA examples",
+    )
     class MockQADataset:
         """A mock QA dataset for demonstration purposes."""
-        
+
         def __init__(self) -> None:
             """Initialize the dataset."""
             pass
-        
+
         def load(self, config: Optional[Dict] = None) -> List[DatasetEntry]:
             """Load the mock dataset.
-            
+
             Args:
                 config: Optional configuration for loading
-                
+
             Returns:
                 List of dataset entries
             """
@@ -52,27 +58,28 @@ def register_mock_dataset() -> None:
                     content={
                         "question": "What is the capital of France?",
                         "choices": ["Berlin", "Madrid", "Paris", "Rome"],
-                        "answer": 2  # Paris (0-indexed)
+                        "answer": 2,  # Paris (0-indexed)
                     },
-                    metadata={"category": "geography", "difficulty": "easy"}
+                    metadata={"category": "geography", "difficulty": "easy"},
                 ),
                 DatasetEntry(
                     content={
                         "question": "Which of these is a mammal?",
                         "choices": ["Shark", "Snake", "Eagle", "Dolphin"],
-                        "answer": 3  # Dolphin (0-indexed)
+                        "answer": 3,  # Dolphin (0-indexed)
                     },
-                    metadata={"category": "biology", "difficulty": "medium"}
+                    metadata={"category": "biology", "difficulty": "medium"},
                 ),
                 DatasetEntry(
                     content={
                         "question": "What is the square root of 144?",
                         "choices": ["10", "12", "14", "16"],
-                        "answer": 1  # 12 (0-indexed)
+                        "answer": 1,  # 12 (0-indexed)
                     },
-                    metadata={"category": "mathematics", "difficulty": "easy"}
-                )
+                    metadata={"category": "mathematics", "difficulty": "easy"},
+                ),
             ]
+
 
 def basic_usage() -> None:
     """Demonstrate basic dataset usage with direct loading."""
@@ -163,7 +170,12 @@ def custom_dataset() -> None:
     """Demonstrate how to create and register a custom dataset."""
 
     # Register a custom dataset (for demonstration only)
-    @register("short_answer_qa", source="custom/short_answer", task_type=TaskType.SHORT_ANSWER, description="A custom dataset for short answer QA examples")
+    @register(
+        "short_answer_qa",
+        source="custom/short_answer",
+        task_type=TaskType.SHORT_ANSWER,
+        description="A custom dataset for short answer QA examples",
+    )
     class ShortAnswerQADataset:
         """A custom short answer QA dataset for demonstration purposes."""
 
@@ -192,7 +204,10 @@ def custom_dataset() -> None:
                 ),
                 DatasetEntry(
                     query="Who wrote Romeo and Juliet?",
-                    metadata={"category": "literature", "answer": "William Shakespeare"},
+                    metadata={
+                        "category": "literature",
+                        "answer": "William Shakespeare",
+                    },
                 ),
             ]
 

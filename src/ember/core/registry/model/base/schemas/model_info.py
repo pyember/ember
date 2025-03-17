@@ -12,9 +12,9 @@ class ModelInfo(EmberModel):
 
     Attributes:
         id (str): Unique identifier for the model.
-        name (str): Human-readable name of the model.
-        cost (ModelCost): Cost details associated with the model.
-        rate_limit (RateLimit): Rate limiting parameters for model usage.
+        name (Optional[str]): Human-readable name of the model. If omitted, defaults to the value of id.
+        cost (ModelCost, optional): Cost details associated with the model. Defaults to zero cost.
+        rate_limit (RateLimit, optional): Rate limiting parameters for model usage. Defaults to no rate limits.
         provider (ProviderInfo): Provider information containing defaults and endpoints.
         api_key (Optional[str]): API key for authentication. If omitted, the provider's default API key is used.
     """
@@ -24,9 +24,9 @@ class ModelInfo(EmberModel):
     )
 
     id: str = Field(...)
-    name: str = Field(...)
-    cost: ModelCost
-    rate_limit: RateLimit
+    name: Optional[str] = None
+    cost: ModelCost = Field(default_factory=ModelCost)
+    rate_limit: RateLimit = Field(default_factory=RateLimit)
     provider: ProviderInfo
     api_key: Optional[str] = None
 
@@ -39,6 +39,22 @@ class ModelInfo(EmberModel):
     def model_name(self) -> str:
         """Alias for name, using a more descriptive name."""
         return self.name
+
+    @field_validator("name", mode="before")
+    def default_name_to_id(cls, name: Optional[str], info: ValidationInfo) -> str:
+        """
+        Sets the name to the value of id when name is not provided.
+
+        Args:
+            name: The name value provided before validation.
+            info: Validation context containing additional field data.
+
+        Returns:
+            The name to use, defaulting to id if none is provided.
+        """
+        if not name and "id" in info.data:
+            return info.data["id"]
+        return name or ""
 
     @field_validator("api_key", mode="before")
     def validate_api_key(cls, api_key: Optional[str], info: ValidationInfo) -> str:

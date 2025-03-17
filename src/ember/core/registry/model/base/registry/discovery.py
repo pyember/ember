@@ -317,7 +317,11 @@ class ModelDiscoveryService:
     def refresh(self) -> Dict[str, ModelInfo]:
         """Force a refresh of model discovery and merge with local configuration."""
         with self._lock:
+            # Force cache invalidation to ensure a fresh fetch
+            self._last_update = 0.0
+
             try:
+                # This will now definitely fetch fresh data due to invalidated cache
                 discovered: Dict[str, Dict[str, Any]] = self.discover_models()
                 merged = self.merge_with_config(discovered=discovered)
                 # Only update cache if discovery is successful
@@ -327,12 +331,19 @@ class ModelDiscoveryService:
             except Exception as e:
                 logger.error("Failed to refresh model discovery: %s", e)
                 # Return last known good cache if available
-                return self._cache.copy() if self._cache else {}
+                return (
+                    self.merge_with_config(discovered=self._cache.copy())
+                    if self._cache
+                    else {}
+                )
 
     def invalidate_cache(self) -> None:
         """Manually invalidate the cache, forcing a refresh on next discovery."""
         with self._lock:
-            self._cache.clear()
+            # Clear the cache dictionary
+            if hasattr(self, "_cache"):
+                self._cache.clear()
+            # Reset the last update timestamp
             self._last_update = 0.0
             logger.info("Cache invalidated; next discovery will fetch fresh data.")
 

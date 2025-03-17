@@ -40,7 +40,8 @@ class TestProviderDiscoveryIntegration:
     )
     def test_openai_discovery_integration(self):
         """Test OpenAI discovery with actual API call."""
-        discovery = OpenAIDiscovery()
+        api_key = os.environ.get("OPENAI_API_KEY")
+        discovery = OpenAIDiscovery(api_key=api_key)
         models = discovery.fetch_models()
 
         # Basic structure checks
@@ -58,7 +59,8 @@ class TestProviderDiscoveryIntegration:
     )
     def test_anthropic_discovery_integration(self):
         """Test Anthropic discovery with actual API call."""
-        discovery = AnthropicDiscovery()
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        discovery = AnthropicDiscovery(api_key=api_key)
         models = discovery.fetch_models()
 
         # Basic structure checks
@@ -72,11 +74,14 @@ class TestProviderDiscoveryIntegration:
         self.check_minimal_model_data(example_model)
 
     @pytest.mark.skipif(
-        not os.environ.get("GOOGLE_API_KEY"), reason="Requires GOOGLE_API_KEY"
+        not os.environ.get("GOOGLE_API_KEY") and not os.environ.get("GEMINI_API_KEY"),
+        reason="Requires GOOGLE_API_KEY or GEMINI_API_KEY",
     )
     def test_deepmind_discovery_integration(self):
         """Test Deepmind/Google discovery with actual API call."""
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         discovery = DeepmindDiscovery()
+        discovery.configure(api_key=api_key)
         models = discovery.fetch_models()
 
         # Basic structure checks (including fallback mechanism)

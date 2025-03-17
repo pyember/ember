@@ -1,3 +1,34 @@
+"""Provider base classes for language model interactions in Ember.
+
+This module defines the foundational abstract base classes and interfaces that all
+LLM provider implementations must adhere to. It establishes a consistent contract for
+integrating various language model providers (OpenAI, Anthropic, etc.) with the Ember
+framework, ensuring uniformity in how models are queried and how responses are processed.
+
+The module includes:
+- Base parameter models for standardizing request parameters across providers
+- Abstract provider classes that define the interface for model implementations
+- Core functionality for parameter conversion and request handling
+
+Typical usage example:
+  ```python
+  # Implementing a custom provider
+  class MyProviderParameters(BaseChatParameters):
+      additional_param: Optional[str] = None
+      
+  class MyProvider(BaseProviderModel):
+      PROVIDER_NAME = "MyProvider"
+      
+      def create_client(self) -> Any:
+          # Initialize your API client
+          return client
+          
+      def forward(self, request: ChatRequest) -> ChatResponse:
+          # Process request and return standardized response
+          return ChatResponse(...)
+  ```
+"""
+
 import abc
 from typing import Any, Optional
 
@@ -96,8 +127,8 @@ class BaseProviderModel(abc.ABC):
     ```python
     # Direct usage (prefer using ModelRegistry instead)
     model_info = ModelInfo(id="anthropic:claude-3", provider=ProviderInfo(name="anthropic"))
-    provider = AnthropicProvider(model_info=model_info)
-    response = provider("Tell me about the Ember framework")
+    model_instance = AnthropicProvider(model_info=model_info)
+    response = model_instance("Tell me about the Ember framework")
     print(response.data)  # The model's response text
     ```
     """

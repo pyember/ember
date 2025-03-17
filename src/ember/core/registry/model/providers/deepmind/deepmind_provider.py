@@ -1,3 +1,85 @@
+"""Google Deepmind (Gemini) provider implementation for the Ember framework.
+
+This module provides a comprehensive integration with Google's Gemini language models
+through the Deepmind provider implementation for the Ember framework. It establishes
+a reliable, high-performance connection with the Google Generative AI API, handling
+all aspects of model interaction including authentication, request formatting,
+response parsing, error handling, and usage tracking.
+
+The implementation adheres to Google's recommended best practices for API integration,
+including proper parameter formatting, efficient retry mechanisms, detailed error
+handling, and comprehensive logging. It supports all Gemini model variants with
+appropriate adjustments for model-specific requirements and versioning.
+
+Classes:
+    DeepmindProviderParams: TypedDict for Gemini-specific parameter configuration
+    GeminiChatParameters: Parameter validation and conversion for Gemini requests
+    GeminiModel: Core provider implementation for Gemini models
+
+Key features:
+    - Authentication and client configuration for Google Generative AI API
+    - Support for all Google Gemini model variants (Gemini 1.0, 1.5, etc.)
+    - Automatic model name normalization to match Google API requirements
+    - Model discovery and validation against available API models
+    - Graceful handling of API errors with automatic retries
+    - Detailed logging for monitoring and debugging
+    - Comprehensive usage statistics for cost tracking
+    - Support for model-specific parameters and configuration
+    - Parameter validation and type safety
+    - Proper timeout handling to prevent hanging requests
+
+Implementation details:
+    - Uses the official Google Generative AI Python SDK
+    - Implements model discovery and listing for validation
+    - Provides fallback mechanisms for configuration errors
+    - Uses tenacity for retry logic with exponential backoff
+    - Normalizes model names to match Google API conventions
+    - Handles response parsing for different API versions
+    - Calculates usage statistics based on Google's token metrics
+
+Typical usage example:
+    ```python
+    # Direct usage (prefer using ModelRegistry or API)
+    from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
+    
+    # Configure model information
+    model_info = ModelInfo(
+        id="deepmind:gemini-1.5-pro",
+        name="gemini-1.5-pro",
+        provider=ProviderInfo(name="Deepmind", api_key="YOUR_API_KEY")
+    )
+    
+    # Initialize the model
+    model = GeminiModel(model_info)
+    
+    # Basic usage
+    response = model("What is the Ember framework?")
+    print(response.data)  # The model's response text
+    
+    # Advanced usage with more parameters
+    response = model(
+        "Generate creative ideas",
+        context="You are a helpful creative assistant",
+        temperature=0.7,
+        provider_params={"top_p": 0.95, "top_k": 40}
+    )
+    
+    # Access usage information
+    print(f"Used {response.usage.total_tokens} tokens")
+    print(f"Prompt tokens: {response.usage.prompt_tokens}")
+    print(f"Completion tokens: {response.usage.completion_tokens}")
+    ```
+
+For higher-level usage, prefer the model registry or API interfaces:
+    ```python
+    from ember.api.models import models
+    
+    # Using the models API (automatically handles authentication)
+    response = models.deepmind.gemini_15_pro("Tell me about Ember")
+    print(response.data)
+    ```
+"""
+
 import logging
 from typing import Any, Dict, Optional
 
@@ -6,7 +88,13 @@ import google.generativeai as genai
 from google.generativeai import GenerativeModel, types
 from pydantic import Field, field_validator
 from tenacity import retry, wait_exponential, stop_after_attempt
+from typing_extensions import TypedDict
 
+from ember.plugin_system import provider
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
+    ProviderAPIError,
+    InvalidPromptError,
+)
 from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
@@ -14,23 +102,121 @@ from ember.core.registry.model.providers.base_provider import (
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
+    ProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
-from ember.plugin_system import provider
-from ember.core.registry.model.base.utils.model_registry_exceptions import (
-    ProviderAPIError,
-    InvalidPromptError,
-)
+
+
+class DeepmindProviderParams(ProviderParams):
+    """Deepmind-specific provider parameters for fine-tuning Gemini requests.
+
+    This TypedDict defines additional parameters that can be passed to Google
+    Generative AI API calls beyond the standard parameters defined in
+    BaseChatParameters. These parameters provide fine-grained control over
+    the model's generation behavior.
+
+    The parameters align with Google's Generative AI API specification and allow
+    for precise control over text generation characteristics including diversity,
+    stopping conditions, and sampling strategies. Each parameter affects the
+    generation process in specific ways and can be combined to achieve desired
+    output characteristics.
+
+    Parameters can be provided in the provider_params field of a ChatRequest:
+    ```python
+    request = ChatRequest(
+        prompt="Tell me about Gemini models",
+        provider_params={
+            "top_p": 0.9,
+            "top_k": 40,
+            "stop_sequences": ["END"]
+        }
+    )
+    ```
+
+    Attributes:
+        candidate_count: Optional integer specifying the number of response
+            candidates to generate. Useful for applications that need diverse
+            responses or for implementing re-ranking strategies. Values typically
+            range from 1 to 8, with higher values requiring more processing time.
+
+        stop_sequences: Optional list of strings that will cause the model to stop
+            generating when encountered. Useful for controlling response length or
+            format. The model will stop at the first occurrence of any sequence
+            in the list. Example: ["##", "END", "STOP"].
+
+        top_p: Optional float between 0 and 1 for nucleus sampling, controlling the
+            cumulative probability threshold for token selection. Lower values (e.g., 0.1)
+            make output more focused and deterministic, while higher values (e.g., 0.9)
+            increase diversity. Often used together with temperature.
+
+        top_k: Optional integer limiting the number of most likely tokens to consider
+            at each generation step. Controls diversity by restricting the token
+            selection pool. Typical values range from 1 (greedy decoding) to 40.
+            Lower values make output more focused and deterministic.
+    """
+
+    candidate_count: Optional[int]
+    stop_sequences: Optional[list[str]]
+    top_p: Optional[float]
+    top_k: Optional[int]
+
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class GeminiChatParameters(BaseChatParameters):
-    """Conversion parameters for Google Gemini generation requests.
+    """Parameter handling for Google Gemini generation requests.
 
-    This class converts a universal ChatRequest into parameters compliant with the
-    Google Gemini API. The `max_tokens` attribute is mapped to the `max_output_tokens`
-    field in the GenerationConfig.
+    This class extends BaseChatParameters to provide Gemini-specific parameter
+    handling and validation. It ensures that parameters are correctly formatted
+    for the Google Generative AI API, handling the conversion between Ember's
+    universal parameter format and Gemini's API requirements.
+
+    The class implements robust parameter validation, default value handling,
+    and conversion logic to ensure that all requests to the Google Generative AI API
+    are properly formatted according to the API's expectations. It handles the
+    differences between Ember's framework-agnostic parameter names and Google's
+    specific parameter naming conventions.
+
+    Key features:
+        - Enforces a minimum value for max_tokens to prevent empty responses
+        - Provides a sensible default (512 tokens) if not specified by the user
+        - Validates that max_tokens is a positive integer with clear error messages
+        - Maps Ember's universal max_tokens parameter to Gemini's max_output_tokens
+        - Constructs a properly formatted GenerationConfig object for the API
+        - Handles temperature scaling in the proper range for Gemini models
+        - Provides clean conversion from internal representation to API format
+
+    Implementation details:
+        - Uses Pydantic's field validation for type safety and constraints
+        - Provides clear error messages for invalid parameter values
+        - Uses consistent parameter defaults aligned with the rest of Ember
+        - Preserves parameter values when converting to ensure fidelity
+
+    Example:
+        ```python
+        # Creating parameters with defaults
+        params = GeminiChatParameters(prompt="Tell me about Gemini models")
+
+        # Converting to Gemini kwargs
+        gemini_kwargs = params.to_gemini_kwargs()
+        # Result:
+        # {
+        #     "generation_config": {
+        #         "max_output_tokens": 512,
+        #         "temperature": 0.7
+        #     }
+        # }
+
+        # With custom values
+        params = GeminiChatParameters(
+            prompt="Explain quantum computing",
+            max_tokens=1024,
+            temperature=0.9
+        )
+        gemini_kwargs = params.to_gemini_kwargs()
+        # Result includes these parameters with proper names for the Gemini API
+        ```
     """
 
     max_tokens: Optional[int] = Field(default=None)
@@ -79,7 +265,50 @@ class GeminiChatParameters(BaseChatParameters):
 
 @provider("Deepmind")
 class GeminiModel(BaseProviderModel):
-    """Deepmind Gemini provider implementation."""
+    """Google Deepmind Gemini provider implementation for Ember.
+
+    This class implements the BaseProviderModel interface for Google's Gemini
+    language models. It provides a complete integration with the Google Generative AI
+    API, handling all aspects of model interaction including authentication,
+    request formatting, error handling, retry logic, and response processing.
+
+    The implementation follows Google's recommended best practices for the
+    Generative AI API, including proper parameter formatting, error handling,
+    and resource cleanup. It incorporates comprehensive error categorization,
+    detailed logging, and automatic retries with exponential backoff for transient
+    errors, ensuring reliable operation in production environments.
+
+    The class provides three core functions:
+        1. Creating and configuring the Google Generative AI client
+        2. Processing chat requests through the forward method with proper error handling
+        3. Calculating usage statistics for billing and monitoring purposes
+
+    Key features:
+        - API authentication and client configuration with API key validation
+        - Model discovery and listing for debugging and validation
+        - Model name normalization to match Google API requirements
+        - Fallback to default models when requested model is unavailable
+        - Automatic retry with exponential backoff for transient errors
+        - Specialized error handling for different error types (e.g., NotFound)
+        - Detailed contextual logging for monitoring and debugging
+        - Usage statistics calculation with cost estimation
+        - Proper timeout handling to prevent hanging requests
+        - Thread-safe implementation for concurrent requests
+
+    Implementation details:
+        - Uses the official Google Generative AI Python SDK
+        - Implements tenacity-based retry logic with exponential backoff
+        - Validates model availability during client creation
+        - Provides model name normalization with proper prefixes
+        - Handles parameter conversion between Ember and Google formats
+        - Integrates with Ember's usage tracking and cost estimation system
+        - Supports all Gemini model variants (1.0, 1.5, etc.)
+
+    Attributes:
+        PROVIDER_NAME: The canonical name of this provider for registration.
+        model_info: Model metadata including credentials and cost schema.
+        client: The configured Google Generative AI client instance.
+    """
 
     PROVIDER_NAME: str = "Google"
 
@@ -204,7 +433,7 @@ class GeminiModel(BaseProviderModel):
 
             # Extract timeout from parameters or use default
             timeout = additional_params.pop("timeout", 30) if additional_params else 30
-            
+
             response = generative_model.generate_content(
                 prompt=request.prompt,
                 generation_config=generation_config,

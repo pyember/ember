@@ -1,3 +1,73 @@
+"""OpenAI provider implementation for the Ember framework.
+
+This module provides a comprehensive integration with OpenAI language models
+(including GPT-3.5, GPT-4, GPT-4o, and future variants) with the Ember framework.
+It handles all aspects of model interaction including auth, request formatting,
+response parsing, error handling, retry logic, and usage tracking specifically for
+the OpenAI API.
+
+The implementation follows OpenAI's best practices for API integration, including
+for parameter handling, retry mechanisms, error categorization,
+and logging. It supports all OpenAI model variants with appropriate
+parameter adjustments for model-specific requirements.
+
+Classes:
+    OpenAIProviderParams: TypedDict defining OpenAI-specific parameters
+    OpenAIChatParameters: Parameter conversion for OpenAI chat completions
+    OpenAIModel: Core implementation of the OpenAI provider
+
+Details:
+    - Authentication and client configuration for OpenAI API
+    - Automatic retry with exponential backoff for transient errors
+    - Specialized error handling for different error types
+    - Model-specific parameter handling (e.g., removing temperature for o1 models)
+    - Parameter validation and transformation
+    - Detailed logging for monitoring and debugging
+    - Usage statistics calculation for cost tracking
+    - Proper timeout handling to prevent hanging requests
+
+Usage example:
+    ```python
+    # Direct usage (prefer using ModelRegistry or API)
+    from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
+    
+    # Configure model information
+    model_info = ModelInfo(
+        id="openai:gpt-4o",
+        name="gpt-4o",
+        provider=ProviderInfo(name="OpenAI", api_key="sk-...")
+    )
+    
+    # Initialize the model
+    model = OpenAIModel(model_info)
+    
+    # Basic usage
+    response = model("What is the Ember framework?")
+    print(response.data)  # The model's response text
+    
+    # Advanced usage with more parameters
+    response = model(
+        "Generate creative ideas",
+        context="You are a helpful creative assistant",
+        temperature=0.9,
+        provider_params={"top_p": 0.95, "frequency_penalty": 0.5}
+    )
+    
+    # Accessing usage statistics
+    print(f"Used {response.usage.total_tokens} tokens")
+    print(f"Cost: ${response.usage.cost_usd:.6f}")
+    ```
+
+For higher-level usage, prefer the model registry or API interfaces:
+    ```python
+    from ember.api.models import models
+    
+    # Using the models API (automatically handles authentication)
+    response = models.openai.gpt4o("Tell me about Ember")
+    print(response.data)
+    ```
+"""
+
 import logging
 from typing import Any, Dict, Final, List, Optional, cast
 
@@ -5,6 +75,7 @@ import openai
 from pydantic import BaseModel, Field, field_validator
 from requests.exceptions import HTTPError
 from tenacity import retry, stop_after_attempt, wait_exponential
+from typing_extensions import TypedDict
 
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
@@ -17,7 +88,7 @@ from ember.core.registry.model.providers.base_provider import (
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
-    OpenAIProviderParams,
+    ProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
@@ -26,14 +97,93 @@ from ember.core.registry.model.base.utils.usage_calculator import (
     DefaultUsageCalculator,
 )
 
+
+class OpenAIProviderParams(ProviderParams):
+    """OpenAI-specific provider parameters for fine-tuning API requests.
+
+    This TypedDict defines additional parameters that can be passed to OpenAI API
+    calls beyond the standard parameters defined in BaseChatParameters. These parameters
+    provide fine-grained control over the model's generation behavior.
+
+    Parameters can be provided in the provider_params field of a ChatRequest:
+    ```python
+    request = ChatRequest(
+        prompt="Generate creative ideas",
+        provider_params={
+            "top_p": 0.9,
+            "frequency_penalty": 0.5,
+            "stop": ["END"]
+        }
+    )
+    ```
+
+    Attributes:
+        stream: Optional boolean to enable streaming responses instead of waiting
+            for the complete response.
+        stop: Optional list of strings that will cause the model to stop
+            generating when encountered.
+        presence_penalty: Optional float between -2.0 and 2.0 that penalizes tokens
+            based on their presence in the text so far. Positive values discourage
+            repetition.
+        frequency_penalty: Optional float between -2.0 and 2.0 that penalizes tokens
+            based on their frequency in the text so far. Positive values discourage
+            repetition.
+        top_p: Optional float between 0 and 1 for nucleus sampling, controlling the
+            cumulative probability threshold for token selection.
+        seed: Optional integer for deterministic sampling, ensuring repeatable outputs
+            for the same inputs (when temperature > 0).
+    """
+
+    stream: Optional[bool]
+    stop: Optional[list[str]]
+    presence_penalty: Optional[float]
+    frequency_penalty: Optional[float]
+    top_p: Optional[float]
+    seed: Optional[int]
+
+
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class OpenAIChatParameters(BaseChatParameters):
-    """Parameters for OpenAI chat requests.
+    """Parameters for OpenAI chat requests with validation and conversion logic.
 
-    Ensures that `max_tokens` is not None (defaulting to 512) and assembles the
-    OpenAI-style messages list.
+    This class extends BaseChatParameters to provide OpenAI-specific parameter
+    handling and validation. It ensures that parameters are correctly formatted
+    for the OpenAI API, handling the conversion between Ember's universal
+    parameter format and OpenAI's API requirements.
+
+    Key features:
+        - Enforces a minimum value for max_tokens
+        - Provides a sensible default (512 tokens) if not specified
+        - Validates that max_tokens is a positive integer
+        - Builds the messages array in the format expected by OpenAI's chat completion API
+        - Structures system and user content into proper roles
+
+    The class handles parameter validation and transformation to ensure that
+    all requests sent to the OpenAI API are properly formatted and contain
+    all required fields with valid values.
+
+    Example:
+        ```python
+        # With context
+        params = OpenAIChatParameters(
+            prompt="Tell me about LLMs",
+            context="You are a helpful assistant",
+            max_tokens=100,
+            temperature=0.7
+        )
+        kwargs = params.to_openai_kwargs()
+        # Result:
+        # {
+        #     "messages": [
+        #         {"role": "system", "content": "You are a helpful assistant"},
+        #         {"role": "user", "content": "Tell me about LLMs"}
+        #     ],
+        #     "max_tokens": 100,
+        #     "temperature": 0.7
+        # }
+        ```
     """
 
     max_tokens: Optional[int] = Field(default=None)
@@ -88,21 +238,47 @@ class OpenAIChatParameters(BaseChatParameters):
         }
 
 
-# NOTE: This class is deprecated and replaced by OpenAIProviderParams TypedDict
-# class OpenAIExtraParams(BaseModel):
-#     """Extra provider parameters for OpenAI that may be safely overridden by users."""
-#
-#     stream: Optional[bool] = None
-#     stop: Optional[List[str]] = None
-#     # Additional overrideable parameters can be defined here as needed.
-
-
 @provider("OpenAI")
 class OpenAIModel(BaseProviderModel):
-    """Implementation for OpenAI-based models.
+    """Implementation for OpenAI language models in the Ember framework.
 
-    Integrates with the OpenAI API, including transient error retry logic,
-    specialized error handling, and extraction of usage as well as cost details.
+    This class provides a comprehensive integration with the OpenAI API, handling
+    all aspects of model interaction including authentication, request formatting,
+    error handling, retry logic, and response processing. It implements the
+    BaseProviderModel interface, making OpenAI models compatible with the wider
+    Ember ecosystem.
+
+    The implementation follows OpenAI's best practices for API integration,
+    including proper parameter formatting, efficient retry mechanisms, detailed
+    error handling, and comprehensive logging. It supports all OpenAI model
+    variants with appropriate parameter adjustments for model-specific requirements.
+
+    Key features:
+        - Robust error handling with automatic retries for transient errors
+        - Specialized handling for different model variants (e.g., o1 models)
+        - Comprehensive logging for debugging and monitoring
+        - Usage statistics tracking for cost analysis
+        - Type-safe parameter handling with runtime validation
+        - Model-specific parameter pruning (e.g., removing temperature for o1 models)
+        - Proper timeout handling to prevent hanging requests
+
+    The class provides three core functions:
+        1. Creating and configuring the OpenAI API client
+        2. Processing chat requests through the forward method
+        3. Calculating usage statistics for billing and monitoring
+
+    Implementation details:
+        - Uses the official OpenAI Python SDK
+        - Implements tenacity-based retry logic with exponential backoff
+        - Properly handles API timeouts to prevent hanging
+        - Calculates usage statistics based on API response data
+        - Handles parameter conversion between Ember and OpenAI formats
+
+    Attributes:
+        PROVIDER_NAME: The canonical name of this provider for registration.
+        model_info: Model metadata including credentials and cost schema.
+        client: The configured OpenAI API client instance.
+        usage_calculator: Component for calculating token usage and costs.
     """
 
     PROVIDER_NAME: Final[str] = "OpenAI"

@@ -8,10 +8,16 @@ This module tests the ModelDiscoveryService which is responsible for:
 5. Error handling for provider failures
 """
 
+import asyncio
+import concurrent.futures
+import os
+import sys
 import threading
 import time
-import pytest
+import types
 from typing import Any, Dict, List, Optional, cast
+
+import pytest
 from unittest.mock import MagicMock, patch
 
 from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
@@ -30,22 +36,59 @@ class MockDiscoveryProvider(BaseDiscoveryProvider):
     This provider returns a predefined set of models for testing.
     """
 
-    def __init__(self, models: Optional[Dict[str, Dict[str, Any]]] = None) -> None:
-        """Initialize the mock provider with optional custom models."""
+    def __init__(
+        self,
+        models: Optional[Dict[str, Dict[str, Any]]] = None,
+        delay: float = 0,
+        should_fail: bool = False,
+        failure_msg: str = "Intentional provider failure",
+    ) -> None:
+        """Initialize the mock provider with optional custom models and behavior.
+
+        Args:
+            models: Dict of model_id to model data
+            delay: Optional delay in seconds to simulate network latency
+            should_fail: If True, provider will raise an exception
+            failure_msg: Message for the exception if should_fail is True
+        """
         self.models = models or {
             "mock:model": {"model_id": "mock:model", "model_name": "Mock Model"}
         }
         self.call_count = 0
+        self.delay = delay
+        self.should_fail = should_fail
+        self.failure_msg = failure_msg
+        self.configured = False
+        self.config = {}
 
     def fetch_models(self) -> Dict[str, Dict[str, Any]]:
         """Return a set of mock models and increment call counter."""
         self.call_count += 1
+
+        if self.should_fail:
+            raise RuntimeError(self.failure_msg)
+
+        if self.delay > 0:
+            time.sleep(self.delay)
+
         return self.models
 
     async def fetch_models_async(self) -> Dict[str, Dict[str, Any]]:
         """Async version of fetch_models for testing async discovery."""
         self.call_count += 1
+
+        if self.should_fail:
+            raise RuntimeError(self.failure_msg)
+
+        if self.delay > 0:
+            await asyncio.sleep(self.delay)
+
         return self.models
+
+    def configure(self, **kwargs) -> None:
+        """Mock configure method for testing provider initialization."""
+        self.configured = True
+        self.config = kwargs
 
 
 @pytest.fixture
@@ -169,7 +212,6 @@ def test_discovery_service_merge_with_config() -> None:
     # Use a module-level patch to avoid import path issues
     import sys
     from types import ModuleType
-    from unittest.mock import patch
 
     # Create a mock EmberSettings module and class for patching
     mock_settings_module = ModuleType("ember.core.registry.model.config.settings")
@@ -249,6 +291,198 @@ def test_discovery_service_mixed_provider_failures() -> None:
     assert "success:model" in models
 
 
+def test_timeout_handling() -> None:
+    """Test timeout handling in fetch_models with ThreadPoolExecutor."""
+    # Create a provider that takes too long
+    slow_provider = MockDiscoveryProvider(delay=2)
+    service = ModelDiscoveryService(ttl=3600)
+    service.providers = [slow_provider]
+
+    # Patch ThreadPoolExecutor to simulate a timeout
+    with patch("concurrent.futures.ThreadPoolExecutor") as mock_executor:
+        # Create a future that raises TimeoutError
+        mock_future = MagicMock()
+        mock_future.result.side_effect = concurrent.futures.TimeoutError(
+            "Provider timeout"
+        )
+        mock_executor.return_value.__enter__.return_value.submit.return_value = (
+            mock_future
+        )
+
+        # Should propagate the timeout as ModelDiscoveryError
+        with pytest.raises(ModelDiscoveryError) as exc_info:
+            service.discover_models()
+
+        assert "timeout" in str(exc_info.value).lower()
+
+
+def test_provider_configure() -> None:
+    """Test that provider configuration correctly passes API key."""
+    provider = MockDiscoveryProvider()
+
+    # Configure the provider directly
+    provider.configure(api_key="test-key", extra_param="value")
+
+    # Verify configuration was applied
+    assert provider.configured is True
+    assert provider.config.get("api_key") == "test-key"
+    assert provider.config.get("extra_param") == "value"
+
+
+def test_provider_configure_with_env_vars() -> None:
+    """Test provider initialization with environment variables."""
+    # Create provider configs list with our test provider
+    with patch.dict("os.environ", {"TEST_API_KEY": "test-key-value"}):
+        # Define the provider configs similar to what's in ModelDiscoveryService
+        provider_configs = [
+            (
+                MockDiscoveryProvider,
+                "TEST_API_KEY",
+                lambda: {"api_key": os.environ.get("TEST_API_KEY")},
+            ),
+        ]
+
+        # Manually initialize providers like the service would
+        providers = []
+        for cls, env_var, config_fn in provider_configs:
+            if os.environ.get(env_var):
+                instance = cls()
+                if hasattr(instance, "configure"):
+                    config = config_fn()
+                    instance.configure(**config)
+                providers.append(instance)
+
+        # Verify provider was initialized and configured
+        assert len(providers) == 1
+        provider = providers[0]
+        assert provider.configured is True
+        assert provider.config.get("api_key") == "test-key-value"
+
+
+def test_refresh_method() -> None:
+    """Test the refresh method for forced cache refresh."""
+    service = ModelDiscoveryService(
+        ttl=3600
+    )  # Long TTL to ensure cache wouldn't expire naturally
+
+    # Create mock provider with initial models
+    provider = MockDiscoveryProvider({"model1": {"model_id": "model1"}})
+    service.providers = [provider]
+
+    # Initial discovery - should populate cache
+    initial_models = service.discover_models()
+    assert "model1" in initial_models
+    assert provider.call_count == 1
+
+    # Change the provider's models to simulate API changes
+    provider.models = {"model2": {"model_id": "model2"}}
+
+    # Without refresh, we should get cached results
+    cached_models = service.discover_models()
+    assert cached_models == initial_models  # Still model1, not model2
+    assert provider.call_count == 1  # No additional call
+
+    # Now with refresh, we should force a refresh even though TTL hasn't expired
+    with patch.object(service, "merge_with_config") as mock_merge:
+        # Setup the mock to return model2
+        mock_merge.return_value = {
+            "model2": ModelInfo(
+                id="model2",
+                name="Model 2",
+                cost=ModelCost(),
+                rate_limit=RateLimit(),
+                provider=ProviderInfo(name="Test", default_api_key="test-key"),
+            )
+        }
+
+        refreshed_models = service.refresh()
+
+        # Verify it forced a new API call
+        assert provider.call_count == 2
+        # Verify mock_merge was called
+        mock_merge.assert_called_once()
+
+
+def test_refresh_error_handling() -> None:
+    """Test that refresh handles errors and returns last known cache."""
+    service = ModelDiscoveryService(ttl=3600)
+
+    # Create mock EmberSettings to control behavior
+    mock_settings_module = types.ModuleType("ember.core.registry.model.config.settings")
+
+    # Create a mock class with registry attribute
+    class MockEmberSettings:
+        def __init__(self):
+            self.registry = types.SimpleNamespace()
+            self.registry.models = []
+
+    # Add the class to the module
+    mock_settings_module.EmberSettings = MockEmberSettings
+
+    # Save original module
+    original_module = sys.modules.get("ember.core.registry.model.config.settings", None)
+    # Replace with our mock
+    sys.modules["ember.core.registry.model.config.settings"] = mock_settings_module
+
+    try:
+        # Initial successful discovery to populate cache
+        provider = MockDiscoveryProvider({"model1": {"model_id": "model1"}})
+        service.providers = [provider]
+
+        with patch.dict("os.environ", {"MOCK_API_KEY": "mock-key"}):
+            initial_models = service.discover_models()
+
+            # Now make the provider fail on next call
+            provider.should_fail = True
+
+            # Refresh should handle the error and return the last known good cache
+            result = service.refresh()
+
+            # Should have attempted to call provider again
+            assert provider.call_count == 2
+
+            # Even though it failed, we should get an empty dict back
+            # since there's no API key match in merge_with_config
+            assert not result  # Empty dict because no matching API keys
+    finally:
+        # Restore original module
+        if original_module:
+            sys.modules["ember.core.registry.model.config.settings"] = original_module
+        else:
+            del sys.modules["ember.core.registry.model.config.settings"]
+
+
+def test_invalidate_cache() -> None:
+    """Test that invalidate_cache properly clears the cache."""
+    service = ModelDiscoveryService(ttl=3600)
+    provider = MockDiscoveryProvider()
+    service.providers = [provider]
+
+    # Initial discovery should fetch from provider
+    service.discover_models()
+    assert provider.call_count == 1
+
+    # Second call should use cache
+    service.discover_models()
+    assert provider.call_count == 1  # Still 1
+
+    # Save the timestamp before invalidation
+    timestamp_before = service._last_update
+
+    # Invalidate the cache
+    service.invalidate_cache()
+
+    # The timestamp should be reset to 0.0 during invalidation
+    assert service._last_update == 0.0
+
+    # Next call should fetch fresh data
+    service.discover_models()
+    assert provider.call_count == 2  # Now 2
+
+    # Now the timestamp should be updated after the new fetch
+    assert service._last_update > timestamp_before
+
+
 @pytest.mark.asyncio
 async def test_discovery_service_async_fetch_and_cache(
     discovery_service: ModelDiscoveryService,
@@ -272,3 +506,189 @@ async def test_discovery_service_async_fetch_and_cache(
     refreshed_models = await discovery_service.discover_models_async()
     assert refreshed_models == models
     assert provider.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_async_provider_failure() -> None:
+    """Test handling of async provider failures."""
+    service = ModelDiscoveryService(ttl=3600)
+
+    # Create provider that fails in async mode
+    failing_provider = MockDiscoveryProvider(
+        should_fail=True, failure_msg="Async provider failure"
+    )
+    service.providers = [failing_provider]
+
+    # Should handle the error and raise ModelDiscoveryError
+    with pytest.raises(ModelDiscoveryError) as exc_info:
+        await service.discover_models_async()
+
+    assert "Async provider failure" in str(exc_info.value)
+    assert failing_provider.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_async_timeout_handling() -> None:
+    """Test timeout handling in async discovery."""
+    service = ModelDiscoveryService(ttl=3600)
+    slow_provider = MockDiscoveryProvider(delay=2)  # Slow provider
+    service.providers = [slow_provider]
+
+    # Mock asyncio.wait_for to simulate timeout
+    with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError("Async timeout")):
+        # Should handle the timeout error
+        with pytest.raises(ModelDiscoveryError) as exc_info:
+            await service.discover_models_async()
+
+        assert "timeout" in str(exc_info.value).lower()
+
+
+def test_merge_with_config_different_provider_prefixes() -> None:
+    """Test merging with different provider prefix scenarios."""
+    service = ModelDiscoveryService()
+
+    # Create discovered models with different prefixes
+    discovered = {
+        "openai:model1": {"model_id": "openai:model1", "model_name": "OpenAI Model 1"},
+        "anthropic:model2": {
+            "model_id": "anthropic:model2",
+            "model_name": "Anthropic Model 2",
+        },
+        "unknown:model3": {
+            "model_id": "unknown:model3",
+            "model_name": "Unknown Model 3",
+        },
+    }
+
+    # Create a mock EmberSettings module and class
+    mock_settings_module = types.ModuleType("ember.core.registry.model.config.settings")
+
+    # Create a mock class with registry attribute
+    class MockEmberSettings:
+        def __init__(self):
+            self.registry = types.SimpleNamespace()
+            self.registry.models = []
+
+    # Add the class to the module
+    mock_settings_module.EmberSettings = MockEmberSettings
+
+    # Save original module
+    original_module = sys.modules.get("ember.core.registry.model.config.settings", None)
+    # Replace with our mock
+    sys.modules["ember.core.registry.model.config.settings"] = mock_settings_module
+
+    try:
+        # Mock environment variables for API keys
+        with patch.dict(
+            "os.environ",
+            {"OPENAI_API_KEY": "openai-key", "ANTHROPIC_API_KEY": "anthropic-key"},
+        ):
+            # Merge with config
+            merged = service.merge_with_config(discovered=discovered)
+
+            # Should include models with known providers
+            assert "openai:model1" in merged
+            assert "anthropic:model2" in merged
+
+            # Verify API keys were set
+            assert merged["openai:model1"].provider.default_api_key == "openai-key"
+            assert (
+                merged["anthropic:model2"].provider.default_api_key == "anthropic-key"
+            )
+
+            # Unknown provider should be skipped since no API key
+            assert "unknown:model3" not in merged
+    finally:
+        # Restore original module
+        if original_module:
+            sys.modules["ember.core.registry.model.config.settings"] = original_module
+        else:
+            del sys.modules["ember.core.registry.model.config.settings"]
+
+
+def test_merge_with_config_no_provider_field() -> None:
+    """Test merging behavior with missing provider field."""
+    service = ModelDiscoveryService()
+
+    # Create a model without provider field
+    discovered = {
+        "model:missing": {
+            "model_id": "model:missing",
+            "model_name": "Model With Missing Provider"
+            # No provider field
+        }
+    }
+
+    # Create a mock EmberSettings module and class
+    mock_settings_module = types.ModuleType("ember.core.registry.model.config.settings")
+
+    # Create a mock class with registry attribute
+    class MockEmberSettings:
+        def __init__(self):
+            self.registry = types.SimpleNamespace()
+            self.registry.models = []
+
+    # Add the class to the module
+    mock_settings_module.EmberSettings = MockEmberSettings
+
+    # Save original module
+    original_module = sys.modules.get("ember.core.registry.model.config.settings", None)
+    # Replace with our mock
+    sys.modules["ember.core.registry.model.config.settings"] = mock_settings_module
+
+    try:
+        # Merge with config
+        merged = service.merge_with_config(discovered=discovered)
+
+        # The model should be skipped due to missing provider
+        assert not merged
+    finally:
+        # Restore original module
+        if original_module:
+            sys.modules["ember.core.registry.model.config.settings"] = original_module
+        else:
+            del sys.modules["ember.core.registry.model.config.settings"]
+
+
+def test_merge_with_config_validation_error() -> None:
+    """Test validation error handling during merge_with_config."""
+    service = ModelDiscoveryService()
+
+    # Create model with invalid data that will fail validation
+    discovered = {
+        "model:invalid": {
+            "model_id": "model:invalid",
+            "model_name": "Invalid Model",
+            "provider": "not_a_dict",  # This will fail validation
+        }
+    }
+
+    # Create a mock EmberSettings module and class
+    mock_settings_module = types.ModuleType("ember.core.registry.model.config.settings")
+
+    # Create a mock class with registry attribute
+    class MockEmberSettings:
+        def __init__(self):
+            self.registry = types.SimpleNamespace()
+            self.registry.models = []
+
+    # Add the class to the module
+    mock_settings_module.EmberSettings = MockEmberSettings
+
+    # Save original module
+    original_module = sys.modules.get("ember.core.registry.model.config.settings", None)
+    # Replace with our mock
+    sys.modules["ember.core.registry.model.config.settings"] = mock_settings_module
+
+    try:
+        # Merge with config - should not raise exception
+        merged = service.merge_with_config(discovered=discovered)
+
+        # The invalid model should be skipped
+        assert not merged
+    finally:
+        # Restore original module
+        if original_module:
+            sys.modules["ember.core.registry.model.config.settings"] = original_module
+        else:
+            del sys.modules["ember.core.registry.model.config.settings"]

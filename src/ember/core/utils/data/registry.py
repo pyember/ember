@@ -192,7 +192,12 @@ class UnifiedDatasetRegistry:
         return dataset.info if dataset is not None else None
 
     def register_with_decorator(
-        self, *, name: str, source: str, task_type: TaskType, description: str = "Custom dataset"
+        self,
+        *,
+        name: str,
+        source: str,
+        task_type: TaskType,
+        description: str = "Custom dataset",
     ) -> Callable[[Type[Any]], Type[Any]]:
         """Decorator for registering a dataset class.
 
@@ -217,7 +222,10 @@ class UnifiedDatasetRegistry:
             """
             if not hasattr(cls, "info"):
                 cls.info = LegacyDatasetInfo(
-                    name=name, source=source, task_type=task_type, description=description
+                    name=name,
+                    source=source,
+                    task_type=task_type,
+                    description=description,
                 )
             self.register_new(name=name, dataset_cls=cls, info=cls.info)
             return cls

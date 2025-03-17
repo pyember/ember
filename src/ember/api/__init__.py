@@ -9,7 +9,7 @@ Examples:
     from ember.api import models, datasets, operators
     
     # Use models with a clean, namespaced interface
-    response = models.openai.gpt4("What's the capital of France?")
+    response = models.openai.gpt4o("What's the capital of France?")
     
     # Load datasets directly
     mmlu_data = datasets("mmlu")
@@ -29,11 +29,12 @@ Examples:
         return complex_computation(x)
 """
 
-
 # Import module namespaces
-import ember.api.non as non                      # Network of Networks patterns
-# import ember.api.xcs as xcs                      # Execution optimization
-import ember.api.operators as operators            # Operator system
+import ember.api.models as models  # Language model access
+import ember.api.non as non  # Network of Networks patterns
+
+# import ember.api.xcs as xcs  # Execution optimization
+import ember.api.operators as operators  # Operator system
 
 # Make operators available as both singular and plural for backward compatibility
 operator = operators
@@ -52,20 +53,31 @@ from ember.api.data import (
     datasets,  # Function to load datasets
 )
 
+# Import model API components
+from ember.api.models import (
+    ModelAPI,  # High-level model API
+    ModelBuilder,  # Builder pattern for model configuration
+    ModelEnum,  # Type-safe model references
+)
+
 # Import types API
 import ember.api.types as types
 
 # Public interface - export facades, modules, and direct API components
 __all__ = [
     # Main facade objects
-    # "models",                # Model access (models.openai.gpt4, etc.)
+    "models",  # Model access (models.openai.gpt4o, etc.)
     "datasets",  # Dataset access (datasets("mmlu"), etc.)
     # Module namespaces
-    "non",                    # Network of Networks patterns
-    # "xcs",                   # Execution optimization
-    "operators",              # Operator system (plural)
-    "operator",               # Operator system (singular, for backward compatibility)
-    "types",                  # Types system for Ember models and operators
+    "non",  # Network of Networks patterns
+    # "xcs",  # Execution optimization
+    "operators",  # Operator system (plural)
+    "operator",  # Operator system (singular, for backward compatibility)
+    "types",  # Types system for Ember models and operators
+    # Model API components
+    "ModelAPI",  # High-level model API
+    "ModelBuilder",  # Builder pattern for model configuration
+    "ModelEnum",  # Type-safe model references
     # Data API components
     "DatasetBuilder",  # Builder pattern for dataset loading
     "Dataset",  # Dataset container class

@@ -6,6 +6,7 @@ import pytest
 from typing import Any, Dict
 
 import openai
+from openai import OpenAI
 
 from ember.core.registry.model.providers.openai.openai_discovery import (
     OpenAIDiscovery,
@@ -14,27 +15,40 @@ from ember.core.registry.model.providers.openai.openai_discovery import (
 
 @pytest.fixture(autouse=True)
 def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patch openai.Model.list to return a dummy response."""
+    """Patch openai client to return a dummy response."""
 
-    def mock_model_list() -> Dict[str, Any]:
-        return {
-            "data": [
-                {"id": "gpt-4o", "name": "gpt-4o"},
-                {"id": "gpt-4o-mini", "name": "gpt-4o-mini"},
+    class MockOpenAI:
+        class Models:
+            def list(self):
+                return MockResponse()
+
+        @property
+        def models(self):
+            return self.Models()
+
+    class MockModel:
+        def __init__(self, id, object_type="model"):
+            self.id = id
+            self.object = object_type
+
+    class MockResponse:
+        @property
+        def data(self):
+            return [
+                MockModel("gpt-4o"),
+                MockModel("gpt-4o-mini"),
             ]
-        }
 
-    monkeypatch.setattr(openai.Model, "list", mock_model_list)
-    # Mock app_context to avoid circular dependency
+    # Patch the OpenAI class
+    monkeypatch.setattr(openai, "OpenAI", MockOpenAI)
+    # Set environment variable for tests
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
 
 @pytest.fixture
 def discovery_instance():
-    """Return a preconfigured discovery instance to avoid app_context access."""
-    discovery = OpenAIDiscovery()
-    discovery.configure(api_key="test-key")
-    return discovery
+    """Return a configured discovery instance."""
+    return OpenAIDiscovery(api_key="test-key")
 
 
 def test_openai_discovery_fetch_models(discovery_instance) -> None:

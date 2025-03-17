@@ -60,6 +60,7 @@ cleanup_backup/
 old/
 *~
 *.bak
+REFACTORING_PLAN.md
 
 # Claude assistant files
 CLAUDE.md

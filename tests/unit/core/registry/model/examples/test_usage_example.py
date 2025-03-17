@@ -1,64 +1,72 @@
 """
 Unit tests for the usage_example script.
-Uses a dummy init() to return a dummy ModelService so that the example main() produces expected output.
 """
 
-import io
 import logging
-from typing import Any
+from typing import Any, Dict
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-# Assume the usage_example script's main() is importable:
-from ember.core.registry.model.examples.usage_example import main
+
+class DummyResponse:
+    """Simple response object with data and usage attributes."""
+
+    def __init__(self, text: str):
+        self.data = text
+        self.usage = None
 
 
-class DummyModel:
-    def __init__(self, model_id: str) -> None:
-        self.model_id = model_id
+@pytest.fixture
+def mock_model_service():
+    """Create a mock model service for testing."""
+    mock_service = MagicMock()
 
-    def __call__(self, prompt: str, **kwargs: Any) -> Any:
-        class DummyResponse:
-            data = f"Response from {self.model_id}: {prompt}"
-            usage = None
+    # Setup invoke_model method
+    def side_effect(model_id, prompt, **kwargs):
+        model_name = getattr(model_id, "value", model_id)
+        return DummyResponse(f"Response from {model_name}: {prompt}")
 
-        return DummyResponse()
+    mock_service.invoke_model.side_effect = side_effect
 
+    # Setup get_model method
+    mock_model = MagicMock()
+    mock_model.side_effect = lambda prompt, **kwargs: DummyResponse(
+        f"Response from model: {prompt}"
+    )
+    mock_service.get_model.return_value = mock_model
 
-class DummyModelService:
-    def __init__(self) -> None:
-        self.models = {"openai:gpt-4o": DummyModel("openai:gpt-4o")}
-
-    def __call__(self, model_id: str, prompt: str, **kwargs: Any) -> Any:
-        return self.models.get(model_id, DummyModel(model_id))(prompt)
-
-    def get_model(self, model_id: str) -> Any:
-        return self.models.get(model_id, DummyModel(model_id))
-
-
-class DummyInitService:
-    """A dummy init() that accepts usage_tracking and returns a DummyModelService."""
-
-    def __call__(
-        self, usage_tracking: bool = True, *args, **kwargs
-    ) -> DummyModelService:
-        return DummyModelService()
+    return mock_service
 
 
 @pytest.fixture(autouse=True)
-def patch_init(monkeypatch: pytest.MonkeyPatch) -> None:
-    """
-    Patch usage_example.py so that 'init(...)' is replaced by DummyInitService(),
-    which accepts usage_tracking without raising a TypeError.
-    """
-    from ember.core.registry.model.examples import usage_example
+def mock_dependencies(monkeypatch, mock_model_service):
+    """Mock all dependencies needed by the usage_example module."""
+    # Mock the get_model_service function
+    monkeypatch.setattr(
+        "ember.core.registry.model.examples.usage_example.get_model_service",
+        lambda *args, **kwargs: mock_model_service,
+    )
 
-    monkeypatch.setattr(usage_example, "init", DummyInitService())
+    # Suppress logging
+    monkeypatch.setattr(
+        "ember.core.registry.model.examples.usage_example.logging.basicConfig",
+        lambda **kwargs: None,
+    )
 
 
-def test_usage_example_output(capsys: pytest.CaptureFixture) -> None:
-    """Run the usage_example main() and capture its output for expected strings."""
+def test_usage_example_output(capsys):
+    """Test that the usage_example main function produces expected output."""
+    # Suppress all logging
     logging.getLogger().handlers = [logging.NullHandler()]
+
+    # Import here to avoid module-level import issues
+    from ember.core.registry.model.examples.usage_example import main
+
+    # Run the main function
     main()
+
+    # Check output
     captured = capsys.readouterr().out
-    assert "Response using string ID:" in captured or "Response using Enum:" in captured
+    assert "Response using string ID:" in captured
+    assert "Response using Enum:" in captured
