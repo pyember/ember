@@ -139,10 +139,10 @@ class ModelDiscoveryService:
         Raises:
             ModelDiscoveryError: If no models can be discovered due to provider errors.
         """
-        
+
         # Checking cache with minimal lock scope
         current_time: float = time.time()
-        with self._lock:  
+        with self._lock:
             if self._cache and (current_time - self._last_update) < self.ttl:
                 logger.info("Returning cached discovery results.")
                 return self._cache.copy()  # Return a copy to avoid external mutation
@@ -155,55 +155,61 @@ class ModelDiscoveryService:
         for provider in self.providers:
             provider_name = provider.__class__.__name__
             logger.info(f"Starting model discovery for provider: {provider_name}")
-            
+
             try:
                 result_container = []
                 error_container = []
                 completion_event = threading.Event()
-                
+
                 def fetch_with_timeout():
                     try:
                         # Call the provider's fetch_models method
                         start = time.time()
                         result = provider.fetch_models()
                         duration = time.time() - start
-                        logger.info(f"Provider {provider_name} completed in {duration:.2f}s")
+                        logger.info(
+                            f"Provider {provider_name} completed in {duration:.2f}s"
+                        )
                         result_container.append(result)
                     except Exception as e:
                         error_container.append(e)
                     finally:
                         completion_event.set()
-                
+
                 # Run the fetch in a thread
                 thread = threading.Thread(target=fetch_with_timeout)
                 thread.daemon = True  # Don't block program exit
                 thread.start()
-                
+
                 # Wait for completion with timeout (15 seconds per provider is plenty)
-                logger.info(f"Waiting for models from {provider_name} (timeout: 15s)...")
+                logger.info(
+                    f"Waiting for models from {provider_name} (timeout: 15s)..."
+                )
                 if not completion_event.wait(15.0):
                     logger.error(f"Timeout while fetching models from {provider_name}")
                     errors.append(f"{provider_name}: Timeout after 15 seconds")
                     # Continue to the next provider - we can't forcibly terminate the thread
                     continue
-                
+
                 # Check if we got results or errors
                 if error_container:
                     e = error_container[0]
                     logger.error(f"Error fetching models from {provider_name}: {e}")
                     errors.append(f"{provider_name}: {str(e)}")
                     continue
-                
+
                 if not result_container:
                     logger.error(f"No results from {provider_name}")
                     errors.append(f"{provider_name}: No results returned")
                     continue
-                
+
                 # Process successful results
                 result = result_container[0]
-                logger.info(f"Successfully received {len(result)} models from {provider_name}")
+                logger.info(
+                    f"Successfully received {len(result)} models from {provider_name}"
+                )
                 aggregated_models.update(result)
-                
+
             except Exception as e:
                 logger.error(f"Unexpected error with {provider_name}: {e}")
                 errors.append(f"{provider_name}: {str(e)}")
@@ -218,8 +224,10 @@ class ModelDiscoveryService:
         with self._lock:
             self._cache = aggregated_models.copy()
             self._last_update = time.time()
-            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
-        
+            logger.info(
+                f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
+            )
+
         return aggregated_models.copy()
 
     def merge_with_config(
@@ -337,15 +345,15 @@ class ModelDiscoveryService:
         return merged_models
 
     def refresh(self) -> Dict[str, ModelInfo]:
-        """Force a refresh of model discovery and merge with local configuration."""        
+        """Force a refresh of model discovery and merge with local configuration."""
         # Invalidate the cache with minimal lock scope
         with self._lock:
             self._last_update = 0.0
-        
+
         try:
             # Perform discovery outside the lock to prevent deadlocks
             discovered: Dict[str, Dict[str, Any]] = self.discover_models()
-            
+
             # Only merge and update cache in a separate lock acquisition
             with self._lock:
                 merged = self.merge_with_config(discovered=discovered)
@@ -387,18 +395,22 @@ class ModelDiscoveryService:
         aggregated_models: Dict[str, Dict[str, Any]] = {}
         errors: List[str] = []
 
-        async def fetch_from_provider(provider: BaseDiscoveryProvider) -> Dict[str, Any]:
+        async def fetch_from_provider(
+            provider: BaseDiscoveryProvider,
+        ) -> Dict[str, Any]:
             """Async wrapper for provider fetch with proper error handling."""
             provider_name = provider.__class__.__name__
             logger.info(f"Starting async model discovery for: {provider_name}")
-            
+
             try:
                 # Check if the provider has an async implementation
                 if hasattr(provider, "fetch_models_async") and callable(
                     provider.fetch_models_async
                 ):
                     # Use the async implementation directly with shorter timeout
-                    logger.info(f"Using native async implementation for {provider_name}")
+                    logger.info(
+                        f"Using native async implementation for {provider_name}"
+                    )
                     provider_models = await asyncio.wait_for(
                         provider.fetch_models_async(), timeout=15
                     )
@@ -411,27 +423,27 @@ class ModelDiscoveryService:
                         )
                     )
                     provider_models = await asyncio.wait_for(fetch_task, timeout=15)
-                
-                logger.info(f"Successfully received {len(provider_models)} models from {provider_name}")
+
+                logger.info(
+                    f"Successfully received {len(provider_models)} models from {provider_name}"
+                )
                 return {
                     "success": True,
                     "provider": provider_name,
-                    "models": provider_models 
+                    "models": provider_models,
                 }
             except asyncio.TimeoutError:
-                logger.error(f"Async timeout while fetching models from {provider_name}")
+                logger.error(
+                    f"Async timeout while fetching models from {provider_name}"
+                )
                 return {
                     "success": False,
                     "provider": provider_name,
-                    "error": f"Timeout after 15 seconds"
+                    "error": f"Timeout after 15 seconds",
                 }
             except Exception as e:
                 logger.error(f"Error in async fetch from {provider_name}: {e}")
-                return {
-                    "success": False,
-                    "provider": provider_name,
-                    "error": str(e)
-                }
+                return {"success": False, "provider": provider_name, "error": str(e)}
 
         # Process each provider with independent timeout protection
         # This is better than gather which might wait for all tasks
@@ -443,12 +455,14 @@ class ModelDiscoveryService:
             except Exception as e:
                 logger.error(f"Unexpected error in async discovery: {e}")
                 # Add error entry but continue with other providers
-                results.append({
-                    "success": False,
-                    "provider": provider.__class__.__name__,
-                    "error": str(e)
-                })
-        
+                results.append(
+                    {
+                        "success": False,
+                        "provider": provider.__class__.__name__,
+                        "error": str(e),
+                    }
+                )
+
         # Process all provider results
         for result in results:
             if result["success"]:
@@ -466,6 +480,8 @@ class ModelDiscoveryService:
         with self._lock:
             self._cache = aggregated_models.copy()
             self._last_update = time.time()
-            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
-            
+            logger.info(
+                f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
+            )
+
         return aggregated_models.copy()

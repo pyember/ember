@@ -332,7 +332,7 @@ def vmap(
             "options": {"format": "json"}  # Complex non-batch parameter
         })
         # results == {"translated": ["Hola", "Mundo", "Ejemplo"]}
-        
+
         # Using with dictionary outputs
         def process_item(item):
             return {
@@ -340,10 +340,10 @@ def vmap(
                 "processed": transform(item["data"]),
                 "timestamp": get_timestamp()
             }
-            
+
         # Creating vectorized function
         batch_process = vmap(process_item)
-        
+
         # Processing multiple items with heterogeneous outputs
         results = batch_process(inputs={
             "id": [1, 2, 3],

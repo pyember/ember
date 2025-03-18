@@ -164,21 +164,23 @@ def test_anthropic_discovery_timeout_handling(
     # Mock requests.get to raise a timeout exception
     def request_that_raises_timeout(*args, **kwargs):
         import requests
+
         raise requests.exceptions.Timeout("Connection timed out")
 
     import requests
+
     monkeypatch.setattr(requests, "get", request_that_raises_timeout)
 
     # Test that we handle the timeout properly and return fallback models
     result = discovery_instance.fetch_models()
-    
+
     # Verify that fallback models were returned despite the timeout
     assert len(result) > 0
-    
+
     # Make sure we got the expected fallback models
     assert "anthropic:claude-3-sonnet" in result
     assert "anthropic:claude-3.5-sonnet" in result
-    
+
     # More specific check that confirms error handling is working
     # Verify we get more than 1 model as expected with fallbacks
     assert len(result) > 1

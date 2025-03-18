@@ -66,7 +66,7 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
 
         This method calls the /v1/models endpoint directly using the requests library
         to get the list of available models, and standardizes them for the model registry.
-        It falls back to hardcoded models if the API call fails. Uses simplified error 
+        It falls back to hardcoded models if the API call fails. Uses simplified error
         handling and aggressive timeouts to prevent hanging.
 
         Returns:
@@ -89,22 +89,29 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
             # Make API request with aggressive timeouts to prevent hanging
             # Use very short timeouts to fail fast rather than hang
             logger.info(f"Calling Anthropic REST API: {models_url} with timeout=(2,5)")
-            
+
             # Direct request with aggressive timeouts
             response = requests.get(
-                models_url, 
-                headers=headers, 
-                timeout=(2, 5)  # (connect_timeout, read_timeout) in seconds - fairly aggressive
+                models_url,
+                headers=headers,
+                timeout=(
+                    2,
+                    5,
+                ),  # (connect_timeout, read_timeout) in seconds - fairly aggressive
             )
 
             # Raising error for non-success responses
             response.raise_for_status()
 
             # Check if we're taking too long already
-            if time.time() - start_time > 10:  # Safety check - if we've spent over 10s already
-                logger.warning("API responded but processing is taking too long, using fallbacks")
+            if (
+                time.time() - start_time > 10
+            ):  # Safety check - if we've spent over 10s already
+                logger.warning(
+                    "API responded but processing is taking too long, using fallbacks"
+                )
                 return self._get_fallback_models()
-                
+
             # Parse response
             models_data = response.json().get("data", [])
             logger.info(
@@ -114,7 +121,7 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
             # Process model data efficiently
             logger.info(f"Processing {len(models_data)} Anthropic models")
             standardized_models: Dict[str, Dict[str, Any]] = {}
-            
+
             # Process with a reasonable model count limit as a safeguard
             model_count_limit = 50  # Reasonable upper limit, reduced from 100
             for model in models_data[:model_count_limit]:

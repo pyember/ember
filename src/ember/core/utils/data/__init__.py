@@ -75,21 +75,24 @@ def load_dataset_entries(
 
     # Retrieve dataset metadata and the corresponding prepper class.
     # Handle different registry API versions
-    if hasattr(metadata_registry, 'get_info'):
+    if hasattr(metadata_registry, "get_info"):
         # New API uses get_info
-        dataset_info: Optional[DatasetInfo] = metadata_registry.get_info(name=dataset_name)
-    elif hasattr(metadata_registry, 'get'):
+        dataset_info: Optional[DatasetInfo] = metadata_registry.get_info(
+            name=dataset_name
+        )
+    elif hasattr(metadata_registry, "get"):
         # Check if get method requires named parameters
         import inspect
+
         get_params = inspect.signature(metadata_registry.get).parameters
-        if 'name' in get_params:
+        if "name" in get_params:
             dataset = metadata_registry.get(name=dataset_name)
-            dataset_info = getattr(dataset, 'info', None) if dataset else None
+            dataset_info = getattr(dataset, "info", None) if dataset else None
         else:
             dataset_info = metadata_registry.get(dataset_name)
     else:
         dataset_info = None
-        
+
     if dataset_info is None:
         raise ValueError(f"Dataset '{dataset_name}' not found in metadata registry.")
 

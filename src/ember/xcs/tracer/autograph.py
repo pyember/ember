@@ -190,15 +190,19 @@ class AutoGraphBuilder:
                 # Check if there's a direct dependency between record i and record j
                 dependent_record = record
                 predecessor_record = records[j]
-                
+
                 # Simple direct data dependency check
-                if self._has_dependency(inputs=dependent_record.inputs, outputs=predecessor_record.outputs):
+                if self._has_dependency(
+                    inputs=dependent_record.inputs, outputs=predecessor_record.outputs
+                ):
                     # Add dependency from graph node j to graph node i
                     # Map node indices to graph_node_ids
                     from_node = predecessor_record.graph_node_id
                     to_node = dependent_record.graph_node_id
                     # Update dependency map using the original node_id
-                    self.dependency_map[dependent_record.node_id].add(predecessor_record.node_id)
+                    self.dependency_map[dependent_record.node_id].add(
+                        predecessor_record.node_id
+                    )
 
         # Analyze data flow by matching signatures
         for i, record in enumerate(records):

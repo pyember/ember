@@ -15,7 +15,7 @@ for logger_name in ["httpx", "httpcore", "openai", "ember"]:
 # Import directly what we need
 from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
 
-# Create service 
+# Create service
 service = ModelDiscoveryService()
 
 # Time the discovery

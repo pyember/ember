@@ -296,29 +296,31 @@ def test_discovery_service_mixed_provider_failures() -> None:
 def test_timeout_handling() -> None:
     """Test timeout handling in fetch_models with ThreadPoolExecutor."""
     # Create a provider that takes too long and should fail with timeout
-    slow_provider = MockDiscoveryProvider(delay=20, should_fail=True, failure_msg="Timeout error")
+    slow_provider = MockDiscoveryProvider(
+        delay=20, should_fail=True, failure_msg="Timeout error"
+    )
     service = ModelDiscoveryService(ttl=3600)
     service.providers = [slow_provider]
 
     # Using the newer threading-based timeout implementation - patch threading.Thread
     from unittest.mock import patch
-    
+
     # Mock the threading.Thread to simulate timeout behavior
-    with patch('threading.Thread') as mock_thread:
+    with patch("threading.Thread") as mock_thread:
         # Configure the mock thread to simulate a thread that never completes
         mock_thread_instance = MagicMock()
         mock_thread.return_value = mock_thread_instance
-        
+
         # Make the completion_event.wait() return False to simulate timeout
-        with patch('threading.Event') as mock_event:
+        with patch("threading.Event") as mock_event:
             mock_event_instance = MagicMock()
             mock_event_instance.wait.return_value = False  # Simulate timeout
             mock_event.return_value = mock_event_instance
-            
+
             # Should propagate the timeout as ModelDiscoveryError
             with pytest.raises(ModelDiscoveryError) as exc_info:
                 service.discover_models()
-                
+
             # Check that the error message contains 'timeout'
             assert "timeout" in str(exc_info.value).lower()
 
@@ -329,34 +331,34 @@ def test_parallel_provider_execution() -> None:
     providers = [
         MockDiscoveryProvider(
             models={"provider1:model": {"model_id": "provider1:model"}},
-            delay=0.1  # Reduced delay for faster test execution
+            delay=0.1,  # Reduced delay for faster test execution
         ),
         MockDiscoveryProvider(
             models={"provider2:model": {"model_id": "provider2:model"}},
-            delay=0.1  # Reduced delay for faster test execution
+            delay=0.1,  # Reduced delay for faster test execution
         ),
         MockDiscoveryProvider(
             models={"provider3:model": {"model_id": "provider3:model"}},
-            delay=0.1  # Reduced delay for faster test execution
+            delay=0.1,  # Reduced delay for faster test execution
         ),
     ]
-    
+
     service = ModelDiscoveryService(ttl=3600)
     service.providers = providers
-    
+
     # Time the execution - it should take ~0.1 seconds (not 0.3) if parallel
     start_time = time.time()
     models = service.discover_models()
     duration = time.time() - start_time
-    
+
     # All models from all providers should be present
     assert "provider1:model" in models
     assert "provider2:model" in models
     assert "provider3:model" in models
-    
+
     # Each provider should have been called exactly once
     assert all(p.call_count == 1 for p in providers)
-    
+
     # If truly parallel, duration should be closer to max(delays) than sum(delays)
     # Allow some buffer for test overhead
     # More generous assertion to avoid flakiness in CI environments
@@ -448,10 +450,10 @@ def test_refresh_method() -> None:
             # Verify lock was acquired - implementation now uses context manager so we might have
             # multiple calls depending on the implementation
             assert mock_lock.__enter__.call_count > 0
-            
+
             # Verify it forced a new API call
             assert provider.call_count == 2
-            
+
             # Verify mock_merge was called
             mock_merge.assert_called_once()
 

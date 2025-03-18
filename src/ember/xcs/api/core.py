@@ -70,26 +70,26 @@ class XCSAPI:
 
     This class provides a simplified interface to the system with a
     consistent interface across different components.
-    
+
     Example:
         ```python
         from ember.xcs.api.core import XCSAPI
-        
+
         # Creating API instance
         xcs = XCSAPI()
-        
+
         # Using JIT compilation
         @xcs.jit
         class MyOperator(Operator):
             def forward(self, *, inputs):
                 return {"result": process(inputs)}
-                
+
         # Using vectorization
         batch_fn = xcs.vmap(single_item_fn)
-        
+
         # Using parallelization
         parallel_fn = xcs.pmap(compute_intensive_fn)
-        
+
         # Building and executing a graph
         graph = xcs.autograph(trace_records)
         result = xcs.execute(graph, inputs={"query": "test"})
@@ -136,7 +136,7 @@ class XCSAPI:
             # Creating an instance and executing
             op = MyOperator()
             result = op(inputs={"query": "example"})
-            
+
             # Using with advanced configuration options
             @xcs.jit(options=JITOptions(
                 sample_input={"query": "Example"},
@@ -147,7 +147,7 @@ class XCSAPI:
                 def __init__(self):
                     self.sub_op1 = SubOperator1()
                     self.sub_op2 = SubOperator2()
-                
+
                 def forward(self, *, inputs):
                     # Multi-stage processing with optimized execution
                     intermediate = self.sub_op1(inputs=inputs)
@@ -236,11 +236,11 @@ class XCSAPI:
 
             # Executing the graph with options
             result = xcs.execute(
-                graph, 
+                graph,
                 inputs={"query": "Example", "temperature": 0.7},
                 options=exec_options
             )
-            
+
             # Accessing results and metrics
             print(f"Outputs: {result.outputs}")
             print(f"Execution time: {result.execution_time:.2f}s")

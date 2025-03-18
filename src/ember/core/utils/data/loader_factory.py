@@ -26,12 +26,12 @@ def discover_preppers(
             dataset prepper classes.
     """
     discovered: Dict[str, Type[IDatasetPrepper]] = {}
-    
+
     try:
         entry_points_obj = entry_points()
-        
+
         # Handle different entry_points() API versions
-        if hasattr(entry_points_obj, 'select'):
+        if hasattr(entry_points_obj, "select"):
             # Python 3.10+ behavior
             for entry_point in entry_points_obj.select(group=entry_point_group):
                 try:
@@ -61,7 +61,7 @@ def discover_preppers(
                     )
     except Exception as e:
         logger.warning(f"Error discovering plugins: {e}")
-        
+
     return discovered
 
 

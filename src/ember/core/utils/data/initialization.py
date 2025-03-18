@@ -70,10 +70,7 @@ def initialize_dataset_registry(
         if hasattr(metadata_registry, "register"):
             metadata_registry.register(dataset_info=dataset_info)
         elif hasattr(metadata_registry, "register_new"):
-            metadata_registry.register_new(
-                name=dataset_info.name,
-                info=dataset_info
-            )
+            metadata_registry.register_new(name=dataset_info.name, info=dataset_info)
 
     # Defining mapping of dataset names to their corresponding prepper classes.
     prepper_mappings: Dict[str, Type[IDatasetPrepper]] = {

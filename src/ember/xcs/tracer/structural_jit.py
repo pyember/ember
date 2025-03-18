@@ -661,7 +661,7 @@ def structural_jit(
     """
     JIT decorator that optimizes operators using structural analysis.
 
-    Transforming Operator classes to analyze their structure and convert them 
+    Transforming Operator classes to analyze their structure and convert them
     to XCS graphs for parallel execution. This approach uses the operator's
     structure and composition to build the execution graph without
     requiring a tracing step.
@@ -699,7 +699,7 @@ def structural_jit(
                 intermediate = self.op1(inputs=inputs)
                 result = self.op2(inputs=intermediate)
                 return result
-                
+
         # Using the optimized operator
         op = MyOperator()
         result = op(inputs={"query": "test"})

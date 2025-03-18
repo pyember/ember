@@ -192,7 +192,9 @@ def initialize_registry(
                 ):
                     model_configs = [(None, m) for m in provider_config.models]
                 else:
-                    logger.warning(f"Provider {provider_name} has no models defined or uses unsupported format")
+                    logger.warning(
+                        f"Provider {provider_name} has no models defined or uses unsupported format"
+                    )
 
                 for model_key, model_config in model_configs:
                     try:
@@ -259,7 +261,11 @@ def initialize_registry(
                 if newly_discovered:
                     logger.info(
                         f"Discovered {len(newly_discovered)} new models in {duration:.2f}s: {list(newly_discovered.keys())[:10]}"
-                        + (f" and {len(newly_discovered) - 10} more" if len(newly_discovered) > 10 else "")
+                        + (
+                            f" and {len(newly_discovered) - 10} more"
+                            if len(newly_discovered) > 10
+                            else ""
+                        )
                     )
                 else:
                     logger.info(
