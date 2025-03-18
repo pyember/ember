@@ -83,9 +83,7 @@ ember_test_env/
 # Docker test environment
 docker-test/
 
-# Installation and testing guides (should be generated or in docs)
-INSTALLATION_GUIDE.md
-TESTING_INSTALLATION.md
+# Installation and testing guides now tracked in git
 
 # Additional caches
 .mypy_cache/
