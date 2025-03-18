@@ -57,7 +57,9 @@ class ModelInfo(EmberModel):
         return name or ""
 
     @field_validator("api_key", mode="after")
-    def validate_api_key(cls, api_key: Optional[str], info: ValidationInfo) -> Optional[str]:
+    def validate_api_key(
+        cls, api_key: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
         """
         Ensures an API key is available, either explicitly or via the provider.
 
@@ -75,16 +77,16 @@ class ModelInfo(EmberModel):
             ValueError: If no API key is provided and the provider lacks a default.
         """
         provider_obj = info.data.get("provider")
-        
+
         # If we already have an API key, just return it
         if api_key:
             return api_key
-            
+
         # Otherwise, check if provider has a default key
         if provider_obj and provider_obj.default_api_key:
             # Return the provider's default key
             return provider_obj.default_api_key
-            
+
         # Check for environment variables later, but for now raise an error if both are None
         if provider_obj and provider_obj.default_api_key is None and api_key is None:
             model_id = info.data.get("id", "unknown")
@@ -92,7 +94,7 @@ class ModelInfo(EmberModel):
                 f"No API key available for model {model_id}. "
                 f"Please set via API, provider default, or environment variable."
             )
-            
+
         # Return None if we'll check environment variables later
         return None
 
@@ -102,29 +104,30 @@ class ModelInfo(EmberModel):
 
         Returns:
             The API key to be used for authentication.
-            
+
         Raises:
             ValueError: If no API key is available from any source.
         """
         # First check if api_key is set directly on this instance
         if self.api_key is not None:
             return self.api_key
-            
+
         # Then check if we can get it from provider's default
         if self.provider and self.provider.default_api_key:
             return self.provider.default_api_key
-            
+
         # Last resort - check environment variables based on provider name
         import os
+
         provider_name = self.provider.name.upper() if self.provider else ""
         env_var_name = f"{provider_name}_API_KEY"
         env_api_key = os.environ.get(env_var_name)
-        
+
         if env_api_key:
             # Cache it for future calls
             self.api_key = env_api_key
             return env_api_key
-            
+
         # If we got here, no API key is available
         raise ValueError(
             f"No API key available for model {self.id}. "

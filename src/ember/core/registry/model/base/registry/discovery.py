@@ -154,7 +154,13 @@ class ModelDiscoveryService:
             result_container: List[Dict[str, Any]] = []
             error_container: List[Exception] = []
 
-            def fetch_with_timeout(prov=provider, pname=provider_name, ev=event, res=result_container, err=error_container):
+            def fetch_with_timeout(
+                prov=provider,
+                pname=provider_name,
+                ev=event,
+                res=result_container,
+                err=error_container,
+            ):
                 try:
                     start = time.time()
                     result = prov.fetch_models()
@@ -169,10 +175,18 @@ class ModelDiscoveryService:
 
             t = threading.Thread(target=fetch_with_timeout)
             t.daemon = True
-            provider_threads.append((provider_name, event, result_container, error_container, t))
+            provider_threads.append(
+                (provider_name, event, result_container, error_container, t)
+            )
             t.start()
 
-        for provider_name, event, result_container, error_container, t in provider_threads:
+        for (
+            provider_name,
+            event,
+            result_container,
+            error_container,
+            t,
+        ) in provider_threads:
             if not event.wait(15.0):
                 logger.error(f"Timeout while fetching models from {provider_name}")
                 errors.append(f"{provider_name}: Timeout after 15 seconds")
@@ -184,16 +198,22 @@ class ModelDiscoveryService:
                     errors.append(f"{provider_name}: No results returned")
                 else:
                     result = result_container[0]
-                    logger.info(f"Successfully received {len(result)} models from {provider_name}")
+                    logger.info(
+                        f"Successfully received {len(result)} models from {provider_name}"
+                    )
                     aggregated_models.update(result)
 
         if not aggregated_models and errors:
-            raise ModelDiscoveryError(f"No models discovered. Errors: {'; '.join(errors)}")
+            raise ModelDiscoveryError(
+                f"No models discovered. Errors: {'; '.join(errors)}"
+            )
 
         with self._lock:
             self._cache = aggregated_models.copy()
             self._last_update = time.time()
-            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
+            logger.info(
+                f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
+            )
 
         return aggregated_models.copy()
 
@@ -320,18 +340,25 @@ class ModelDiscoveryService:
         try:
             # Perform discovery outside the lock to prevent deadlocks
             discovered: Dict[str, Dict[str, Any]] = self.discover_models()
-            
+
             # Ensure discovered is a proper dict before proceeding
             if discovered and not isinstance(discovered, dict):
-                logger.error("Discovery returned non-dict result: %s (type: %s). Converting to empty dict.", 
-                             discovered, type(discovered).__name__)
+                logger.error(
+                    "Discovery returned non-dict result: %s (type: %s). Converting to empty dict.",
+                    discovered,
+                    type(discovered).__name__,
+                )
                 discovered = {}
             elif discovered and isinstance(discovered, dict):
                 # Check each value to ensure it's a dict for merge_with_config to work properly
                 for k, v in list(discovered.items()):
                     if not isinstance(v, dict):
-                        logger.error("Model data for %s is not a dict: %s (type: %s). Removing from results.", 
-                                    k, v, type(v).__name__)
+                        logger.error(
+                            "Model data for %s is not a dict: %s (type: %s). Removing from results.",
+                            k,
+                            v,
+                            type(v).__name__,
+                        )
                         discovered.pop(k)
 
             # Only merge and update cache in a separate lock acquisition
@@ -458,17 +485,24 @@ class ModelDiscoveryService:
 
         # Ensure aggregated_models is a proper dict before proceeding
         if not isinstance(aggregated_models, dict):
-            logger.error("Async discovery returned non-dict result: %s (type: %s). Converting to empty dict.", 
-                         aggregated_models, type(aggregated_models).__name__)
+            logger.error(
+                "Async discovery returned non-dict result: %s (type: %s). Converting to empty dict.",
+                aggregated_models,
+                type(aggregated_models).__name__,
+            )
             aggregated_models = {}
         else:
             # Check each value to ensure it's a dict
             for k, v in list(aggregated_models.items()):
                 if not isinstance(v, dict):
-                    logger.error("Async model data for %s is not a dict: %s (type: %s). Removing from results.", 
-                                k, v, type(v).__name__)
+                    logger.error(
+                        "Async model data for %s is not a dict: %s (type: %s). Removing from results.",
+                        k,
+                        v,
+                        type(v).__name__,
+                    )
                     aggregated_models.pop(k)
-            
+
         # Update cache with minimal lock scope
         with self._lock:
             self._cache = aggregated_models.copy()
