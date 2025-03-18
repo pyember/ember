@@ -161,6 +161,34 @@ class ModelService:
             )
         return response
 
+    # Registry passthrough methods
+    def list_models(self):
+        """List all registered models.
+        
+        Returns:
+            List[str]: A list of registered model IDs.
+        """
+        return self._registry.list_models()
+    
+    def get_model_info(self, model_id: str):
+        """Get model info for a specific model.
+        
+        Args:
+            model_id: The ID of the model to get info for.
+            
+        Returns:
+            Optional[ModelInfo]: The model info if found, None otherwise.
+        """
+        return self._registry.get_model_info(model_id)
+    
+    def discover_models(self):
+        """Discover available models from providers.
+        
+        Returns:
+            List[str]: A list of newly discovered model IDs.
+        """
+        return self._registry.discover_models()
+    
     # Aliases for method invocation.
     forward = invoke_model
     __call__ = invoke_model

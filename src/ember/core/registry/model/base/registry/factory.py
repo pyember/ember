@@ -232,13 +232,29 @@ class ModelFactory:
                 f"Unrecognized model ID '{model_info.id}'."
             ) from error
 
+        # Getting provider name and normalizing it for case-insensitive lookup
         provider_name: str = model_info.provider.name
+        
+        # Retrieving available providers
         discovered_providers: Dict[
             str, Type[BaseProviderModel]
         ] = ModelFactory._get_providers()
+        
+        # Trying exact match first
         provider_class: Optional[Type[BaseProviderModel]] = discovered_providers.get(
             provider_name
         )
+        
+        # Falling back to case-insensitive match if exact match fails
+        if provider_class is None:
+            for avail_name, avail_class in discovered_providers.items():
+                if provider_name.lower() == avail_name.lower():
+                    provider_class = avail_class
+                    # Logging the case mismatch for debugging
+                    LOGGER.warning(
+                        "Provider name case mismatch: '%s' vs '%s'. Using the registered provider.",
+                        provider_name, avail_name
+                    )
         if provider_class is None:
             available_providers: str = ", ".join(sorted(discovered_providers.keys()))
             raise ProviderConfigError(

@@ -112,9 +112,25 @@ def test_anthropic_discovery_fetch_models(discovery_instance) -> None:
 
 def test_anthropic_fallback_models() -> None:
     """Test that fallback models are provided when API key is missing."""
-    # This will cause an error since no API key is provided
-    with pytest.raises(Exception):
-        AnthropicDiscovery()
+    # Save the original environment variable value to restore later
+    import os
+    original_api_key = os.environ.get("ANTHROPIC_API_KEY")
+    
+    try:
+        # Clear the environment variable
+        if "ANTHROPIC_API_KEY" in os.environ:
+            del os.environ["ANTHROPIC_API_KEY"]
+            
+        # Import after clearing environment variable
+        from ember.core.registry.model.providers.base_discovery import ModelDiscoveryError
+        
+        # Now the constructor should raise ModelDiscoveryError
+        with pytest.raises(ModelDiscoveryError):
+            AnthropicDiscovery()
+    finally:
+        # Restore the original environment variable if it existed
+        if original_api_key is not None:
+            os.environ["ANTHROPIC_API_KEY"] = original_api_key
 
 
 def test_anthropic_discovery_model_id_generation(discovery_instance) -> None:

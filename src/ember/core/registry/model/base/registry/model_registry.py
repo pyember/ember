@@ -159,7 +159,20 @@ class ModelRegistry(Generic[M]):
         Returns:
             True if the model is registered, False otherwise.
         """
-        with self._lock:
+        # Fast path for empty model_id
+        if not model_id:
+            return False
+            
+        # Use the lock non-blockingly if possible to optimize for the common case
+        # where we don't already hold the lock
+        if self._lock.acquire(blocking=False):
+            try:
+                return model_id in self._model_infos
+            finally:
+                self._lock.release()
+        else:
+            # We're likely already holding the lock in the current thread
+            # so just check directly to avoid deadlock
             return model_id in self._model_infos
 
     def list_models(self) -> List[str]:
@@ -232,29 +245,56 @@ class ModelRegistry(Generic[M]):
             )
 
             # Step 3: Register each model, tracking newly added ones
-            with self._lock:  # Ensure thread safety during registration
-                for model_id, model_info in merged_models.items():
-                    if not self.is_registered(model_id):
-                        try:
-                            self.register_model(model_info=model_info)
-                            newly_registered.append(model_id)
-                            self._logger.info(
-                                "Discovered and registered model: %s", model_id
-                            )
-                        except ValueError as registration_error:
-                            # Expected error if model already exists (already checked with is_registered)
-                            self._logger.debug(
-                                "Model %s already registered: %s",
-                                model_id,
-                                registration_error,
-                            )
-                        except Exception as unexpected_error:
-                            # Unexpected error during registration (validation failure, etc.)
-                            self._logger.error(
-                                "Failed to register discovered model %s: %s",
-                                model_id,
-                                unexpected_error,
-                            )
+            self._logger.info(f"Registering {len(merged_models)} models from discovery")
+            registration_stats = {"new": 0, "skipped": 0, "failed": 0}
+            
+            # Process models one by one with appropriate locking
+            for model_id, model_info in merged_models.items():
+                # Check if registered with minimal lock scope
+                is_already_registered = False
+                with self._lock:
+                    is_already_registered = model_id in self._model_infos
+                    
+                if not is_already_registered:
+                    try:
+                        self._logger.debug(
+                            "Attempting to register discovered model: %s (provider: %s)",
+                            model_id,
+                            model_info.provider.name if model_info.provider else "unknown"
+                        )
+                        # Use register_model which has its own lock
+                        self.register_model(model_info=model_info)
+                        newly_registered.append(model_id)
+                        registration_stats["new"] += 1
+                        self._logger.info(
+                            "Successfully registered model: %s with provider %s",
+                            model_id,
+                            model_info.provider.name if model_info.provider else "unknown"
+                        )
+                    except ValueError as registration_error:
+                        # Expected error if model already exists
+                        registration_stats["skipped"] += 1
+                        self._logger.debug(
+                            "Model %s already registered: %s",
+                            model_id,
+                            registration_error,
+                        )
+                    except Exception as unexpected_error:
+                        # Unexpected error during registration (validation failure, etc.)
+                        registration_stats["failed"] += 1
+                        self._logger.error(
+                            "Failed to register discovered model %s: %s (error type: %s)",
+                            model_id,
+                            unexpected_error,
+                            type(unexpected_error).__name__
+                        )
+            
+            self._logger.info(
+                "Registration summary: %d new, %d skipped, %d failed",
+                registration_stats["new"],
+                registration_stats["skipped"],
+                registration_stats["failed"]
+            )
 
             if newly_registered:
                 self._logger.info(

@@ -42,9 +42,8 @@ class ModelDiscoveryService:
         self._cache: Dict[str, Dict[str, Any]] = {}
         self._last_update: float = 0.0
         self.ttl: int = ttl
-        self._lock: threading.RLock = (
-            threading.RLock()
-        )  # Added reentrant lock for thread safety
+        # Using reentrant lock for thread safety to allow nested lock acquisition
+        self._lock: threading.RLock = threading.RLock()
 
     def _initialize_providers(self) -> List[BaseDiscoveryProvider]:
         """Initialize discovery providers based on available API keys.
@@ -139,94 +138,62 @@ class ModelDiscoveryService:
         Raises:
             ModelDiscoveryError: If no models can be discovered due to provider errors.
         """
-
-        # Checking cache with minimal lock scope
         current_time: float = time.time()
         with self._lock:
             if self._cache and (current_time - self._last_update) < self.ttl:
                 logger.info("Returning cached discovery results.")
-                return self._cache.copy()  # Return a copy to avoid external mutation
+                return self._cache.copy()
 
-        # Simple sequential processing of providers with timeout protection
         aggregated_models: Dict[str, Dict[str, Any]] = {}
         errors: List[str] = []
 
-        # Process each provider sequentially with timeout
+        provider_threads = []
         for provider in self.providers:
             provider_name = provider.__class__.__name__
-            logger.info(f"Starting model discovery for provider: {provider_name}")
+            event = threading.Event()
+            result_container: List[Dict[str, Any]] = []
+            error_container: List[Exception] = []
 
-            try:
-                result_container = []
-                error_container = []
-                completion_event = threading.Event()
+            def fetch_with_timeout(prov=provider, pname=provider_name, ev=event, res=result_container, err=error_container):
+                try:
+                    start = time.time()
+                    result = prov.fetch_models()
+                    duration = time.time() - start
+                    logger.info(f"Provider {pname} completed in {duration:.2f}s")
+                    res.append(result)
+                except Exception as e:
+                    logger.error(f"Error fetching models from {pname}: {e}")
+                    err.append(e)
+                finally:
+                    ev.set()
 
-                def fetch_with_timeout():
-                    try:
-                        # Call the provider's fetch_models method
-                        start = time.time()
-                        result = provider.fetch_models()
-                        duration = time.time() - start
-                        logger.info(
-                            f"Provider {provider_name} completed in {duration:.2f}s"
-                        )
-                        result_container.append(result)
-                    except Exception as e:
-                        error_container.append(e)
-                    finally:
-                        completion_event.set()
+            t = threading.Thread(target=fetch_with_timeout)
+            t.daemon = True
+            provider_threads.append((provider_name, event, result_container, error_container, t))
+            t.start()
 
-                # Run the fetch in a thread
-                thread = threading.Thread(target=fetch_with_timeout)
-                thread.daemon = True  # Don't block program exit
-                thread.start()
-
-                # Wait for completion with timeout (15 seconds per provider is plenty)
-                logger.info(
-                    f"Waiting for models from {provider_name} (timeout: 15s)..."
-                )
-                if not completion_event.wait(15.0):
-                    logger.error(f"Timeout while fetching models from {provider_name}")
-                    errors.append(f"{provider_name}: Timeout after 15 seconds")
-                    # Continue to the next provider - we can't forcibly terminate the thread
-                    continue
-
-                # Check if we got results or errors
+        for provider_name, event, result_container, error_container, t in provider_threads:
+            if not event.wait(15.0):
+                logger.error(f"Timeout while fetching models from {provider_name}")
+                errors.append(f"{provider_name}: Timeout after 15 seconds")
+            else:
                 if error_container:
-                    e = error_container[0]
-                    logger.error(f"Error fetching models from {provider_name}: {e}")
-                    errors.append(f"{provider_name}: {str(e)}")
-                    continue
-
-                if not result_container:
+                    errors.append(f"{provider_name}: {str(error_container[0])}")
+                elif not result_container:
                     logger.error(f"No results from {provider_name}")
                     errors.append(f"{provider_name}: No results returned")
-                    continue
+                else:
+                    result = result_container[0]
+                    logger.info(f"Successfully received {len(result)} models from {provider_name}")
+                    aggregated_models.update(result)
 
-                # Process successful results
-                result = result_container[0]
-                logger.info(
-                    f"Successfully received {len(result)} models from {provider_name}"
-                )
-                aggregated_models.update(result)
-
-            except Exception as e:
-                logger.error(f"Unexpected error with {provider_name}: {e}")
-                errors.append(f"{provider_name}: {str(e)}")
-
-        # If no models found and we had errors, raise exception
         if not aggregated_models and errors:
-            raise ModelDiscoveryError(
-                f"No models discovered. Errors: {'; '.join(errors)}"
-            )
+            raise ModelDiscoveryError(f"No models discovered. Errors: {'; '.join(errors)}")
 
-        # Updating cache with minimal lock scope
         with self._lock:
             self._cache = aggregated_models.copy()
             self._last_update = time.time()
-            logger.info(
-                f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
-            )
+            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
 
         return aggregated_models.copy()
 
@@ -353,6 +320,19 @@ class ModelDiscoveryService:
         try:
             # Perform discovery outside the lock to prevent deadlocks
             discovered: Dict[str, Dict[str, Any]] = self.discover_models()
+            
+            # Ensure discovered is a proper dict before proceeding
+            if discovered and not isinstance(discovered, dict):
+                logger.error("Discovery returned non-dict result: %s (type: %s). Converting to empty dict.", 
+                             discovered, type(discovered).__name__)
+                discovered = {}
+            elif discovered and isinstance(discovered, dict):
+                # Check each value to ensure it's a dict for merge_with_config to work properly
+                for k, v in list(discovered.items()):
+                    if not isinstance(v, dict):
+                        logger.error("Model data for %s is not a dict: %s (type: %s). Removing from results.", 
+                                    k, v, type(v).__name__)
+                        discovered.pop(k)
 
             # Only merge and update cache in a separate lock acquisition
             with self._lock:
@@ -476,12 +456,28 @@ class ModelDiscoveryService:
                 f"No models discovered. Errors: {'; '.join(errors)}"
             )
 
+        # Ensure aggregated_models is a proper dict before proceeding
+        if not isinstance(aggregated_models, dict):
+            logger.error("Async discovery returned non-dict result: %s (type: %s). Converting to empty dict.", 
+                         aggregated_models, type(aggregated_models).__name__)
+            aggregated_models = {}
+        else:
+            # Check each value to ensure it's a dict
+            for k, v in list(aggregated_models.items()):
+                if not isinstance(v, dict):
+                    logger.error("Async model data for %s is not a dict: %s (type: %s). Removing from results.", 
+                                k, v, type(v).__name__)
+                    aggregated_models.pop(k)
+            
         # Update cache with minimal lock scope
         with self._lock:
             self._cache = aggregated_models.copy()
             self._last_update = time.time()
-            logger.info(
-                f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
-            )
+            if aggregated_models:
+                logger.info(
+                    f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}"
+                )
+            else:
+                logger.info("No valid models discovered during async discovery")
 
         return aggregated_models.copy()

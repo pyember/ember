@@ -51,6 +51,12 @@ def main() -> None:
 
     # Get the model service
     service = get_model_service(initialize_context=True)
+    print(service.list_models())
+    print(service.get_model_info("openai:gpt-4o"))
+    
+    # The ModelService provides access to the registry methods
+    # No need to directly access the registry attribute
+    
 
     # Example 1: String-based invocation with error handling
     try:
