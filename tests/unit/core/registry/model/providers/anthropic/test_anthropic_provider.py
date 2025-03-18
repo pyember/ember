@@ -63,3 +63,49 @@ def test_anthropic_parameters() -> None:
     kwargs = params.to_anthropic_kwargs()
     # Default max_tokens should be 768 if None provided.
     assert kwargs["max_tokens_to_sample"] == 768
+
+
+def test_normalize_anthropic_model_name() -> None:
+    """Test that _normalize_anthropic_model_name correctly maps model names to API versions."""
+    dummy_info = create_dummy_anthropic_model_info()
+    model = AnthropicModel(dummy_info)
+
+    # Test specific models are correctly mapped to their versioned counterparts
+    assert (
+        model._normalize_anthropic_model_name("claude-3-sonnet")
+        == "claude-3-sonnet-20240229"
+    )
+    assert (
+        model._normalize_anthropic_model_name("claude-3-opus")
+        == "claude-3-opus-20240229"
+    )
+    assert (
+        model._normalize_anthropic_model_name("claude-3-haiku")
+        == "claude-3-haiku-20240307"
+    )
+    assert (
+        model._normalize_anthropic_model_name("claude-3.5-sonnet")
+        == "claude-3-5-sonnet-20240620"
+    )
+    assert (
+        model._normalize_anthropic_model_name("claude-3.7-sonnet")
+        == "claude-3-7-sonnet-20250219"
+    )
+
+    # Test prefixed model names
+    assert (
+        model._normalize_anthropic_model_name("anthropic:claude-3-sonnet")
+        == "claude-3-sonnet-20240229"
+    )
+
+    # Test already correctly versioned models are not changed
+    assert (
+        model._normalize_anthropic_model_name("claude-3-sonnet-20240229")
+        == "claude-3-sonnet-20240229"
+    )
+
+    # Test unrecognized model name returns fallback
+    assert (
+        model._normalize_anthropic_model_name("unknown-model")
+        == "claude-3-sonnet-20240229"
+    )

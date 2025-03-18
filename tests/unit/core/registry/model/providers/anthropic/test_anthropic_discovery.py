@@ -143,6 +143,45 @@ def test_anthropic_discovery_model_id_generation(discovery_instance) -> None:
     assert model_id == "anthropic:claude-3-opus-20240229"
 
 
+def test_extract_base_model_id(discovery_instance) -> None:
+    """Test the extraction of base model IDs from dated model identifiers."""
+    # Test that model variants are properly preserved
+    assert (
+        discovery_instance._extract_base_model_id("claude-3-sonnet-20240229")
+        == "claude-3-sonnet"
+    )
+    assert (
+        discovery_instance._extract_base_model_id("claude-3-opus-20240229")
+        == "claude-3-opus"
+    )
+    assert (
+        discovery_instance._extract_base_model_id("claude-3-haiku-20240307")
+        == "claude-3-haiku"
+    )
+    assert (
+        discovery_instance._extract_base_model_id("claude-3.5-sonnet-20241022")
+        == "claude-3.5-sonnet"
+    )
+    assert (
+        discovery_instance._extract_base_model_id("claude-3.7-sonnet-20250219")
+        == "claude-3.7-sonnet"
+    )
+
+    # Test undated model IDs remain unchanged
+    assert (
+        discovery_instance._extract_base_model_id("claude-3-sonnet")
+        == "claude-3-sonnet"
+    )
+    assert (
+        discovery_instance._extract_base_model_id("claude-3.5-sonnet")
+        == "claude-3.5-sonnet"
+    )
+
+    # Test base model names
+    assert discovery_instance._extract_base_model_id("claude-3") == "claude-3"
+    assert discovery_instance._extract_base_model_id("claude-3.5") == "claude-3.5"
+
+
 def test_anthropic_discovery_fetch_models_error(
     discovery_instance,
     monkeypatch: pytest.MonkeyPatch,
@@ -203,3 +242,64 @@ def test_anthropic_discovery_timeout_handling(
     # More specific check that confirms error handling is working
     # Verify we get more than 1 model as expected with fallbacks
     assert len(result) > 1
+
+
+def test_anthropic_discovery_response_format_handling(
+    discovery_instance,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Test handling of different response formats from the Anthropic API."""
+    import json
+    from unittest.mock import MagicMock
+
+    # Case 1: Test with response containing dict with data key
+    dict_response = MagicMock()
+    dict_response.json.return_value = {
+        "data": [
+            {
+                "id": "claude-3-opus-20240229",
+                "object": "model",
+                "display_name": "Claude 3 Opus",
+            },
+            {
+                "id": "claude-3-sonnet-20240229",
+                "object": "model",
+                "display_name": "Claude 3 Sonnet",
+            },
+        ]
+    }
+    dict_response.raise_for_status = lambda: None
+
+    # Case 2: Test with response containing a direct list
+    list_response = MagicMock()
+    list_response.json.return_value = [
+        {
+            "id": "claude-3-haiku-20240307",
+            "object": "model",
+            "display_name": "Claude 3 Haiku",
+        },
+    ]
+    list_response.raise_for_status = lambda: None
+
+    # Mock requests.get to return our test responses in sequence
+    response_sequence = [dict_response, list_response]
+    response_index = 0
+
+    def mock_requests_get(*args, **kwargs):
+        nonlocal response_index
+        response = response_sequence[response_index % len(response_sequence)]
+        response_index += 1
+        return response
+
+    import requests
+
+    monkeypatch.setattr(requests, "get", mock_requests_get)
+
+    # Test with dictionary response format
+    dict_result = discovery_instance.fetch_models()
+    assert "anthropic:claude-3-opus" in dict_result
+    assert "anthropic:claude-3-sonnet" in dict_result
+
+    # Test with list response format
+    list_result = discovery_instance.fetch_models()
+    assert "anthropic:claude-3-haiku" in list_result

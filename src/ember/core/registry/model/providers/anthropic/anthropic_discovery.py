@@ -113,7 +113,22 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
                 return self._get_fallback_models()
 
             # Parse response
-            models_data = response.json().get("data", [])
+            response_json = response.json()
+
+            # The Anthropic API can return data in different formats
+            # Sometimes it's a dictionary with a 'data' key containing a list of models
+            # Sometimes it's a list of models directly
+            if isinstance(response_json, dict) and "data" in response_json:
+                models_data = response_json.get("data", [])
+            elif isinstance(response_json, list):
+                models_data = response_json
+            else:
+                # Fallback to empty list if unexpected format
+                logger.warning(
+                    f"Unexpected format from Anthropic API: {type(response_json).__name__}. Using fallback models."
+                )
+                models_data = []
+
             logger.info(
                 f"Successfully retrieved {len(models_data)} Anthropic models via REST API"
             )
@@ -125,7 +140,19 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
             # Process with a reasonable model count limit as a safeguard
             model_count_limit = 50  # Reasonable upper limit, reduced from 100
             for model in models_data[:model_count_limit]:
-                raw_model_id: str = model.get("id", "")
+                # Handle both dictionary models and object models
+                if isinstance(model, dict):
+                    raw_model_id = model.get("id", "")
+                    model_object = model.get("object", "model")
+                    display_name = model.get("display_name", "")
+                    created_at = model.get("created_at", "")
+                else:
+                    # Handle case where model might be an object with attributes
+                    raw_model_id = getattr(model, "id", "")
+                    model_object = getattr(model, "object", "model")
+                    display_name = getattr(model, "display_name", "")
+                    created_at = getattr(model, "created_at", "")
+
                 # Extracting base version without date for standardized model ID
                 base_model_id = self._extract_base_model_id(raw_model_id)
                 canonical_id: str = self._generate_model_id(base_model_id)
@@ -133,9 +160,9 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
                     model_id=canonical_id,
                     model_data={
                         "id": raw_model_id,
-                        "object": model.get("object", "model"),
-                        "display_name": model.get("display_name", ""),
-                        "created_at": model.get("created_at", ""),
+                        "object": model_object,
+                        "display_name": display_name,
+                        "created_at": created_at,
                     },
                 )
 
@@ -214,19 +241,22 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
 
         # Handle specific common cases
         if raw_model_id.startswith("claude-3-"):
-            # Map claude-3-sonnet-YYYYMMDD to claude-3
-            if any(
-                model_type in raw_model_id for model_type in ["sonnet", "opus", "haiku"]
-            ):
-                return "claude-3"
+            # Map claude-3-sonnet-YYYYMMDD to claude-3-sonnet (preserve the model variant)
+            for model_type in ["sonnet", "opus", "haiku"]:
+                if model_type in raw_model_id:
+                    return f"claude-3-{model_type}"
+            return "claude-3"
         elif raw_model_id.startswith("claude-3.5-"):
-            # Map claude-3.5-sonnet-YYYYMMDD to claude-3.5
-            if any(model_type in raw_model_id for model_type in ["sonnet", "haiku"]):
-                return "claude-3.5"
+            # Map claude-3.5-sonnet-YYYYMMDD to claude-3.5-sonnet (preserve the model variant)
+            for model_type in ["sonnet", "haiku"]:
+                if model_type in raw_model_id:
+                    return f"claude-3.5-{model_type}"
+            return "claude-3.5"
         elif raw_model_id.startswith("claude-3.7-"):
-            # Map claude-3.7-sonnet-YYYYMMDD to claude-3.7
+            # Map claude-3.7-sonnet-YYYYMMDD to claude-3.7-sonnet (preserve the model variant)
             if "sonnet" in raw_model_id:
-                return "claude-3.7"
+                return "claude-3.7-sonnet"
+            return "claude-3.7"
         elif raw_model_id == "claude-3":
             return "claude-3"
         elif raw_model_id == "claude-3.5":

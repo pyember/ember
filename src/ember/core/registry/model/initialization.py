@@ -259,8 +259,9 @@ def initialize_registry(
                 duration = time.time() - start_time
 
                 if newly_discovered:
+                    # Handle newly_discovered correctly, which is a list not a dict
                     logger.info(
-                        f"Discovered {len(newly_discovered)} new models in {duration:.2f}s: {list(newly_discovered.keys())[:10]}"
+                        f"Discovered {len(newly_discovered)} new models in {duration:.2f}s: {newly_discovered[:10]}"
                         + (
                             f" and {len(newly_discovered) - 10} more"
                             if len(newly_discovered) > 10

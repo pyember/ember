@@ -4,7 +4,10 @@
 
 ## Ember in a Nutshell
 
-Aspirationally, Ember is to Networks of Networks (NONs) Compound AI Systems development what PyTorch and XLA are to Neural Networks (NN) development. It's a compositional framework with both eager execution affordances and graph execution optimization capabilities. It enables users to compose complex NONs, and supports automatic parallelization and optimization of these.
+Aspirationally, Ember is to Networks of Networks (NONs) Compound AI Systems development what PyTorch 
+and XLA are to Neural Networks (NN) development. It's a compositional framework with both eager 
+execution affordances and graph execution optimization capabilities. It enables users to compose 
+complex NONs, and supports automatic parallelization and optimization of these.
 
 ## Simple Example: `horizontal` inference-time scaling with best-of-N
 
@@ -17,19 +20,50 @@ from ember.api.models import EmberModel
 
 # Define structured I/O types, in a TypedDict syntax
 class QueryInput(EmberModel):
+    """Input model containing the query to process.
+    
+    Attributes:
+        query: The user's question or prompt text.
+    """
     query: str
     
 class ReasonedOutput(EmberModel):
+    """Structured output model with answer and confidence score.
+    
+    Attributes:
+        answer: The synthesized response text.
+        confidence: A confidence score between 0.0 and 1.0.
+    """
     answer: str
     confidence: float
 
 class ReasonerSpecification(Specification):
+    """Specification for the reasoning operator NON.
+    
+    Defines input/output models and prompt templates.
+    """
+    # Input/output type definitions
     input_model = QueryInput
     structured_output = ReasonedOutput
+    
 
 @jit  # Automatically optimize execution with JIT compilation
 class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
-    """A multi-model ensemble with synthesis for robust reasoning."""
+    """A multi-model ensemble reasoning Operator with a judge that reasons over and generates 
+    a new response, informed by candidate responses.
+    
+    This compound system can help with reasoning robustness and reliability.
+    
+    Creates a pipeline that:
+    1. Distributes a query to multiple model instances in parallel, generating `candidate responses`
+    2. Creates an aggregate single best response, informed by the candidate responses
+    3. Returns a structured output with answer and confidence
+    
+    Attributes:
+        specification: The input/output specification for this operator.
+        ensemble: A parallel ensemble of models generating multiple `candidate responses`.
+        judge: A judge Operator that combines and evaluates responses.
+    """
     # Input/output specification
     specification: Specification = ReasonerSpecification()
 
@@ -37,8 +71,13 @@ class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
     ensemble: non.UniformEnsemble
     judge: non.JudgeSynthesis
     
-    def __init__(self, width: int = 3):
-        # Create components for the reasoning pipeline
+    def __init__(self, width: int = 3) -> None:
+        """Initializing the ensemble reasoning pipeline.
+        
+        Args:
+            width: Number of parallel model instances in the ensemble.
+        """
+        # Creating components for the reasoning pipeline
         self.ensemble = non.UniformEnsemble(
             num_units=width,
             model_name="openai:gpt-4o",
@@ -51,16 +90,24 @@ class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
         )
     
     def forward(self, *, inputs: QueryInput) -> ReasonedOutput:
-        # Get multiple reasoning paths (executed in parallel)
+        """Processing a query through the ensemble reasoning pipeline.
+        
+        Args:
+            inputs: A QueryInput containing the user's question.
+            
+        Returns:
+            A ReasonedOutput containing the synthesized answer and confidence score.
+        """
+        # Getting multiple reasoning paths (executed in parallel)
         ensemble_result = self.ensemble(query=inputs.query)
         
-        # Synthesize a final response 
+        # Synthesizing a final response 
         synthesis = self.judge(
             query=inputs.query,
             responses=ensemble_result["responses"]
         )
         
-        # Return structured output
+        # Returning structured output
         return ReasonedOutput(
             answer=synthesis["final_answer"],
             confidence=float(synthesis.get("confidence", 0.0))
@@ -75,10 +122,13 @@ print(f"Confidence: {result.confidence:.2f}")
 
 ## Core Elements
 
-1. **Composable Operators with Rigorous Specification**: Build reliable compound AI systems from type-safe, reusable components with validated inputs and outputs
-2. **Automatic Parallelization**: Independent operations are automatically executed concurrently across a full computational graph
+1. **Composable Operators with Rigorous Specification**: Build reliable compound AI systems from 
+   type-safe, reusable components with validated inputs and outputs
+2. **Automatic Parallelization**: Independent operations are automatically executed concurrently 
+   across a full computational graph
 3. **XCS Optimization Framework**: Just-in-time tracing and execution optimization inspired by JAX/XLA 
-4. **Multi-Provider Support**: Unified API across OpenAI, Anthropic, Claude, Gemini, and more with standardized usage tracking
+4. **Multi-Provider Support**: Unified API across OpenAI, Anthropic, Claude, Gemini, and more 
+   with standardized usage tracking
 
 ## Installation
 
@@ -180,10 +230,11 @@ class ComplexPipeline(Operator):
         self.op3 = SubOperator3()
     
     def forward(self, *, inputs):
-        # These operations will be automatically parallelized
-        # when the execution graph is built
+        # These operations will be automatically parallelized when the execution graph is built
         result1 = self.op1(inputs=inputs)
         result2 = self.op2(inputs=inputs)
+        
+        # Combine the parallel results
         combined = self.op3(inputs={"r1": result1, "r2": result2})
         return combined
 
@@ -223,7 +274,9 @@ eval_pipeline = EvaluationPipeline([
     
     # Custom evaluation metrics
     Evaluator.from_function(
-        lambda prediction, reference: {"factual_accuracy": score_factual_content(prediction, reference)}
+        lambda prediction, reference: {
+            "factual_accuracy": score_factual_content(prediction, reference)
+        }
     )
 ])
 

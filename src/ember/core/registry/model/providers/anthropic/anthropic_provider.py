@@ -376,24 +376,48 @@ class AnthropicModel(BaseProviderModel):
     def _normalize_anthropic_model_name(self, raw_name: str) -> str:
         """Normalize the provided model name against the configuration.
 
+        Maps model names from the ember format to the exact API model identifier.
         If the supplied model name is unrecognized, the method falls back to a default model.
 
         Args:
             raw_name (str): The model name provided by the user.
 
         Returns:
-            str: A valid model name from the configuration.
+            str: A valid model name for the Anthropic API.
         """
+        # Direct mapping from ember model names to Anthropic API model IDs
+        model_mapping = {
+            # Model ID to raw API name
+            "claude-3-sonnet": "claude-3-sonnet-20240229",
+            "claude-3-opus": "claude-3-opus-20240229",
+            "claude-3-haiku": "claude-3-haiku-20240307",
+            "claude-3.5-sonnet": "claude-3-5-sonnet-20240620",
+            "claude-3.7-sonnet": "claude-3-7-sonnet-20250219",
+            # Handle split IDs (provider:model)
+            "anthropic:claude-3-sonnet": "claude-3-sonnet-20240229",
+            "anthropic:claude-3-opus": "claude-3-opus-20240229",
+            "anthropic:claude-3-haiku": "claude-3-haiku-20240307",
+            "anthropic:claude-3.5-sonnet": "claude-3-5-sonnet-20240620",
+            "anthropic:claude-3.7-sonnet": "claude-3-7-sonnet-20250219",
+        }
+
+        # If the model is directly in our mapping, use it
+        if raw_name in model_mapping:
+            return model_mapping[raw_name]
+
+        # Check if it's already a valid dated version
         valid_models: Set[str] = AnthropicConfig.get_valid_models()
-        if raw_name not in valid_models:
-            default_model: str = AnthropicConfig.get_default_model()
-            logger.warning(
-                "Anthropic model '%s' not recognized in configuration. Falling back to '%s'.",
-                raw_name,
-                default_model,
-            )
-            return default_model
-        return raw_name
+        if raw_name in valid_models:
+            return raw_name
+
+        # Fallback to default model
+        default_model: str = "claude-3-sonnet-20240229"  # Most reliable fallback
+        logger.warning(
+            "Anthropic model '%s' not recognized in configuration. Falling back to '%s'.",
+            raw_name,
+            default_model,
+        )
+        return default_model
 
     def create_client(self) -> anthropic.Anthropic:
         """Instantiate and return an Anthropic API client.
