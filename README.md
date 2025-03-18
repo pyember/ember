@@ -290,7 +290,7 @@ print(f"Factual Accuracy: {results['factual_accuracy']:.2f}")
 ## Documentation & Examples
 
 - [Architecture Overview](ARCHITECTURE.md)
-- [Quick Start Guide](docs/quickstart/README.md)
+- [Quick Start Guide](QUICKSTART.md)
 - [Model Registry Guide](docs/quickstart/model_registry.md)
 - [Operators Guide](docs/quickstart/operators.md)
 - [NON Patterns](docs/quickstart/non.md)
