@@ -624,10 +624,10 @@ The diagram below illustrates the complete dependency flow between major compone
 Ember's configuration system provides a standardized way to configure all aspects of the framework:
 
 ```python
-from ember.core.configs import ConfigManager, create_default_config_manager
+from ember.core.configs import ConfigManager, create_config_manager
 
 # Create configuration manager with standard discovery
-config_manager = create_default_config_manager()
+config_manager = create_config_manager()
 
 # Access typed, validated configuration
 model_registry_config = config_manager.get_config("model_registry")
