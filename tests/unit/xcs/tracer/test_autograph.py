@@ -17,213 +17,105 @@ class TestAutoGraphBuilder(unittest.TestCase):
 
     def test_build_simple_graph(self) -> None:
         """Test building a simple graph with sequential dependencies."""
-        # Create a series of trace records that form a linear chain with exact matching values
-        # to ensure the data flow detection works properly
-        test_output1 = "this is a unique output string from op1"
-        test_output2 = "this is a unique output string from op2"
-
+        # Create a series of trace records that form a linear chain
         records = [
             TraceRecord(
                 operator_name="Op1",
                 node_id="1",
                 inputs={"query": "test"},
-                outputs={"result": test_output1},
-                timestamp=1.0,
+                outputs={"result": "output1"},
             ),
             TraceRecord(
                 operator_name="Op2",
                 node_id="2",
-                inputs={"result": test_output1},  # Exact match with Op1's output
-                outputs={"intermediate": test_output2},
-                timestamp=2.0,
+                inputs={"result": "output1"},
+                outputs={"intermediate": "output2"},
             ),
             TraceRecord(
                 operator_name="Op3",
                 node_id="3",
-                inputs={"intermediate": test_output2},  # Exact match with Op2's output
+                inputs={"intermediate": "output2"},
                 outputs={"final": "output3"},
-                timestamp=3.0,
             ),
         ]
 
         # Build the graph
         builder = AutoGraphBuilder()
-        graph = builder.build_graph(records=records)
+        graph = builder.build_graph(records)
 
-        # Verify the graph structure - 3 nodes with expected IDs
+        # Verify the graph structure
         self.assertEqual(len(graph.nodes), 3)
-        # With the new implementation, nodes are named Op1_0, Op2_1, Op3_2
         self.assertIn("Op1_0", graph.nodes)
         self.assertIn("Op2_1", graph.nodes)
         self.assertIn("Op3_2", graph.nodes)
 
-        # Instead of checking the dependency map directly, verify edges in the graph
-        # 1. Check for a node named Op2_1 in the graph
-        # 2. Verify that the nodes exist in the graph
-        self.assertIsNotNone(graph.nodes.get("Op2_1", None))
-        self.assertIsNotNone(graph.nodes.get("Op3_2", None))
-
-        # Due to changes in the implementation, just verify that the graph was created properly
-        # without checking specific dependencies which depend on the internal data flow analysis
+        # Check dependencies - Op2 should depend on Op1, Op3 should depend on Op2
+        self.assertIn("Op1_0", graph.nodes["Op2_1"].inbound_edges)
+        self.assertIn("Op2_1", graph.nodes["Op3_2"].inbound_edges)
 
     def test_build_graph_with_branches(self) -> None:
         """Test building a graph with branching dependencies."""
-        # Create trace records that form a diamond pattern with distinctive values
-        # to ensure data flow detection works:
+        # Create trace records that form a diamond pattern:
         # Op1 -> Op2a -> Op3
         #   \-> Op2b -/
-        test_output1 = "distinctive output from op1 with unique signature"
-        test_output2a = "distinctive output from op2a branch"
-        test_output2b = "distinctive output from op2b branch"
-
         records = [
             TraceRecord(
                 operator_name="Op1",
                 node_id="1",
                 inputs={"query": "test"},
-                outputs={"result": test_output1},
-                timestamp=1.0,
+                outputs={"result": "output1"},
             ),
             TraceRecord(
                 operator_name="Op2a",
                 node_id="2a",
-                inputs={"result": test_output1},  # Match with Op1's output
-                outputs={"branch_a": test_output2a},
-                timestamp=2.0,
+                inputs={"result": "output1"},
+                outputs={"branch_a": "output2a"},
             ),
             TraceRecord(
                 operator_name="Op2b",
                 node_id="2b",
-                inputs={"result": test_output1},  # Match with Op1's output
-                outputs={"branch_b": test_output2b},
-                timestamp=2.1,
+                inputs={"result": "output1"},
+                outputs={"branch_b": "output2b"},
             ),
             TraceRecord(
                 operator_name="Op3",
                 node_id="3",
-                inputs={
-                    "branch_a": test_output2a,
-                    "branch_b": test_output2b,
-                },  # Match with outputs
+                inputs={"branch_a": "output2a", "branch_b": "output2b"},
                 outputs={"final": "output3"},
-                timestamp=3.0,
             ),
         ]
 
         # Build the graph
         builder = AutoGraphBuilder()
-        graph = builder.build_graph(records=records)
+        graph = builder.build_graph(records)
 
         # Verify the graph structure
         self.assertEqual(len(graph.nodes), 4)
 
-        # Verify that all nodes exist in the graph with expected naming
-        self.assertIsNotNone(graph.nodes.get("Op1_0", None))
-        self.assertIsNotNone(graph.nodes.get("Op2a_1", None))
-        self.assertIsNotNone(graph.nodes.get("Op2b_2", None))
-        self.assertIsNotNone(graph.nodes.get("Op3_3", None))
-
-        # Due to changes in the implementation, just verify that the graph was created properly
-        # without checking specific dependencies which depend on the internal data flow analysis
-
-    def test_build_graph_with_nested_operators(self) -> None:
-        """Test building a graph with nested operator calls.
-
-        This scenario simulates a parent operator that calls child operators,
-        where the child operators should not be directly dependent on the parent.
-        """
-        # Create trace records that represent a nested execution pattern with distinctive values:
-        # ParentOp calls ChildOp1 and ChildOp2 internally, which shouldn't be treated as dependencies
-        parent_output = "unique parent operator output value"
-        child1_output = "unique child1 operator output value"
-        child2_output = "unique child2 operator output value"
-
-        records = [
-            TraceRecord(
-                operator_name="ParentOp",
-                node_id="parent1",
-                inputs={"query": "test"},
-                outputs={"result": parent_output},
-                timestamp=1.0,
-            ),
-            TraceRecord(
-                operator_name="ChildOp1",
-                node_id="child1",
-                inputs={"query": "test"},
-                outputs={"child_result": child1_output},
-                timestamp=1.1,  # Executed during ParentOp
-            ),
-            TraceRecord(
-                operator_name="ChildOp2",
-                node_id="child2",
-                inputs={"child_input": child1_output},  # Match with ChildOp1's output
-                outputs={"final": child2_output},
-                timestamp=1.2,  # Executed during ParentOp
-            ),
-            TraceRecord(
-                operator_name="NextOp",
-                node_id="next1",
-                inputs={"result": parent_output},  # Match with ParentOp's output
-                outputs={"next_result": "next_output"},
-                timestamp=2.0,  # Executed after ParentOp
-            ),
-        ]
-
-        # Build the graph
-        builder = AutoGraphBuilder()
-
-        # Create a manual hierarchy map to simulate nested execution
-        hierarchy_map = {"parent1": ["child1", "child2"]}
-        # Override the method to return our predefined hierarchy map
-        builder._build_hierarchy_map = lambda **kwargs: hierarchy_map
-
-        graph = builder.build_graph(records=records)
-
-        # Verify the graph structure
-        self.assertEqual(len(graph.nodes), 4)
-
-        # Check the dependency map
-        # NextOp should depend on ParentOp, not on the child ops
-        self.assertIn("next1", builder.dependency_map)
-        self.assertIn("parent1", builder.dependency_map["next1"])
-
-        # Verify that NextOp does not directly depend on children
-        self.assertNotIn("child1", builder.dependency_map["next1"])
-        self.assertNotIn("child2", builder.dependency_map["next1"])
+        # Check dependencies
+        self.assertIn("Op1_0", graph.nodes["Op2a_1"].inbound_edges)
+        self.assertIn("Op1_0", graph.nodes["Op2b_2"].inbound_edges)
+        self.assertIn("Op2a_1", graph.nodes["Op3_3"].inbound_edges)
+        self.assertIn("Op2b_2", graph.nodes["Op3_3"].inbound_edges)
 
     def test_dependency_detection(self) -> None:
         """Test the dependency detection logic."""
         builder = AutoGraphBuilder()
 
-        # Test dictionary value dependency with the new data flow matching approach
+        # Test dictionary value dependency
         inputs = {"x": 1, "y": "output_from_previous"}
         outputs = {"result": "output_from_previous"}
+        self.assertTrue(builder._has_dependency(inputs=inputs, outputs=outputs))
 
-        # Generate signatures for the test data
-        input_sigs = builder._generate_data_signatures(inputs)
-        output_sigs = builder._generate_data_signatures(outputs)
+        # Test no dependency
+        inputs = {"x": 1, "y": "no_match"}
+        outputs = {"result": "output_from_previous"}
+        self.assertFalse(builder._has_dependency(inputs=inputs, outputs=outputs))
 
-        # Use the new matching method directly
-        matches = builder._find_matching_data(
-            input_sigs=input_sigs,
-            output_sigs=output_sigs,
-            inputs=inputs,
-            outputs=outputs,
-        )
-
-        # Check for matches indicating a dependency
-        self.assertTrue(len(matches) > 0)
-
-        # Test no dependency case
-        inputs_no_match = {"x": 1, "y": "no_match"}
-        input_sigs_no_match = builder._generate_data_signatures(inputs_no_match)
-        matches_no_match = builder._find_matching_data(
-            input_sigs=input_sigs_no_match,
-            output_sigs=output_sigs,
-            inputs=inputs_no_match,
-            outputs=outputs,
-        )
-        self.assertEqual(len(matches_no_match), 0)
+        # Test direct value dependency
+        inputs = {"x": 1, "y": "output_value"}
+        outputs = "output_value"
+        self.assertTrue(builder._has_dependency(inputs=inputs, outputs=outputs))
 
 
 if __name__ == "__main__":

@@ -1,9 +1,33 @@
 """
 Core implementation of the XCS API.
 
-This module provides the core implementation of the XCS API, offering a simplified
-interface to the XCS functionality. It abstracts away the details of the underlying
-implementation, providing a clean, intuitive interface for users.
+Providing the implementation of the XCS API with a simplified
+interface to XCS functionality. Abstracting away implementation details
+for a clear interface.
+
+This module serves as the entry point for using XCS capabilities.
+
+Example:
+    ```python
+    from ember.xcs.api.core import XCSAPI
+    
+    # Creating an API instance
+    xcs = XCSAPI()
+    
+    # Using the API to apply JIT optimization
+    @xcs.jit(options={"sample_input": {"query": "test"}})
+    class MyOperator(Operator):
+        def forward(self, *, inputs):
+            return {"result": process(inputs["query"])}
+            
+    # Executing an operator with tracing
+    with xcs.tracing() as tracer:
+        result = my_op(inputs={"query": "example"})
+        
+    # Building and executing a graph
+    graph = xcs.autograph(tracer.records)
+    final_result = xcs.execute(graph, inputs={"query": "test"})
+    ```
 """
 
 from __future__ import annotations
@@ -41,13 +65,35 @@ class XCSAPI:
     """
     Main API class for XCS functionality.
 
-    This class provides a unified interface to the XCS (eXecutable Computation System)
-    functionality, abstracting away the details of the underlying implementation and
-    providing a clean, intuitive interface for users.
+    Providing a unified interface to the XCS (eXecutable Computation System)
+    functionality, abstracting away the details of the implementation.
 
-    The design follows the Facade pattern, offering a simplified interface to the
-    complex underlying system. It also implements the Adapter pattern to provide
-    a consistent interface across different components.
+    This class provides a simplified interface to the system with a
+    consistent interface across different components.
+    
+    Example:
+        ```python
+        from ember.xcs.api.core import XCSAPI
+        
+        # Creating API instance
+        xcs = XCSAPI()
+        
+        # Using JIT compilation
+        @xcs.jit
+        class MyOperator(Operator):
+            def forward(self, *, inputs):
+                return {"result": process(inputs)}
+                
+        # Using vectorization
+        batch_fn = xcs.vmap(single_item_fn)
+        
+        # Using parallelization
+        parallel_fn = xcs.pmap(compute_intensive_fn)
+        
+        # Building and executing a graph
+        graph = xcs.autograph(trace_records)
+        result = xcs.execute(graph, inputs={"query": "test"})
+        ```
     """
 
     def __init__(self) -> None:
@@ -64,7 +110,7 @@ class XCSAPI:
         """
         Just-In-Time compilation decorator for Ember Operators.
 
-        The @jit decorator transforms Operator classes to automatically trace their execution
+        Transforming Operator classes to automatically trace their execution
         and compile optimized execution plans. This brings significant performance benefits
         for complex operations and operator pipelines.
 
@@ -80,17 +126,32 @@ class XCSAPI:
             ```python
             from ember.xcs import xcs
 
-            # As a decorator
+            # Using as a direct decorator
             @xcs.jit
             class MyOperator(Operator):
                 def forward(self, *, inputs):
                     # Complex logic here
-                    return result
+                    return {"result": process(inputs["query"])}
 
-            # With options
-            @xcs.jit(options=JITOptions(sample_input={"query": "Example"}))
-            class MyOperator(Operator):
-                ...
+            # Creating an instance and executing
+            op = MyOperator()
+            result = op(inputs={"query": "example"})
+            
+            # Using with advanced configuration options
+            @xcs.jit(options=JITOptions(
+                sample_input={"query": "Example"},
+                force_trace=False,
+                recursive=True
+            ))
+            class OptimizedOperator(Operator):
+                def __init__(self):
+                    self.sub_op1 = SubOperator1()
+                    self.sub_op2 = SubOperator2()
+                
+                def forward(self, *, inputs):
+                    # Multi-stage processing with optimized execution
+                    intermediate = self.sub_op1(inputs=inputs)
+                    return self.sub_op2(inputs=intermediate)
             ```
         """
         # Handle options
@@ -146,15 +207,15 @@ class XCSAPI:
         options: Optional[XCSExecutionOptions] = None,
     ) -> ExecutionResult:
         """
-        Execute an XCS graph with the given inputs.
+        Executing an XCS graph with the given inputs.
 
-        This function executes a graph with the given inputs, optionally using
-        the provided execution options.
+        Running a graph with the provided inputs, optionally using
+        execution options to control parallelism and timeout settings.
 
         Args:
             graph: The XCS graph to execute
             inputs: Input values for the graph
-            options: Optional execution options
+            options: Optional execution options for controlling parallelism, workers, and timeout
 
         Returns:
             The execution result, including outputs and timing information
@@ -162,13 +223,27 @@ class XCSAPI:
         Example:
             ```python
             from ember.xcs import xcs
+            from ember.xcs.api.types import XCSExecutionOptions
 
-            # Create a graph
+            # Creating a graph from trace records
             graph = xcs.autograph(tracer.records)
 
-            # Execute the graph
-            result = xcs.execute(graph, inputs={"query": "Example"})
-            print(result.outputs)
+            # Setting execution options
+            exec_options = XCSExecutionOptions(
+                max_workers=4,     # Using up to 4 parallel workers
+                timeout=10000      # Setting a 10-second timeout
+            )
+
+            # Executing the graph with options
+            result = xcs.execute(
+                graph, 
+                inputs={"query": "Example", "temperature": 0.7},
+                options=exec_options
+            )
+            
+            # Accessing results and metrics
+            print(f"Outputs: {result.outputs}")
+            print(f"Execution time: {result.execution_time:.2f}s")
             ```
         """
         # Prepare execution options

@@ -20,7 +20,7 @@ poetry run python src/ember/examples/models/model_registry_example.py
 - **[models/](./models/)** - Examples for working with LLM models and the model registry
 - **[operators/](./operators/)** - Examples showing how to create and compose operators
 - **[data/](./data/)** - Examples for data loading, transformation, and dataset usage
-- **[xcs/](./xcs/)** - Examples for using the XCS (eXecutable Computation System) features
+- **[xcs/](./xcs/)** - Examples for using the XCS (Accelerated Compound Systems) features
 - **[advanced/](./advanced/)** - Advanced examples with complex workflows and optimizations
 - **[integration/](./integration/)** - Examples showing integration with other systems
 

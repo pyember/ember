@@ -1,7 +1,7 @@
 """
 Test XCS Implementation
 
-This example demonstrates the use of the XCS (Accelerated Compound Systems) API
+This example demonstrates the use of the XCS (Accelerated Compound Systems)  API
 directly. It shows how to use JIT compilation, vectorization, and automatic 
 graph building for high-performance operator execution.
 

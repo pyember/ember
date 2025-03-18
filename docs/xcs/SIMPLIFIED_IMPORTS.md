@@ -1,6 +1,6 @@
 # Simplified XCS Import Structure
 
-The XCS (Accelerated Compound Systems) module lays a groundwork for high-performance execution capabilities for operator graphs, just-in-time tracing, and parallel execution transformations.
+The XCS (Accelerated Compound Systems)  module lays a groundwork for high-performance execution capabilities for operator graphs, just-in-time tracing, and parallel execution transformations.
 
 ## Before: Complex Import Paths
 

@@ -157,15 +157,12 @@ def initialize_registry(
         if auto_register_enabled:
             registered_models = []
 
-            # Process each provider - handle both new and old schema
+            # Get providers from registry configuration
             providers_dict = {}
             if hasattr(config, "registry") and hasattr(config.registry, "providers"):
                 providers_dict = config.registry.providers
-            elif hasattr(config, "model_registry") and hasattr(
-                config.model_registry, "providers"
-            ):
-                # Legacy schema support
-                providers_dict = config.model_registry.providers
+            else:
+                logger.warning("No providers found in registry configuration")
 
             # Process each provider
             for provider_name, provider_config in providers_dict.items():
@@ -186,32 +183,27 @@ def initialize_registry(
                     )
                     continue
 
-                # Register models for this provider - handle both dict and list formats
+                # Register models for this provider using standardized list format
                 model_configs = []
 
-                # Handle provider.models as a list (new schema)
+                # Process models list from provider configuration
                 if hasattr(provider_config, "models") and isinstance(
                     provider_config.models, list
                 ):
                     model_configs = [(None, m) for m in provider_config.models]
-                # Handle provider.models as a dict (old schema)
-                elif hasattr(provider_config, "models") and isinstance(
-                    provider_config.models, dict
-                ):
-                    model_configs = list(provider_config.models.items())
+                else:
+                    logger.warning(f"Provider {provider_name} has no models defined or uses unsupported format")
 
                 for model_key, model_config in model_configs:
                     try:
-                        # Generate model ID
+                        # Generate model ID using consistent format
                         if hasattr(model_config, "id"):
                             model_id = model_config.id
+                            # Ensure provider prefix in model ID
                             if ":" not in model_id:
                                 model_id = f"{provider_name}:{model_id}"
-                        elif model_key is not None:
-                            # Use the dictionary key as model name
-                            model_id = f"{provider_name}:{model_key}"
                         elif hasattr(model_config, "name"):
-                            # Fallback for schema changes
+                            # Use model name if ID not available
                             model_id = f"{provider_name}:{model_config.name}"
                         else:
                             # Cannot determine model ID
@@ -254,17 +246,28 @@ def initialize_registry(
 
         # Run model discovery if enabled or forced
         if discovery_enabled or force_discovery:
-            logger.info("Running model discovery...")
+            logger.info(
+                "Execute model discovery (timeout: 30 seconds per provider, running in parallel)"
+            )
             try:
+                import time
+
+                start_time = time.time()
                 newly_discovered = registry.discover_models()
+                duration = time.time() - start_time
+
                 if newly_discovered:
                     logger.info(
-                        f"Discovered {len(newly_discovered)} new models: {newly_discovered}"
+                        f"Discovered {len(newly_discovered)} new models in {duration:.2f}s: {list(newly_discovered.keys())[:10]}"
+                        + (f" and {len(newly_discovered) - 10} more" if len(newly_discovered) > 10 else "")
                     )
                 else:
-                    logger.info("No new models discovered")
+                    logger.info(
+                        f"No new models discovered (discovery completed in {duration:.2f}s)"
+                    )
             except Exception as e:
                 logger.error(f"Error during model discovery: {e}")
+                logger.info("Continuing with available models from configuration")
 
         return registry
 

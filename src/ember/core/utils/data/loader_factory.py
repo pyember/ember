@@ -26,19 +26,42 @@ def discover_preppers(
             dataset prepper classes.
     """
     discovered: Dict[str, Type[IDatasetPrepper]] = {}
-    entry_points_obj = entry_points()
-    for entry_point in entry_points_obj.select(group=entry_point_group):
-        try:
-            prepper_cls: Type[IDatasetPrepper] = entry_point.load()
-            dataset_name: str = entry_point.name
-            discovered[dataset_name] = prepper_cls
-        except Exception as error:
-            logger.warning(
-                "Failed to load dataset prepper plugin for '%s': %s",
-                entry_point.name,
-                error,
-                exc_info=True,
-            )
+    
+    try:
+        entry_points_obj = entry_points()
+        
+        # Handle different entry_points() API versions
+        if hasattr(entry_points_obj, 'select'):
+            # Python 3.10+ behavior
+            for entry_point in entry_points_obj.select(group=entry_point_group):
+                try:
+                    prepper_cls: Type[IDatasetPrepper] = entry_point.load()
+                    dataset_name: str = entry_point.name
+                    discovered[dataset_name] = prepper_cls
+                except Exception as error:
+                    logger.warning(
+                        "Failed to load dataset prepper plugin for '%s': %s",
+                        entry_point.name,
+                        error,
+                        exc_info=True,
+                    )
+        else:
+            # Python 3.9 and earlier behavior
+            for entry_point in entry_points_obj.get(entry_point_group, []):
+                try:
+                    prepper_cls: Type[IDatasetPrepper] = entry_point.load()
+                    dataset_name: str = entry_point.name
+                    discovered[dataset_name] = prepper_cls
+                except Exception as error:
+                    logger.warning(
+                        "Failed to load dataset prepper plugin for '%s': %s",
+                        entry_point.name,
+                        error,
+                        exc_info=True,
+                    )
+    except Exception as e:
+        logger.warning(f"Error discovering plugins: {e}")
+        
     return discovered
 
 

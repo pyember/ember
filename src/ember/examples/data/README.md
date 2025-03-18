@@ -5,7 +5,6 @@ This directory contains examples demonstrating Ember's data handling capabilitie
 ## Examples
 
 - `data_api_example.py` - Using the data API for dataset operations
-- `halueval_experiment.py` - Running evaluation on hallucination datasets
 - `mcq_experiment_example.py` - Multiple choice question experiments
 - `transformation_example.py` - Data transformation and preprocessing
 

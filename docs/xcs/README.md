@@ -1,6 +1,6 @@
 # Ember XCS: High-Performance Execution Framework
 
-The Ember XCS (eXecutable Computation System) module provides a high-performance execution framework for computational graphs, enabling intelligent scheduling, just-in-time tracing, and advanced parallel execution transformations.
+The Ember XCS (Accelerated Compound Systems) module provides a high-performance execution framework for computational graphs, enabling intelligent scheduling, just-in-time tracing, and advanced parallel execution transformations.
 
 ## Core Features
 

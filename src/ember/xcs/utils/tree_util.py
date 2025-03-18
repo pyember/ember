@@ -3,13 +3,44 @@ XCS Tree Utilities
 
 This module provides registration and transformation utilities for immutable
 EmberModules and other tree-like objects within the Ember system. It implements
-functions analogous to JAX's pytrees:
+functions analogous to JAX's pytrees for structural decomposition and reconstruction
+of arbitrarily nested data structures:
+
   • register_tree: Registers a type with its custom flatten and unflatten functions.
   • tree_flatten: Recursively flattens an object into its constituent leaves and
                   auxiliary metadata.
   • tree_unflatten: Reconstructs an object from its auxiliary metadata and flattened leaves.
 
 All functions enforce strong type annotations and require named parameter invocation.
+
+This module enables critical XCS system capabilities:
+1. Transforms like vmap and pmap operate on nested structures without manual handling
+2. JIT compilation analyzes and optimizes operators by decomposing their structure 
+3. Execution engines efficiently traverse complex object graphs
+
+Examples:
+    # Registering a custom type
+    class MyType:
+        def __init__(self, value):
+            self.value = value
+            
+    def flatten_my_type(obj):
+        return [obj.value], (type(obj), None)
+        
+    def unflatten_my_type(aux_data, children):
+        cls, _ = aux_data
+        return cls(children[0])
+        
+    register_tree(
+        cls=MyType,
+        flatten_func=flatten_my_type,
+        unflatten_func=unflatten_my_type
+    )
+    
+    # Using tree operations
+    obj = {"a": MyType(1), "b": [MyType(2), MyType(3)]}
+    leaves, aux_data = tree_flatten(tree=obj)  # leaves = [1, 2, 3]
+    reconstructed = tree_unflatten(aux=aux_data, children=leaves)  # Same structure as obj
 """
 
 from __future__ import annotations
@@ -73,16 +104,49 @@ def register_tree(
     unflatten_func: UnflattenFn[T, L, AuxType],
 ) -> None:
     """Registers a type with its custom flatten and unflatten functions for XCS tree utilities.
+    
+    Extends the tree traversal system to handle custom types by registering specialized
+    functions that control how instances are decomposed and reconstructed. This enables
+    transformations like JIT and vmap to work with arbitrary user-defined types.
+    
+    The flatten function should extract dynamic values that participate in transformations,
+    separating them from static metadata. The unflatten function should reconstruct
+    instances from transformed values and the original metadata.
 
     Args:
-        cls: The type to register.
-        flatten_func: A function that flattens an instance of `cls`. It returns a tuple
-                      containing a list of leaves and auxiliary metadata.
+        cls: The type to register, which will be used as the key in the registry.
+        flatten_func: A function that decomposes an instance of `cls` into a tuple
+                      containing a list of dynamic leaf values and static auxiliary metadata.
+                      Signature: (obj: T) -> Tuple[List[L], AuxType]
         unflatten_func: A function that reconstructs an instance of `cls` from auxiliary
-                        metadata and a list of leaves.
+                        metadata and transformed leaf values.
+                        Signature: (aux: AuxType, children: List[L]) -> T
 
     Raises:
-        ValueError: If `cls` is already registered.
+        ValueError: If `cls` is already registered, to prevent conflicts.
+        
+    Example:
+        ```python
+        class CustomNode:
+            def __init__(self, value, metadata):
+                self.value = value
+                self.metadata = metadata  # Static value that won't change
+                
+        def flatten_custom_node(node):
+            # Return leaves (dynamic values) and auxiliary data (static values)
+            return [node.value], (CustomNode, node.metadata)
+            
+        def unflatten_custom_node(aux_data, children):
+            node_cls, metadata = aux_data
+            # Reconstruct with transformed leaves and original metadata
+            return node_cls(children[0], metadata)
+            
+        register_tree(
+            cls=CustomNode,
+            flatten_func=flatten_custom_node, 
+            unflatten_func=unflatten_custom_node
+        )
+        ```
     """
     if cls in _pytree_registry:
         raise ValueError(f"Type {cls.__name__} is already registered as a tree node.")
@@ -93,14 +157,29 @@ def _flatten_iterable(
     iterable: List[object],
 ) -> Tuple[List[L], List[Tuple[Tuple[Type[object], object], int]]]:
     """Helper function to flatten iterable objects such as lists or tuples.
+    
+    Processes a sequence of elements, flattening each one and consolidating their
+    leaves into a single flat list. For each element, it also collects auxiliary
+    metadata and keeps track of how many leaves came from that element, creating
+    a detailed structural map of the original sequence.
+    
+    This implementation recursively flattens each element using tree_flatten,
+    allowing it to handle arbitrarily nested structures within sequences.
+    The detailed metadata captured enables perfect reconstruction during unflattening.
 
     Args:
-        iterable: The iterable to flatten.
+        iterable: The sequence (list or tuple) to flatten, containing arbitrary elements
+                 that may themselves be complex nested structures.
 
     Returns:
         A tuple containing:
-          - A list of flattened leaves.
-          - A list of tuples, each containing the child's auxiliary metadata and its leaf count.
+          - A list of all flattened leaves extracted from the sequence elements.
+          - A list of tuples, each containing:
+            * The auxiliary metadata for an element
+            * The number of leaves that came from that element
+          
+    This metadata structure is crucial for the unflattening process to correctly
+    allocate leaves to each element during reconstruction.
     """
     flat_leaves: List[L] = []
     children_info: List[Tuple[Tuple[Type[object], object], int]] = []
@@ -117,16 +196,29 @@ def _unflatten_sequence(
     aux_list: List[Tuple[AuxType, int]], children: List[L]
 ) -> List[object]:
     """Helper function to unflatten sequences (lists or tuples) from auxiliary metadata.
+    
+    Reconstructs a sequence of elements from flattened leaves and auxiliary data.
+    Each entry in aux_list describes one element in the original sequence, including
+    metadata about its structure and how many leaves it contains.
+    
+    The implementation processes elements sequentially, extracting the appropriate
+    number of leaves for each element and recursively reconstructing it using tree_unflatten.
+    This ensures that complex nested structures are properly rebuilt.
 
     Args:
-        aux_list: A list of tuples where each tuple contains auxiliary metadata and a leaf count.
-        children: The list of flattened leaves.
+        aux_list: A list of tuples where each tuple contains:
+                  - The auxiliary metadata for an element
+                  - The number of leaves that element requires
+        children: The flat list of leaf values to incorporate into the sequence.
 
     Returns:
-        A list of unflattened elements.
+        A list of reconstructed elements that can later be converted to the
+        appropriate sequence type (list or tuple).
 
     Raises:
-        ValueError: If the total number of leaves does not match the expected count.
+        ValueError: If the total number of leaves consumed doesn't match the length
+                   of the children list, indicating a mismatch between flattening
+                   and unflattening operations.
     """
     result: List[object] = []
     start: int = 0
@@ -144,16 +236,31 @@ def _unflatten_dict(
     aux_list: List[Tuple[Hashable, AuxType, int]], children: List[L]
 ) -> Dict[Hashable, object]:
     """Helper function to unflatten dictionaries from auxiliary metadata.
+    
+    Reconstructs a dictionary from flattened leaves and structured auxiliary data.
+    The aux_list contains the key, structural metadata, and leaf count for each 
+    key-value pair in the original dictionary. This function processes each entry
+    sequentially, extracting the needed leaves and recursively reconstructing each value.
+    
+    Dictionary reconstruction is more complex than sequence reconstruction because
+    it needs to preserve both keys and the structure of values. The function maintains
+    original key ordering by processing aux_list entries in order.
 
     Args:
-        aux_list: A list of tuples where each tuple is (key, auxiliary metadata, leaf count).
-        children: The list of flattened leaves.
+        aux_list: A list of tuples where each tuple contains:
+                  - key: The dictionary key (must be hashable)
+                  - aux_item: The auxiliary metadata for the value
+                  - leaf_count: The number of leaves needed for this value
+        children: The flat list of leaf values to incorporate into the dictionary.
 
     Returns:
-        The reconstructed dictionary.
+        The fully reconstructed dictionary with the original keys and
+        reconstructed values.
 
     Raises:
-        ValueError: If the total number of leaves does not match the expected count.
+        ValueError: If the total number of leaves consumed doesn't match the length
+                   of the children list, indicating an inconsistency between the
+                   flattening and unflattening operations.
     """
     result: Dict[Hashable, object] = {}
     start: int = 0
@@ -168,13 +275,42 @@ def _unflatten_dict(
 
 def tree_flatten(*, tree: object) -> Tuple[List[L], AuxType]:
     """Recursively flattens a tree object into its constituent leaves and auxiliary metadata.
+    
+    Traverses a nested data structure and extracts all leaf values into a flat list while 
+    preserving structural information in auxiliary metadata. This decomposition allows
+    transformations to operate on leaf values while maintaining the ability to reconstruct
+    the original structure.
+    
+    The function handles four cases:
+    1. Registered custom types - Uses their custom flatten_func
+    2. Dictionaries - Flattens values while preserving keys in auxiliary data
+    3. Lists/tuples - Flattens elements while preserving sequence type
+    4. Other values - Treated as leaf nodes
 
     Args:
-        tree: The tree-like object to flatten.
+        tree: The tree-like object to flatten, which may be a nested structure 
+              containing dictionaries, lists, tuples, and custom registered types.
 
     Returns:
-        A tuple where the first element is a list of leaves and the second element is the auxiliary
-        metadata that encodes the structure of the tree.
+        A tuple containing:
+          - A flat list of all leaf values extracted from the tree
+          - Auxiliary metadata that encodes the structure information needed for reconstruction
+    
+    Example:
+        ```python
+        # For a nested structure
+        data = {"a": [1, 2], "b": {"c": 3}}
+        
+        # Flatten into leaves and auxiliary data
+        leaves, aux_data = tree_flatten(tree=data)
+        
+        # leaves = [1, 2, 3]
+        # aux_data contains nested structure information
+        
+        # Can be reconstructed exactly with tree_unflatten
+        reconstructed = tree_unflatten(aux=aux_data, children=leaves)
+        # reconstructed = {"a": [1, 2], "b": {"c": 3}}
+        ```
     """
     tree_type: Type[object] = type(tree)
 
@@ -221,17 +357,46 @@ def tree_flatten(*, tree: object) -> Tuple[List[L], AuxType]:
 
 def tree_unflatten(*, aux: AuxType, children: List[L]) -> object:
     """Reconstructs an object from its auxiliary metadata and a list of leaves.
+    
+    This function is the inverse of tree_flatten, rebuilding a nested structure from
+    a flat list of leaf values and the structural metadata. It reconstructs the 
+    exact structure using the type information and auxiliary data stored during flattening.
+    
+    The reconstruction process follows these steps:
+    1. Extract type and metadata from the auxiliary data
+    2. If the type is registered, use its custom unflatten function
+    3. For built-in containers (list, tuple, dict), reconstruct using helper functions
+    4. For leaf nodes, return the single child value
+    
+    This operation is crucial for transformations that need to maintain structural 
+    integrity while operating on the underlying values.
 
     Args:
-        aux: A tuple containing the tree type and associated auxiliary metadata.
-        children: The list of leaves from which to reconstruct the tree.
+        aux: A tuple containing (type_info, metadata) where:
+             - type_info: The Python type of the original object
+             - metadata: Structure-specific auxiliary data needed for reconstruction
+        children: The flat list of leaf values to incorporate into the reconstructed structure.
+                 These should match the structure expected based on the auxiliary data.
 
     Returns:
-        The reconstructed tree-like object.
+        The reconstructed tree-like object with the original structure but potentially
+        transformed leaf values.
 
     Raises:
-        ValueError: If the provided leaves do not match the expected structure or if an unregistered
-                    type with multiple leaves is encountered.
+        ValueError: If the provided leaves don't match the expected structure (e.g., incorrect
+                   number of leaves) or if an unregistered type with multiple leaves is encountered.
+                   This helps catch inconsistencies between flattening and unflattening operations.
+    
+    Example:
+        ```python
+        # Starting with flattened data
+        leaves = [1, 2, 3]
+        aux_data = (dict, [...])  # Auxiliary data encoding a dictionary structure
+        
+        # Reconstruct the original structure
+        result = tree_unflatten(aux=aux_data, children=leaves)
+        # result might be something like {"a": [1, 2], "b": 3}
+        ```
     """
     tree_type, metadata = aux
 

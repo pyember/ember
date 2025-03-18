@@ -53,7 +53,18 @@ class ModelDiscoveryError(Exception):
         ```
     """
 
-    pass
+    def __init__(self, message: str, provider: str = None) -> None:
+        """Initialize the ModelDiscoveryError with enhanced context.
+
+        Args:
+            message: Detailed error description
+            provider: Optional provider name where the error occurred
+        """
+        if provider:
+            super().__init__(f"[{provider}] {message}")
+        else:
+            super().__init__(message)
+        self.provider = provider
 
 
 class BaseDiscoveryProvider(ABC):

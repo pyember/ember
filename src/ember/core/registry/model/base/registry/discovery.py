@@ -5,7 +5,10 @@ import threading
 from typing import Any, Dict, List
 
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
+from ember.core.registry.model.providers.base_discovery import (
+    BaseDiscoveryProvider,
+    ModelDiscoveryError,
+)
 from ember.core.registry.model.providers.openai.openai_discovery import (
     OpenAIDiscovery,
 )
@@ -33,7 +36,7 @@ class ModelDiscoveryService:
         Args:
             ttl (int): Cache time-to-live in seconds. Defaults to 3600.
         """
-        # Load discovery providers dynamically based on available API keys
+        # Loading discovery providers dynamically based on available API keys
         self.providers: List[BaseDiscoveryProvider] = self._initialize_providers()
 
         self._cache: Dict[str, Dict[str, Any]] = {}
@@ -80,7 +83,7 @@ class ModelDiscoveryService:
             ),
         ]
 
-        # Initialize providers with available credentials
+        # Initializing providers with available credentials
         providers: List[BaseDiscoveryProvider] = []
 
         for provider_class, env_var_name, config_fn in provider_configs:
@@ -91,12 +94,12 @@ class ModelDiscoveryService:
                     if config_fn:
                         config = config_fn()
                         if hasattr(provider_class, "configure"):
-                            # If provider has a configure method, use it
+                            # If provider has a configure method, using it
                             instance = provider_class()
                             instance.configure(**config)  # type: ignore
                             providers.append(instance)
                         else:
-                            # Otherwise try to pass config to constructor
+                            # Otherwise trying to pass config to constructor
                             providers.append(provider_class(**config))  # type: ignore
                     else:
                         # Simple initialization without config
@@ -136,69 +139,88 @@ class ModelDiscoveryService:
         Raises:
             ModelDiscoveryError: If no models can be discovered due to provider errors.
         """
-        with self._lock:  # Protects access to the internal cache
-            current_time: float = time.time()
-            # If the cached results are still valid (within TTL), return them
+        
+        # Checking cache with minimal lock scope
+        current_time: float = time.time()
+        with self._lock:  
             if self._cache and (current_time - self._last_update) < self.ttl:
                 logger.info("Returning cached discovery results.")
                 return self._cache.copy()  # Return a copy to avoid external mutation
 
-            aggregated_models: Dict[str, Dict[str, Any]] = {}
-            errors: List[str] = []
+        # Simple sequential processing of providers with timeout protection
+        aggregated_models: Dict[str, Dict[str, Any]] = {}
+        errors: List[str] = []
 
-            # Attempt to fetch models from each provider
-            for provider in self.providers:
-                try:
-                    # Set a timeout for fetch_models to prevent hanging
-                    import concurrent.futures
-                    import signal
+        # Process each provider sequentially with timeout
+        for provider in self.providers:
+            provider_name = provider.__class__.__name__
+            logger.info(f"Starting model discovery for provider: {provider_name}")
+            
+            try:
+                result_container = []
+                error_container = []
+                completion_event = threading.Event()
+                
+                def fetch_with_timeout():
+                    try:
+                        # Call the provider's fetch_models method
+                        start = time.time()
+                        result = provider.fetch_models()
+                        duration = time.time() - start
+                        logger.info(f"Provider {provider_name} completed in {duration:.2f}s")
+                        result_container.append(result)
+                    except Exception as e:
+                        error_container.append(e)
+                    finally:
+                        completion_event.set()
+                
+                # Run the fetch in a thread
+                thread = threading.Thread(target=fetch_with_timeout)
+                thread.daemon = True  # Don't block program exit
+                thread.start()
+                
+                # Wait for completion with timeout (15 seconds per provider is plenty)
+                logger.info(f"Waiting for models from {provider_name} (timeout: 15s)...")
+                if not completion_event.wait(15.0):
+                    logger.error(f"Timeout while fetching models from {provider_name}")
+                    errors.append(f"{provider_name}: Timeout after 15 seconds")
+                    # Continue to the next provider - we can't forcibly terminate the thread
+                    continue
+                
+                # Check if we got results or errors
+                if error_container:
+                    e = error_container[0]
+                    logger.error(f"Error fetching models from {provider_name}: {e}")
+                    errors.append(f"{provider_name}: {str(e)}")
+                    continue
+                
+                if not result_container:
+                    logger.error(f"No results from {provider_name}")
+                    errors.append(f"{provider_name}: No results returned")
+                    continue
+                
+                # Process successful results
+                result = result_container[0]
+                logger.info(f"Successfully received {len(result)} models from {provider_name}")
+                aggregated_models.update(result)
+                
+            except Exception as e:
+                logger.error(f"Unexpected error with {provider_name}: {e}")
+                errors.append(f"{provider_name}: {str(e)}")
 
-                    # Define a function to call fetch_models with a timeout
-                    def fetch_with_timeout():
-                        return provider.fetch_models()
+        # If no models found and we had errors, raise exception
+        if not aggregated_models and errors:
+            raise ModelDiscoveryError(
+                f"No models discovered. Errors: {'; '.join(errors)}"
+            )
 
-                    # Use ThreadPoolExecutor with a timeout to prevent hanging
-                    with concurrent.futures.ThreadPoolExecutor(
-                        max_workers=1
-                    ) as executor:
-                        future = executor.submit(fetch_with_timeout)
-                        try:
-                            provider_models = future.result(
-                                timeout=30
-                            )  # 30 second timeout
-                            aggregated_models.update(provider_models)
-                        except concurrent.futures.TimeoutError:
-                            logger.error(
-                                "Timeout while fetching models from %s",
-                                provider.__class__.__name__,
-                            )
-                            errors.append(
-                                f"{provider.__class__.__name__}: Timeout after 30 seconds"
-                            )
-
-                except Exception as e:
-                    errors.append(f"{provider.__class__.__name__}: {e}")
-                    logger.error(
-                        "Failed to fetch models from %s: %s",
-                        provider.__class__.__name__,
-                        e,
-                    )
-
-            # If no models found and we had errors, raise exception
-            if not aggregated_models and errors:
-                from ember.core.registry.model.providers.base_discovery import (
-                    ModelDiscoveryError,
-                )
-
-                raise ModelDiscoveryError(
-                    f"No models discovered. Errors: {'; '.join(errors)}"
-                )
-
-            # Store a copy of the new results in the cache
+        # Updating cache with minimal lock scope
+        with self._lock:
             self._cache = aggregated_models.copy()
-            self._last_update = current_time
-            logger.info("Discovered models: %s", list(aggregated_models.keys()))
-            return aggregated_models.copy()
+            self._last_update = time.time()
+            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
+        
+        return aggregated_models.copy()
 
     def merge_with_config(
         self, discovered: Dict[str, Dict[str, Any]]
@@ -315,22 +337,26 @@ class ModelDiscoveryService:
         return merged_models
 
     def refresh(self) -> Dict[str, ModelInfo]:
-        """Force a refresh of model discovery and merge with local configuration."""
+        """Force a refresh of model discovery and merge with local configuration."""        
+        # Invalidate the cache with minimal lock scope
         with self._lock:
-            # Force cache invalidation to ensure a fresh fetch
             self._last_update = 0.0
-
-            try:
-                # This will now definitely fetch fresh data due to invalidated cache
-                discovered: Dict[str, Dict[str, Any]] = self.discover_models()
+        
+        try:
+            # Perform discovery outside the lock to prevent deadlocks
+            discovered: Dict[str, Dict[str, Any]] = self.discover_models()
+            
+            # Only merge and update cache in a separate lock acquisition
+            with self._lock:
                 merged = self.merge_with_config(discovered=discovered)
-                # Only update cache if discovery is successful
+                # Only updating cache if discovery is successful
                 self._cache = discovered.copy()
                 self._last_update = time.time()
                 return merged
-            except Exception as e:
-                logger.error("Failed to refresh model discovery: %s", e)
-                # Return last known good cache if available
+        except Exception as e:
+            logger.error("Failed to refresh model discovery: %s", e)
+            # Return last known good cache if available - with minimal lock scope
+            with self._lock:
                 return (
                     self.merge_with_config(discovered=self._cache.copy())
                     if self._cache
@@ -351,6 +377,7 @@ class ModelDiscoveryService:
         """Asynchronously discover models using registered providers, with caching based on TTL."""
         import asyncio
 
+        # Check cache with minimal lock scope
         current_time: float = time.time()
         with self._lock:
             if self._cache and (current_time - self._last_update) < self.ttl:
@@ -360,61 +387,85 @@ class ModelDiscoveryService:
         aggregated_models: Dict[str, Dict[str, Any]] = {}
         errors: List[str] = []
 
-        async def fetch_from_provider(provider: BaseDiscoveryProvider) -> None:
+        async def fetch_from_provider(provider: BaseDiscoveryProvider) -> Dict[str, Any]:
+            """Async wrapper for provider fetch with proper error handling."""
+            provider_name = provider.__class__.__name__
+            logger.info(f"Starting async model discovery for: {provider_name}")
+            
             try:
-                # Each fetch is done with timeout
-                try:
-                    # Check if the provider has an async implementation
-                    if hasattr(provider, "fetch_models_async") and callable(
-                        provider.fetch_models_async
-                    ):
-                        # Use the async implementation directly
-                        provider_models = await asyncio.wait_for(
-                            provider.fetch_models_async(), timeout=30
-                        )
-                    else:
-                        # Fall back to running the sync version in a thread pool
-                        fetch_task = asyncio.create_task(
-                            asyncio.get_event_loop().run_in_executor(
-                                None, provider.fetch_models
-                            )
-                        )
-                        provider_models = await asyncio.wait_for(
-                            fetch_task, timeout=30
-                        )  # 30 second timeout
-
-                    with self._lock:
-                        aggregated_models.update(provider_models)
-                except asyncio.TimeoutError:
-                    error_msg = (
-                        f"{provider.__class__.__name__}: Timeout after 30 seconds"
+                # Check if the provider has an async implementation
+                if hasattr(provider, "fetch_models_async") and callable(
+                    provider.fetch_models_async
+                ):
+                    # Use the async implementation directly with shorter timeout
+                    logger.info(f"Using native async implementation for {provider_name}")
+                    provider_models = await asyncio.wait_for(
+                        provider.fetch_models_async(), timeout=15
                     )
-                    errors.append(error_msg)
-                    logger.error(
-                        "Timeout while fetching models from %s",
-                        provider.__class__.__name__,
+                else:
+                    # Fall back to running the sync version in a thread pool
+                    logger.info(f"Using thread pool for sync method of {provider_name}")
+                    fetch_task = asyncio.create_task(
+                        asyncio.get_event_loop().run_in_executor(
+                            None, provider.fetch_models
+                        )
                     )
+                    provider_models = await asyncio.wait_for(fetch_task, timeout=15)
+                
+                logger.info(f"Successfully received {len(provider_models)} models from {provider_name}")
+                return {
+                    "success": True,
+                    "provider": provider_name,
+                    "models": provider_models 
+                }
+            except asyncio.TimeoutError:
+                logger.error(f"Async timeout while fetching models from {provider_name}")
+                return {
+                    "success": False,
+                    "provider": provider_name,
+                    "error": f"Timeout after 15 seconds"
+                }
             except Exception as e:
-                error_msg = f"{provider.__class__.__name__}: {e}"
-                errors.append(error_msg)
-                logger.error(
-                    "Failed to fetch models from %s: %s", provider.__class__.__name__, e
-                )
+                logger.error(f"Error in async fetch from {provider_name}: {e}")
+                return {
+                    "success": False,
+                    "provider": provider_name,
+                    "error": str(e)
+                }
 
-        tasks = [fetch_from_provider(provider) for provider in self.providers]
-        await asyncio.gather(*tasks)
+        # Process each provider with independent timeout protection
+        # This is better than gather which might wait for all tasks
+        results = []
+        for provider in self.providers:
+            try:
+                result = await fetch_from_provider(provider)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Unexpected error in async discovery: {e}")
+                # Add error entry but continue with other providers
+                results.append({
+                    "success": False,
+                    "provider": provider.__class__.__name__,
+                    "error": str(e)
+                })
+        
+        # Process all provider results
+        for result in results:
+            if result["success"]:
+                aggregated_models.update(result["models"])
+            else:
+                errors.append(f"{result['provider']}: {result['error']}")
 
+        # Handle case where no models were discovered
         if not aggregated_models and errors:
-            from ember.core.registry.model.providers.base_discovery import (
-                ModelDiscoveryError,
-            )
-
             raise ModelDiscoveryError(
                 f"No models discovered. Errors: {'; '.join(errors)}"
             )
 
+        # Update cache with minimal lock scope
         with self._lock:
             self._cache = aggregated_models.copy()
-            self._last_update = current_time
-            logger.info("Discovered models: %s", list(aggregated_models.keys()))
-            return aggregated_models.copy()
+            self._last_update = time.time()
+            logger.info(f"Discovered {len(aggregated_models)} models: {list(aggregated_models.keys())}")
+            
+        return aggregated_models.copy()

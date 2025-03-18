@@ -1,33 +1,40 @@
 """
-Vectorized Mapping (vmap): High-Performance Batch Processing Transformation
+Vectorized Mapping (vmap): Batch Processing Transformation
 
-This module provides the vmap transformation, a fundamental building block for parallel
-computation in the XCS framework. The vmap transformation automatically vectorizes operators
-and functions to efficiently process batched inputs in parallel, similar to NumPy's vectorization
-or JAX's vmap, but specialized for the XCS execution model.
+Providing the vmap transformation for parallel computation in the XCS framework.
+The vmap transformation vectorizes operators and functions to process batched 
+inputs in parallel, similar to NumPy's vectorization or JAX's vmap, but 
+specialized for the XCS execution model.
 
-Key benefits:
-1. Performance - Processes multiple inputs in parallel without manual batching logic
-2. Simplicity - Automatically converts single-item operators to batched operators
-3. Composability - Can be combined with other transforms like pmap for nested parallelism
-4. Flexibility - Works with both primitive operators and complex pipelines
+Key features:
+1. Processing multiple inputs in parallel without manual batching logic
+2. Converting single-item operators to batched operators
+3. Combining with other transforms like pmap for nested parallelism
+4. Working with both primitive operators and complex pipelines
 
-The implementation ensures proper handling of batch dimensions, automatic broadcasting of
-scalar values, and correct merging of results. It follows functional programming principles
-by maintaining immutability and avoiding side effects while transforming operators.
+Handling batch dimensions, broadcasting scalar values across batches,
+and merging results from batch processing.
 
 Example:
-    # Create a single-item operator
+    ```python
+    # Creating a single-item operator
     class MyOperator(Operator):
         def __call__(self, *, inputs):
             return {"result": process_item(inputs["text"])}
             
-    # Create a vectorized version that processes batches in parallel
+    # Creating a vectorized version that processes batches in parallel
     batched_operator = vmap(MyOperator())
     
-    # Process multiple items with a single call
-    results = batched_operator(inputs={"text": ["item1", "item2", "item3"]})
+    # Processing multiple items with a single call
+    results = batched_operator(inputs={
+        "text": ["item1", "item2", "item3"],
+        "options": {"format": "json"}  # Non-batched parameter applied to all items
+    })
     # results == {"result": [processed1, processed2, processed3]}
+    
+    # Combining with other transforms for advanced parallelism
+    distributed_batch_op = pmap(vmap(MyOperator()))
+    ```
 """
 
 from functools import wraps
@@ -115,20 +122,17 @@ class VMapConfig(TypedDict, total=False):
 def _get_batch_size(
     inputs: Mapping[str, object], in_axes: Union[int, Mapping[str, int]]
 ) -> int:
-    """Determines the consistent batch size from a dictionary of inputs.
+    """Determining the consistent batch size from a dictionary of inputs.
 
-    This function analyzes the input dictionary and the batch axis specification
-    to infer the appropriate batch size for processing. It verifies that all
-    batched inputs have consistent sizes to ensure proper vectorization.
+    Analyzing the input dictionary and batch axis specification
+    to find the appropriate batch size. Checking that all
+    batched inputs have consistent sizes.
 
-    The function implements the following logic:
-    1. If in_axes is an integer, check all sequence inputs for batch size
-    2. If in_axes is a mapping, only check keys specified in the mapping
-    3. Verify all found batch sizes are consistent
-    4. Default to 1 (single item) if no batched dimensions are found
-
-    This approach ensures robust handling of mixed batch and non-batch inputs
-    while enforcing data consistency requirements for safe vectorization.
+    The function follows this logic:
+    1. If in_axes is an integer, checking all sequence inputs for batch size
+    2. If in_axes is a mapping, only checking keys specified in the mapping
+    3. Verifying batch sizes are consistent
+    4. Defaulting to 1 (single item) if no batched dimensions are found
 
     Args:
         inputs: Dictionary containing the input values, some of which may be batched.
@@ -254,7 +258,7 @@ def _combine_outputs(
     if not results:
         return {}
 
-    # If all results are mappings (dictionaries), combine them by key
+    # Combining results if all are mappings (dictionaries), by key
     if all(isinstance(r, Mapping) for r in results):
         combined: Dict[str, object] = {}
         first_result = cast(Mapping[str, object], results[0])
@@ -273,7 +277,7 @@ def _combine_outputs(
             combined[key] = values
         return combined
 
-    # Otherwise, return all results under the "result" key
+    # Otherwise, returning all results under the "result" key
     return {"result": list(results)}
 
 
@@ -284,23 +288,18 @@ def vmap(
     in_axes: Union[int, Dict[str, int]] = 0,
     out_axes: Union[int, Dict[str, int]] = 0,
 ) -> Callable[[Mapping[str, object]], Dict[str, object]]:
-    """Transforms a single-item operator/function into a vectorized batch processor.
+    """Transforming a single-item operator/function into a vectorized batch processor.
 
-    This higher-order transformation follows functional programming principles to elevate
-    operators from processing individual items to efficiently handling batches. It applies
-    the wrapped function independently to each batch element and then intelligently combines
-    the results. The transformation preserves the original operator's semantics while
-    enhancing it with batch processing capabilities.
+    Converting functions from processing individual items to handling batches. Applying
+    the wrapped function to each batch element and then combining the results. The
+    transformation maintains the original operator's semantics while adding
+    batch processing capabilities.
 
-    The implementation handles complex scenarios including:
+    Handling several scenarios:
     - Mixed batch and non-batch inputs (broadcasting scalars across the batch)
     - Heterogeneous output structures
-    - Automatic result merging with proper type preservation
-    - Consistent handling of edge cases (empty batches, single-item batches)
-
-    This design follows the Decorator pattern, enhancing the original callable's
-    functionality while maintaining its interface contract. It adheres to the
-    Single Responsibility Principle by focusing exclusively on batch vectorization.
+    - Result merging with type preservation
+    - Edge cases (empty batches, single-item batches)
 
     Args:
         operator_or_fn: The target operator or function to vectorize. Can be either an
@@ -317,20 +316,45 @@ def vmap(
         batched inputs and returns batched outputs.
 
     Example:
-        # Single-item operator
+        ```python
+        # Creating a single-item operator
         class Translator(Operator):
             def __call__(self, *, inputs):
                 return {"translated": translate(inputs["text"])}
 
-        # Create vectorized version
+        # Creating vectorized version
         batch_translator = vmap(Translator())
 
-        # Process a batch of texts in a single call
+        # Processing a batch of texts in a single call
         results = batch_translator(inputs={
             "text": ["Hello", "World", "Example"],
-            "target_language": "Spanish"  # Non-batch parameter, applied to all items
+            "target_language": "Spanish",  # Non-batch parameter, applied to all items
+            "options": {"format": "json"}  # Complex non-batch parameter
         })
         # results == {"translated": ["Hola", "Mundo", "Ejemplo"]}
+        
+        # Using with dictionary outputs
+        def process_item(item):
+            return {
+                "id": item["id"],
+                "processed": transform(item["data"]),
+                "timestamp": get_timestamp()
+            }
+            
+        # Creating vectorized function
+        batch_process = vmap(process_item)
+        
+        # Processing multiple items with heterogeneous outputs
+        results = batch_process(inputs={
+            "id": [1, 2, 3],
+            "data": ["a", "b", "c"]
+        })
+        # results == {
+        #    "id": [1, 2, 3],
+        #    "processed": ["TRANSFORMED_A", "TRANSFORMED_B", "TRANSFORMED_C"],
+        #    "timestamp": [t1, t2, t3]
+        # }
+        ```
     """
 
     # Type-specialized execution function to handle different callables
@@ -351,7 +375,7 @@ def vmap(
         """
         batch_size: int = _get_batch_size(inputs=inputs, in_axes=in_axes)
 
-        # Handle empty prompt batch case
+        # Handling empty prompt batch case
         if "prompts" not in inputs or (
             isinstance(inputs.get("prompts"), (list, tuple))
             and not inputs.get("prompts")
@@ -364,10 +388,10 @@ def vmap(
 
         batch_results: List[object] = []
         for i in range(batch_size):
-            # Create a single batch element input
+            # Creating a single batch element input
             batch_element = {key: value[i] for key, value in batched_inputs.items()}
 
-            # Process the individual batch element - handle both calling styles
+            # Processing the individual batch element - handling both calling styles
             if isinstance(fn, Operator):
                 item_result = fn(inputs=batch_element)
             else:
@@ -378,29 +402,29 @@ def vmap(
 
         return _combine_outputs(results=batch_results, out_axes=out_axes)
 
-    # Create a generic vectorized callable type - works for both operator and function case
+    # Creating a generic vectorized callable type - works for both operator and function case
     VectorizedCallable = Callable[[Mapping[str, object]], Dict[str, object]]
 
-    # Handle Operator case
+    # Handling Operator case
     if isinstance(operator_or_fn, Operator):
-        # Create the wrapper function with the correct signature
+        # Creating the wrapper function with the correct signature
         def vectorized_operator(*, inputs: Mapping[str, object]) -> Dict[str, object]:
             return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
 
-        # Preserve the name and docstring
+        # Preserving the name and docstring
         vectorized_operator.__name__ = f"vectorized_{operator_or_fn.__class__.__name__}"
         vectorized_operator.__doc__ = operator_or_fn.__doc__
 
-        # Attach the vectorized version to the operator for reference
+        # Attaching the vectorized version to the operator for reference
         setattr(operator_or_fn, "vectorized", vectorized_operator)
         return cast(VectorizedCallable, vectorized_operator)
 
-    # Handle plain function case
-    # Create the wrapper function with the correct signature
+    # Handling plain function case
+    # Creating the wrapper function with the correct signature
     def vectorized_fn(*, inputs: Mapping[str, object]) -> Dict[str, object]:
         return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
 
-    # Preserve the name and docstring
+    # Preserving the name and docstring
     if hasattr(operator_or_fn, "__name__"):
         vectorized_fn.__name__ = f"vectorized_{operator_or_fn.__name__}"
     if hasattr(operator_or_fn, "__doc__") and operator_or_fn.__doc__:

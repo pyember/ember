@@ -1,8 +1,8 @@
 """
-XCS: eXecutable Computation System
+XCS: Accelerated Compound Systems Execution Engine
 
-The XCS module provides a high-performance distributed execution framework for 
-computational graphs. It implements a directed acyclic graph (DAG) architecture 
+Providing a high-performance distributed execution framework for 
+computational graphs. Implementing a directed acyclic graph (DAG) architecture 
 for operator composition, intelligent scheduling, and just-in-time tracing.
 
 Key components:
@@ -13,6 +13,32 @@ Key components:
 
 This module implements the Facade pattern to provide a clean, simplified interface
 to the underlying XCS functionality while abstracting away implementation details.
+
+Example:
+    ```python
+    from ember.xcs import jit, vmap, autograph, execute
+    
+    # Defining a JIT-optimized operator
+    @jit
+    class MyOperator(Operator):
+        def forward(self, *, inputs):
+            return {"result": process_data(inputs["data"])}
+    
+    # Creating a vectorized version for batch processing
+    batch_op = vmap(MyOperator())
+    
+    # Processing multiple inputs in parallel
+    results = batch_op(inputs={"data": ["item1", "item2", "item3"]})
+    # results == {"result": [processed1, processed2, processed3]}
+    
+    # Building and executing a computation graph
+    with autograph() as graph:
+        x = op1(inputs={"query": "example"})
+        y = op2(inputs=x)
+    
+    # Executing the graph with parallel scheduling
+    results = execute(graph)
+    ```
 """
 
 from typing import (

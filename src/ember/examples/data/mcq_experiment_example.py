@@ -259,7 +259,7 @@ class SingleModelBaseline(
         ensemble_output = self.ensemble(query=inputs.query)
         responses = ensemble_output.responses
 
-        # If we have a response, use the first one as our answer
+        # If we have a response, use the first one as our answer for example purposes
         intermediate_answer = responses[0] if responses else ""
 
         # Step 2: Ensure the answer is valid

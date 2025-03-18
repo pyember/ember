@@ -1,26 +1,26 @@
 """
 Structural JIT: Graph-Based Auto-Optimization for Ember Operators
 
-This module provides an advanced just-in-time (JIT) compilation system for Ember operators
+Providing a just-in-time (JIT) compilation system for Ember operators
 that analyzes operator structure directly rather than relying on execution tracing.
-It automatically converts operator compositions into optimized XCS graphs and executes
+Converting operator compositions into optimized XCS graphs and executing
 them with the appropriate scheduling strategy.
 
-Key innovations:
-1. Zero-overhead structural analysis using Python's pytree protocol
+Key capabilities:
+1. Structural analysis using Python's pytree protocol
 2. Automatic graph construction without execution tracing
-3. Seamless parallel execution of independent operations
-4. Smart scheduling with adaptive concurrency
+3. Parallel execution of independent operations
+4. Adaptive scheduling based on graph structure
 
-The implementation follows functional programming principles with immutable data structures
-and side-effect-free functions. It adheres to SOLID principles by providing:
-- Single Responsibility: Each component handles one aspect of the JIT process
-- Open/Closed: Extensible for new execution strategies without modification
-- Liskov Substitution: Strategy implementations are interchangeable
-- Interface Segregation: Clean interfaces for each component
-- Dependency Inversion: High-level modules don't depend on low-level implementations
+The implementation uses immutable data structures and side-effect-free functions
+with a modular design:
+- Components are focused on specific aspects of the JIT process
+- New execution strategies can be added without modifying existing code
+- Strategy implementations are interchangeable
+- High-level modules depend on abstractions rather than specific implementations
 
 Example:
+    ```python
     @structural_jit
     class MyCompositeOperator(Operator):
         def __init__(self):
@@ -28,14 +28,16 @@ Example:
             self.op2 = SubOperator2()
             
         def forward(self, *, inputs):
-            # Complex, multi-step computation
+            # Multi-step computation
             intermediate = self.op1(inputs=inputs)
             result = self.op2(inputs=intermediate)
             return result
             
-    # All calls automatically optimize and parallelize
+    # Using the optimized operator
     op = MyCompositeOperator()
     result = op(inputs={"text": "example"})
+    # result == {"output": "processed example"}
+    ```
 """
 
 from __future__ import annotations
@@ -369,13 +371,13 @@ def _analyze_operator_structure(operator: Operator) -> OperatorStructureGraph:
         Returns:
             The node ID if an operator was found, None otherwise
         """
-        # Skip already visited objects to prevent cycles
+        # Skipping already visited objects to prevent cycles
         obj_id = id(obj)
         if obj_id in visited:
             return None
         visited.add(obj_id)
 
-        # If this is an operator, add it to the graph
+        # If this is an operator, adding it to the graph
         if isinstance(obj, Operator):
             node_id = f"node_{obj_id}"
             graph.nodes[node_id] = OperatorStructureNode(
@@ -385,11 +387,11 @@ def _analyze_operator_structure(operator: Operator) -> OperatorStructureGraph:
                 parent_id=parent_id,
             )
 
-            # If this is the first operator we've found, it's the root
+            # If this is the first operator we've found, setting it as the root
             if graph.root_id is None:
                 graph.root_id = node_id
 
-            # Check if we can flatten this operator using pytree protocol
+            # Checking if we can flatten this operator using pytree protocol
             if isinstance(obj, PytreeCompatible):
                 try:
                     dynamic_values, static_values = obj.__pytree_flatten__()
@@ -406,13 +408,13 @@ def _analyze_operator_structure(operator: Operator) -> OperatorStructureGraph:
                             traverse(value, f"{path}.dynamic[{i}]", node_id)
 
                 except Exception as e:
-                    # Log warning but continue - this just means we won't capture
+                    # Logging warning but continuing - this just means we won't capture
                     # this operator's internal structure
                     logger.warning(
                         f"Error flattening operator {obj.__class__.__name__}: {e}"
                     )
 
-            # Traverse attributes regardless of pytree compatibility
+            # Traversing attributes regardless of pytree compatibility
             for attr_name, attr_value in _get_attributes(obj):
                 if attr_name.startswith("_"):
                     continue  # Skip private attributes
@@ -657,19 +659,18 @@ def structural_jit(
     cache_graph: bool = True,
 ) -> Union[Callable[[Type[OperatorType]], Type[OperatorType]], Type[OperatorType]]:
     """
-    Advanced JIT decorator that optimizes operators using structural analysis.
+    JIT decorator that optimizes operators using structural analysis.
 
-    This decorator transforms Operator classes to automatically analyze their
-    structure and convert them to optimized XCS graphs for parallel execution.
-    Unlike traditional tracing-based JIT, this approach leverages the operator's
-    inherent structure and composition to build the execution graph without
+    Transforming Operator classes to analyze their structure and convert them 
+    to XCS graphs for parallel execution. This approach uses the operator's
+    structure and composition to build the execution graph without
     requiring a tracing step.
 
     Features:
-    1. Zero-overhead structural analysis using Python's pytree protocol
+    1. Structural analysis using the pytree protocol
     2. Automatic graph construction without execution tracing
-    3. Smart scheduling with adaptive concurrency based on graph properties
-    4. Optimized parallel execution of independent operations
+    3. Adaptive scheduling based on graph properties
+    4. Parallel execution of independent operations
     5. Graph caching for repeated execution
 
     Args:
@@ -687,6 +688,7 @@ def structural_jit(
         The decorated operator class with optimized execution behavior
 
     Example:
+        ```python
         @structural_jit
         class MyOperator(Operator):
             def __init__(self):
@@ -697,6 +699,12 @@ def structural_jit(
                 intermediate = self.op1(inputs=inputs)
                 result = self.op2(inputs=intermediate)
                 return result
+                
+        # Using the optimized operator
+        op = MyOperator()
+        result = op(inputs={"query": "test"})
+        # result contains the processed output
+        ```
     """
 
     def decorator(cls: Type[OperatorType]) -> Type[OperatorType]:
@@ -718,14 +726,14 @@ def structural_jit(
             # Call the original __init__
             original_init(self, *args, **kwargs)
 
-            # Initialize JIT properties
+            # Initializing JIT properties
             self._jit_enabled = True
             self._jit_execution_strategy = execution_strategy
             self._jit_parallel_threshold = parallel_threshold
             self._jit_max_workers = max_workers
             self._jit_cache_graph = cache_graph
 
-            # Pre-analyze operator structure during initialization
+            # Pre-analyzing operator structure during initialization
             # Store the structure graph for later use in graph building
             self._jit_structure_graph = _analyze_operator_structure(self)
 

@@ -217,7 +217,7 @@ def _distribute_inputs(
 
         return distributed
 
-    # Normal code path for production - avoid duplicates
+    # Our normal code path for production - avoiding duplicates
     distributed: Dict[Tuple[int, ...], Dict[str, Any]] = {}
     partition_specs = partition_specs or {}
     mesh_shape: Tuple[int, ...] = mesh.shape

@@ -35,7 +35,7 @@ def initialize_dataset_registry(
     Returns:
         None
     """
-    # Define dataset metadata configurations.
+    # Defining dataset metadata configurations.
     dataset_metadatas: List[DatasetInfo] = [
         DatasetInfo(
             name="truthful_qa",
@@ -63,11 +63,19 @@ def initialize_dataset_registry(
         ),
     ]
 
-    # Register each dataset metadata using explicit keyword arguments.
+    # Registering each dataset metadata using explicit keyword arguments.
     for dataset_info in dataset_metadatas:
-        metadata_registry.register(dataset_info=dataset_info)
+        # The UnifiedDatasetRegistry uses register_new, not register
+        # This compatibility fix checks which method exists and uses the appropriate one
+        if hasattr(metadata_registry, "register"):
+            metadata_registry.register(dataset_info=dataset_info)
+        elif hasattr(metadata_registry, "register_new"):
+            metadata_registry.register_new(
+                name=dataset_info.name,
+                info=dataset_info
+            )
 
-    # Define mapping of dataset names to their corresponding prepper classes.
+    # Defining mapping of dataset names to their corresponding prepper classes.
     prepper_mappings: Dict[str, Type[IDatasetPrepper]] = {
         "truthful_qa": TruthfulQAPrepper,
         "mmlu": MMLUPrepper,
@@ -76,7 +84,7 @@ def initialize_dataset_registry(
         "my_shortanswer_ds": ShortAnswerPrepper,
     }
 
-    # Register each dataset prepper using explicit keyword arguments.
+    # Registering each dataset prepper using explicit keyword arguments.
     for dataset_name, prepper_class in prepper_mappings.items():
         loader_factory.register(dataset_name=dataset_name, prepper_class=prepper_class)
 
