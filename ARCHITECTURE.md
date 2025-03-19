@@ -912,6 +912,6 @@ For more detailed information, consult these resources:
 
 - [Model Registry Documentation](docs/quickstart/model_registry.md)
 - [Operator System Documentation](docs/quickstart/operators.md)
-- [XCS Execution Engine Documentation](docs/advanced/xcs_graphs.md)
-- [Enhanced JIT Documentation](docs/advanced/enhanced_jit.md)
+- [XCS Execution Engine Documentation](docs/xcs/README.md)
+- [Enhanced JIT Documentation](docs/xcs/JIT_OVERVIEW.md)
 - [Example Applications](src/ember/examples)
