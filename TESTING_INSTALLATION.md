@@ -127,9 +127,9 @@ Run the minimal examples to verify the installation:
 # For a PyPI installation
 poetry run python -c "import ember; print(ember.__version__)"
 
-# For a local repository installation
-poetry run python src/ember/examples/basic/minimal_example.py
-poetry run python src/ember/examples/basic/minimal_operator_example.py
+# For a local repository installation, from ember/ember_test (step 1)
+poetry run python ../src/ember/examples/basic/minimal_example.py
+poetry run python ../src/ember/examples/basic/minimal_operator_example.py
 ```
 
 ### 5. Verification Checklist
