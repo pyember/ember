@@ -70,12 +70,6 @@ If you want to develop or contribute to Ember:
    poetry shell
    ```
 
-3. **Setup correct import paths** (optional but recommended):
-   ```bash
-   # Run the setup script to ensure imports work correctly
-   python setup_imports.py
-   ```
-
 ## OS-Specific Installation Notes
 
 ### macOS

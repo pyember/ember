@@ -130,10 +130,7 @@ poetry run python -c "import sys; print(sys.executable)"
 If Python can't find Ember modules:
 
 ```bash
-# Run the setup_imports.py script
-poetry run python setup_imports.py
-
-# Or ensure you're running from the project root
+# Ensure you're running from the project root
 cd /path/to/ember
 poetry run python src/ember/examples/basic/minimal_example.py
 ```
