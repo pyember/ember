@@ -9,6 +9,17 @@ and XLA are to Neural Networks (NN) development. It's a compositional framework 
 execution affordances and graph execution optimization capabilities. It enables users to compose 
 complex NONs, and supports automatic parallelization and optimization of these.
 
+## Documentation & Examples
+
+- [Architecture Overview](ARCHITECTURE.md)
+- [Quick Start Guide](QUICKSTART.md)
+- [Model Registry Guide](docs/quickstart/model_registry.md)
+- [Operators Guide](docs/quickstart/operators.md)
+- [NON Patterns](docs/quickstart/non.md)
+- [Data Processing](docs/quickstart/data.md)
+- [Configuration](docs/quickstart/configuration.md)
+- [Examples Directory](src/ember/examples)
+
 ## Simple Example: `horizontal` inference-time scaling with best-of-N
 
 ```python
@@ -286,17 +297,6 @@ print(f"Accuracy: {results['accuracy']:.2f}")
 print(f"Response Quality: {results['response_quality']:.2f}")
 print(f"Factual Accuracy: {results['factual_accuracy']:.2f}")
 ```
-
-## Documentation & Examples
-
-- [Architecture Overview](ARCHITECTURE.md)
-- [Quick Start Guide](QUICKSTART.md)
-- [Model Registry Guide](docs/quickstart/model_registry.md)
-- [Operators Guide](docs/quickstart/operators.md)
-- [NON Patterns](docs/quickstart/non.md)
-- [Data Processing](docs/quickstart/data.md)
-- [Configuration](docs/quickstart/configuration.md)
-- [Examples Directory](src/ember/examples)
 
 ## License
 
