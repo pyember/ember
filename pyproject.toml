@@ -1,15 +1,16 @@
-[tool.poetry]
+[project]
 name = "ember-ai"
 version = "0.1.0"
 description = "Compositional framework for building and orchestrating Compound AI Systems and Networks of Networks (NONs)."
-authors = ["Jared Quincy Davis <jaredq@cs.stanford.edu>"]
-maintainers = ["Ember Team <team@pyember.org>"]
+authors = [
+    {name = "Jared Quincy Davis", email = "jaredq@cs.stanford.edu"}
+]
+maintainers = [
+    {name = "Ember Team", email = "team@pyember.org"}
+]
 readme = "README.md"
-license = "Apache-2.0"
-repository = "https://github.com/pyember/ember"
-documentation = "https://docs.pyember.org"
-homepage = "https://pyember.org"
-keywords = ["AI", "LLM", "Networks of Networks", "Machine Learning", "Compound AI", "Orchestration", "AI Framework", "LLM Orchestration", "AI System Design"]
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9,<3.13"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -23,120 +24,163 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Operating System :: OS Independent",
 ]
-packages = [
-    { include = "ember", from = "src" },
+keywords = ["AI", "LLM", "Networks of Networks", "Machine Learning", "Compound AI", "Orchestration", "AI Framework", "LLM Orchestration", "AI System Design"]
+dependencies = [
+    # Core dependencies
+    "pandas>=1.0.0,<2.2.0",
+    "numpy>=1.21.0,<1.27.0",
+    "pydantic>=2.7.4",
+    "pydantic-core>=2.18.4",
+    "pydantic-settings>=2.3.0",
+    "PyYAML>=6.0.1",
+    "typing_extensions>=4.12.2",
+    
+    # LLM providers - Core providers
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+    
+    # HTTP and async - Critical core functionality
+    "aiohttp>=3.9.5",
+    "aiosignal>=1.3.1",
+    "httpx>=0.27.0",
+    "requests>=2.32.2",
+    
+    # Data processing
+    "datasets>=2.20.0",
+    
+    # Core utilities - Required for robust operation
+    "tqdm>=4.67.1",
+    "tenacity>=9.0.0",
+    "cachetools>=5.4.0",
+    "dill>=0.3.8",
+    
+    # Basic required dependencies
+    "annotated-types>=0.7.0",
+    "anyio>=4.4.0",
+    "attrs>=23.2.0",
+    "certifi>=2024.6.2",
+    "charset-normalizer>=3.3.2",
+    "packaging>=24.1",
+    "six>=1.16.0",
+    "idna>=3.7",
+    "urllib3>=1.26.19",
+    "sniffio>=1.3.1",
 ]
 
-[tool.poetry.dependencies]
-python = ">=3.9,<3.13"  # Support Python 3.9-3.12
-pandas = ">=1.0.0,<2.2.0"
-numpy = ">=1.21.0,<1.27.0"
-
-# Core dependencies
-pydantic = "^2.7.4"
-pydantic-core = "^2.18.4"
-pydantic-settings = "^2.3.0"
-PyYAML = "^6.0.1"
-typing_extensions = "^4.12.2"
-
-# LLM providers - Core providers are required, not optional
-openai = "^1.57.2"
-anthropic = "^0.40.0"
-google-generativeai = "^0.8.3"
-
-# HTTP and async - Critical core functionality
-aiohttp = "^3.9.5"
-aiosignal = "^1.3.1"
-httpx = "^0.27.0"
-requests = "^2.32.2"
-
-# Data processing - Optional for advanced users
-datasets = {version = "^2.20.0", optional = false}
-scikit-learn = {version = "^1.6.0", optional = true}
-scipy = {version = "^1.13.1", optional = true}
-huggingface-hub = {version = "^0.26.5", optional = true}
-pyarrow = {version = "^16.1.0", optional = true}
-"pyarrow-hotfix" = {version = "^0.6", optional = true}
-
-# Visualization - Optional for users who need it
-matplotlib = {version = "^3.9.1", optional = true}
-prettytable = {version = "^3.12.0", optional = true}
-
-# Core utilities - Required for robust operation
-tqdm = "^4.67.1"
-tenacity = "^9.0.0"
-cachetools = "^5.4.0"
-dill = "^0.3.8"
-
-# Google API dependencies - Only needed for Google provider
-google-ai-generativelanguage = {version = "^0.6.6", optional = true}
-google-api-core = {version = "^2.19.1", optional = true}
-google-api-python-client = {version = "^2.139.0", optional = true}
-google-auth = {version = "^2.32.0", optional = true}
-google-auth-httplib2 = {version = "^0.2.0", optional = true}
-googleapis-common-protos = {version = "^1.63.2", optional = true}
-
-# Basic required dependencies
-annotated-types = "^0.7.0"
-anyio = "^4.4.0"
-attrs = "^23.2.0"
-certifi = "^2024.6.2"
-charset-normalizer = "^3.3.2"
-
-# For dependency resolution, these will be managed by poetry automatically
-packaging = "^24.1"
-six = "^1.16.0"
-idna = "^3.7"
-urllib3 = "^1.26.19"
-sniffio = "^1.3.1"
-
-[tool.poetry.extras]
+[project.optional-dependencies]
 # Main extras groups
-all = ["openai", "anthropic", "google", "data", "viz", "dev", "docs"]
-minimal = ["openai"]  # Minimal viable installation with just OpenAI
+all = [
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.13.1",
+    "huggingface-hub>=0.26.5",
+    "pyarrow>=16.1.0",
+    "pyarrow-hotfix>=0.6",
+    "matplotlib>=3.9.1",
+    "prettytable>=3.12.0",
+    "google-ai-generativelanguage>=0.6.6",
+    "google-api-core>=2.19.1",
+    "google-api-python-client>=2.139.0",
+    "google-auth>=2.32.0",
+    "google-auth-httplib2>=0.2.0",
+    "googleapis-common-protos>=1.63.2",
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.23.4",
+    "parameterized>=0.9.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.99.0",
+    "mutmut>=2.4.4",
+    "tox>=4.11.4",
+    "jupyterlab>=4.0.6",
+    "ipykernel>=6.26.0",
+    "black>=23.12.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.1",
+    "pylint>=3.0.2",
+    "pre-commit>=3.5.0",
+    "ruff>=0.1.6",
+    "sphinx>=7.1.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "nbsphinx>=0.9.3",
+    "myst-parser>=2.0.0",
+    "jupyter",
+    "notebook",
+]
+minimal = ["openai>=1.57.2"]  # Minimal viable installation with just OpenAI
 
 # Provider-specific extras
-openai = ["openai"]
-anthropic = ["anthropic"]
-google = ["google-generativeai", "google-ai-generativelanguage", "google-api-core", "google-api-python-client", "google-auth", "google-auth-httplib2", "googleapis-common-protos"]
-allproviders = ["openai", "anthropic", "google"]
+openai = ["openai>=1.57.2"]
+anthropic = ["anthropic>=0.40.0"]
+google = [
+    "google-generativeai>=0.8.3",
+    "google-ai-generativelanguage>=0.6.6",
+    "google-api-core>=2.19.1",
+    "google-api-python-client>=2.139.0",
+    "google-auth>=2.32.0",
+    "google-auth-httplib2>=0.2.0",
+    "googleapis-common-protos>=1.63.2",
+]
+allproviders = [
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+]
 
 # Feature-specific extras
-data = ["datasets", "scikit-learn", "scipy", "huggingface-hub", "pyarrow", "pyarrow-hotfix"]
-viz = ["matplotlib", "prettytable"]
+data = [
+    "datasets>=2.20.0",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.13.1",
+    "huggingface-hub>=0.26.5",
+    "pyarrow>=16.1.0",
+    "pyarrow-hotfix>=0.6",
+]
+viz = [
+    "matplotlib>=3.9.1",
+    "prettytable>=3.12.0",
+]
 
 # Developer extras
-dev = ["pytest", "pytest-asyncio", "parameterized", "jupyterlab", "ipykernel", "pytest-cov", "hypothesis", "mutmut", "tox", "black", "isort", "mypy", "pylint", "pre-commit", "ruff"]
-docs = ["sphinx", "sphinx-rtd-theme", "nbsphinx", "myst-parser", "jupyter", "notebook"]
+dev = [
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.23.4",
+    "parameterized>=0.9.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.99.0",
+    "mutmut>=2.4.4",
+    "tox>=4.11.4",
+    "jupyterlab>=4.0.6",
+    "ipykernel>=6.26.0",
+    "black>=23.12.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.1",
+    "pylint>=3.0.2",
+    "pre-commit>=3.5.0",
+    "ruff>=0.1.6",
+]
+docs = [
+    "sphinx>=7.1.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "nbsphinx>=0.9.3",
+    "myst-parser>=2.0.0",
+    "jupyter",
+    "notebook",
+]
 
-[tool.poetry.group.dev.dependencies]
-# Testing
-pytest = "8.3.2"
-pytest-asyncio = "^0.23.4"
-parameterized = "0.9.0"
-pytest-cov = "4.1.0"
-hypothesis = "6.99.0"
-mutmut = "2.4.4"
-tox = "4.11.4"
+[project.urls]
+repository = "https://github.com/pyember/ember"
+documentation = "https://docs.pyember.org"
+homepage = "https://pyember.org"
 
-# Development environment
-jupyterlab = "4.0.6"
-ipykernel = "6.26.0"
-black = "^23.12.0"
-isort = "^5.12.0"
-mypy = "^1.7.1"
-pylint = "^3.0.2"
-pre-commit = "^3.5.0"
-ruff = "^0.1.6"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx = "^7.1.0"
-sphinx-rtd-theme = "^1.3.0"
-nbsphinx = "^0.9.3"
-myst-parser = "^2.0.0"
+[project.entry-points."ember.dataset_preppers"]
+truthful_qa = "ember.core.utils.data.datasets_registry.truthful_qa:TruthfulQAPrepper"
+short_answer = "ember.core.utils.data.datasets_registry.short_answer:ShortAnswerPrepper"
+commonsense_qa = "ember.core.utils.data.datasets_registry.commonsense_qa:CommonsenseQAPrepper"
+halueval = "ember.core.utils.data.datasets_registry.halueval:HaluEvalPrepper"
+mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
 
 [tool.pytest.ini_options]
 pythonpath = [
@@ -200,20 +244,13 @@ select = ["E", "F", "B", "I"]
 ignore = []
 
 [build-system]
-requires = ["poetry-core>=1.5.0"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.plugins."ember.dataset_preppers"]
-truthful_qa = "ember.core.utils.data.datasets_registry.truthful_qa:TruthfulQAPrepper"
-short_answer = "ember.core.utils.data.datasets_registry.short_answer:ShortAnswerPrepper"
-commonsense_qa = "ember.core.utils.data.datasets_registry.commonsense_qa:CommonsenseQAPrepper"
-halueval = "ember.core.utils.data.datasets_registry.halueval:HaluEvalPrepper"
-mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 packages = ["ember"]
 
 # CLI is being developed separately and is currently excluded
-# [tool.poetry.scripts]
+# [project.scripts]
 # ember = "ember.cli:main"

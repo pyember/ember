@@ -1,39 +1,52 @@
 # Ember Environment Management Guide
 
-This guide explains how to effectively manage Python environments when working with Ember, especially focusing on Poetry's virtual environment capabilities.
+This guide explains how to effectively manage Python environments when working with Ember using uv.
 
-## Understanding Poetry's Environment Management
+## Python Environment Management with uv
 
-Poetry automatically creates and manages isolated virtual environments for your projects, providing several benefits:
+uv provides simplified Python environment management with these benefits:
 
-- **Dependency Isolation**: Prevent conflicts between project dependencies
-- **Reproducible Environments**: Ensure consistent behavior across development setups
-- **Clean Environment Management**: Automated creation and activation of virtual environments
+- **Dependency Isolation**: Prevents conflicts between project dependencies
+- **Reproducible Environments**: Ensures consistent behavior across development setups
+- **Simplified Workflow**: Reduces the need for explicit environment activation
 
 ## Environment Management Approaches
 
-### 1. Using Poetry's Built-in Environment Management (Recommended)
+### 1. Using uv's Simplified Environment Management (Recommended)
 
-Poetry creates and manages virtual environments automatically:
+The simplest approach is to use uv's `run` command, which handles environments automatically:
 
 ```bash
-# Install Ember with Poetry (creates the environment automatically)
+# Install Ember
 cd ember
-poetry install
+uv pip install -e "."
 
-# Enter the virtual environment
-# For Poetry 2.0+
-poetry env use python3
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Run Python code without explicit environment activation
+uv run python src/ember/examples/basic/minimal_example.py
 
-# For Poetry 1.x
-poetry shell
-
-# Run commands within the environment without activation
-poetry run python src/ember/examples/basic/minimal_example.py
+# Run tools without explicit environment activation
+uv run pytest
 ```
 
-### 2. Using External Virtual Environment Tools
+### 2. Traditional Virtual Environment Workflow
+
+If you prefer a more traditional virtual environment workflow:
+
+```bash
+# Create a virtual environment in the project directory
+uv venv
+
+# Activate the environment (still required for interactive use)
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install Ember in the active environment
+uv pip install -e "."
+
+# Run code in the activated environment
+python src/ember/examples/basic/minimal_example.py
+```
+
+### 3. Using Other Virtual Environment Tools
 
 If you prefer using other environment managers:
 
@@ -42,87 +55,70 @@ If you prefer using other environment managers:
 python -m venv ember_env
 source ember_env/bin/activate  # On Windows: ember_env\Scripts\activate
 
-# Install with pip in this environment
-pip install -e .
-
-# Or use Poetry with an existing environment
-poetry config virtualenvs.create false  # Tell Poetry to use the current environment
-poetry install
+# Install with uv in this environment
+uv pip install -e "."
 ```
 
 ## Environment Management Best Practices
 
-1. **Always use virtual environments** - Never install Ember in your global Python environment
-2. **Let Poetry handle environments when possible** - It manages dependency resolution better
-3. **For interactive work**:
-   - **Poetry 2.0+**: Use `poetry env use python3` followed by `source .venv/bin/activate`
-   - **Poetry 1.x**: Use `poetry shell` which creates a subshell with the environment activated
-4. **Use `poetry run` for single commands** - Runs a command in the environment without activation
-5. **Be aware of Poetry's environment location** - By default, it's in `{cache-dir}/virtualenvs/` or in a local `.venv` directory
+1. **Always use isolated environments** - Never install Ember in your global Python environment
+2. **For simple usage, use `uv run`** - This handles environment management automatically
+3. **For interactive shell work:**
+   - Create a virtual environment with `uv venv`
+   - Activate it with `source .venv/bin/activate`
+4. **For running tools directly** - Use `uvx` which runs tools in isolated environments:
+   ```bash
+   uvx black src tests
+   uvx mypy src
+   ```
 
 ## Common Environment Commands
 
 ```bash
-# See where Poetry stores your virtual environments
-poetry config virtualenvs.path
+# Create a virtual environment in the current directory
+uv venv
 
-# Create a new Poetry environment
-poetry env use python3.11
+# Create a virtual environment with a specific Python version
+uv venv --python=3.11
 
-# List Poetry environments
-poetry env list
+# Install packages
+uv pip install -e "."
+uv pip install -e ".[dev]"  # With development extras
 
-# Show information about the current environment
-poetry env info
+# Run in an isolated environment
+uv run python script.py
+uv run pytest tests/
+```
 
-# Remove a Poetry environment
-poetry env remove <environment-name>
+## Python Version Management
+
+uv can also manage Python versions:
+
+```bash
+# Install Python versions
+uv python install 3.10 3.11 3.12
+
+# Use a specific Python version
+uv venv --python 3.11
+uv run --python 3.11 -- python script.py
+
+# Pin a Python version for a project
+uv python pin 3.11  # Creates .python-version
 ```
 
 ## Troubleshooting
 
-### Poetry Can't Find Python Version
+### Python Version Issues
 
 ```bash
-# Check available Python versions
-poetry env use --help
+# Check Python version
+python --version
 
-# Specify a specific Python executable
-poetry env use /path/to/python
+# Specify a Python version for a virtual environment
+uv venv --python 3.11
 
-# Install additional Python version
-# macOS: brew install python@3.11
-# Linux: apt install python3.11 (or use pyenv)
-```
-
-### Environment Activation Issues
-
-#### Poetry 2.0+ Environments
-
-In Poetry 2.0+, the `shell` command is not installed by default. Instead, use:
-
-```bash
-# Set up the environment with your Python interpreter
-poetry env use python3
-
-# Activate the environment directly (recommended)
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Or get the activation command from Poetry
-source $(poetry env info --path)/bin/activate
-
-# Check that you're in the correct environment
-which python  # Should point to the Poetry environment
-```
-
-#### If `poetry shell` Fails in Poetry 1.x:
-
-```bash
-# Alternative 1: Manually activate
-source $(poetry env info --path)/bin/activate
-
-# Alternative 2: Always use poetry run
-poetry run python -c "import sys; print(sys.executable)"
+# Install a specific Python version with uv
+uv python install 3.11
 ```
 
 ### Path Issues
@@ -132,5 +128,17 @@ If Python can't find Ember modules:
 ```bash
 # Ensure you're running from the project root
 cd /path/to/ember
-poetry run python src/ember/examples/basic/minimal_example.py
+uv run python src/ember/examples/basic/minimal_example.py
+```
+
+### Dependency Resolution Issues
+
+If you encounter dependency conflicts:
+
+```bash
+# Use cached resolution if available
+uv pip install -e "." --cache-only
+
+# Force re-resolution
+uv pip install -e "." --no-cache
 ```

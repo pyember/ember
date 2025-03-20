@@ -11,7 +11,11 @@ This directory contains examples demonstrating how to integrate Ember with other
 To run any example, use the following command format:
 
 ```bash
-poetry run python src/ember/examples/integration/example_name.py
+# Using uv (recommended)
+uv run python src/ember/examples/integration/example_name.py
+
+# Or if in an activated virtual environment
+python src/ember/examples/integration/example_name.py
 ```
 
 Replace `example_name.py` with the desired example file.

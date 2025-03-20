@@ -5,23 +5,19 @@ This guide will help you quickly get started with Ember, the compositional frame
 ## Installation
 
 ```bash
-# Clone the repository
+# Quick install with uv (recommended)
+uv pip install ember-ai
+
+# Or from source
 git clone https://github.com/pyember/ember.git
 cd ember
+uv pip install -e ".[dev]"  # Install with development dependencies
 
-# Install using Poetry (creates a virtual environment automatically)
-poetry install
+# Run examples directly with uv
+uv run python src/ember/examples/basic/minimal_example.py
 
-# Activate the Poetry-managed virtual environment
-# For Poetry 2.0+
-poetry env use python3
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# For Poetry 1.x
-poetry shell
-
-# Or run commands directly within the environment without activation
-poetry run python src/ember/examples/basic/minimal_example.py
+# For CLI tools, you can run directly without installation
+uvx ember-ai <arguments>  # If you have CLI commands
 ```
 
 For detailed installation instructions including troubleshooting, please see:

@@ -49,16 +49,19 @@ Located in `helpers/` directory. These provide standardized test data and config
 
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run unit tests only
-poetry run pytest tests/unit
+uv run pytest tests/unit
 
 # Run integration tests only (requires RUN_INTEGRATION_TESTS=1)
-RUN_INTEGRATION_TESTS=1 poetry run pytest tests/integration
+RUN_INTEGRATION_TESTS=1 uv run pytest tests/integration
 
 # Run with coverage
-poetry run pytest --cov=src/ember
+uv run pytest --cov=src/ember
+
+# Or using uvx shorthand for running tools directly
+uvx pytest tests/unit
 ```
 
 ## Integration Testing
