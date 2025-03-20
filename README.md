@@ -22,15 +22,15 @@ Jared Quincy Davis<sup>F,S</sup>, Marquita Ellis<sup>I</sup>, Diana Arroyo<sup>I
 </p>
 
 <p align="center" style="display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 20px;">
-  <img src="docs/assets/logos/foundry-logo.avif" alt="Foundry" height="80" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/databricks-logo.png" alt="Databricks" height="40" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/ibm-logo.svg" alt="IBM" height="40" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/stanford-logo.png" alt="Stanford" height="80" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/berkeley-logo.png" alt="Berkeley" height="80" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/nvidia-log.png" alt="NVIDIA" height="80" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/anyscale-logo.png" alt="Anyscale" height="20" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/google-logo.png" alt="Google" height="80" style="margin: 0 15px;"/>
-  <img src="docs/assets/logos/princeton-logo.png" alt="Princeton" height="40" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/foundry-logo.avif" alt="Foundry" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/databricks-logo.png" alt="Databricks" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/ibm-logo.svg" alt="IBM" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/stanford-logo.png" alt="Stanford" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/berkeley-logo.png" alt="Berkeley" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/nvidia-log.png" alt="NVIDIA" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/anyscale-logo.png" alt="Anyscale" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/google-logo.png" alt="Google" height="50" style="margin: 0 15px;"/>
+  <img src="docs/assets/logos/princeton-logo.png" alt="Princeton" height="50" style="margin: 0 15px;"/>
 </p>
 
 # <span style="color:#0366d6;">Ember</span>: A Compositional Framework for Compound AI Systems
