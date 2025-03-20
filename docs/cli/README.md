@@ -8,7 +8,7 @@ The Ember CLI is a powerful command-line interface for interacting with the Embe
 
 - Node.js 16.0 or higher
 - Python 3.11 or higher
-- Ember AI package installed (`poetry add ember-ai`)
+- Ember AI package installed (`uv pip install ember-ai`)
 
 ### Installing the CLI
 
@@ -391,7 +391,7 @@ $ ember project new my-ember-app --template complete
 
 To get started, run:
   cd my-ember-app
-  poetry install
+  uv pip install -e "."
 
 💡 Tip: Set up your API keys as environment variables or configure them with ember provider configure <provider>
 
@@ -480,7 +480,7 @@ The Ember CLI is designed to be extensible. You can create plugins and extension
 
 1. **Python Bridge Errors**
    - Ensure Python 3.11+ is installed and in your PATH
-   - Verify Ember AI is installed (`poetry show ember-ai`)
+   - Verify Ember AI is installed (`uv pip list | grep ember-ai`)
 
 2. **API Key Issues**
    - Check provider configuration (`ember config list`)

@@ -6,47 +6,48 @@ This guide provides detailed instructions for installing Ember in different envi
 
 - **Python**: 3.9 or newer (3.10, 3.11, and 3.12 supported)
 - **Operating System**: macOS, Linux, or Windows
-- **Package Manager**: Poetry 1.5.0 or newer
 
 ## Installation Methods
 
-### Method 1: Using Poetry (Recommended)
+### Method 1: Using uv (Recommended)
 
-Poetry is the recommended package manager for Ember. It automatically creates isolated environments and manages dependencies.
+uv is the recommended package manager for Ember. It is extremely fast (10-100x faster than pip) and simplifies Python environment management.
 
-1. **Install Poetry** if you don't have it already:
+1. **Install uv** if you don't have it already:
    ```bash
-   curl -sSL https://install.python-poetry.org | python3 -
-   ```
-
-   After installation, make sure Poetry is in your PATH:
-   ```bash
-   # Add Poetry to your PATH (add this to your .bashrc or .zshrc for persistence)
-   export PATH="$HOME/.local/bin:$PATH"
+   # On macOS and Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # On Windows
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   
+   # Or with pip if you prefer
+   pip install uv
    
    # Verify the installation
-   poetry --version
+   uv --version
    ```
 
-2. **Clone and install Ember**:
+2. **Install Ember from PyPI**:
+   ```bash
+   # Install Ember directly (creates a virtual environment automatically if needed)
+   uv pip install ember-ai
+   
+   # Run examples without activating an environment
+   uv run python -c "import ember; print(ember.__version__)"
+   ```
+
+3. **Install from source**:
    ```bash
    # Clone the repository
    git clone https://github.com/pyember/ember.git
    cd ember
    
-   # Install with Poetry (creates a virtual environment automatically)
-   poetry install
+   # Install in development mode (editable installation)
+   uv pip install -e "."
    
-   # Activate the Poetry-managed virtual environment
-   # For Poetry 2.0+
-   poetry env use python3
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   
-   # For Poetry 1.x
-   poetry shell
-   
-   # Alternatively, run commands directly within the environment
-   poetry run python src/ember/examples/basic/minimal_example.py
+   # Run examples directly without environment activation
+   uv run python src/ember/examples/basic/minimal_example.py
    ```
    
    By default, this installs Ember with OpenAI, Anthropic, and Google/Deepmind provider support.
@@ -64,10 +65,18 @@ If you want to develop or contribute to Ember:
 2. **Install with development dependencies**:
    ```bash
    # Install including development dependencies
-   poetry install --with dev
+   uv pip install -e ".[dev]"
    
-   # Activate the Poetry environment
-   poetry shell
+   # Run commands directly with uv
+   uv run pytest
+   ```
+
+3. **Running tools**:
+   ```bash
+   # Run linters, formatters, and other tools without installation
+   uvx black src tests
+   uvx mypy src
+   uvx pytest
    ```
 
 ## OS-Specific Installation Notes
@@ -77,12 +86,13 @@ If you want to develop or contribute to Ember:
 On macOS, you might encounter issues with the default Python installation:
 
 ```bash
-# If you get a "cannot create venvs without using symlinks" error:
+# If you encounter Python-related errors:
 # Install Python using Homebrew (recommended)
 brew install python@3.11
 
-# Use the Homebrew Python with Poetry
-poetry env use $(brew --prefix python@3.11)/bin/python3.11
+# Use the Homebrew Python with uv
+/opt/homebrew/bin/python3.11 -m pip install uv
+/opt/homebrew/bin/python3.11 -m uv pip install -e "."
 ```
 
 ### Windows
@@ -90,11 +100,12 @@ poetry env use $(brew --prefix python@3.11)/bin/python3.11
 On Windows, ensure you have the latest Python installed from python.org:
 
 ```powershell
-# Add Poetry to your PATH
-$env:PATH += ";$env:USERPROFILE\.poetry\bin"
+# Add uv to your PATH if needed
+$env:PATH += ";$env:USERPROFILE\.uv\bin"
 
-# Use PowerShell for activation
-poetry shell
+# Install and run directly
+uv pip install -e "."
+uv run python src/ember/examples/basic/minimal_example.py
 ```
 
 ## Troubleshooting
@@ -107,25 +118,27 @@ If you encounter Python version errors:
 # Check your Python version
 python --version
 
-# If using the wrong version, specify the correct Python for Poetry
-poetry env use python3.11
-# Or specify the exact path
-poetry env use /path/to/python3.11
+# Specify a Python version for uv
+uv venv --python=3.11
+source .venv/bin/activate
+
+# Or run with a specific Python version
+uv run --python=3.11 -- python script.py
 ```
 
-### Poetry Installation Issues
+### uv Installation Issues
 
-If you have problems with Poetry:
+If you have problems with uv:
 
 ```bash
-# Ensure Poetry is in your PATH
-echo $PATH
+# Ensure uv is in your PATH
+which uv
 
-# Upgrade Poetry
-poetry self update
+# Update uv to the latest version
+uv self update
 
-# Clear Poetry's cache
-poetry cache clear pypi --all
+# Reinstall uv if needed
+pip install --upgrade uv
 ```
 
 ### Virtual Environment Issues
@@ -133,11 +146,11 @@ poetry cache clear pypi --all
 If you have problems with virtual environments:
 
 ```bash
-# See what environment Poetry is using
-poetry env info
+# Create a fresh virtual environment
+uv venv --force
 
-# Create a new environment with a specific Python version
-poetry env use python3.11
+# Activate the environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
 See [ENVIRONMENT_MANAGEMENT.md](ENVIRONMENT_MANAGEMENT.md) for more details on managing environments.
@@ -147,11 +160,12 @@ See [ENVIRONMENT_MANAGEMENT.md](ENVIRONMENT_MANAGEMENT.md) for more details on m
 If you encounter dependency conflicts:
 
 ```bash
-# Update Poetry lock file
-poetry lock --no-update
+# Try reinstalling without using cache
+uv pip install -e "." --no-cache
 
-# Install with verbose output
-poetry install -v
+# Install with specific package versions if needed
+uv pip install -e "." --no-deps
+uv pip install "specific-package==version"
 ```
 
 ## Testing Your Installation
@@ -159,10 +173,10 @@ poetry install -v
 After installation, verify everything is working:
 
 ```bash
-# From the project root directory, using the Poetry environment
-poetry run python src/ember/examples/basic/minimal_example.py
+# From the project root directory, using uv
+uv run python src/ember/examples/basic/minimal_example.py
 
-# Or if you're in a Poetry shell
+# Or if you're in an activated virtual environment
 python src/ember/examples/basic/minimal_example.py
 ```
 

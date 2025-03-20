@@ -8,10 +8,13 @@ If you're new to Ember, start with the basic examples that demonstrate core conc
 
 ```bash
 # Run a minimal example
-poetry run python src/ember/examples/basic/minimal_example.py
+uv run python src/ember/examples/basic/minimal_example.py
 
 # Try a simple model example
-poetry run python src/ember/examples/models/model_registry_example.py
+uv run python src/ember/examples/models/model_registry_example.py
+
+# Or using the uvx shorthand for running tools
+uvx pytest tests/unit/  # Run unit tests
 ```
 
 ## Directory Structure

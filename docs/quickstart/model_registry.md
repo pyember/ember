@@ -9,8 +9,8 @@ This quickstart guide will help you integrate LLM models into your project using
 git clone https://github.com/pyember/ember.git
 cd ember
 
-# Install using Poetry
-poetry install
+# Install using uv
+uv pip install -e "."
 ```
 
 ## 2. API Key Setup

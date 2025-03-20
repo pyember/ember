@@ -57,7 +57,7 @@ registry/
 1. **Install Dependencies**
 
    ```bash
-   poetry install
+   uv pip install -e "."
    ```
 
 2. **Set Environment Variables**  

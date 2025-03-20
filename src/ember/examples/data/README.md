@@ -13,7 +13,11 @@ This directory contains examples demonstrating Ember's data handling capabilitie
 To run any example, use the following command format:
 
 ```bash
-poetry run python src/ember/examples/data/example_name.py
+# Using uv (recommended)
+uv run python src/ember/examples/data/example_name.py
+
+# Or if in an activated virtual environment
+python src/ember/examples/data/example_name.py
 ```
 
 Replace `example_name.py` with the desired example file.

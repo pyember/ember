@@ -173,23 +173,22 @@ print(f"Confidence: {result.confidence:.2f}")
 ## Installation
 
 ```bash
-# Install using pip
-pip install ember-ai
+# Quick install using uv (recommended)
+uv pip install ember-ai
 
-# Or from source with Poetry
+# Run directly without installing (fastest)
+uvx ember-ai  # If you have a CLI command
+
+# Or from source
 git clone https://github.com/pyember/ember.git
 cd ember
-poetry install
+uv pip install -e ".[dev]"
 
-# Activate the virtual environment (Poetry 2.0+)
-poetry env use python3
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+# Run examples directly with uv
+uv run python src/ember/examples/basic/minimal_example.py
 
-# Or for Poetry 1.x
-poetry shell
-
-# Alternatively, run commands directly in the environment
-poetry run python src/ember/examples/basic/minimal_example.py
+# Or install using pip (alternative)
+pip install ember-ai
 ```
 
 ## Model Registry & Provider Integration

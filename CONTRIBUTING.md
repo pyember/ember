@@ -34,27 +34,40 @@ Thank you for your interest in contributing to Ember! This document provides gui
    cd ember
    ```
 
-2. **Set up Poetry (recommended)**:
-   We use Poetry for dependency management. [Install Poetry](https://python-poetry.org/docs/#installation) if you haven't already.
+2. **Install uv (recommended)**:
+   We use uv for dependency management. [Install uv](https://github.com/astral-sh/uv) if you haven't already:
+   ```bash
+   # On macOS and Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # On Windows
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   
+   # Or with pip
+   pip install uv
+   ```
 
 3. **Install dependencies**:
    ```bash
    # Install with all development dependencies
-   poetry install --with dev
+   uv pip install -e ".[dev]"
    ```
 
-4. **Activate the virtual environment**:
+4. **Working with the environment**:
    ```bash
-   # For Poetry 2.0+
-   poetry env use python3
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   # Option 1: Run commands directly (recommended)
+   uv run pytest
+   uv run python src/ember/examples/basic/minimal_example.py
    
-   # For Poetry 1.x
-   poetry shell
+   # Option 2: Create and activate a virtual environment
+   uv venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 5. **Set up pre-commit hooks** (recommended):
    ```bash
+   uv run pre-commit install
+   # Or if you've activated a virtual environment:
    pre-commit install
    ```
 
@@ -123,7 +136,7 @@ ember/
 │   │   └── xcs/        # XCS unit tests
 │   └── fuzzing/        # Fuzzing tests
 ├── pyproject.toml      # Python project configuration
-├── poetry.lock         # Poetry dependencies lock file
+├── poetry.lock         # Dependencies lock file (we're transitioning to uv)
 ├── pytest.ini          # Pytest configuration
 ├── mypy.ini            # Type checking configuration
 └── README.md           # Project overview
@@ -137,16 +150,16 @@ We use pytest for testing. To run the test suite:
 
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run specific tests
-poetry run pytest tests/unit/core
+uv run pytest tests/unit/core
 
 # Run tests with code coverage
-poetry run pytest --cov=src/ember
+uv run pytest --cov=src/ember
 
 # Run a specific test file
-poetry run pytest tests/unit/core/test_app_context.py
+uv run pytest tests/unit/core/test_app_context.py
 ```
 
 ### Code Style and Quality
@@ -156,20 +169,20 @@ We enforce high code quality standards:
 1. **Code Formatting**:
    - We use Black for code formatting
    - Line length is set to 88 characters
-   - Run `poetry run black src tests` before committing
+   - Run `uvx black src tests` before committing
 
 2. **Import Sorting**:
    - We use isort for import sorting
-   - Run `poetry run isort src tests` before committing
+   - Run `uvx isort src tests` before committing
 
 3. **Linting**:
    - We use ruff and pylint for linting
-   - Run `poetry run ruff check src tests` before committing
-   - Run `poetry run pylint src/ember` for more detailed linting
+   - Run `uvx ruff check src tests` before committing
+   - Run `uvx pylint src/ember` for more detailed linting
 
 4. **Type Checking**:
    - We use mypy for static type checking
-   - Run `poetry run mypy src` before committing
+   - Run `uvx mypy src` before committing
 
 All these checks are also performed automatically when you submit a pull request.
 
