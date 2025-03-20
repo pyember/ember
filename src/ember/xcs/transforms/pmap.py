@@ -6,9 +6,9 @@ operations concurrently across multiple devices or cores, adapted for XCS's
 execution model.
 """
 
-import os
-import multiprocessing
 import logging
+import multiprocessing
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
 from typing import (
@@ -17,9 +17,9 @@ from typing import (
     Dict,
     List,
     Optional,
-    Union,
     Protocol,
     TypeVar,
+    Union,
     runtime_checkable,
 )
 

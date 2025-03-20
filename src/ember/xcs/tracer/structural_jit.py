@@ -26,13 +26,13 @@ Example:
         def __init__(self):
             self.op1 = SubOperator1()
             self.op2 = SubOperator2()
-            
+
         def forward(self, *, inputs):
             # Multi-step computation
             intermediate = self.op1(inputs=inputs)
             result = self.op2(inputs=intermediate)
             return result
-            
+
     # Using the optimized operator
     op = MyCompositeOperator()
     result = op(inputs={"text": "example"})
@@ -44,8 +44,8 @@ from __future__ import annotations
 
 import functools
 import inspect
-import time
 import logging
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import (
@@ -54,25 +54,26 @@ from typing import (
     Dict,
     List,
     Optional,
+    Protocol,
     Set,
     Tuple,
     Type,
     TypeVar,
     Union,
     cast,
-    Protocol,
     runtime_checkable,
 )
 
-# Import XCS components
-from ember.xcs.graph.xcs_graph import XCSGraph, XCSNode
 from ember.xcs.engine.xcs_engine import (
+    IScheduler,
+    TopologicalSchedulerWithParallelDispatch,
     compile_graph,
     execute_graph,
-    TopologicalSchedulerWithParallelDispatch,
-    IScheduler,
 )
 from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
+
+# Import XCS components
+from ember.xcs.graph.xcs_graph import XCSGraph, XCSNode
 
 # Logger for this module
 logger = logging.getLogger(__name__)

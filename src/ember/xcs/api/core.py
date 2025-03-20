@@ -10,20 +10,20 @@ This module serves as the entry point for using XCS capabilities.
 Example:
     ```python
     from ember.xcs.api.core import XCSAPI
-    
+
     # Creating an API instance
     xcs = XCSAPI()
-    
+
     # Using the API to apply JIT optimization
     @xcs.jit(options={"sample_input": {"query": "test"}})
     class MyOperator(Operator):
         def forward(self, *, inputs):
             return {"result": process(inputs["query"])}
-            
+
     # Executing an operator with tracing
     with xcs.tracing() as tracer:
         result = my_op(inputs={"query": "example"})
-        
+
     # Building and executing a graph
     graph = xcs.autograph(tracer.records)
     final_result = xcs.execute(graph, inputs={"query": "test"})
@@ -35,27 +35,28 @@ from __future__ import annotations
 import functools
 import inspect
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, cast, Union
+from typing import Any, Callable, Dict, List, Optional, Type, TypeVar, Union, cast
 
 from ember.xcs.api.types import (
-    XCSExecutionOptions,
     ExecutionResult,
     JITOptions,
     TransformOptions,
+    XCSExecutionOptions,
 )
-from ember.xcs.tracer.tracer_decorator import jit as raw_jit
-from ember.xcs.tracer.autograph import AutoGraphBuilder
-from ember.xcs.engine.xcs_engine import execute_graph
 from ember.xcs.engine.execution_options import ExecutionOptions, execution_options
-from ember.xcs.transforms.vmap import vmap as raw_vmap
-from ember.xcs.transforms.pmap import pmap as raw_pmap, pjit as raw_pjit
+from ember.xcs.engine.xcs_engine import execute_graph
+from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.tracer.autograph import AutoGraphBuilder
+from ember.xcs.tracer.tracer_decorator import jit as raw_jit
+from ember.xcs.tracer.xcs_tracing import TraceRecord
 from ember.xcs.transforms.mesh import (
     DeviceMesh,
     PartitionSpec,
-    mesh_sharded as raw_mesh_sharded,
 )
-from ember.xcs.graph.xcs_graph import XCSGraph
-from ember.xcs.tracer.xcs_tracing import TraceRecord
+from ember.xcs.transforms.mesh import mesh_sharded as raw_mesh_sharded
+from ember.xcs.transforms.pmap import pjit as raw_pjit
+from ember.xcs.transforms.pmap import pmap as raw_pmap
+from ember.xcs.transforms.vmap import vmap as raw_vmap
 
 # Type variable for operators
 T = TypeVar("T")

@@ -1,8 +1,8 @@
 """
 XCS: Accelerated Compound Systems Execution Engine
 
-Providing a high-performance distributed execution framework for 
-computational graphs. Implementing a directed acyclic graph (DAG) architecture 
+Providing a high-performance distributed execution framework for
+computational graphs. Implementing a directed acyclic graph (DAG) architecture
 for operator composition, intelligent scheduling, and just-in-time tracing.
 
 Key components:
@@ -17,48 +17,49 @@ to the underlying XCS functionality while abstracting away implementation detail
 Example:
     ```python
     from ember.xcs import jit, vmap, autograph, execute
-    
+
     # Defining a JIT-optimized operator
     @jit
     class MyOperator(Operator):
         def forward(self, *, inputs):
             return {"result": process_data(inputs["data"])}
-    
+
     # Creating a vectorized version for batch processing
     batch_op = vmap(MyOperator())
-    
+
     # Processing multiple inputs in parallel
     results = batch_op(inputs={"data": ["item1", "item2", "item3"]})
     # results == {"result": [processed1, processed2, processed3]}
-    
+
     # Building and executing a computation graph
     with autograph() as graph:
         x = op1(inputs={"query": "example"})
         y = op2(inputs=x)
-    
+
     # Executing the graph with parallel scheduling
     results = execute(graph)
     ```
 """
 
+import functools
+import sys
+import warnings
+from contextlib import contextmanager
+from types import ModuleType
 from typing import (
     Any,
     Callable,
     Dict,
     List,
     Optional,
+    Protocol,
     Tuple,
     TypeVar,
     Union,
     cast,
     overload,
+    runtime_checkable,
 )
-from typing import Protocol, runtime_checkable
-from contextlib import contextmanager
-import functools
-import sys
-import warnings
-from types import ModuleType
 
 # Type variables for generic function signatures
 T = TypeVar("T")
@@ -163,13 +164,13 @@ try:
 
     spec = importlib.util.find_spec("ember.xcs.engine.xcs_engine")
     if spec is not None:
-        from .engine.xcs_engine import execute_graph as _execute
+        from .engine.execution_options import ExecutionOptions as _ExecutionOptions
         from .engine.xcs_engine import (
+            IScheduler,
             TopologicalScheduler,
             TopologicalSchedulerWithParallelDispatch,
-            IScheduler,
         )
-        from .engine.execution_options import ExecutionOptions as _ExecutionOptions
+        from .engine.xcs_engine import execute_graph as _execute
 
         import_results["engine"] = True
     else:
@@ -223,11 +224,11 @@ try:
 
     spec = importlib.util.find_spec("ember.xcs.tracer.tracer_decorator")
     if spec is not None:
-        from .tracer.tracer_decorator import jit as _jit
         from .tracer import autograph as _autograph
-        from .tracer.xcs_tracing import TracerContext, TraceRecord
         from .tracer._context_types import TraceContextData
         from .tracer.autograph import AutoGraphBuilder
+        from .tracer.tracer_decorator import jit as _jit
+        from .tracer.xcs_tracing import TracerContext, TraceRecord
 
         # Try to import structural JIT if available
         try:
@@ -309,10 +310,10 @@ except ImportError as e:
 
 # XCS Transforms imports
 try:
-    from .transforms.vmap import vmap as _vmap
-    from .transforms.pmap import pmap as _pmap
-    from .transforms.mesh import mesh_sharded as _mesh_sharded
     from .transforms.mesh import DeviceMesh, PartitionSpec
+    from .transforms.mesh import mesh_sharded as _mesh_sharded
+    from .transforms.pmap import pmap as _pmap
+    from .transforms.vmap import vmap as _vmap
 
     import_results["transforms"] = True
 except ImportError as e:
@@ -397,10 +398,10 @@ try:
     spec = importlib.util.find_spec("ember.xcs.api.types")
     if spec is not None:
         from .api.types import (
-            XCSExecutionOptions,
+            ExecutionResult,
             JITOptions,
             TransformOptions,
-            ExecutionResult,
+            XCSExecutionOptions,
         )
 
         import_results["api"] = True

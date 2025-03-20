@@ -1,12 +1,12 @@
+# Export the autograph context manager for public API
+from contextlib import contextmanager
+
+from ._context_types import TraceContextData
+from .autograph import AutoGraphBuilder
 from .xcs_tracing import (
     TracerContext,
     TraceRecord,
 )
-from ._context_types import TraceContextData
-from .autograph import AutoGraphBuilder
-
-# Export the autograph context manager for public API
-from contextlib import contextmanager
 
 
 @contextmanager

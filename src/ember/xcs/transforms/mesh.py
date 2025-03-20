@@ -5,10 +5,10 @@ computation within XCS. It provides mechanisms for partitioning data and
 distributing computations across an N-dimensional grid of devices.
 """
 
-import os
-import multiprocessing
 import itertools
 import logging
+import multiprocessing
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import wraps
 from typing import (
@@ -17,9 +17,9 @@ from typing import (
     Dict,
     List,
     Optional,
+    Protocol,
     Tuple,
     Union,
-    Protocol,
     runtime_checkable,
 )
 
@@ -421,12 +421,12 @@ def mesh_sharded(
 
         @wraps(operator_or_fn.__call__)
         def sharded_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[
-                Tuple[int, ...], Dict[str, Any]
-            ] = _distribute_inputs(
-                inputs=inputs,
-                mesh=mesh,
-                partition_specs=in_partition,
+            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
+                _distribute_inputs(
+                    inputs=inputs,
+                    mesh=mesh,
+                    partition_specs=in_partition,
+                )
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition
@@ -438,12 +438,12 @@ def mesh_sharded(
 
         @wraps(operator_or_fn)
         def sharded_fn(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[
-                Tuple[int, ...], Dict[str, Any]
-            ] = _distribute_inputs(
-                inputs=inputs,
-                mesh=mesh,
-                partition_specs=in_partition,
+            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
+                _distribute_inputs(
+                    inputs=inputs,
+                    mesh=mesh,
+                    partition_specs=in_partition,
+                )
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition

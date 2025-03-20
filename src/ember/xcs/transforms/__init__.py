@@ -11,11 +11,11 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Union,
-    Optional,
     List,
-    TypeVar,
+    Optional,
     Protocol,
+    TypeVar,
+    Union,
     runtime_checkable,
 )
 
@@ -125,13 +125,12 @@ def mesh_sharded_func(
 # Try to import the actual implementations and set up the public exports
 try:
     # Try relative imports first to avoid circular dependencies
+    from .mesh import DeviceMesh as _DeviceMesh
+    from .mesh import PartitionSpec as _PartitionSpec
+    from .mesh import mesh_sharded as _mesh_sharded
+    from .pmap import pjit as _pjit
+    from .pmap import pmap as _pmap
     from .vmap import vmap as _vmap
-    from .pmap import pmap as _pmap, pjit as _pjit
-    from .mesh import (
-        DeviceMesh as _DeviceMesh,
-        PartitionSpec as _PartitionSpec,
-        mesh_sharded as _mesh_sharded,
-    )
 
     # Use the actual implementations
     vmap = _vmap

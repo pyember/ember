@@ -3,12 +3,12 @@
 This package provides the execution engine and scheduler interfaces for Ember XCS.
 """
 
-from ember.xcs.engine.execution_options import execution_options, ExecutionOptions
+from ember.xcs.engine.execution_options import ExecutionOptions, execution_options
 from ember.xcs.engine.xcs_engine import (
-    execute_graph,
     IScheduler,
     TopologicalScheduler,
     TopologicalSchedulerWithParallelDispatch,
+    execute_graph,
 )
 
 __all__ = [

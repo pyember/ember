@@ -6,25 +6,25 @@ including schedulers for determining execution order and dispatchers for
 executing the operations.
 """
 
+import dataclasses
+import logging
+import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
 from typing import (
     Any,
+    Callable,
     Dict,
     List,
+    NamedTuple,
     Optional,
+    Protocol,
     Set,
-    Callable,
-    Union,
     Tuple,
     TypeVar,
-    Protocol,
-    NamedTuple,
+    Union,
 )
-import dataclasses
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import threading
-import logging
-import uuid
-from dataclasses import dataclass, field
 
 from ember.xcs.graph.xcs_graph import XCSGraph, XCSNode
 
