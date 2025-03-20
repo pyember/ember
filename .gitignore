@@ -130,3 +130,4 @@ src/ember/examples/operators/
 src/ember/examples/xcs/
 # Keep basic examples
 !src/ember/examples/basic/
+docs/assets/logos/
