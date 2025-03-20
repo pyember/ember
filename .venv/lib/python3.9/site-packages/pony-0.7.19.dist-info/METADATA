@@ -1,0 +1,72 @@
+Metadata-Version: 2.1
+Name: pony
+Version: 0.7.19
+Summary: Pony Object-Relational Mapper
+Home-page: https://ponyorm.com
+Author: Alexander Kozlovsky <alexander.kozlovsky@gmail.com>, Alexey Malashkevich <alexey@ponyorm.org>, Alexander Tischenko <sashaaero@yandex.ru>
+Author-email: team@ponyorm.com
+License: Apache License Version 2.0
+Download-URL: http://pypi.python.org/pypi/pony/
+Project-URL: Documentation, https://docs.ponyorm.org
+Project-URL: Source, https://github.com/ponyorm/pony
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Software Development :: Libraries
+Classifier: Topic :: Database
+
+
+About
+=========
+Pony ORM is easy to use and powerful object-relational mapper for Python.
+Using Pony, developers can create and maintain database-oriented software applications
+faster and with less effort. One of the most interesting features of Pony is
+its ability to write queries to the database using generator expressions.
+Pony then analyzes the abstract syntax tree of a generator and translates it
+to its SQL equivalent.
+
+Following is an example of a query in Pony::
+
+    select(p for p in Product if p.name.startswith('A') and p.cost <= 1000)
+
+Such approach simplify the code and allows a programmer to concentrate
+on the business logic of the application.
+
+Pony translates queries to SQL using a specific database dialect.
+Currently Pony works with SQLite, MySQL, PostgreSQL and Oracle databases.
+
+The package `pony.orm.examples <https://github.com/ponyorm/pony/tree/orm/pony/orm/examples>`_
+contains several examples.
+
+Installation
+=================
+::
+
+    pip install pony
+
+Entity-Relationship Diagram Editor
+=============================================
+`Pony online ER Diagram Editor <https://editor.ponyorm.com>`_ is a great tool for prototyping.
+You can draw your ER diagram online, generate  Pony entity declarations or SQL script for
+creating database schema based on the diagram and start working with the database in seconds.
+
+Pony ORM Links:
+=================
+- Main site: https://ponyorm.com
+- Documentation: https://docs.ponyorm.com
+- GitHub: https://github.com/ponyorm/pony
+- Mailing list:  http://ponyorm-list.ponyorm.com
+- ER Diagram Editor: https://editor.ponyorm.com
+- Blog: https://blog.ponyorm.com
+
+

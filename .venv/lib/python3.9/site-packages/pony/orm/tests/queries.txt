@@ -1,0 +1,1185 @@
+# Testing queries from documentation (CRUD):
+
+Schema:
+pony.orm.examples.estore
+
+>>> Product.get(id=1)
+
+SELECT "id", "name", "description", "picture", "price", "quantity"
+FROM "Product"
+WHERE "id" = ?
+
+>>> Product.get(name="Product1")
+
+SELECT "id", "name", "description", "picture", "price", "quantity"
+FROM "Product"
+WHERE "name" = ?
+LIMIT 2
+
+>>> Product.select(lambda p: p.price > 100)
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > 100
+
+>>> x = 100
+>>> Product.select(lambda p: p.price > x)
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > ?
+
+>>> Product.select(lambda p: p.price > 100).order_by(lambda p: desc(p.price))
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > 100
+ORDER BY "p"."price" DESC
+
+>>> Product.select(lambda p: p.price > 100).order_by(desc(Product.price))
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > 100
+ORDER BY "p"."price" DESC
+
+>>> Product.select(lambda p: p.price > 100).order_by(desc(Product.price), Product.name)
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > 100
+ORDER BY "p"."price" DESC, "p"."name"
+
+>>> Product.select(lambda p: p.price > 100).order_by("desc(p.price), p.name")
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+WHERE "p"."price" > 100
+ORDER BY "p"."price" DESC, "p"."name"
+
+>>> Product.select().order_by(lambda p: desc(p.price))[:10]
+
+SELECT "p"."id", "p"."name", "p"."description", "p"."picture", "p"."price", "p"."quantity"
+FROM "Product" "p"
+ORDER BY "p"."price" DESC
+LIMIT 10
+
+
+# Testing declarative queries from documentation:
+
+# TODO
+
+# Testing aggregation queries from documentation:
+
+Schema:
+pony.orm.examples.university1
+
+>>> sum(s.gpa for s in Student if s.group.number == 101)
+
+SELECT coalesce(SUM("s"."gpa"), 0)
+FROM "Student" "s"
+WHERE "s"."group" = 101
+
+>>> count(s for s in Student if s.gpa > 3)
+
+SELECT COUNT(*)
+FROM "Student" "s"
+WHERE "s"."gpa" > 3
+
+
+>>> min(s.name for s in Student if "Philosophy" in s.courses.name)
+
+SELECT MIN("s"."name")
+FROM "Student" "s"
+WHERE 'Philosophy' IN (
+    SELECT "t-1"."course_name"
+    FROM "Course_Student" "t-1"
+    WHERE "s"."id" = "t-1"."student"
+    )
+
+>>> max(s.dob for s in Student if s.group.number == 101)
+
+SELECT MAX("s"."dob")
+FROM "Student" "s"
+WHERE "s"."group" = 101
+
+>>> avg(s.gpa for s in Student if s.group.dept.number == 44)
+
+SELECT AVG("s"."gpa")
+FROM "Student" "s", "Group" "group"
+WHERE "group"."dept" = 44
+  AND "s"."group" = "group"."number"
+
+>>> select(s for s in Student if s.group.number == 101 and s.dob == max(s.dob for s in Student if s.group.number == 101))
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE "s"."group" = 101
+  AND "s"."dob" = (
+    SELECT MAX("s-2"."dob")
+    FROM "Student" "s-2"
+    WHERE "s-2"."group" = 101
+    )
+
+>>> select(g for g in Group if avg(s.gpa for s in g.students) > 4.5)
+
+SELECT "g"."number", "g"."major", "g"."dept"
+FROM "Group" "g"
+WHERE (
+    SELECT AVG("s"."gpa")
+    FROM "Student" "s"
+    WHERE "g"."number" = "s"."group"
+    ) > 4.5
+
+>>> select(g for g in Group if avg(g.students.gpa) > 4.5)
+
+SELECT "g"."number"
+FROM "Group" "g"
+  LEFT JOIN "Student" "student"
+    ON "g"."number" = "student"."group"
+GROUP BY "g"."number"
+HAVING AVG("student"."gpa") > 4.5
+
+>>> select((s.group, min(s.gpa), max(s.gpa)) for s in Student)
+
+SELECT "s"."group", MIN("s"."gpa"), MAX("s"."gpa")
+FROM "Student" "s"
+GROUP BY "s"."group"
+
+>>> select((g, min(g.students.gpa), max(g.students.gpa)) for g in Group)
+
+SELECT "g"."number", MIN("student"."gpa"), MAX("student"."gpa")
+FROM "Group" "g"
+  LEFT JOIN "Student" "student"
+    ON "g"."number" = "student"."group"
+GROUP BY "g"."number"
+
+>>> select((g, g.students.name, min(g.students.gpa), max(g.students.gpa)) for g in Group)
+
+SELECT "g"."number", "student"."name", MIN("student"."gpa"), MAX("student"."gpa")
+FROM "Group" "g"
+  LEFT JOIN "Student" "student"
+    ON "g"."number" = "student"."group"
+GROUP BY "g"."number", "student"."name"
+
+>>> count(s for s in Student if s.group.number == 101)
+
+SELECT COUNT(*)
+FROM "Student" "s"
+WHERE "s"."group" = 101
+
+>>> select((g, count(g.students)) for g in Group if g.dept.number == 44)
+
+SELECT "g"."number", COUNT(DISTINCT "student"."id")
+FROM "Group" "g"
+  LEFT JOIN "Student" "student"
+    ON "g"."number" = "student"."group"
+WHERE "g"."dept" = 44
+GROUP BY "g"."number"
+
+>>> select((s.group, count(s)) for s in Student if s.group.dept.number == 44)
+
+SELECT "s"."group", COUNT(DISTINCT "s"."id")
+FROM "Student" "s", "Group" "group"
+WHERE "group"."dept" = 44
+  AND "s"."group" = "group"."number"
+GROUP BY "s"."group"
+
+>>> select((g, count(s for s in g.students if s.gpa <= 3), count(s for s in g.students if s.gpa > 3 and s.gpa <= 4), count(s for s in g.students if s.gpa > 4)) for g in Group)
+
+SELECT "g"."number", (
+    SELECT COUNT(DISTINCT "s"."id")
+    FROM "Student" "s"
+    WHERE "g"."number" = "s"."group"
+      AND "s"."gpa" <= 3
+    ), (
+    SELECT COUNT(DISTINCT "s"."id")
+    FROM "Student" "s"
+    WHERE "g"."number" = "s"."group"
+      AND "s"."gpa" > 3
+      AND "s"."gpa" <= 4
+    ), (
+    SELECT COUNT(DISTINCT "s"."id")
+    FROM "Student" "s"
+    WHERE "g"."number" = "s"."group"
+      AND "s"."gpa" > 4
+    )
+FROM "Group" "g"
+
+>>> select((s.group, count(s.gpa <= 3), count(s.gpa > 3 and s.gpa <= 4), count(s.gpa > 4)) for s in Student)
+
+SELECT "s"."group", COUNT(case when "s"."gpa" <= 3 then 1 else null end), COUNT(case when "s"."gpa" > 3 AND "s"."gpa" <= 4 then 1 else null end), COUNT(case when "s"."gpa" > 4 then 1 else null end)
+FROM "Student" "s"
+GROUP BY "s"."group"
+
+>>> left_join((g, count(s.gpa <= 3), count(s.gpa > 3 and s.gpa <= 4), count(s.gpa > 4)) for g in Group for s in g.students)
+
+SELECT "g"."number", COUNT(case when "s"."gpa" <= 3 then 1 else null end), COUNT(case when "s"."gpa" > 3 AND "s"."gpa" <= 4 then 1 else null end), COUNT(case when "s"."gpa" > 4 then 1 else null end)
+FROM "Group" "g"
+  LEFT JOIN "Student" "s"
+    ON "g"."number" = "s"."group"
+GROUP BY "g"."number"
+
+>>> select((s.dob.year, avg(s.gpa)) for s in Student)
+
+SELECT cast(substr("s"."dob", 1, 4) as integer), AVG("s"."gpa")
+FROM "Student" "s"
+GROUP BY cast(substr("s"."dob", 1, 4) as integer)
+
+Schema:
+pony.orm.examples.estore
+
+>>> select((item.order, sum(item.price * item.quantity)) for item in OrderItem if item.order.id == 123)
+
+SELECT "item"."order", coalesce(SUM(("item"."price" * "item"."quantity")), 0)
+FROM "OrderItem" "item"
+WHERE "item"."order" = 123
+GROUP BY "item"."order"
+
+>>> select((order, sum(order.items.price * order.items.quantity)) for order in Order if order.id == 123)
+
+SELECT "order"."id", coalesce(SUM(("orderitem"."price" * "orderitem"."quantity")), 0)
+FROM "Order" "order"
+  LEFT JOIN "OrderItem" "orderitem"
+    ON "order"."id" = "orderitem"."order"
+WHERE "order"."id" = 123
+GROUP BY "order"."id"
+
+>>> select((item.order, item.order.total_price, sum(item.price * item.quantity)) for item in OrderItem if item.order.total_price < sum(item.price * item.quantity))
+
+SELECT "item"."order", "order"."total_price", coalesce(SUM(("item"."price" * "item"."quantity")), 0)
+FROM "OrderItem" "item", "Order" "order"
+WHERE "item"."order" = "order"."id"
+GROUP BY "item"."order", "order"."total_price"
+HAVING "order"."total_price" < coalesce(SUM(("item"."price" * "item"."quantity")), 0)
+
+>>> select(c for c in Customer for p in c.orders.items.product if 'Tablets' in p.categories.name and count(p) > 1)
+
+SELECT "c"."id"
+FROM "Customer" "c", "Order" "order", "OrderItem" "orderitem"
+WHERE 'Tablets' IN (
+    SELECT "category"."name"
+    FROM "Category_Product" "t-1", "Category" "category"
+    WHERE "orderitem"."product" = "t-1"."product"
+      AND "t-1"."category" = "category"."id"
+    )
+  AND "c"."id" = "order"."customer"
+  AND "order"."id" = "orderitem"."order"
+GROUP BY "c"."id"
+HAVING COUNT(DISTINCT "orderitem"."product") > 1
+
+Schema:
+pony.orm.examples.university1
+
+>>> select((s.group, count(s)) for s in Student  if s.group.dept.number == 44 and avg(s.gpa) > 4)
+
+SELECT "s"."group", COUNT(DISTINCT "s"."id")
+FROM "Student" "s", "Group" "group"
+WHERE "group"."dept" = 44
+  AND "s"."group" = "group"."number"
+GROUP BY "s"."group"
+HAVING AVG("s"."gpa") > 4
+
+>>> select(g for g in Group if max(g.students.gpa) < 4)
+
+SELECT "g"."number"
+FROM "Group" "g"
+  LEFT JOIN "Student" "student"
+    ON "g"."number" = "student"."group"
+GROUP BY "g"."number"
+HAVING MAX("student"."gpa") < 4
+
+>>> select(g for g in Group if JOIN(max(g.students.gpa) < 4))
+
+SELECT "g"."number"
+FROM "Group" "g"
+  LEFT JOIN (
+    SELECT "student"."group" AS "group", MAX("student"."gpa") AS "expr-1"
+    FROM "Student" "student"
+    GROUP BY "student"."group"
+    ) "t-1"
+    ON "g"."number" = "t-1"."group"
+WHERE "t-1"."expr-1" < 4
+GROUP BY "g"."number"
+
+>>> select(s.group for s in Student if max(s.gpa) < 4)
+
+SELECT "s"."group"
+FROM "Student" "s"
+GROUP BY "s"."group"
+HAVING MAX("s"."gpa") < 4
+
+>>> select((s.group, avg(s.gpa)) for s in Student).order_by(lambda: avg(s.gpa))
+
+SELECT "s"."group", AVG("s"."gpa")
+FROM "Student" "s"
+GROUP BY "s"."group"
+ORDER BY AVG("s"."gpa")
+
+>>> select((s.group, avg(s.gpa)) for s in Student).order_by(lambda: desc(avg(s.gpa)))
+
+SELECT "s"."group", AVG("s"."gpa")
+FROM "Student" "s"
+GROUP BY "s"."group"
+ORDER BY AVG("s"."gpa") DESC
+
+>>> select((s.group, avg(s.gpa)) for s in Student).order_by(2)
+
+SELECT "s"."group", AVG("s"."gpa")
+FROM "Student" "s"
+GROUP BY "s"."group"
+ORDER BY 2
+
+>>> select((s.group, avg(s.gpa)) for s in Student).order_by(-2)
+
+SELECT "s"."group", AVG("s"."gpa")
+FROM "Student" "s"
+GROUP BY "s"."group"
+ORDER BY 2 DESC
+
+>>> select(sum(s.gpa) for s in Student)
+
+SELECT coalesce(SUM("s"."gpa"), 0)
+FROM "Student" "s"
+
+>>> select(s.gpa for s in Student).sum()
+
+SELECT coalesce(SUM("s"."gpa"), 0)
+FROM "Student" "s"
+
+
+# Other tests
+
+Schema:
+pony.orm.examples.university1
+
+>>> select(s for s in Student if s.gpa > 3)
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE "s"."gpa" > 3
+
+Oracle:
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."GPA" > 3
+
+>>> select(s for s in Student if s.group.number == 1)
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE "s"."group" = 1
+
+Oracle:
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."GROUP" = 1
+
+>>> select(c for c in Course if count(c.students) > 3)
+
+SELECT "c"."name", "c"."semester"
+FROM "Course" "c"
+  LEFT JOIN "Course_Student" "t-1"
+    ON "c"."name" = "t-1"."course_name" AND "c"."semester" = "t-1"."course_semester"
+GROUP BY "c"."name", "c"."semester"
+HAVING COUNT(DISTINCT "t-1"."student") > 3
+
+Oracle:
+
+SELECT "c"."NAME", "c"."SEMESTER"
+FROM "COURSE" "c"
+  LEFT JOIN "COURSE_STUDENT" "t-1"
+    ON "c"."NAME" = "t-1"."COURSE_NAME" AND "c"."SEMESTER" = "t-1"."COURSE_SEMESTER"
+GROUP BY "c"."NAME", "c"."SEMESTER"
+HAVING COUNT(DISTINCT "t-1"."STUDENT") > 3
+
+>>> select(s for s in Student if count(s.courses) > 3)
+
+SELECT "s"."id"
+FROM "Student" "s"
+  LEFT JOIN "Course_Student" "t-1"
+    ON "s"."id" = "t-1"."student"
+GROUP BY "s"."id"
+HAVING COUNT("t-1"."ROWID") > 3
+
+Oracle:
+
+SELECT "s"."ID"
+FROM "STUDENT" "s"
+  LEFT JOIN "COURSE_STUDENT" "t-1"
+    ON "s"."ID" = "t-1"."STUDENT"
+GROUP BY "s"."ID"
+HAVING COUNT("t-1"."ROWID") > 3
+
+>>> select(s for s in Student).for_update()[:3]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+LIMIT 3
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."ROWID" IN (
+    SELECT * FROM (
+        SELECT "s"."ROWID" AS "row-id"
+        FROM "STUDENT" "s"
+    ) WHERE ROWNUM <= 3
+    )
+FOR UPDATE
+
+>>> select(s for s in Student).order_by(Student.name).for_update()[:3]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+ORDER BY "s"."name"
+LIMIT 3
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."ROWID" IN (
+    SELECT * FROM (
+        SELECT "s"."ROWID" AS "row-id"
+        FROM "STUDENT" "s"
+        ORDER BY "s"."NAME"
+    ) WHERE ROWNUM <= 3
+    )
+ORDER BY "s"."NAME"
+FOR UPDATE
+
+>>> select(s for s in Student).order_by(Student.name).for_update()[3:6]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+ORDER BY "s"."name"
+LIMIT 3 OFFSET 3
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."ROWID" IN (
+    SELECT t."row-id" FROM (
+        SELECT t.*, ROWNUM "row-num" FROM (
+            SELECT "s"."ROWID" AS "row-id"
+            FROM "STUDENT" "s"
+            ORDER BY "s"."NAME"
+        ) t WHERE ROWNUM <= 6
+    ) t WHERE "row-num" > 3
+    )
+ORDER BY "s"."NAME"
+FOR UPDATE
+
+>>> select(s for s in Student).for_update()[3:6]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+LIMIT 3 OFFSET 3
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."ROWID" IN (
+    SELECT t."row-id" FROM (
+        SELECT t.*, ROWNUM "row-num" FROM (
+            SELECT "s"."ROWID" AS "row-id"
+            FROM "STUDENT" "s"
+        ) t WHERE ROWNUM <= 6
+    ) t WHERE "row-num" > 3
+    )
+FOR UPDATE
+
+>>> select((g, count(s)) for g in Group for s in g.students)
+
+SELECT "g"."number", COUNT(DISTINCT "s"."id")
+FROM "Group" "g", "Student" "s"
+WHERE "g"."number" = "s"."group"
+GROUP BY "g"."number"
+
+Oracle:
+
+SELECT "g"."NUMBER", COUNT(DISTINCT "s"."ID")
+FROM "GROUP" "g", "STUDENT" "s"
+WHERE "g"."NUMBER" = "s"."GROUP"
+GROUP BY "g"."NUMBER"
+
+PostgreSQL:
+
+SELECT "g"."number", COUNT(DISTINCT "s"."id")
+FROM "group" "g", "student" "s"
+WHERE "g"."number" = "s"."group"
+GROUP BY "g"."number"
+
+>>> select((s, count(c)) for s in Student for c in s.courses)
+
+SELECT "s"."id", COUNT(DISTINCT "c"."ROWID")
+FROM "Student" "s", "Course_Student" "t-1", "Course" "c"
+WHERE "s"."id" = "t-1"."student"
+  AND "t-1"."course_name" = "c"."name"
+  AND "t-1"."course_semester" = "c"."semester"
+GROUP BY "s"."id"
+
+Oracle:
+
+SELECT "s"."ID", COUNT(DISTINCT "c"."ROWID")
+FROM "STUDENT" "s", "COURSE_STUDENT" "t-1", "COURSE" "c"
+WHERE "s"."ID" = "t-1"."STUDENT"
+  AND "t-1"."COURSE_NAME" = "c"."NAME"
+  AND "t-1"."COURSE_SEMESTER" = "c"."SEMESTER"
+GROUP BY "s"."ID"
+
+PostgreSQL:
+
+SELECT "s"."id", COUNT(DISTINCT case when ("t-1"."course_name", "t-1"."course_semester") IS NULL then null else ("t-1"."course_name", "t-1"."course_semester") end)
+FROM "student" "s", "course_student" "t-1"
+WHERE "s"."id" = "t-1"."student"
+GROUP BY "s"."id"
+
+>>> x = '123'
+>>> select(s for s in Student if s.tel == x)[:]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE "s"."tel" = ?
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."TEL" = :p1
+
+>>> x = ''
+>>> select(s for s in Student if s.tel == x)[:]
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."TEL" IS NULL
+
+>>> x = ''
+>>> select(s for s in Student).filter(lambda s: s.tel == x)[:]
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE "s"."TEL" IS NULL
+
+>>> select(s.name for s in Student if s.name in (s.name for s in Student if count() > 1))[:]
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+WHERE "s"."name" IN (
+    SELECT "s-2"."name"
+    FROM "Student" "s-2"
+    GROUP BY "s-2"."name"
+    HAVING COUNT(*) > 1
+    )
+
+>>> empty_list = []
+>>> select(s.name for s in Student if s.id in empty_list)
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+WHERE 0 = 1
+
+>>> empty_list = []
+>>> select(s.name for s in Student if s.id not in empty_list)
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+WHERE 1 = 1
+
+>>> select(s.name for s in Student)[:]
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+
+>>> select(s.name for s in Student).without_distinct()[:]
+
+SELECT "s"."name"
+FROM "Student" "s"
+
+>>> select(s.name for s in Student).without_distinct().distinct()[:]
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+
+>>> select(s.name for s in Student).without_distinct().distinct().without_distinct()[:]
+
+SELECT "s"."name"
+FROM "Student" "s"
+
+>>> select(s.name for s in Student).first()
+
+SELECT "s"."name"
+FROM "Student" "s"
+ORDER BY 1
+LIMIT 1
+
+>>> select(s.name for s in Student).without_distinct().first()
+
+SELECT "s"."name"
+FROM "Student" "s"
+ORDER BY 1
+LIMIT 1
+
+>>> select(s.name for s in Student)[4:5]
+
+SELECT DISTINCT "s"."name"
+FROM "Student" "s"
+LIMIT 1 OFFSET 4
+
+>>> select(s for s in Student if (s.group, s.gpa) in select((s2.group, max(s2.gpa)) for s2 in Student))
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE EXISTS (
+    SELECT 1
+    FROM "Student" "s2"
+    GROUP BY "s2"."group"
+    HAVING "s"."group" = "s2"."group"
+      AND "s"."gpa" = MAX("s2"."gpa")
+    )
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."group", "s"."gpa") IN (
+    SELECT "s2"."group", MAX("s2"."gpa")
+    FROM "student" "s2"
+    GROUP BY "s2"."group"
+    )
+
+>>> select(s for s in Student if (s.group, s.gpa) not in select((s2.group, max(s2.gpa)) for s2 in Student))
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM "Student" "s2"
+    GROUP BY "s2"."group"
+    HAVING "s"."group" = "s2"."group"
+      AND "s"."gpa" = MAX("s2"."gpa")
+    )
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."group", "s"."gpa") NOT IN (
+    SELECT "s2"."group", MAX("s2"."gpa")
+    FROM "student" "s2"
+    GROUP BY "s2"."group"
+    HAVING MAX("s2"."gpa") IS NOT NULL
+    )
+
+# Complex aggregations:
+
+Schema:
+pony.orm.examples.university1
+
+>>> count(g for g in Group if count(g.students) > 0 and g.number > 101)
+
+SELECT COUNT(*)
+FROM (
+    SELECT "g"."number"
+        FROM "Group" "g"
+      LEFT JOIN "Student" "student"
+        ON "g"."number" = "student"."group"
+    WHERE "g"."number" > 101
+    GROUP BY "g"."number"
+    HAVING COUNT(DISTINCT "student"."id") > 0
+    ) "t"
+
+>>> count(g for g in Group if count(s for s in g.students) > 0 and g.number > 101)
+
+SELECT COUNT(*)
+FROM "Group" "g"
+WHERE (
+    SELECT COUNT(DISTINCT "s"."id")
+    FROM "Student" "s"
+    WHERE "g"."number" = "s"."group"
+    ) > 0
+  AND "g"."number" > 101
+
+>>> sum(s.gpa for s in Student if count(s.courses) > 3 and s.gpa > 3.5)
+
+SELECT coalesce(SUM("s"."gpa"), 0)
+FROM (
+    SELECT "s"."gpa"
+        FROM "Student" "s"
+      LEFT JOIN "Course_Student" "t-1"
+        ON "s"."id" = "t-1"."student"
+    WHERE "s"."gpa" > 3.5
+    GROUP BY "s"."gpa"
+    HAVING COUNT("t-1"."ROWID") > 3
+    ) "s"
+
+>>> sum(s.dob.year for s in Student if count(s.courses) > 3 and s.gpa > 3.5)
+
+SELECT coalesce(SUM("t"."expr"), 0)
+FROM (
+    SELECT cast(substr("s"."dob", 1, 4) as integer) AS "expr"
+        FROM "Student" "s"
+      LEFT JOIN "Course_Student" "t-1"
+        ON "s"."id" = "t-1"."student"
+    WHERE "s"."gpa" > 3.5
+    GROUP BY cast(substr("s"."dob", 1, 4) as integer)
+    HAVING COUNT("t-1"."ROWID") > 3
+    ) "t"
+
+# Bulk delete:
+
+>>> select(s for s in Student if s.gpa > 3).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "gpa" > 3
+
+>>> select(s for s in Student if s.group.dept.number == 1).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "id" IN (
+    SELECT "s"."id"
+    FROM "Student" "s", "Group" "group"
+    WHERE "group"."dept" = 1
+      AND "s"."group" = "group"."number"
+    )
+
+MySQL:
+
+DELETE `s` FROM `student` `s`
+  INNER JOIN `group` `group`
+    ON `s`.`group` = `group`.`number`
+WHERE `group`.`dept` = 1
+
+PostgreSQL:
+
+DELETE FROM "student"
+WHERE "id" IN (
+    SELECT "s"."id"
+    FROM "student" "s", "group" "group"
+    WHERE "group"."dept" = 1
+      AND "s"."group" = "group"."number"
+    )
+
+Oracle:
+
+DELETE FROM "STUDENT"
+WHERE "ID" IN (
+    SELECT "s"."ID"
+    FROM "STUDENT" "s", "GROUP" "group"
+    WHERE "group"."DEPT" = 1
+      AND "s"."GROUP" = "group"."NUMBER"
+    )
+
+>>> select(c for c in Course if c.dept.name.startswith('D')).delete(bulk=True)
+
+DELETE FROM "Course"
+WHERE "ROWID" IN (
+    SELECT "c"."ROWID"
+    FROM "Course" "c", "Department" "department"
+    WHERE "department"."name" LIKE 'D%'
+      AND "c"."dept" = "department"."number"
+    )
+
+MySQL:
+
+DELETE `c` FROM `course` `c`
+  INNER JOIN `department` `department`
+    ON `c`.`dept` = `department`.`number`
+WHERE `department`.`name` LIKE 'D%%'
+
+PostgreSQL:
+
+DELETE FROM "course"
+WHERE ("name", "semester") IN (
+    SELECT "c"."name", "c"."semester"
+    FROM "course" "c", "department" "department"
+    WHERE "department"."name" LIKE 'D%%'
+      AND "c"."dept" = "department"."number"
+    )
+
+Oracle:
+
+DELETE FROM "COURSE"
+WHERE "ROWID" IN (
+    SELECT "c"."ROWID"
+    FROM "COURSE" "c", "DEPARTMENT" "department"
+    WHERE "department"."NAME" LIKE 'D%'
+      AND "c"."DEPT" = "department"."NUMBER"
+    )
+
+>>> select(s for s in Student if s.gpa > 3 and s not in (s2 for s2 in Student if s2.group.dept.name.startswith('A'))).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "gpa" > 3
+  AND "id" NOT IN (
+    SELECT "s2"."id"
+    FROM "Student" "s2", "Group" "group", "Department" "department"
+    WHERE "department"."name" LIKE 'A%'
+      AND "s2"."group" = "group"."number"
+      AND "group"."dept" = "department"."number"
+    )
+
+# MySQL does not support such queries
+
+PostgreSQL:
+
+DELETE FROM "student"
+WHERE "gpa" > 3
+  AND "id" NOT IN (
+    SELECT "s2"."id"
+    FROM "student" "s2", "group" "group", "department" "department"
+    WHERE "department"."name" LIKE 'A%%'
+      AND "s2"."group" = "group"."number"
+      AND "group"."dept" = "department"."number"
+    )
+
+Oracle:
+
+DELETE FROM "STUDENT"
+WHERE "GPA" > 3
+  AND "ID" NOT IN (
+    SELECT "s2"."ID"
+    FROM "STUDENT" "s2", "GROUP" "group", "DEPARTMENT" "department"
+    WHERE "department"."NAME" LIKE 'A%'
+      AND "s2"."GROUP" = "group"."NUMBER"
+      AND "group"."DEPT" = "department"."NUMBER"
+    )
+
+>>> select(s for s in Student if exists(s2 for s2 in Student if s.gpa > s2.gpa)).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "id" IN (
+    SELECT "s"."id"
+    FROM "Student" "s"
+    WHERE EXISTS (
+        SELECT 1
+        FROM "Student" "s2"
+        WHERE "s"."gpa" > "s2"."gpa"
+        )
+    )
+
+PostgreSQL:
+
+DELETE FROM "student"
+WHERE "id" IN (
+    SELECT "s"."id"
+    FROM "student" "s"
+    WHERE EXISTS (
+        SELECT 1
+        FROM "student" "s2"
+        WHERE "s"."gpa" > "s2"."gpa"
+        )
+    )
+
+Oracle:
+
+DELETE FROM "STUDENT"
+WHERE "ID" IN (
+    SELECT "s"."ID"
+    FROM "STUDENT" "s"
+    WHERE EXISTS (
+        SELECT 1
+        FROM "STUDENT" "s2"
+        WHERE "s"."GPA" > "s2"."GPA"
+        )
+    )
+
+>>> select(s for s in Student if count(g for g in s.group.dept.groups) > 2).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "id" IN (
+    SELECT "s"."id"
+    FROM "Student" "s"
+    WHERE (
+        SELECT COUNT(DISTINCT "g"."number")
+        FROM "Group" "group", "Group" "g"
+        WHERE "s"."group" = "group"."number"
+          AND "group"."dept" = "g"."dept"
+        ) > 2
+    )
+
+>>> Student.select(lambda s: count(s.group.students) == 2).delete(bulk=True)
+
+DELETE FROM "Student"
+WHERE "id" IN (
+    SELECT "s"."id"
+        FROM "Student" "s"
+      LEFT JOIN "Student" "student"
+        ON "s"."group" = "student"."group"
+    )
+
+# Test UPPER/LOWER functions:
+
+>>> select(s.name.upper() for s in Student)
+
+SELECT DISTINCT py_upper("s"."name")
+FROM "Student" "s"
+
+PostgreSQL:
+
+SELECT DISTINCT upper("s"."name")
+FROM "student" "s"
+
+# Test modulo division operator
+
+>>> select(s for s in Student if s.id % 2 == 0)
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE ("s"."id" % 2) = 0
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."id" %% 2) = 0
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+WHERE (`s`.`id` %% 2) = 0
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE MOD("s"."ID", 2) = 0
+
+# Test group_concat:
+
+>>> select((g, group_concat(s.name, '+')) for g in Group for s in g.students)
+
+SELECT "g"."number", GROUP_CONCAT("s"."name", '+')
+FROM "Group" "g", "Student" "s"
+WHERE "g"."number" = "s"."group"
+GROUP BY "g"."number"
+
+PostgreSQL:
+
+SELECT "g"."number", string_agg("s"."name"::text, '+')
+FROM "group" "g", "student" "s"
+WHERE "g"."number" = "s"."group"
+GROUP BY "g"."number"
+
+MySQL:
+
+SELECT `g`.`number`, GROUP_CONCAT(`s`.`name` SEPARATOR '+')
+FROM `group` `g`, `student` `s`
+WHERE `g`.`number` = `s`.`group`
+GROUP BY `g`.`number`
+
+Oracle:
+
+SELECT "g"."NUMBER", LISTAGG("s"."NAME", '+') WITHIN GROUP(ORDER BY 1)
+FROM "GROUP" "g", "STUDENT" "s"
+WHERE "g"."NUMBER" = "s"."GROUP"
+GROUP BY "g"."NUMBER"
+
+# Test offset without limit
+
+>>> select(s for s in Student)[3:]
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+LIMIT -1 OFFSET 3
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+LIMIT null OFFSET 3
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+LIMIT 18446744073709551615 OFFSET 3
+
+Oracle:
+
+SELECT t.* FROM (
+    SELECT t.*, ROWNUM "row-num" FROM (
+        SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+        FROM "STUDENT" "s"
+    ) t 
+) t WHERE "row-num" > 3
+
+# Test row comparison:
+
+>>> select((s1.id, s2.id) for s1 in Student for s2 in Student if (s1.name, s1.gpa, s1.tel) < (s2.name, s2.gpa, s2.tel))
+
+SELECT DISTINCT "s1"."id", "s2"."id"
+FROM "Student" "s1", "Student" "s2"
+WHERE ("s1"."name" < "s2"."name" OR "s1"."name" = "s2"."name" AND "s1"."gpa" < "s2"."gpa" OR "s1"."name" = "s2"."name" AND "s1"."gpa" = "s2"."gpa" AND "s1"."tel" < "s2"."tel")
+
+PostgreSQL:
+
+SELECT DISTINCT "s1"."id", "s2"."id"
+FROM "student" "s1", "student" "s2"
+WHERE ("s1"."name", "s1"."gpa", "s1"."tel") < ("s2"."name", "s2"."gpa", "s2"."tel")
+
+MySQL:
+
+SELECT DISTINCT `s1`.`id`, `s2`.`id`
+FROM `student` `s1`, `student` `s2`
+WHERE (`s1`.`name`, `s1`.`gpa`, `s1`.`tel`) < (`s2`.`name`, `s2`.`gpa`, `s2`.`tel`)
+
+Oracle:
+
+SELECT DISTINCT "s1"."ID", "s2"."ID"
+FROM "STUDENT" "s1", "STUDENT" "s2"
+WHERE ("s1"."NAME", "s1"."GPA", "s1"."TEL") < ("s2"."NAME", "s2"."GPA", "s2"."TEL")
+
+>>> select((s1.id, s2.id) for s1 in Student for s2 in Student if (s1.name, s1.gpa, s1.tel) == (s2.name, s2.gpa, s2.tel))
+
+SELECT DISTINCT "s1"."id", "s2"."id"
+FROM "Student" "s1", "Student" "s2"
+WHERE "s1"."name" = "s2"."name"
+  AND "s1"."gpa" = "s2"."gpa"
+  AND "s1"."tel" = "s2"."tel"
+
+PostgreSQL:
+
+SELECT DISTINCT "s1"."id", "s2"."id"
+FROM "student" "s1", "student" "s2"
+WHERE "s1"."name" = "s2"."name"
+  AND "s1"."gpa" = "s2"."gpa"
+  AND "s1"."tel" = "s2"."tel"
+
+MySQL:
+
+SELECT DISTINCT `s1`.`id`, `s2`.`id`
+FROM `student` `s1`, `student` `s2`
+WHERE `s1`.`name` = `s2`.`name`
+  AND `s1`.`gpa` = `s2`.`gpa`
+  AND `s1`.`tel` = `s2`.`tel`
+
+Oracle:
+
+SELECT DISTINCT "s1"."ID", "s2"."ID"
+FROM "STUDENT" "s1", "STUDENT" "s2"
+WHERE "s1"."NAME" = "s2"."NAME"
+  AND "s1"."GPA" = "s2"."GPA"
+  AND "s1"."TEL" = "s2"."TEL"
+
+
+# Test date operations:
+
+
+>>> select(s for s in Student if s.dob + timedelta(days=100) < date(2010, 1, 1))
+
+SQLite:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE date("s"."dob", '+100 days') < '2010-01-01'
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."dob" + INTERVAL '2400:0:0' HOUR TO SECOND) < DATE '2010-01-01'
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE ("s"."DOB" + INTERVAL '2400:0:0' HOUR TO SECOND) < DATE '2010-01-01'
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+WHERE ADDDATE(`s`.`dob`, INTERVAL '2400:0:0' HOUR_SECOND) < DATE '2010-01-01'
+
+
+>>> td = timedelta(days=100)
+>>> select(s for s in Student if s.dob + td < date(2010, 1, 1))
+
+SQLite:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE datetime(julianday("s"."dob") + ?) < '2010-01-01'
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."dob" + %(p1)s) < DATE '2010-01-01'
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE ("s"."DOB" + :p1) < DATE '2010-01-01'
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+WHERE ADDDATE(`s`.`dob`, %s) < DATE '2010-01-01'
+
+
+>>> select(s for s in Student if s.dob - timedelta(days=100) < date(2010, 1, 1))
+
+SQLite:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE date("s"."dob", '-100 days') < '2010-01-01'
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."dob" - INTERVAL '2400:0:0' HOUR TO SECOND) < DATE '2010-01-01'
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE ("s"."DOB" - INTERVAL '2400:0:0' HOUR TO SECOND) < DATE '2010-01-01'
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+WHERE SUBDATE(`s`.`dob`, INTERVAL '2400:0:0' HOUR_SECOND) < DATE '2010-01-01'
+
+>>> td = timedelta(days=100)
+>>> select(s for s in Student if s.dob - td < date(2010, 1, 1))
+
+SQLite:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "Student" "s"
+WHERE datetime(julianday("s"."dob") - ?) < '2010-01-01'
+
+PostgreSQL:
+
+SELECT "s"."id", "s"."name", "s"."dob", "s"."tel", "s"."gpa", "s"."group"
+FROM "student" "s"
+WHERE ("s"."dob" - %(p1)s) < DATE '2010-01-01'
+
+Oracle:
+
+SELECT "s"."ID", "s"."NAME", "s"."DOB", "s"."TEL", "s"."GPA", "s"."GROUP"
+FROM "STUDENT" "s"
+WHERE ("s"."DOB" - :p1) < DATE '2010-01-01'
+
+MySQL:
+
+SELECT `s`.`id`, `s`.`name`, `s`.`dob`, `s`.`tel`, `s`.`gpa`, `s`.`group`
+FROM `student` `s`
+WHERE SUBDATE(`s`.`dob`, %s) < DATE '2010-01-01'
