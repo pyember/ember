@@ -5,6 +5,22 @@
   <img src="docs/assets/ember_workmark.svg" alt="Ember" width="350"/>
 </p>
 
+<p align="center">
+<strong>Contributors</strong>
+</p>
+
+<p align="center">
+In collaboration with the following early users, contributors, and reviewers:
+</p>
+
+<p align="center">
+Jared Quincy Davis<sup>F,S</sup>, Lingjiao Chen<sup>MS</sup>, Omar Khattab<sup>D,MT</sup>, Marquita Ellis<sup>I</sup>, Diana Arroyo<sup>I</sup>, Pravein Govindan Kannan<sup>I</sup>, Paul Castro<sup>I</sup>, Siddharth Sharma<sup>F,S</sup>, Parth Asawa<sup>B</sup>, Allan Zhu<sup>B</sup>, Connor Chow<sup>B</sup>, Jason Lee<sup>B</sup>, Jay Adityanag Tipirneni<sup>B</sup>, Chad Ferguson<sup>B</sup>, Kathleen Ge<sup>B</sup>, Kunal Agrawal<sup>B</sup>, Rishab Bhatia<sup>B</sup>, Rohan Penmatcha<sup>B</sup>, Sai Kolasani<sup>B</sup>, Théo Jaffrelot Inizan<sup>B</sup>, Deepak Narayanan<sup>N</sup>, Long Fei<sup>F</sup>, Aparajit Raghavan<sup>F</sup>, Eyal Cidon<sup>F</sup>, Jacob Schein<sup>F</sup>, Prasanth Somasundar<sup>F</sup>, Boris Hanin<sup>F,P</sup>, James Zou<sup>S</sup>, Joey Gonzalez<sup>B</sup>, Peter Bailis<sup>G,S</sup>, Ion Stoica<sup>A,B,D</sup>, Matei Zaharia<sup>D,B</sup>
+</p>
+
+<p align="center">
+<sup>F</sup> Foundry (MLFoundry), <sup>D</sup> Databricks, <sup>I</sup> IBM Research, <sup>S</sup> Stanford University, <sup>B</sup> UC Berkeley, <sup>MT</sup> MIT, <sup>N</sup> NVIDIA, <sup>MS</sup> Microsoft, <sup>A</sup> Anyscale, <sup>G</sup> Google, <sup>P</sup> Princeton
+</p>
+
 # <span style="color:#0366d6;">Ember</span>: A Compositional Framework for Compound AI Systems
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
