@@ -14,7 +14,11 @@
 Aspirationally, Ember is to Networks of Networks (NONs) Compound AI Systems development what PyTorch 
 and XLA are to Neural Networks (NN) development. It's a compositional framework with both eager 
 execution affordances and graph execution optimization capabilities. It enables users to compose 
-complex NONs, and supports automatic parallelization and optimization of these.
+complex NONs, and supports automatic parallelization and optimization of these. 
+
+Ember's vision is to enable development of **compound AI systems composed of, one day, millions-billions of calls** and beyond. Simple constructs--like best-of-N graphs, verifier-prover structures, and ensembles with “voting-based” aggregation--work surprisingly well in many regimes. This led us to believe that there is a rich architecture space for constructing and optimizing what we call “networks of networks” graphs, or NONs. This is analogous to how neural network architecture research uncovered many emergent properties of systems composed of simple artificial neurons. It would be frictionful to conduct NN research if we had to implement architectures from scratch via for-loops or implement bespoke libraries for vectorization and efficient execution. Similarly, it can be challenging at present to compose NON architectures of many calls, despite the rapidly falling cost-per-token of intelligence.
+
+Ember's goal is to help unlock research and practice along this new frontier. 
 
 ## Documentation & Examples
 
