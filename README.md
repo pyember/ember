@@ -1,4 +1,11 @@
-# Ember: Compositional Framework for Compound AI Systems
+<p align="center">
+  <img src="docs/assets/ember_icon_400@2x.svg" alt="Ember Logo" width="150"/>
+</p>
+<p align="center">
+  <img src="docs/assets/ember_workmark.svg" alt="Ember" width="350"/>
+</p>
+
+# <span style="color:#0366d6;">Ember</span>: Compositional Framework for Compound AI Systems
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
