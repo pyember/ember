@@ -147,11 +147,11 @@ class ModelFactory:
                 )
                 provider_package_name: str = provider_module.__name__
                 provider_package_path: str = os.path.dirname(provider_module.__file__)
-                dynamic_providers: Dict[str, Type[BaseProviderModel]] = (
-                    discover_providers_in_package(
-                        package_name=provider_package_name,
-                        package_path=provider_package_path,
-                    )
+                dynamic_providers: Dict[
+                    str, Type[BaseProviderModel]
+                ] = discover_providers_in_package(
+                    package_name=provider_package_name,
+                    package_path=provider_package_path,
                 )
                 for name, provider_class in dynamic_providers.items():
                     if name not in cls._provider_cache:
@@ -236,9 +236,9 @@ class ModelFactory:
         provider_name: str = model_info.provider.name
 
         # Retrieving available providers
-        discovered_providers: Dict[str, Type[BaseProviderModel]] = (
-            ModelFactory._get_providers()
-        )
+        discovered_providers: Dict[
+            str, Type[BaseProviderModel]
+        ] = ModelFactory._get_providers()
 
         # Trying exact match first
         provider_class: Optional[Type[BaseProviderModel]] = discovered_providers.get(

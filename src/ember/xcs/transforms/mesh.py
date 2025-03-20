@@ -421,12 +421,12 @@ def mesh_sharded(
 
         @wraps(operator_or_fn.__call__)
         def sharded_operator(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
-                _distribute_inputs(
-                    inputs=inputs,
-                    mesh=mesh,
-                    partition_specs=in_partition,
-                )
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
+                inputs=inputs,
+                mesh=mesh,
+                partition_specs=in_partition,
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition
@@ -438,12 +438,12 @@ def mesh_sharded(
 
         @wraps(operator_or_fn)
         def sharded_fn(*, inputs: Dict[str, Any]) -> Dict[str, Any]:
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
-                _distribute_inputs(
-                    inputs=inputs,
-                    mesh=mesh,
-                    partition_specs=in_partition,
-                )
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
+                inputs=inputs,
+                mesh=mesh,
+                partition_specs=in_partition,
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition

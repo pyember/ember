@@ -95,9 +95,11 @@ ItemT_co = TypeVar(
 class BatchableInput(Protocol[ItemT_co]):
     """Protocol for types that can be batched."""
 
-    def __len__(self) -> int: ...
+    def __len__(self) -> int:
+        ...
 
-    def __getitem__(self, index: int) -> ItemT_co: ...
+    def __getitem__(self, index: int) -> ItemT_co:
+        ...
 
 
 class BatchAxis(TypedDict, total=False):

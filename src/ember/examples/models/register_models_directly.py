@@ -179,7 +179,9 @@ def check_models(model_ids: List[str], registry: ModelRegistry) -> None:
 
                 logger.info(f"Model '{model_id}' is available and initialized")
             except Exception as e:
-                table.add_row([model_id, "⚠️ Error", "Error", "Error", "Error", "Error"])
+                table.add_row(
+                    [model_id, "⚠️ Error", "Error", "Error", "Error", "Error"]
+                )
                 logger.warning(f"Error getting model info for '{model_id}': {e}")
         else:
             table.add_row([model_id, "❌ Not Found", "N/A", "N/A", "N/A", "N/A"])

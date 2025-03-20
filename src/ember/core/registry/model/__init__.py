@@ -52,7 +52,6 @@ from ember.core.registry.model.providers.base_provider import (
 # These are already imported above using absolute imports, so we can remove these relative imports
 
 
-
 # Add load_model function
 def load_model(model_id: str, registry: ModelRegistry) -> BaseProviderModel:
     """Public helper to load model instances from registry.

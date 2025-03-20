@@ -72,12 +72,14 @@ A_contra = TypeVar(
 
 # Protocol for flatten function - converts an object to (leaves, auxiliary data)
 class FlattenFn(Protocol[T_contra, L, A_co]):
-    def __call__(self, obj: T_contra) -> Tuple[List[L], A_co]: ...
+    def __call__(self, obj: T_contra) -> Tuple[List[L], A_co]:
+        ...
 
 
 # Protocol for unflatten function - reconstructs object from auxiliary data and leaves
 class UnflattenFn(Protocol[T_co, L, A_contra]):
-    def __call__(self, aux: A_contra, children: List[L]) -> T_co: ...
+    def __call__(self, aux: A_contra, children: List[L]) -> T_co:
+        ...
 
 
 # Type variable for registry keys

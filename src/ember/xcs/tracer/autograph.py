@@ -87,9 +87,9 @@ class AutoGraphBuilder:
             # Generate predictable node IDs for tests that match the expected format
             graph_node_id = f"{record.operator_name}_{i}"
 
-            operator_callable: Callable[[Dict[str, Any]], Any] = (
-                self._create_operator_callable(record_outputs=record.outputs)
-            )
+            operator_callable: Callable[
+                [Dict[str, Any]], Any
+            ] = self._create_operator_callable(record_outputs=record.outputs)
             graph.add_node(
                 operator=operator_callable,
                 node_id=graph_node_id,

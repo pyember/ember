@@ -69,9 +69,7 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
                 if f"{{{field}}}" not in self.prompt_template
             ]
             if missing_fields:
-                error_msg: str = (
-                    f"Missing placeholders in prompt_template: {', '.join(missing_fields)}"
-                )
+                error_msg: str = f"Missing placeholders in prompt_template: {', '.join(missing_fields)}"
                 logger.error(error_msg)
                 raise PlaceholderMissingError(
                     message=error_msg, missing_placeholder=", ".join(missing_fields)
@@ -166,9 +164,7 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             return model.model_validate(data)
         if isinstance(data, EmberModel):
             if not isinstance(data, model):
-                error_msg: str = (
-                    f"{model_label} model mismatch. Expected {model.__name__}, got {type(data).__name__}."
-                )
+                error_msg: str = f"{model_label} model mismatch. Expected {model.__name__}, got {type(data).__name__}."
                 logger.error(error_msg)
                 raise MismatchedModelError(message=error_msg)
             return data
