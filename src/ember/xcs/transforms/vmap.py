@@ -2,8 +2,8 @@
 Vectorized Mapping (vmap): Batch Processing Transformation
 
 Providing the vmap transformation for parallel computation in the XCS framework.
-The vmap transformation vectorizes operators and functions to process batched 
-inputs in parallel, similar to NumPy's vectorization or JAX's vmap, but 
+The vmap transformation vectorizes operators and functions to process batched
+inputs in parallel, similar to NumPy's vectorization or JAX's vmap, but
 specialized for the XCS execution model.
 
 Key features:
@@ -21,42 +21,42 @@ Example:
     class MyOperator(Operator):
         def __call__(self, *, inputs):
             return {"result": process_item(inputs["text"])}
-            
+
     # Creating a vectorized version that processes batches in parallel
     batched_operator = vmap(MyOperator())
-    
+
     # Processing multiple items with a single call
     results = batched_operator(inputs={
         "text": ["item1", "item2", "item3"],
         "options": {"format": "json"}  # Non-batched parameter applied to all items
     })
     # results == {"result": [processed1, processed2, processed3]}
-    
+
     # Combining with other transforms for advanced parallelism
     distributed_batch_op = pmap(vmap(MyOperator()))
     ```
 """
 
 from functools import wraps
-from typing import (
-    TypeVar,
-    Callable,
-    Dict,
-    List,
-    Union,
-    Mapping,
-    Sequence,
-    Optional,
-    Generic,
-    cast,
-    Iterator,
-    Iterable,
-    Any,
-)
-from typing_extensions import TypedDict, Protocol
 
 # Use stub classes to avoid import errors
-from typing import TypeVar, Dict, Any
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    TypeVar,
+    Union,
+    cast,
+)
+
+from typing_extensions import Protocol, TypedDict
 
 
 # Stub class for Operator to avoid circular imports
@@ -95,11 +95,9 @@ ItemT_co = TypeVar(
 class BatchableInput(Protocol[ItemT_co]):
     """Protocol for types that can be batched."""
 
-    def __len__(self) -> int:
-        ...
+    def __len__(self) -> int: ...
 
-    def __getitem__(self, index: int) -> ItemT_co:
-        ...
+    def __getitem__(self, index: int) -> ItemT_co: ...
 
 
 class BatchAxis(TypedDict, total=False):

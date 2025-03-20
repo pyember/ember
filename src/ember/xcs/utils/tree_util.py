@@ -15,7 +15,7 @@ All functions enforce strong type annotations and require named parameter invoca
 
 This module enables critical XCS system capabilities:
 1. Transforms like vmap and pmap operate on nested structures without manual handling
-2. JIT compilation analyzes and optimizes operators by decomposing their structure 
+2. JIT compilation analyzes and optimizes operators by decomposing their structure
 3. Execution engines efficiently traverse complex object graphs
 
 Examples:
@@ -23,20 +23,20 @@ Examples:
     class MyType:
         def __init__(self, value):
             self.value = value
-            
+
     def flatten_my_type(obj):
         return [obj.value], (type(obj), None)
-        
+
     def unflatten_my_type(aux_data, children):
         cls, _ = aux_data
         return cls(children[0])
-        
+
     register_tree(
         cls=MyType,
         flatten_func=flatten_my_type,
         unflatten_func=unflatten_my_type
     )
-    
+
     # Using tree operations
     obj = {"a": MyType(1), "b": [MyType(2), MyType(3)]}
     leaves, aux_data = tree_flatten(tree=obj)  # leaves = [1, 2, 3]
@@ -48,14 +48,14 @@ from __future__ import annotations
 from typing import (
     Callable,
     Dict,
+    Generic,
+    Hashable,
     List,
+    Protocol,
     Tuple,
     Type,
     TypeVar,
-    Generic,
     cast,
-    Protocol,
-    Hashable,
 )
 
 # Define more precise type variables for tree operations
@@ -72,14 +72,12 @@ A_contra = TypeVar(
 
 # Protocol for flatten function - converts an object to (leaves, auxiliary data)
 class FlattenFn(Protocol[T_contra, L, A_co]):
-    def __call__(self, obj: T_contra) -> Tuple[List[L], A_co]:
-        ...
+    def __call__(self, obj: T_contra) -> Tuple[List[L], A_co]: ...
 
 
 # Protocol for unflatten function - reconstructs object from auxiliary data and leaves
 class UnflattenFn(Protocol[T_co, L, A_contra]):
-    def __call__(self, aux: A_contra, children: List[L]) -> T_co:
-        ...
+    def __call__(self, aux: A_contra, children: List[L]) -> T_co: ...
 
 
 # Type variable for registry keys

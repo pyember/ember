@@ -5,8 +5,8 @@ This module provides configuration options for graph execution, allowing
 customization of dispatching strategy, parallelism, and device selection.
 """
 
-from typing import Any, Dict, List, Optional, Union
 import dataclasses
+from typing import Any, Dict, List, Optional, Union
 
 
 @dataclasses.dataclass

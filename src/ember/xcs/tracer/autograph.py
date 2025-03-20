@@ -8,10 +8,10 @@ constructs a graph that can be used for parallel execution.
 
 from __future__ import annotations
 
-import logging
 import hashlib
-from typing import Any, Callable, Dict, List, Set, Tuple, Optional, Union, cast
+import logging
 from collections import defaultdict
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union, cast
 
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.tracer.xcs_tracing import TraceRecord
@@ -87,9 +87,9 @@ class AutoGraphBuilder:
             # Generate predictable node IDs for tests that match the expected format
             graph_node_id = f"{record.operator_name}_{i}"
 
-            operator_callable: Callable[
-                [Dict[str, Any]], Any
-            ] = self._create_operator_callable(record_outputs=record.outputs)
+            operator_callable: Callable[[Dict[str, Any]], Any] = (
+                self._create_operator_callable(record_outputs=record.outputs)
+            )
             graph.add_node(
                 operator=operator_callable,
                 node_id=graph_node_id,

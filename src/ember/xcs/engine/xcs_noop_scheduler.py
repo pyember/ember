@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from ember.xcs.engine.xcs_engine import XCSPlan, IScheduler
+from ember.xcs.engine.xcs_engine import IScheduler, XCSPlan
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 

@@ -16,8 +16,9 @@ enabling advanced capabilities like execution profiling, debugging, audit loggin
 and performance optimization while maintaining strict type safety.
 """
 
-from typing import Dict, TypeVar, Generic
-from typing_extensions import TypedDict, NotRequired
+from typing import Dict, Generic, TypeVar
+
+from typing_extensions import NotRequired, TypedDict
 
 
 class TraceMetadata(TypedDict, total=False):

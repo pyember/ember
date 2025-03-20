@@ -6,10 +6,10 @@ It allows defining operator nodes and the edges between them, and is used by the
 XCS execution engine to execute computational flows.
 """
 
-from typing import Any, Dict, List, Optional, Set, Callable, Union, Tuple, TypeVar, cast
 import dataclasses
-from collections import defaultdict, deque
 import uuid
+from collections import defaultdict, deque
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, TypeVar, Union, cast
 
 
 @dataclasses.dataclass

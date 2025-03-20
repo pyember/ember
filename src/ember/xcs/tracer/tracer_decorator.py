@@ -10,7 +10,7 @@ Key features:
 1. Transparent operator instrumentation via the @jit decorator
 2. Automatic execution graph construction from traced operator calls
 3. Compile-once, execute-many optimization for repeated operations
-4. Support for pre-compilation with sample inputs 
+4. Support for pre-compilation with sample inputs
 5. Configurable tracing and caching behaviors
 
 Implementation follows functional programming principles where possible,
@@ -24,11 +24,11 @@ Example:
         def __call__(self, *, inputs):
             # Complex, multi-step computation
             return result
-            
+
     # First call triggers tracing and compilation
     op = MyOperator()
     result1 = op(inputs={"text": "example"})
-    
+
     # Subsequent calls reuse the compiled execution plan
     result2 = op(inputs={"text": "another example"})
 """
@@ -51,7 +51,7 @@ from typing import (
 )
 
 # Import the base classes carefully to avoid circular imports
-from ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
+from ember.xcs.tracer.xcs_tracing import TracerContext, TraceRecord
 
 # We need to use a string for the bound to avoid circular imports
 # Type variable for Operator subclasses
