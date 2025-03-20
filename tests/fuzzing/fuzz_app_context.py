@@ -8,12 +8,13 @@ edge cases or threading issues.
 
 import os
 import sys
-import time
-import atheris
-import threading
 import tempfile
-from typing import Optional, List, Dict, Any
+import threading
+import time
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
+
+import atheris
 
 # Ensure Ember is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))

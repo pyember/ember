@@ -1,20 +1,19 @@
 #!/usr/bin/env python3
-"""Unit tests for the GeminiModel (Deepmind provider) implementation.
-"""
+"""Unit tests for the GeminiModel (Deepmind provider) implementation."""
 
 import pytest
 
-from ember.core.registry.model.providers.deepmind.deepmind_provider import (
-    GeminiModel,
-    GeminiChatParameters,
-)
 from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatResponse,
     ChatRequest,
+    ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.providers.deepmind.deepmind_provider import (
+    GeminiChatParameters,
+    GeminiModel,
+)
 
 
 class DummyGeminiResponse:
@@ -44,8 +43,9 @@ def create_dummy_deepmind_model_info() -> ModelInfo:
 
 @pytest.fixture(autouse=True)
 def patch_genai() -> None:
-    import google.generativeai as genai
     from unittest.mock import patch
+
+    import google.generativeai as genai
 
     # Patch google's generativeai directly to avoid import path issues
     # First, save the original

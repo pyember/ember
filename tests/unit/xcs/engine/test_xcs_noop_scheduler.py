@@ -5,10 +5,11 @@ which provides a sequential execution strategy for XCS graphs without parallelis
 """
 
 from typing import Any, Dict, List
+
 import pytest
 
-from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
 from ember.xcs.engine.xcs_engine import execute_graph
+from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 

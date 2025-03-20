@@ -1,11 +1,11 @@
 """Test basic functionality of XCS API facade."""
 
-import unittest
 import importlib.util
 import sys
 import types
+import unittest
 from pathlib import Path
-from typing import List, Dict, Any, Callable, TypeVar, Optional
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 # Define our own mock module with a clean API that matches test expectations
 T = TypeVar("T")
@@ -17,8 +17,8 @@ class TestXCSBasic(unittest.TestCase):
     def test_module_imports(self):
         """Test that the xcs module can be imported and has expected attributes."""
         # Import the module directly
-        import sys
         import importlib.util
+        import sys
         from pathlib import Path
 
         project_root = Path(__file__).parent.parent.absolute()

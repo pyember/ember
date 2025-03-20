@@ -1,7 +1,7 @@
 """Unit tests for dataset preppers."""
 
 import unittest
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from ember.core.utils.data.base.config import BaseDatasetConfig
 from ember.core.utils.data.base.models import DatasetEntry

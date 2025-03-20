@@ -1,14 +1,13 @@
-"""Unit tests for ModelEnum and parse_model_str functionality.
-"""
+"""Unit tests for ModelEnum and parse_model_str functionality."""
 
 import pytest
 
 from ember.core.registry.model.config.model_enum import (
-    parse_model_str,
-    ModelEnum,
-    OpenAIModelEnum,
     AnthropicModelEnum,
     DeepmindModelEnum,
+    ModelEnum,
+    OpenAIModelEnum,
+    parse_model_str,
 )
 
 

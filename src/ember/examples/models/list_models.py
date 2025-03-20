@@ -8,9 +8,10 @@ To run:
     poetry run python src/ember/examples/list_models.py
 """
 
-import os
 import logging
-from typing import List, Dict, Any
+import os
+from typing import Any, Dict, List
+
 from prettytable import PrettyTable
 
 from ember.api import models
@@ -219,12 +220,16 @@ def list_available_models():
                         provider,
                         model_id,
                         f"{info.context_window if hasattr(info, 'context_window') else 'N/A'}",
-                        f"${info.cost.input_cost_per_thousand:.4f}"
-                        if hasattr(info, "cost") and info.cost
-                        else "N/A",
-                        f"${info.cost.output_cost_per_thousand:.4f}"
-                        if hasattr(info, "cost") and info.cost
-                        else "N/A",
+                        (
+                            f"${info.cost.input_cost_per_thousand:.4f}"
+                            if hasattr(info, "cost") and info.cost
+                            else "N/A"
+                        ),
+                        (
+                            f"${info.cost.output_cost_per_thousand:.4f}"
+                            if hasattr(info, "cost") and info.cost
+                            else "N/A"
+                        ),
                     ]
                 )
             except Exception as e:

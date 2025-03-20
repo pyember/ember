@@ -3,9 +3,10 @@
 Script to examine metrics objects structure for testing.
 """
 
-import pprint
 import inspect
-from prometheus_client import Counter, Histogram, CollectorRegistry
+import pprint
+
+from prometheus_client import CollectorRegistry, Counter, Histogram
 
 
 def examine_metric_objects():

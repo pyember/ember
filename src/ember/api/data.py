@@ -7,14 +7,14 @@ Examples:
     # Loading a dataset
     from ember.api import datasets
     mmlu_data = datasets("mmlu")
-    
+
     # Using the builder pattern
     from ember.api import DatasetBuilder
     dataset = DatasetBuilder().split("test").sample(100).build("mmlu")
-    
+
     # Registering a custom dataset
     from ember.api import register, TaskType, DatasetEntry
-    
+
     @register("custom_qa", source="custom/qa", task_type=TaskType.QUESTION_ANSWERING)
     class CustomQADataset:
         def load(self, config=None):
@@ -30,12 +30,13 @@ Examples:
             ]
 """
 
-# Import from core implementation
-from ember.core.utils.data.base.models import TaskType, DatasetInfo, DatasetEntry
-from ember.core.utils.data.base.config import BaseDatasetConfig as DatasetConfig
-from ember.core.utils.data.registry import register, UNIFIED_REGISTRY
-from typing import Dict, List, Optional, Union, Any, TypeVar, Generic, Type
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
+from ember.core.utils.data.base.config import BaseDatasetConfig as DatasetConfig
+
+# Import from core implementation
+from ember.core.utils.data.base.models import DatasetEntry, DatasetInfo, TaskType
+from ember.core.utils.data.registry import UNIFIED_REGISTRY, register
 
 # Type variables for generic typing
 T = TypeVar("T")
@@ -192,11 +193,11 @@ def datasets(
     Raises:
         ValueError: If the dataset is not found or loading fails
     """
-    from ember.core.utils.data.service import DatasetService
     from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-    from ember.core.utils.data.base.validators import DatasetValidator
     from ember.core.utils.data.base.samplers import DatasetSampler
     from ember.core.utils.data.base.transformers import NoOpTransformer
+    from ember.core.utils.data.base.validators import DatasetValidator
+    from ember.core.utils.data.service import DatasetService
 
     # Get dataset registration info from the unified registry
     dataset_entry = UNIFIED_REGISTRY.get(name=name)

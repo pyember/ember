@@ -2,10 +2,10 @@
 This test mocks openai.Model.list() to simulate API responses.
 """
 
-import pytest
 from typing import Any, Dict
 
 import openai
+import pytest
 from openai import OpenAI
 
 from ember.core.registry.model.providers.openai.openai_discovery import (

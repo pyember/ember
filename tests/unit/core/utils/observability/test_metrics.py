@@ -4,11 +4,11 @@ Tests for the ember.core.utils.observability.metrics module.
 This module tests the metrics creation and functionality.
 """
 
-import pytest
 import prometheus_client
+import pytest
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-from ember.core.utils.observability.metrics import create_metrics, METRICS
+from ember.core.utils.observability.metrics import METRICS, create_metrics
 
 
 # Helper functions for cross-version compatibility

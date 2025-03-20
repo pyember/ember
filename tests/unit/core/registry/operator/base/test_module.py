@@ -2,7 +2,7 @@
 
 This module tests the core functionality of the EmberModule system, including:
 1. Field creation and metadata handling
-2. Metaclass behavior for automatic dataclass decoration and registration 
+2. Metaclass behavior for automatic dataclass decoration and registration
 3. Tree flattening and unflattening for transformation operations
 4. EmberModule initialization and immutability
 5. EmberModule integration with the transformation system
@@ -15,27 +15,26 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
-import threading
 import sys
+import threading
 from typing import Any, List, Tuple
 
 import pytest
 
 from ember.core.registry.operator.base._module import (
-    EmberModule,
     BoundMethod,
-    static_field,
-    ember_field,
-    _make_initable_wrapper,
+    EmberModule,
     EmberModuleMeta,
     ModuleCache,
+    _make_initable_wrapper,
+    ember_field,
+    static_field,
 )
 from ember.xcs.utils.tree_util import (
+    _pytree_registry,
     tree_flatten,
     tree_unflatten,
-    _pytree_registry,
 )
-
 
 # -----------------------------------------------------------------------------
 # Field Creation Tests

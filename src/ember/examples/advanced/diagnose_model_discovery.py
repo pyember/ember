@@ -5,14 +5,14 @@ It adds detailed logging and performs targeted tests to identify issues in the m
 discovery process.
 """
 
-import os
-import sys
-import logging
 import importlib
 import inspect
+import logging
+import os
+import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(name)s: %(message)s")
@@ -27,8 +27,8 @@ if src_path not in sys.path:
 # Import with careful error handling
 try:
     from ember.api import models
-    from ember.core.registry.model.base.registry.model_registry import ModelRegistry
     from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
+    from ember.core.registry.model.base.registry.model_registry import ModelRegistry
     from ember.core.registry.model.providers.base_discovery import BaseDiscoveryProvider
     from ember.core.registry.model.providers.registry import PROVIDER_REGISTRY
 

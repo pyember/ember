@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Union
+
 from datasets import Dataset
 
 # Define a type alias for datasets: either a Hugging Face Dataset or a list of dictionaries.

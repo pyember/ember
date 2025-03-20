@@ -16,14 +16,14 @@ import threading
 import time
 import types
 from typing import Any, Dict, List, Optional, cast
-
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from ember.core.registry.model.base.registry.discovery import ModelDiscoveryService
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.providers.base_discovery import (
     BaseDiscoveryProvider,
     ModelDiscoveryError,
@@ -669,7 +669,7 @@ def test_merge_with_config_no_provider_field() -> None:
     discovered = {
         "model:missing": {
             "model_id": "model:missing",
-            "model_name": "Model With Missing Provider"
+            "model_name": "Model With Missing Provider",
             # No provider field
         }
     }

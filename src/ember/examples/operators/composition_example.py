@@ -15,16 +15,16 @@ To run:
 
 import logging
 import time
-from typing import Any, Dict, List, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
 
-from pydantic import BaseModel
 from prettytable import PrettyTable
+from pydantic import BaseModel
 
 # ember API imports
 from ember.api import non
-from ember.api.operator import Operator, Specification
 from ember.api.models import LMModule, LMModuleConfig
-from ember.api.xcs import jit, execution_options
+from ember.api.operator import Operator, Specification
+from ember.api.xcs import execution_options, jit
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -258,9 +258,11 @@ def main() -> None:
             [
                 "Functional",
                 f"{elapsed:.4f}",
-                result["final_answer"][:50] + "..."
-                if len(result["final_answer"]) > 50
-                else result["final_answer"],
+                (
+                    result["final_answer"][:50] + "..."
+                    if len(result["final_answer"]) > 50
+                    else result["final_answer"]
+                ),
             ]
         )
 
@@ -284,9 +286,11 @@ def main() -> None:
             [
                 "Nested",
                 f"{elapsed:.4f}",
-                result["final_answer"][:50] + "..."
-                if len(result["final_answer"]) > 50
-                else result["final_answer"],
+                (
+                    result["final_answer"][:50] + "..."
+                    if len(result["final_answer"]) > 50
+                    else result["final_answer"]
+                ),
             ]
         )
 
@@ -310,9 +314,11 @@ def main() -> None:
             [
                 "Sequential",
                 f"{elapsed:.4f}",
-                result["final_answer"][:50] + "..."
-                if len(result["final_answer"]) > 50
-                else result["final_answer"],
+                (
+                    result["final_answer"][:50] + "..."
+                    if len(result["final_answer"]) > 50
+                    else result["final_answer"]
+                ),
             ]
         )
 
@@ -339,9 +345,11 @@ def main() -> None:
                 [
                     "Nested (Sequential)",
                     f"{elapsed:.4f}",
-                    result["final_answer"][:50] + "..."
-                    if len(result["final_answer"]) > 50
-                    else result["final_answer"],
+                    (
+                        result["final_answer"][:50] + "..."
+                        if len(result["final_answer"]) > 50
+                        else result["final_answer"]
+                    ),
                 ]
             )
 

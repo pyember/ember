@@ -1,7 +1,7 @@
 """Unit tests for the DatasetLoaderFactory class."""
 
 import unittest
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 from unittest import mock
 
 from ember.core.utils.data.base.preppers import IDatasetPrepper

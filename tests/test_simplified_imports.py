@@ -5,27 +5,24 @@ This module verifies that the simplified import patterns work as expected.
 """
 
 import unittest
-from typing import Dict, Any
+from typing import Any, Dict
 
 # Test the simplified imports directly
 try:
     # Import everything from the simplified_imports module
-    from tests.helpers.simplified_imports import (
-        # Get Operator from the same module to ensure correct type checking
-        Operator,
-        T_in,
-        T_out,
-        # Operators
-        UniformEnsemble,
-        MostCommon,
-        JudgeSynthesis,
-        Verifier,
-        Sequential,
-        # Input/Output types
+    from tests.helpers.simplified_imports import (  # Get Operator from the same module to ensure correct type checking; Operators; Input/Output types
         EnsembleInputs,
         EnsembleOperatorOutputs,
+        JudgeSynthesis,
         JudgeSynthesisInputs,
         JudgeSynthesisOutputs,
+        MostCommon,
+        Operator,
+        Sequential,
+        T_in,
+        T_out,
+        UniformEnsemble,
+        Verifier,
     )
 
     IMPORT_SUCCESS = True

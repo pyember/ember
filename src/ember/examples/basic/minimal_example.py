@@ -2,8 +2,8 @@
 
 This module demonstrates the simplest possible Ember operator.
 
-This example illustrates how the Ember `Operator` construct provides a minimal 
-foundation that can be used for language-model transformations or to wrap 
+This example illustrates how the Ember `Operator` construct provides a minimal
+foundation that can be used for language-model transformations or to wrap
 arbitrary function logic.
 
 To run:

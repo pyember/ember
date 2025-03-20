@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 from typing import Dict, Type
 
 import pytest
-from ember.core.types import EmberModel
 
 from ember.core.registry.specification.exceptions import (
     InvalidInputTypeError,
@@ -10,6 +10,7 @@ from ember.core.registry.specification.exceptions import (
     PlaceholderMissingError,
 )
 from ember.core.registry.specification.specification import Specification
+from ember.core.types import EmberModel
 
 
 class DummyInput(EmberModel):

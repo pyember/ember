@@ -5,13 +5,14 @@ Fuzzing tests for Ember config parser functionality.
 This module tests the robustness of the ConfigManager class against malformed input.
 """
 
+import configparser
 import os
 import sys
 import tempfile
-import atheris
-import configparser
 from pathlib import Path
 from typing import Optional
+
+import atheris
 
 # Ensure Ember is in the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))

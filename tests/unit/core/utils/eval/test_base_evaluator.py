@@ -1,9 +1,9 @@
 """Tests for base_evaluator module."""
 
-from typing import Any, Dict, TypeVar
-import sys
 import os
+import sys
 import unittest
+from typing import Any, Dict, TypeVar
 from unittest import mock
 
 import pytest

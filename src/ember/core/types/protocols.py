@@ -6,7 +6,7 @@ various components in the Ember system, enabling structural typing
 and better interoperability between components.
 """
 
-from typing import Any, Dict, Protocol, runtime_checkable, Type, Optional
+from typing import Any, Dict, Optional, Protocol, Type, runtime_checkable
 
 
 class TypeInfo:

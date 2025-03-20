@@ -8,10 +8,10 @@ To run:
     poetry run python src/ember/examples/example_simplified_xcs.py
 """
 
+from ember.api.xcs import jit, pmap, vmap
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.api.xcs import jit, vmap, pmap
-from ember.xcs.tracer.autograph import autograph
 from ember.xcs.engine.execution_options import execution_options
+from ember.xcs.tracer.autograph import autograph
 
 # Import the API for advanced configuration
 from ember.xcs.tracer.tracer_decorator import JITOptions

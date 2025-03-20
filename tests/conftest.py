@@ -1,10 +1,11 @@
 """Configure pytest environment for unit tests."""
 
-import pytest
-import sys
 import importlib
 import logging
+import sys
 from pathlib import Path
+
+import pytest
 
 # Get absolute paths
 PROJECT_ROOT = Path(__file__).parent.parent.absolute()
@@ -57,16 +58,18 @@ import warnings
 warnings.filterwarnings("ignore", message=".*XCS functionality partially unavailable.*")
 warnings.filterwarnings("ignore", message=".*initialize_ember\\(\\) is deprecated.*")
 
-# Register test providers for unit and integration tests
-from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
+from typing import Any
+
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+
+# Register test providers for unit and integration tests
+from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
 from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.plugin_system import registered_providers
-from typing import Any
 
 
 # Test Provider for test_model_registry

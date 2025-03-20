@@ -4,13 +4,14 @@ This example demonstrates how to manually register models with the ModelRegistry
 using the new simplified API.
 """
 
-import os
 import logging
+import os
 from typing import Dict, List, Optional
+
 from prettytable import PrettyTable
 
 from ember.api import models
-from ember.api.models import ModelInfo, ModelCost, RateLimit, register_model
+from ember.api.models import ModelCost, ModelInfo, RateLimit, register_model
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

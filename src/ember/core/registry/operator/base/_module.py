@@ -28,6 +28,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Final,
     Generic,
     List,
     Optional,
@@ -35,7 +36,6 @@ from typing import (
     Type,
     TypeVar,
     final,
-    Final,
 )
 
 from ember.core.registry.operator.exceptions import (

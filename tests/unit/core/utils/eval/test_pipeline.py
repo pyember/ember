@@ -1,7 +1,7 @@
 """Tests for pipeline module."""
 
-import sys
 import os
+import sys
 import unittest
 from unittest import mock
 
@@ -18,16 +18,16 @@ except ImportError:
 
 try:
     from ember.core.utils.eval.pipeline import (
-        PipelineEvaluator,
         BatchEvaluationSummary,
+        PipelineEvaluator,
         evaluate_batch,
         evaluate_batch_with_summary,
         summarize_batch,
     )
 except ImportError:
     from ember.core.utils.eval.pipeline import (
-        PipelineEvaluator,
         BatchEvaluationSummary,
+        PipelineEvaluator,
         evaluate_batch,
         evaluate_batch_with_summary,
         summarize_batch,

@@ -2,7 +2,7 @@
 Ember: Compositional Framework for Compound AI Systems
 =====================================================
 
-Ember is a powerful, extensible Python framework for building and orchestrating 
+Ember is a powerful, extensible Python framework for building and orchestrating
 Compound AI Systems and "Networks of Networks" (NONs).
 
 Core Features:
@@ -20,35 +20,35 @@ For more information, visit https://pyember.org
 Examples:
     # Import primary API modules
     import ember
-    
+
     # Initialize model registry and service
     from ember.api.models import initialize_registry, create_model_service
-    
+
     registry = initialize_registry(auto_discover=True)
     model_service = create_model_service(registry=registry)
-    
+
     # Call a model
     response = model_service.invoke_model(
         model_id="openai:gpt-4",
         prompt="What's the capital of France?",
         temperature=0.7
     )
-    
+
     # Load datasets directly
     from ember.api.data import datasets
     mmlu_data = datasets("mmlu")
-    
+
     # Or use the dataset builder pattern
     from ember.api.data import DatasetBuilder
     dataset = DatasetBuilder().split("test").sample(100).build("mmlu")
-    
+
     # Create Networks of Networks (NONs)
     from ember.api import non
     ensemble = non.UniformEnsemble(
-        num_units=3, 
+        num_units=3,
         model_name="openai:gpt-4o"
     )
-    
+
     # Optimize with XCS
     from ember.api import xcs
     @xcs.jit
@@ -59,21 +59,19 @@ Examples:
 from __future__ import annotations
 
 import importlib.metadata
-from typing import Optional, Dict, Any, Union
+from typing import Any, Dict, Optional, Union
 
 # Import primary API components - these are the only public interfaces
-from ember.api import (
-    models,  # Language model access (models.openai.gpt4, etc.)
-    data,  # Dataset access (datasets("mmlu"), etc.)
-    operators,  # Operator registry (operators.get_operator(), etc.)
-    non,  # Network of Networks patterns (non.UniformEnsemble, etc.)
-    xcs,  # Execution optimization (xcs.jit, etc.)
-)
+from ember.api import data  # Dataset access (datasets("mmlu"), etc.)
+from ember.api import models  # Language model access (models.openai.gpt4, etc.)
+from ember.api import non  # Network of Networks patterns (non.UniformEnsemble, etc.)
+from ember.api import operators  # Operator registry (operators.get_operator(), etc.)
+from ember.api import xcs  # Execution optimization (xcs.jit, etc.)
 
 # Import necessary components for initialization
-from ember.core.app_context import create_ember_app, EmberContext, EmberAppContext
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.app_context import EmberAppContext, EmberContext, create_ember_app
 from ember.core.config.manager import ConfigManager, create_config_manager
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 
 # Version detection
 try:

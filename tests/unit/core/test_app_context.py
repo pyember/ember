@@ -3,7 +3,7 @@ Test the EmberContext and EmberAppContext functionality.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from ember.core.app_context import (
     EmberAppContext,

@@ -11,9 +11,8 @@ from datasets import Dataset, DatasetDict
 
 from ember.core.utils.data import load_dataset_entries
 from ember.core.utils.data.base.models import DatasetEntry
-from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
 from ember.core.utils.data.datasets_registry.halueval import HaluEvalConfig
-
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
 
 # Skip unless environment variable is set to run integration tests
 should_run_integration = os.environ.get("RUN_INTEGRATION_TESTS", "").lower() in (

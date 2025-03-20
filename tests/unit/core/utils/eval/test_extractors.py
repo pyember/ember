@@ -1,9 +1,9 @@
 """Tests for extractors module."""
 
-from typing import Any
-import sys
 import os
+import sys
 import unittest
+from typing import Any
 
 import pytest
 

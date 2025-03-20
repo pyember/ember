@@ -17,12 +17,10 @@ from __future__ import annotations
 
 from typing import List
 
-from ember.core.types import EmberModel
-
-from ember.core.registry.operator.base.operator_base import Operator
-
-from ember.core.registry.specification.specification import Specification
 from ember.core.registry.model.model_module.lm import LMModule
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types import EmberModel
 
 
 class EnsembleOperatorInputs(EmberModel):

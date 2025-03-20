@@ -4,13 +4,13 @@ This module provides functions for loading configuration from various sources
 and transforming it into a validated EmberConfig object.
 """
 
-from typing import Dict, Any, Optional, List
 import os
 import re
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from .schema import EmberConfig
 from .exceptions import ConfigError
+from .schema import EmberConfig
 
 
 def merge_dicts(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:

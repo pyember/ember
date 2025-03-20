@@ -1,19 +1,19 @@
 """Models API for Ember.
 
-This module provides a clean, type-safe API for working with language models from 
+This module provides a clean, type-safe API for working with language models from
 various providers. It offers a consistent interface with multiple invocation patterns
 to suit different programming styles.
 
 Examples:
     # 1. Initialize the model system
     from ember.api import models
-    
+
     # 2. Use namespace-style access (preferred pattern)
     response = models.openai.gpt4o("What is the capital of France?")
-    
+
     # 3. Use with configuration builder
     from ember.api.models import ModelBuilder
-    
+
     model = (
         ModelBuilder()
         .temperature(0.7)
@@ -21,22 +21,22 @@ Examples:
         .build("anthropic:claude-3.5-sonnet")
     )
     response = model.generate(prompt="Explain quantum computing")
-    
+
     # 4. Use type-safe ModelEnum references
     from ember.api.models import ModelEnum, ModelAPI
-    
+
     model = ModelAPI.from_enum(ModelEnum.OPENAI_GPT4O)
     response = model.generate(prompt="What's the best programming language?")
-    
+
     # 5. Access the underlying registry directly for advanced usage
     from ember.api.models import get_registry
-    
+
     registry = get_registry()
     available_models = registry.list_models()
-    
+
     # 6. Track model usage with UsageService
     from ember.api.models import get_usage_service
-    
+
     usage = get_usage_service()
     stats = usage.get_usage_stats()
     print(f"Total tokens: {stats.total_tokens}")
@@ -45,9 +45,17 @@ Examples:
 import sys
 from typing import Any, Dict, List, Optional, Union
 
-# Core initialization and registry access
-from ember.core.registry.model.initialization import initialize_registry
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+)
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+
+# Model schemas and types
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.schemas.usage import UsageStats
 
 # Service and provider model access
 from ember.core.registry.model.base.services.model_service import (
@@ -55,23 +63,16 @@ from ember.core.registry.model.base.services.model_service import (
     create_model_service,
 )
 from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
-
-# Model schemas and types
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.model.base.schemas.usage import UsageStats
-from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatResponse,
-    ChatRequest,
-)
-
-# Language model module classes
-from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 
 # Configuration and enums
 from ember.core.registry.model.config.model_enum import ModelEnum
+
+# Core initialization and registry access
+from ember.core.registry.model.initialization import initialize_registry
+
+# Language model module classes
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 # Singleton instances for global access
 _registry: Optional[ModelRegistry] = None

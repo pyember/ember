@@ -2,7 +2,7 @@
 OpenAI model discovery provider.
 
 This module implements model discovery using the latest OpenAI Python SDK.
-It creates a client via the OpenAI class, retrieves available models using 
+It creates a client via the OpenAI class, retrieves available models using
 client.models.list(), filters the results, and standardizes them for the Ember model registry.
 """
 
@@ -11,7 +11,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import openai
-from openai import OpenAI, APIError
+from openai import APIError, OpenAI
 
 from ember.core.registry.model.providers.base_discovery import (
     BaseDiscoveryProvider,

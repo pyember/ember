@@ -4,10 +4,11 @@ This module verifies parallel execution using the TopologicalSchedulerWithParall
 scheduler, focusing on performance and correctness when executing independent operations.
 """
 
-from typing import Any, Dict, List
-import time
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
+
 import pytest
 
 from ember.xcs.engine.xcs_engine import (

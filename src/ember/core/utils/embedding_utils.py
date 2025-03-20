@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from typing import List, Protocol
-import math
-
 
 ################################################################
 # 1) Embedding Model Interfaces & Implementations

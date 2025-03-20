@@ -2,15 +2,16 @@
 Tests for XCS (eXecution Control System) type definitions.
 """
 
+from typing import Any, Dict, List, Optional, Union
+
 import pytest
-from typing import Dict, Any, List, Optional, Union
 
 from ember.core.types.xcs_types import (
-    XCSNode,
     XCSGraph,
-    XCSPlan,
+    XCSNode,
     XCSNodeAttributes,
     XCSNodeResult,
+    XCSPlan,
 )
 
 
@@ -35,9 +36,9 @@ class MockNode:
         self.inbound_edges: List[str] = []  # Nodes that feed into this one
         self.outbound_edges: List[str] = []  # Nodes this one feeds into
         self.attributes: XCSNodeAttributes = {}  # Node metadata
-        self.captured_outputs: Optional[
-            Dict[str, Any]
-        ] = None  # Latest execution result
+        self.captured_outputs: Optional[Dict[str, Any]] = (
+            None  # Latest execution result
+        )
 
 
 class MockGraph:

@@ -1,12 +1,12 @@
 """Provider Model Factory Module
 
-This module provides a factory pattern implementation for dynamically discovering and 
-instantiating provider model instances from ModelInfo configurations. The factory 
+This module provides a factory pattern implementation for dynamically discovering and
+instantiating provider model instances from ModelInfo configurations. The factory
 handles both explicitly registered providers and automatically discovered providers
 at runtime.
 
 Architecture:
-- Provider Discovery: Scans the provider package directory structure to find all 
+- Provider Discovery: Scans the provider package directory structure to find all
   compatible provider implementations
 - Provider Registry: Maintains a cache of discovered provider classes for faster access
 - Lazy Loading: Providers are discovered only when first needed, then cached
@@ -18,20 +18,20 @@ The factory is essential for the model registry system, enabling it to:
 3. Handle provider-specific configuration and instantiation details
 """
 
-from types import ModuleType
 import importlib
 import inspect
 import logging
 import os
 import pkgutil
+from types import ModuleType
 from typing import Any, Dict, Optional, Type
 
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.core.registry.model.config.model_enum import parse_model_str
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.core.registry.model.providers.registry import PROVIDER_REGISTRY
 
 LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -147,11 +147,11 @@ class ModelFactory:
                 )
                 provider_package_name: str = provider_module.__name__
                 provider_package_path: str = os.path.dirname(provider_module.__file__)
-                dynamic_providers: Dict[
-                    str, Type[BaseProviderModel]
-                ] = discover_providers_in_package(
-                    package_name=provider_package_name,
-                    package_path=provider_package_path,
+                dynamic_providers: Dict[str, Type[BaseProviderModel]] = (
+                    discover_providers_in_package(
+                        package_name=provider_package_name,
+                        package_path=provider_package_path,
+                    )
                 )
                 for name, provider_class in dynamic_providers.items():
                     if name not in cls._provider_cache:
@@ -236,9 +236,9 @@ class ModelFactory:
         provider_name: str = model_info.provider.name
 
         # Retrieving available providers
-        discovered_providers: Dict[
-            str, Type[BaseProviderModel]
-        ] = ModelFactory._get_providers()
+        discovered_providers: Dict[str, Type[BaseProviderModel]] = (
+            ModelFactory._get_providers()
+        )
 
         # Trying exact match first
         provider_class: Optional[Type[BaseProviderModel]] = discovered_providers.get(

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Any
-
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Any, Dict, Generic, Optional, TypeVar
 
 # We define separate type variables for system output and correct answer.
 T_out = TypeVar("T_out")

@@ -1,4 +1,5 @@
 import pytest
+
 from tests.helpers.simplified_imports import EmberModel
 
 

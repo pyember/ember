@@ -4,10 +4,11 @@ This script tests the automatic model discovery functionality in the model regis
 It's a simple test script that directly uses the registry and discovery service.
 """
 
-import os
-import pytest
 import logging
-from typing import Dict, Any, List
+import os
+from typing import Any, Dict, List
+
+import pytest
 
 # Import module directly from src path to avoid import issues
 from src.ember import initialize_ember as initialize_registry

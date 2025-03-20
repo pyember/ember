@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Unit tests for model registry exceptions.
-"""
+"""Unit tests for model registry exceptions."""
 
 import pytest
 
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
-    ModelRegistrationError,
     ModelDiscoveryError,
+    ModelRegistrationError,
 )
 
 

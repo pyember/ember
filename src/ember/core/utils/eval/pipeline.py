@@ -1,8 +1,9 @@
 from __future__ import annotations
-from typing import Any, Callable, List
-from dataclasses import dataclass
 
-from .base_evaluator import IEvaluator, EvaluationResult
+from dataclasses import dataclass
+from typing import Any, Callable, List
+
+from .base_evaluator import EvaluationResult, IEvaluator
 
 
 class PipelineEvaluator(IEvaluator[Any, Any]):

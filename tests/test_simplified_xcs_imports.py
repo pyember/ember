@@ -5,26 +5,26 @@ This module verifies that the simplified import patterns work as expected.
 """
 
 import unittest
-from typing import Dict, Any, Callable, List
+from typing import Any, Callable, Dict, List
 
 # Try using the simplified import structure
 try:
     # Use our stub implementations for testing
     from tests.helpers.simplified_xcs_imports import (
-        jit,
-        vmap,
-        pmap,
-        autograph,
-        execute,
-        xcs,
-        XCSExecutionOptions,
+        DeviceMesh,
         ExecutionResult,
         JITOptions,
-        TransformOptions,
+        PartitionSpec,
         TracerContext,
         TraceRecord,
-        DeviceMesh,
-        PartitionSpec,
+        TransformOptions,
+        XCSExecutionOptions,
+        autograph,
+        execute,
+        jit,
+        pmap,
+        vmap,
+        xcs,
     )
 except ImportError as e:
     # Fall back to direct imports if simplified structure isn't available
@@ -35,23 +35,22 @@ except ImportError as e:
     try:
         # Try to import from core implementations
         # Direct imports for XCS functionality
-        from ember.xcs.tracer.tracer_decorator import jit
-        from ember.xcs.transforms.vmap import vmap
-        from ember.xcs.transforms.pmap import pmap
-        from ember.xcs.tracer.autograph import AutoGraphBuilder as autograph
-        from ember.xcs.engine.xcs_engine import execute_graph as execute
-
         # Import API singleton
         from ember.xcs.api.core import XCSAPI
+        from ember.xcs.engine.xcs_engine import execute_graph as execute
+        from ember.xcs.tracer.autograph import AutoGraphBuilder as autograph
+        from ember.xcs.tracer.tracer_decorator import jit
+        from ember.xcs.transforms.pmap import pmap
+        from ember.xcs.transforms.vmap import vmap
 
         xcs = XCSAPI()
 
         # Type imports
         from ember.xcs.api.types import (
-            XCSExecutionOptions,
             ExecutionResult,
             JITOptions,
             TransformOptions,
+            XCSExecutionOptions,
         )
 
         # Tracing components
@@ -63,20 +62,20 @@ except ImportError as e:
         # As a last resort, use our stub implementations for testing
         print("Core XCS imports also failed. Using stub implementations for testing.")
         from tests.helpers.simplified_xcs_imports import (
-            jit,
-            vmap,
-            pmap,
-            autograph,
-            execute,
-            xcs,
-            XCSExecutionOptions,
+            DeviceMesh,
             ExecutionResult,
             JITOptions,
-            TransformOptions,
+            PartitionSpec,
             TracerContext,
             TraceRecord,
-            DeviceMesh,
-            PartitionSpec,
+            TransformOptions,
+            XCSExecutionOptions,
+            autograph,
+            execute,
+            jit,
+            pmap,
+            vmap,
+            xcs,
         )
 
 # All imports succeeded

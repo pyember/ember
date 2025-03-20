@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 import subprocess
-from typing import Any, Dict, TypeVar, Optional, List, Generic, Callable, Union
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar, Union
 
-from .base_evaluator import IEvaluator, EvaluationResult
+from .base_evaluator import EvaluationResult, IEvaluator
 from .extractors import RegexExtractor
 
 T_out = TypeVar("T_out")

@@ -2,7 +2,7 @@
 
 import unittest
 
-from ember.core.utils.data.base.models import TaskType, DatasetInfo, DatasetEntry
+from ember.core.utils.data.base.models import DatasetEntry, DatasetInfo, TaskType
 
 
 class TestTaskType(unittest.TestCase):

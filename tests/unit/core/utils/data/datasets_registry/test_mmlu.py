@@ -2,7 +2,7 @@
 
 import unittest
 
-from ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper, MMLUConfig
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig, MMLUPrepper
 
 
 class TestMMLUConfig(unittest.TestCase):

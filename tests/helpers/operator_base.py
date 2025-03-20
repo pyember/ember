@@ -17,13 +17,13 @@ from typing import (
     Any,
     Dict,
     Generic,
-    TypeVar,
-    Union,
     Optional,
     Protocol,
-    runtime_checkable,
     Type,
+    TypeVar,
+    Union,
     cast,
+    runtime_checkable,
 )
 
 # Import the EmberModel instead of BaseModel

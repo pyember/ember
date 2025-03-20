@@ -5,21 +5,22 @@ These tests exercise complete workflows from model creation to operator executio
 in an integrated manner using real components and interfaces.
 """
 
-import os
 import logging
+import os
+from typing import Annotated, Any, Dict, List, Optional, Type, Union
+
 import pytest
 from pydantic import Field
-from typing import Dict, Any, List, Optional, Type, Union, Annotated
 
 # Core components
 from ember.core.app_context import create_ember_app
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.specification.specification import Specification
-from ember.core.registry.operator.base._module import static_field
+from ember.core.registry.model.base.services.model_service import ModelService
 
 # Model components
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.operator.base._module import static_field
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
 
 # Import base types
 from ember.core.types.ember_model import EmberModel

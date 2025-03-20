@@ -7,14 +7,14 @@ To run:
     poetry run python src/ember/examples/diverse_ensemble_operator_example.py
 """
 
-from typing import ClassVar, Dict, List, Optional, Type
 from random import sample
+from typing import ClassVar, Dict, List, Optional, Type
 
 from pydantic import Field
 
 from ember.api import models, non
-from ember.api.operator import Operator, Specification
 from ember.api.models import LMModule, LMModuleConfig
+from ember.api.operator import Operator, Specification
 from ember.api.types import EmberModel, extract_value
 
 

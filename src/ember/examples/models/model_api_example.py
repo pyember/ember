@@ -8,9 +8,9 @@ To run:
     poetry run python src/ember/examples/model_api_example.py
 """
 
-import os
 import logging
-from typing import Dict, Any
+import os
+from typing import Any, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 # Import from the simplified API
 from ember.api.models import (
-    initialize_registry,
-    create_model_service,
+    ModelCost,
+    ModelInfo,
     ModelRegistry,
     ModelService,
-    UsageService,
-    ModelInfo,
-    ModelCost,
     RateLimit,
+    UsageService,
+    create_model_service,
+    initialize_registry,
 )
 
 

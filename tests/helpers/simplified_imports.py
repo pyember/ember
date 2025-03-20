@@ -8,32 +8,34 @@ import structure specifically for testing the simplified import mechanism.
 # Try to import directly from core implementation modules
 try:
     # This is what the simplified imports are meant to expose
+    from ember.core.non import Sequential
     from ember.core.registry.operator.base.operator_base import Operator, T_in, T_out
 
+    # Import output types
     # Import operators from their actual implementation locations
     from ember.core.registry.operator.core.ensemble import (
-        UniformEnsemble,
         EnsembleOperatorInputs as EnsembleInputs,
+    )
+    from ember.core.registry.operator.core.ensemble import (
+        EnsembleOperatorOutputs,
+        UniformEnsemble,
     )
     from ember.core.registry.operator.core.most_common import MostCommon
     from ember.core.registry.operator.core.synthesis_judge import (
         JudgeSynthesis,
         JudgeSynthesisInputs,
+        JudgeSynthesisOutputs,
     )
     from ember.core.registry.operator.core.verifier import Verifier
-    from ember.core.non import Sequential
-
-    # Import output types
-    from ember.core.registry.operator.core.ensemble import EnsembleOperatorOutputs
-    from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOutputs
 
     # Add alias for output types if needed
     EnsembleOutputs = EnsembleOperatorOutputs
 
 except ImportError:
     # If direct imports fail, use minimal stubs for simplified import testing
+    from typing import Any, Dict, Generic, List, Optional, TypeVar
+
     from pydantic import BaseModel
-    from typing import List, TypeVar, Generic, Dict, Any, Optional
 
     # Create minimal EmberModel for testing
     class EmberModel(BaseModel):

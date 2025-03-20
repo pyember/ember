@@ -6,7 +6,7 @@ transform test modules, promoting code reuse and consistency.
 """
 
 import time
-from typing import Any, Dict, List, Tuple, Callable
+from typing import Any, Callable, Dict, List, Tuple
 
 
 def generate_batch_inputs(

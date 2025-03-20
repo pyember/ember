@@ -5,12 +5,12 @@ Fuzzing test suite for Ember using Atheris.
 This script discovers and runs all fuzzing tests defined in the fuzzing directory.
 """
 
+import argparse
+import glob
+import importlib.util
 import os
 import sys
 import time
-import glob
-import importlib.util
-import argparse
 from typing import List, Optional
 
 # Ensure Ember is in the Python path

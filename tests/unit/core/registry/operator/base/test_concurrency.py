@@ -1,6 +1,6 @@
+import dataclasses
 import threading
 import unittest
-import dataclasses
 from typing import List
 
 from ember.core.registry.operator.base._module import EmberModule, ember_field

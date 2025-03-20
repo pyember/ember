@@ -3,9 +3,6 @@
 This module provides access to the centralized configuration system in ember.core.config.
 """
 
-# Import from centralized config system
-from ember.core.config.schema import EmberConfig as EmberSettings
-
 import logging
 import os
 import warnings
@@ -13,22 +10,24 @@ from typing import Any, Dict, List, Optional, Set
 
 from pydantic import BaseModel
 
-from ember.core.exceptions import EmberError
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.config.manager import create_config_manager
 
 # Import from current locations
+# Import from centralized config system
 from ember.core.config.schema import EmberConfig
-from ember.core.config.manager import create_config_manager
+from ember.core.config.schema import EmberConfig as EmberSettings
+from ember.core.exceptions import EmberError
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.initialization import initialize_registry
 
 # Keep imports for compatibility with old code
 try:
-    from ember.core.config.schema import Provider, Model
-    from ember.core.config.loader import load_config
     from ember.core.config.exceptions import ConfigError
+    from ember.core.config.loader import load_config
+    from ember.core.config.schema import Model, Provider
 except ImportError:
     # Fallbacks for environments without the old modules
     class Provider:

@@ -14,15 +14,15 @@ To run:
     poetry run python src/ember/examples/advanced/reasoning_system.py
 """
 
-from typing import ClassVar, List, Dict, Any, Optional, Type
 from dataclasses import dataclass, field
+from typing import Any, ClassVar, Dict, List, Optional, Type
 
 # Ember API imports
-from ember.api.xcs import jit, execution_options
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.types.ember_model import EmberModel, Field
-from ember.core.registry.specification.specification import Specification
+from ember.api.xcs import execution_options, jit
 from ember.core import non
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel, Field
 
 ###############################################################################
 # Input/Output Models

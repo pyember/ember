@@ -1,4 +1,5 @@
 """This module is a placeholder example for observability metrics. We are excited to expand on this in the future."""
+
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
 

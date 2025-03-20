@@ -1,5 +1,4 @@
-"""Unit tests for cost schemas (ModelCost and RateLimit).
-"""
+"""Unit tests for cost schemas (ModelCost and RateLimit)."""
 
 import pytest
 

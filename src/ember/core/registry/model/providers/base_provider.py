@@ -15,14 +15,14 @@ Typical usage example:
   # Implementing a custom provider
   class MyProviderParameters(BaseChatParameters):
       additional_param: Optional[str] = None
-      
+
   class MyProvider(BaseProviderModel):
       PROVIDER_NAME = "MyProvider"
-      
+
       def create_client(self) -> Any:
           # Initialize your API client
           return client
-          
+
       def forward(self, request: ChatRequest) -> ChatResponse:
           # Process request and return standardized response
           return ChatResponse(...)
@@ -34,11 +34,11 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
 
 
 class BaseChatParameters(BaseModel):

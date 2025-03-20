@@ -1,22 +1,22 @@
-import os
-import time
 import logging
+import os
 import threading
+import time
 from typing import Any, Dict, List
 
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
+    AnthropicDiscovery,
+)
 from ember.core.registry.model.providers.base_discovery import (
     BaseDiscoveryProvider,
     ModelDiscoveryError,
 )
-from ember.core.registry.model.providers.openai.openai_discovery import (
-    OpenAIDiscovery,
-)
-from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
-    AnthropicDiscovery,
-)
 from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,
+)
+from ember.core.registry.model.providers.openai.openai_discovery import (
+    OpenAIDiscovery,
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ class ModelDiscoveryService:
         Returns:
             List[BaseDiscoveryProvider]: A list of initialized discovery providers.
         """
-        from typing import Dict, Tuple, Optional, Type, Callable
+        from typing import Callable, Dict, Optional, Tuple, Type
 
         # Define provider configurations
         ProviderConfig = Tuple[
@@ -232,6 +232,7 @@ class ModelDiscoveryService:
             Dict[str, ModelInfo]: Mapping from model ID to merged ModelInfo objects.
         """
         import os
+
         from ember.core.registry.model.config.settings import EmberSettings
 
         settings = EmberSettings()

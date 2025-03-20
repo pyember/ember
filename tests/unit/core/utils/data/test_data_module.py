@@ -3,13 +3,13 @@
 import unittest
 from unittest import mock
 
-# Import the types we need directly
-from ember.core.utils.data.base.models import DatasetInfo, TaskType
-from ember.core.utils.data.base.config import BaseDatasetConfig
-from ember.core.utils.data.base.preppers import IDatasetPrepper
-
 # Import the function under test directly
 from ember.core.utils.data import load_dataset_entries
+from ember.core.utils.data.base.config import BaseDatasetConfig
+
+# Import the types we need directly
+from ember.core.utils.data.base.models import DatasetInfo, TaskType
+from ember.core.utils.data.base.preppers import IDatasetPrepper
 
 
 class TestLoadDatasetEntriesBasic(unittest.TestCase):

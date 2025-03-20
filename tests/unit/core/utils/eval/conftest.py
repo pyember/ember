@@ -1,7 +1,7 @@
 """Fixtures and utilities for eval module tests."""
 
-import sys
 import os
+import sys
 from typing import Any, Dict, List
 
 import pytest

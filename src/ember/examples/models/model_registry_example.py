@@ -3,7 +3,7 @@
 Demonstrates patterns for integrating LLMs using the Ember model registry.
 
 This example shows:
-1. The one-line initialization pattern 
+1. The one-line initialization pattern
 2. The standard initialization pattern
 3. Direct model access (PyTorch-like pattern)
 4. Usage tracking and cost estimation
@@ -68,7 +68,7 @@ def standard_pattern():
     """
     try:
         # With the new API, we can create a model instance with more control
-        from ember.api.models import ModelBuilder, ModelAPI
+        from ember.api.models import ModelAPI, ModelBuilder
 
         # Create a model with specific parameters
         model = (

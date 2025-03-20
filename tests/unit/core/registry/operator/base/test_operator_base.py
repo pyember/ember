@@ -8,13 +8,12 @@ This module verifies:
     - Proper error handling when specifications are missing or misconfigured.
 """
 
-from typing import Any, Dict, Optional, Type
+# Import needed modules via their direct import paths
+from typing import Any, Dict, Generic, Optional, Type, TypeVar
 
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-# Import needed modules via their direct import paths
-from typing import Generic, TypeVar
 from ember.core.registry.operator.exceptions import OperatorExecutionError
 from ember.core.registry.specification.specification import Specification
 

@@ -3,23 +3,23 @@
 Tests model retrieval and invocation using a dummy model provider.
 """
 
+import asyncio
 from typing import Any
 
 import pytest
-import asyncio
 
-from ember.core.registry.model.base.services.model_service import ModelService
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.exceptions import ProviderAPIError, ModelNotFoundError
+from ember.core.exceptions import ModelNotFoundError, ProviderAPIError
 from ember.core.registry.model.base.registry.factory import ModelFactory
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 
 # Define test providers directly in this module for test independence

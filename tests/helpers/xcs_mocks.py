@@ -17,23 +17,24 @@ would design robust testing infrastructure.
 """
 
 from __future__ import annotations
+
+import functools
+import logging
+import threading
+import time
+from abc import ABC, abstractmethod
+from contextlib import contextmanager
 from typing import (
     Any,
     Callable,
     Dict,
     List,
     Optional,
+    Protocol,
     TypeVar,
     Union,
-    Protocol,
     runtime_checkable,
 )
-from contextlib import contextmanager
-import functools
-import logging
-import threading
-import time
-from abc import ABC, abstractmethod
 
 # Setup logger
 logger = logging.getLogger(__name__)

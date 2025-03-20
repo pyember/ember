@@ -4,8 +4,9 @@ This module defines the data structures used for configuration in Ember.
 The schemas are designed to be minimal but extensible through Pydantic.
 """
 
-from typing import Dict, List, Optional, Any, ClassVar, Union
-from pydantic import BaseModel, Field, field_validator, computed_field, model_validator
+from typing import Any, ClassVar, Dict, List, Optional, Union
+
+from pydantic import BaseModel, Field, computed_field, field_validator, model_validator
 
 
 class Cost(BaseModel):

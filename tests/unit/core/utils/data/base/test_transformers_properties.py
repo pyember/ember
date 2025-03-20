@@ -5,19 +5,20 @@ This module contains property-based tests using Hypothesis to test invariants
 and properties of data transformers.
 """
 
-import pytest
-from typing import Dict, Any, List, Optional, Callable
-from hypothesis import given, strategies as st, settings, HealthCheck
-from hypothesis.extra.pandas import column, data_frames
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
+import pytest
 from datasets import Dataset
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from hypothesis.extra.pandas import column, data_frames
 
 from ember.core.utils.data.base.transformers import (
+    DatasetItem,
+    DatasetType,
     IDatasetTransformer,
     NoOpTransformer,
-    DatasetType,
-    DatasetItem,
 )
 
 

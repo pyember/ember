@@ -5,13 +5,13 @@ in Ember, following patterns from high-quality OSS libraries like JAX and PyTorc
 It uses the Network of Operators (NON) pattern for standardized, composable LLM pipelines.
 """
 
-from typing import ClassVar, Dict, List, Type, Any
+from typing import Any, ClassVar, Dict, List, Type
 
 # Import the non module directly from ember
 from ember import non
-from ember.api.operators import Operator, EmberModel, Field
-from ember.core.registry.specification.specification import Specification
+from ember.api.operators import EmberModel, Field, Operator
 from ember.core.app_context import get_ember_context
+from ember.core.registry.specification.specification import Specification
 
 
 class NetworkInput(EmberModel):

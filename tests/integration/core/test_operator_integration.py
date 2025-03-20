@@ -4,17 +4,18 @@ These tests verify actual operator workflows with realistic compositions.
 Uses minimal test doubles to avoid import issues.
 """
 
-import pytest
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import pytest
 
 # Import minimal test doubles instead of actual implementations
 from tests.helpers.operator_minimal_doubles import (
     MinimalOperator,
     MinimalTestModel,
-    SimpleLLMOperator,
     SimpleDeterministicOperator,
     SimpleEnsembleOperator,
+    SimpleLLMOperator,
     SimpleSelectorOperator,
 )
 

@@ -16,16 +16,16 @@ import logging
 import time
 from typing import Any, ClassVar, Dict, List, Type
 
+from ember.api.xcs import jit
+
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator, Specification
 from ember.core.types.ember_model import EmberModel, Field
-from ember.api.xcs import jit
-from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine.xcs_engine import (
-    execute_graph,
     TopologicalSchedulerWithParallelDispatch,
+    execute_graph,
 )
-
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 ###############################################################################
 # Input/Output Models

@@ -5,7 +5,7 @@ This module provides reusable TypeVar definitions with specific bounds
 to ensure consistent type annotations throughout the codebase.
 """
 
-from typing import TypeVar, Dict, Any
+from typing import Any, Dict, TypeVar
 
 # Generic type variables
 T = TypeVar("T")

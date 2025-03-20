@@ -6,37 +6,41 @@ pattern in Ember, offering composable building blocks for LLM application patter
 Examples:
     # Creating a simple ensemble with a judge
     from ember.api import non
-    
+
     ensemble = non.UniformEnsemble(
         num_units=3,
-        model_name="openai:gpt-4o", 
+        model_name="openai:gpt-4o",
         temperature=1.0
     )
-    
+
     judge = non.JudgeSynthesis(model_name="anthropic:claude-3-opus")
-    
+
     pipeline = non.Sequential(operators=[ensemble, judge])
-    
+
     result = pipeline(inputs={"query": "What is the capital of France?"})
 """
 
 # Import from the implementation
+from ember.core.non import EnsembleInputs  # Inputs for ensemble operators
 from ember.core.non import (
-    # Operator patterns
-    UniformEnsemble,  # Generate multiple responses with identical models
-    MostCommon,  # Select most common answer from ensemble
     JudgeSynthesis,  # Use a judge to synthesize multiple responses
-    Verifier,  # Verify answers for correctness
-    Sequential,  # Chain operators in sequence
+)
+from ember.core.non import JudgeSynthesisOutputs  # Judge I/O
+from ember.core.non import MostCommon  # Select most common answer from ensemble
+from ember.core.non import Sequential  # Chain operators in sequence
+from ember.core.non import (
+    UniformEnsemble,  # Generate multiple responses with identical models
+)
+from ember.core.non import (
     VariedEnsemble,  # Generate responses with varied model configurations
-    # Input/Output types
-    EnsembleInputs,  # Inputs for ensemble operators
+)
+from ember.core.non import VariedEnsembleOutputs  # Varied Ensemble I/O
+from ember.core.non import Verifier  # Verify answers for correctness
+from ember.core.non import VerifierOutputs  # Verifier I/O
+from ember.core.non import (  # Operator patterns; Input/Output types
     JudgeSynthesisInputs,
-    JudgeSynthesisOutputs,  # Judge I/O
-    VerifierInputs,
-    VerifierOutputs,  # Verifier I/O
     VariedEnsembleInputs,
-    VariedEnsembleOutputs,  # Varied Ensemble I/O
+    VerifierInputs,
 )
 
 __all__ = [

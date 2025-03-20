@@ -1,7 +1,7 @@
 """Unit tests for XCS Engine execution functionality.
 
 This module verifies the functionality of the XCS Engine's topological scheduler and
-execution system, focusing on correct graph execution, task dependencies, and proper 
+execution system, focusing on correct graph execution, task dependencies, and proper
 error handling in accordance with high engineering standards.
 """
 
@@ -10,10 +10,10 @@ from typing import Any, Dict, List
 import pytest
 
 from ember.xcs.engine.xcs_engine import (
+    IScheduler,
     TopologicalScheduler,
     TopologicalSchedulerWithParallelDispatch,
     execute_graph,
-    IScheduler,
 )
 from ember.xcs.graph.xcs_graph import XCSGraph
 

@@ -30,21 +30,21 @@ Usage example:
     ```python
     # Direct usage (prefer using ModelRegistry or API)
     from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
-    
+
     # Configure model information
     model_info = ModelInfo(
         id="openai:gpt-4o",
         name="gpt-4o",
         provider=ProviderInfo(name="OpenAI", api_key="sk-...")
     )
-    
+
     # Initialize the model
     model = OpenAIModel(model_info)
-    
+
     # Basic usage
     response = model("What is the Ember framework?")
     print(response.data)  # The model's response text
-    
+
     # Advanced usage with more parameters
     response = model(
         "Generate creative ideas",
@@ -52,7 +52,7 @@ Usage example:
         temperature=0.9,
         provider_params={"top_p": 0.95, "frequency_penalty": 0.5}
     )
-    
+
     # Accessing usage statistics
     print(f"Used {response.usage.total_tokens} tokens")
     print(f"Cost: ${response.usage.cost_usd:.6f}")
@@ -61,7 +61,7 @@ Usage example:
 For higher-level usage, prefer the model registry or API interfaces:
     ```python
     from ember.api.models import models
-    
+
     # Using the models API (automatically handles authentication)
     response = models.openai.gpt4o("Tell me about Ember")
     print(response.data)
@@ -77,25 +77,25 @@ from requests.exceptions import HTTPError
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import TypedDict
 
-from ember.core.registry.model.base.utils.model_registry_exceptions import (
-    InvalidPromptError,
-    ProviderAPIError,
-)
-from ember.core.registry.model.providers.base_provider import (
-    BaseChatParameters,
-    BaseProviderModel,
-)
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
     ProviderParams,
 )
-from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.plugin_system import provider
+from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
+    InvalidPromptError,
+    ProviderAPIError,
+)
 from ember.core.registry.model.base.utils.usage_calculator import (
     DefaultUsageCalculator,
 )
+from ember.core.registry.model.providers.base_provider import (
+    BaseChatParameters,
+    BaseProviderModel,
+)
+from ember.plugin_system import provider
 
 
 class OpenAIProviderParams(ProviderParams):

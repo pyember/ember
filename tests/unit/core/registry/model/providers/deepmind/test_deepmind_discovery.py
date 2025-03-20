@@ -2,10 +2,10 @@
 This test mocks google.generativeai.list_models to return a dummy model.
 """
 
-import pytest
 from typing import Any, Dict, List
 
 import google.generativeai as genai
+import pytest
 
 from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,

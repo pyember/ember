@@ -5,20 +5,22 @@ These tests use real Operator and ModelService implementations
 to test the integration of components within the framework.
 """
 
-import pytest
 import re
-from typing import List, Dict, Any, Optional, Callable, Union, Type
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-# Core components
-from ember.core.types.ember_model import EmberModel
+import pytest
+
+from ember.core.registry.model.base.services.model_service import ModelService
 
 # Use the real model components
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from ember.core.registry.model.base.services.model_service import ModelService
 
 # Use the real operator and specifications
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
+
+# Core components
+from ember.core.types.ember_model import EmberModel
 
 
 class SummarizeInput(EmberModel):
@@ -35,7 +37,7 @@ class SummarizeOutput(EmberModel):
     word_count: int
 
 
-from ember.core.registry.operator.base._module import static_field, ember_field
+from ember.core.registry.operator.base._module import ember_field, static_field
 
 
 class SummarizerOperator(Operator[SummarizeInput, SummarizeOutput]):

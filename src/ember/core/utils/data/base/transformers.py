@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Union, List, Dict, Any, TypedDict
+from typing import Any, Dict, List, TypedDict, Union
+
 from datasets import Dataset
 
 # Define a type alias for dataset representations.

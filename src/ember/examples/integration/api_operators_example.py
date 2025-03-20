@@ -7,12 +7,12 @@ demonstrating basic operators, ensemble patterns, and advanced composition techn
 from typing import List
 
 from ember.api.operators import (
-    Operator,
     EmberModel,
-    Field,
     EnsembleOperator,
-    MostCommonAnswerSelector,
+    Field,
     JudgeSynthesisOperator,
+    MostCommonAnswerSelector,
+    Operator,
     Specification,
 )
 

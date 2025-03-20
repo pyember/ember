@@ -5,22 +5,22 @@ This module implements Ember's application context architecture, providing a dep
 injection system and global service management. The context serves as the composition
 root for framework services, while offering thread-safe singleton access when needed.
 
-The design supports both direct dependency injection for components and convenient 
+The design supports both direct dependency injection for components and convenient
 global access for application code, with special accommodations for testing scenarios.
 
 For complete architectural details, see ARCHITECTURE.md
 """
 
 import logging
-import threading
 import os
+import threading
 from threading import Lock
-from typing import Optional, Dict, ClassVar, Type, Any
+from typing import Any, ClassVar, Dict, Optional, Type
 
+from ember.core.config.manager import ConfigManager, create_config_manager
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.config.manager import ConfigManager, create_config_manager
 from ember.core.registry.model.initialization import initialize_registry
 
 

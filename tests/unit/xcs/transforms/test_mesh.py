@@ -2,39 +2,39 @@
 Unit tests for the device mesh infrastructure and transformations.
 
 This module provides comprehensive testing for the mesh-based transformations in XCS,
-including DeviceMesh, PartitionSpec, and mesh_sharded execution. Tests cover basic 
+including DeviceMesh, PartitionSpec, and mesh_sharded execution. Tests cover basic
 functionality, sharding strategies, edge cases, and performance characteristics.
 """
 
-import os
-import pytest
-import time
-import threading
 import multiprocessing
-from typing import Dict, Any, List, Callable, Set, Tuple, Optional
-import numpy as np
+import os
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from unittest.mock import patch
 
+import numpy as np
+import pytest
+
 from ember.xcs.transforms import DeviceMesh, PartitionSpec, mesh_sharded
-from ember.xcs.transforms.mesh import _distribute_inputs, _collect_outputs
+from ember.xcs.transforms.mesh import _collect_outputs, _distribute_inputs
 
 # Import test operators
 from tests.unit.xcs.transforms.mock_operators import (
+    AsyncBehaviorOperator,
     BasicOperator,
-    StatefulOperator,
-    NestedOperator,
+    ComplexInputOperator,
     ExceptionOperator,
     MockModule,
-    ComplexInputOperator,
-    AsyncBehaviorOperator,
+    NestedOperator,
+    StatefulOperator,
 )
 from tests.unit.xcs.transforms.test_utils import (
-    generate_batch_inputs,
     assert_processing_time,
-    time_function_execution,
     count_unique_threads,
+    generate_batch_inputs,
+    time_function_execution,
 )
-
 
 # =============================== Fixtures ===============================
 

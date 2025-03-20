@@ -1,6 +1,7 @@
 from typing import Any, List
-from .base_evaluator import IEvaluator, IStatefulEvaluator, EvaluationResult
-from .pipeline import summarize_batch, BatchEvaluationSummary
+
+from .base_evaluator import EvaluationResult, IEvaluator, IStatefulEvaluator
+from .pipeline import BatchEvaluationSummary, summarize_batch
 
 
 class AggregatorEvaluator(IStatefulEvaluator[Any, Any]):

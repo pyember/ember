@@ -2,11 +2,12 @@
 Tests for EmberModel and its protocol implementations.
 """
 
+from typing import Any, Dict, List, Optional
+
 import pytest
-from typing import Dict, Any, List, Optional
 
 from ember.core.types.ember_model import EmberModel
-from ember.core.types.protocols import EmberTyped, EmberSerializable
+from ember.core.types.protocols import EmberSerializable, EmberTyped
 
 
 class SampleModel(EmberModel):

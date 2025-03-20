@@ -12,17 +12,17 @@ Example usage:
     ```python
     # Create an ensemble with 3 identical models
     ensemble = UniformEnsemble(
-        num_units=3, 
+        num_units=3,
         model_name="openai:gpt-4o",
         temperature=1.0
     )
-    
+
     # Create a judge to synthesize the outputs
     judge = JudgeSynthesis(model_name="claude-3-opus")
-    
+
     # Combine them sequentially
     pipeline = Sequential(operators=[ensemble, judge])
-    
+
     # Execute the pipeline
     result = pipeline(inputs={"query": "What is the future of AI?"})
     ```
@@ -30,16 +30,14 @@ Example usage:
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, Type, Generic
-
-from pydantic import BaseModel
-
 # Ember package imports: use direct imports to avoid circular dependencies
 # Access the operator base directly to avoid circular imports
 # These paths need to be fixed for proper resolution
 import sys
 import types
-from typing import TypeVar
+from typing import Any, Generic, List, Optional, Type, TypeVar
+
+from pydantic import BaseModel
 
 # Create placeholder type variables to avoid circular imports
 T_in = TypeVar("T_in")
@@ -77,17 +75,23 @@ def ember_field(init=False):
     return decorator
 
 
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+
+# Alias re-export types for backward compatibility with clients/tests from before our
+# registry refactor.
 from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
+    EnsembleOperatorOutputs,
 )
 from ember.core.registry.operator.core.most_common import (
     MostCommonAnswerSelectorOperator,
     MostCommonAnswerSelectorOperatorInputs,
+    MostCommonAnswerSelectorOutputs,
 )
 from ember.core.registry.operator.core.synthesis_judge import (
-    JudgeSynthesisOperator,
     JudgeSynthesisInputs,
+    JudgeSynthesisOperator,
     JudgeSynthesisOutputs,
     JudgeSynthesisSpecification,
 )
@@ -98,14 +102,6 @@ from ember.core.registry.operator.core.verifier import (
     VerifierSpecification,
 )
 from ember.core.registry.specification.specification import Specification
-from ember.core.registry.model.model_module.lm import LMModuleConfig, LMModule
-
-# Alias re-export types for backward compatibility with clients/tests from before our
-# registry refactor.
-from ember.core.registry.operator.core.ensemble import EnsembleOperatorOutputs
-from ember.core.registry.operator.core.most_common import (
-    MostCommonAnswerSelectorOutputs,
-)
 
 EnsembleInputs = EnsembleOperatorInputs
 MostCommonInputs = MostCommonAnswerSelectorOperatorInputs

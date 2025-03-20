@@ -8,10 +8,10 @@ principle of "avoid overmocking" from CLAUDE.md guidelines.
 Also includes minimal doubles for the unified data registry system.
 """
 
-from typing import Any, Dict, List, Optional, Callable, TypeVar, Generic, Type, Union
 import json
 import logging
 from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Generic, List, Optional, Type, TypeVar, Union
 from unittest import mock
 
 # Setup logger

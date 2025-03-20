@@ -5,15 +5,15 @@ Import from ember.core.utils.data.registry instead.
 """
 
 import warnings
-from typing import Dict, Tuple, Optional, List, Type
+from typing import Dict, List, Optional, Tuple, Type
 
 from ember.core.utils.data.base.models import DatasetInfo
 from ember.core.utils.data.base.preppers import IDatasetPrepper
 from ember.core.utils.data.registry import (
     UNIFIED_REGISTRY,
-    register as unified_register,
     initialize_registry,
 )
+from ember.core.utils.data.registry import register as unified_register
 
 # Removed explicit warning since this is an internal module
 # The warning will be shown just by importing, so the importing code should handle this

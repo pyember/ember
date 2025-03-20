@@ -5,17 +5,18 @@ They only run when explicitly enabled via environment variables.
 """
 
 import os
-import pytest
 import time
 
+import pytest
+
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
 from ember.core.registry.model.providers.anthropic.anthropic_discovery import (
     AnthropicDiscovery,
 )
 from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,
 )
+from ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
 
 
 @pytest.mark.integration

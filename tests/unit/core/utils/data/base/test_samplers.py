@@ -5,7 +5,8 @@ from typing import Any, Optional
 from unittest import mock
 
 from datasets import Dataset
-from ember.core.utils.data.base.samplers import IDatasetSampler, DatasetSampler
+
+from ember.core.utils.data.base.samplers import DatasetSampler, IDatasetSampler
 
 
 class TestIDatasetSampler(unittest.TestCase):

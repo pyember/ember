@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
-"""Unit tests for the OpenAIModel provider implementation.
-"""
+"""Unit tests for the OpenAIModel provider implementation."""
 
-import pytest
 from typing import Any
 
-from ember.core.registry.model.providers.openai.openai_provider import (
-    OpenAIModel,
-    OpenAIChatParameters,
-)
+import pytest
+
 from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatResponse,
     ChatRequest,
+    ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.providers.openai.openai_provider import (
+    OpenAIChatParameters,
+    OpenAIModel,
+)
 
 
 class DummyMessage:

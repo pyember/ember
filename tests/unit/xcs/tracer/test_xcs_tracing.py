@@ -5,12 +5,13 @@ captures trace records, and restores the original operator methods.
 """
 
 from typing import Any, Dict
+
 import pytest
 from pydantic import BaseModel
 
-from tests.helpers.stub_classes import Operator
-from ember.xcs.tracer.xcs_tracing import TracerContext
 from ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.tracer.xcs_tracing import TracerContext
+from tests.helpers.stub_classes import Operator
 
 
 class MockInput(BaseModel):

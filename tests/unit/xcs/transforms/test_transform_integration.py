@@ -1,46 +1,46 @@
 """
 Integration tests for combined XCS transformations.
 
-This module provides tests for the integration and composition of multiple XCS 
+This module provides tests for the integration and composition of multiple XCS
 transformations, like combining vmap with pmap, pmap with mesh_sharded, etc.
 It also tests the interaction of transformations with the XCS execution engine.
 """
 
-import pytest
-import time
 import os
 import threading
-from typing import Dict, Any, List, Callable, Set, Tuple, Optional
+import time
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from tests.helpers.stub_classes import Operator
+import pytest
 
-# Import directly from our fixed imports module to avoid 'module is not callable' errors
-from tests.unit.xcs.transforms.test_transform_imports import (
-    vmap,
-    pmap,
-    pjit,
-    DeviceMesh,
-    PartitionSpec,
-    mesh_sharded,
+from ember.xcs.engine.xcs_engine import (
+    TopologicalSchedulerWithParallelDispatch,
+    execute_graph,
 )
 from ember.xcs.graph.xcs_graph import XCSGraph
-from ember.xcs.engine.xcs_engine import (
-    execute_graph,
-    TopologicalSchedulerWithParallelDispatch,
-)
+from tests.helpers.stub_classes import Operator
 
 # Import test operators
 from tests.unit.xcs.transforms.mock_operators import (
+    AsyncBehaviorOperator,
     BasicOperator,
     NestedOperator,
-    AsyncBehaviorOperator,
-)
-from tests.unit.xcs.transforms.test_utils import (
-    generate_batch_inputs,
-    assert_processing_time,
-    time_function_execution,
 )
 
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import (
+    DeviceMesh,
+    PartitionSpec,
+    mesh_sharded,
+    pjit,
+    pmap,
+    vmap,
+)
+from tests.unit.xcs.transforms.test_utils import (
+    assert_processing_time,
+    generate_batch_inputs,
+    time_function_execution,
+)
 
 # =============================== Fixtures ===============================
 

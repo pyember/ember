@@ -8,18 +8,19 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    List,
+    Optional,
     Type,
     TypeVar,
-    Optional,
     Union,
-    List,
-    get_type_hints,
     cast,
+    get_type_hints,
 )
-from pydantic import BaseModel, create_model, ConfigDict, Field
+
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 # Import locally to avoid circular imports
-from .protocols import TypeInfo, EmberTyped, EmberSerializable
+from .protocols import EmberSerializable, EmberTyped, TypeInfo
 
 T = TypeVar("T", bound="EmberModel")
 

@@ -13,26 +13,29 @@ The type system follows these design principles:
 """
 
 from typing import (
-    Dict,
-    List,
-    Protocol,
-    TypeVar,
-    Union,
-    runtime_checkable,
+    Any,
     Callable,
+    ClassVar,
+    Dict,
+    Generic,
+    Hashable,
+    List,
     Mapping,
     Optional,
+    Protocol,
     Sequence,
     Type,
-    Generic,
+    TypeVar,
+    Union,
     cast,
-    Hashable,
-    Any,
-    ClassVar,
     final,
     overload,
+    runtime_checkable,
 )
-from typing_extensions import TypedDict, NotRequired, Literal, Protocol as ExtProtocol
+
+from typing_extensions import Literal, NotRequired
+from typing_extensions import Protocol as ExtProtocol
+from typing_extensions import TypedDict
 
 # Standard invariant type variables for regular usage
 NodeInputT = TypeVar("NodeInputT", bound=Mapping[str, object])
@@ -85,7 +88,9 @@ class ResultMetadata(TypedDict, total=False):
 
     start_time: float  # Unix timestamp when execution started
     end_time: float  # Unix timestamp when execution completed
-    execution_time: float  # Duration in seconds (may differ from end-start due to precision)
+    execution_time: (
+        float  # Duration in seconds (may differ from end-start due to precision)
+    )
     memory_usage: int  # Peak memory usage in bytes
     cpu_usage: float  # CPU usage percentage (0.0-100.0)
     device: str  # Device ID/name where execution occurred

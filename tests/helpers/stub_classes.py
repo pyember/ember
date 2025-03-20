@@ -1,7 +1,7 @@
 """
 Stub classes for tests.
 
-This module provides stub implementations of key classes to avoid circular 
+This module provides stub implementations of key classes to avoid circular
 dependencies during test collection and execution. These stubs implement
 the minimal interface needed for tests to collect and run without requiring
 the full implementations.
@@ -10,18 +10,19 @@ the full implementations.
 from __future__ import annotations
 
 from typing import (
-    Dict,
     Any,
+    Callable,
+    Dict,
+    Generic,
     List,
     Optional,
-    TypeVar,
-    Generic,
-    Callable,
     Protocol,
-    runtime_checkable,
     Type,
+    TypeVar,
     Union,
+    runtime_checkable,
 )
+
 from pydantic import BaseModel
 
 # Import the EmberModel to properly type operators

@@ -1,5 +1,6 @@
+from typing import Any, Dict, Optional, Union
+
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, Union
 from typing_extensions import TypedDict
 
 from ember.core.registry.model.base.schemas.usage import UsageStats

@@ -8,33 +8,34 @@ This module focuses on more complex test cases for the structural_jit decorator:
 5. Integration with other XCS components
 """
 
-import time
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Type, Union, cast
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional, Type, Union, cast
 
 import pytest
 from pydantic import BaseModel
 
-from tests.helpers.stub_classes import Operator, EmberModel
+from tests.helpers.stub_classes import EmberModel, Operator
 
 try:
     from ember.xcs.tracer.structural_jit import (
-        structural_jit,
-        disable_structural_jit,
+        AutoExecutionStrategy,
         ExecutionStrategy,
+        OperatorStructureGraph,
         ParallelExecutionStrategy,
         SequentialExecutionStrategy,
-        AutoExecutionStrategy,
-        OperatorStructureGraph,
         _analyze_operator_structure,
+        disable_structural_jit,
+        structural_jit,
     )
 except ImportError:
     # Use decorator from tracer_decorator as a fallback
     # This will make tests pass but not provide actual structural JIT functionality
-    from ember.xcs.tracer.tracer_decorator import jit as structural_jit
     from contextlib import contextmanager
+
+    from ember.xcs.tracer.tracer_decorator import jit as structural_jit
 
     # Create stub classes to make tests pass
     class ExecutionStrategy:
@@ -85,7 +86,6 @@ except ImportError:
 
 
 from ember.xcs.tracer.tracer_decorator import jit
-
 
 # -----------------------------------------------------------------------------
 # Advanced Test Operators

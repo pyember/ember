@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 from typing import Literal, Optional, Type
 
-from ember.core.types import EmberModel
-
 from ember.core.registry.specification.specification import Specification
+from ember.core.types import EmberModel
 
 
 class CaravanLabelsOutput(EmberModel):

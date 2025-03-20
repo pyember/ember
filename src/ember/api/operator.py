@@ -5,28 +5,24 @@ code importing from ember.api.operator (singular).
 """
 
 # Re-export all symbols from operators
-from ember.api.operators import (
-    # Base classes
-    Operator,
-    Specification,
-    EmberModel,
-    Field,
-    # Type variables
-    InputT,
-    OutputT,
-    # Built-in operators
-    EnsembleOperator,
-    MostCommonAnswerSelector,
-    VerifierOperator,
-    SelectorJudgeOperator,
-    JudgeSynthesisOperator,
-    # Useful types
-    List,
-    Dict,
+from ember.api.operators import (  # Base classes; Type variables; Built-in operators; Useful types
     Any,
+    Dict,
+    EmberModel,
+    EnsembleOperator,
+    Field,
+    InputT,
+    JudgeSynthesisOperator,
+    List,
+    MostCommonAnswerSelector,
+    Operator,
     Optional,
-    Union,
+    OutputT,
+    SelectorJudgeOperator,
+    Specification,
     TypeVar,
+    Union,
+    VerifierOperator,
 )
 
 # Make everything available for import

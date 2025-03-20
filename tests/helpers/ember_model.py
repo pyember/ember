@@ -12,17 +12,18 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
     Type,
     TypeVar,
-    Optional,
     Union,
-    List,
-    get_type_hints,
     cast,
-    Protocol,
+    get_type_hints,
     runtime_checkable,
-    Tuple,
 )
+
 from pydantic import BaseModel
 
 

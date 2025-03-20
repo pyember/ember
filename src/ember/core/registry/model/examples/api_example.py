@@ -6,8 +6,7 @@ This module demonstrates how to use the high-level Ember API for model interacti
 import logging
 from typing import Any, Dict
 
-from ember.api import models
-from ember.api import ModelBuilder, ModelAPI, ModelEnum
+from ember.api import ModelAPI, ModelBuilder, ModelEnum, models
 from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 
 # Configure logging

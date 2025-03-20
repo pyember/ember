@@ -8,8 +8,8 @@ maintained as a placeholder. For more information, see docs/cli/CLI_STATUS.md
 
 import argparse
 import sys
-from typing import Any, Optional
 import warnings
+from typing import Any, Optional
 
 
 def main() -> None:

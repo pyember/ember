@@ -1,11 +1,11 @@
-import threading
-from typing import Dict, Union, Optional
 import logging
+import threading
+from typing import Dict, Optional, Union
 
 from ember.core.registry.model.base.schemas.usage import (
     UsageRecord,
-    UsageSummary,
     UsageStats,
+    UsageSummary,
 )
 
 

@@ -1,6 +1,6 @@
 """Plugin Registration System for Ember Model Providers.
 
-Providers (e.g., OpenAI, Anthropic, etc.) can register themselves using the 
+Providers (e.g., OpenAI, Anthropic, etc.) can register themselves using the
 @provider decorator. This mechanism decouples provider implementations from the core Ember code.
 """
 

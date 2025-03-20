@@ -4,7 +4,7 @@ This module demonstrates several ways to use models through the model registry.
 """
 
 import logging
-from typing import Optional, Any, Union, cast
+from typing import Any, Optional, Union, cast
 
 from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 from ember.core.registry.model.base.services.model_service import ModelService

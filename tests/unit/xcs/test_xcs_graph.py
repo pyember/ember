@@ -6,6 +6,7 @@ These tests now also check that merging graphs using namespace prefixes works as
 """
 
 import pytest
+
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 

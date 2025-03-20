@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Union, List, Dict, Any
+from typing import Any, Dict, List, Union
+
 from datasets import Dataset, DatasetDict
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)

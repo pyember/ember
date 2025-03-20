@@ -7,9 +7,9 @@ import logging
 import os
 from typing import List
 
-from ember.core.registry.model.initialization import initialize_registry
 from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.initialization import initialize_registry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -56,9 +56,7 @@ def main() -> None:
                     prompt="Explain quantum computing in 50 words",
                     timeout=DEFAULT_TIMEOUT,
                 )
-                print(
-                    f"🛎️ Service response from {model_id}:\n{service_response.data}\n"
-                )
+                print(f"🛎️ Service response from {model_id}:\n{service_response.data}\n")
 
                 # Style 2: Direct model instance for PyTorch-like workflows
                 model = service.get_model(model_identifier)

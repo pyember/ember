@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Any, Dict, List, Optional
-from ember.core.types import EmberModel
 
 from ember.core.registry.operator.base.operator_base import Operator
-
 from ember.core.registry.specification.specification import Specification
+from ember.core.types import EmberModel
 
 
 class MostCommonAnswerSelectorOperatorInputs(EmberModel):

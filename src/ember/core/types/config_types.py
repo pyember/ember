@@ -7,15 +7,16 @@ more precise TypedDict and Protocol definitions.
 """
 
 from typing import (
-    Dict,
     Any,
+    Dict,
     List,
     Optional,
     Protocol,
-    runtime_checkable,
     TypedDict,
     Union,
+    runtime_checkable,
 )
+
 from typing_extensions import NotRequired, Required
 
 from .protocols import EmberTyped, TypeInfo

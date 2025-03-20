@@ -7,12 +7,12 @@ especially focusing on the fixes we made to ensure backward compatibility.
 import unittest
 from unittest import mock
 
+from ember.core.utils.data.base.models import DatasetInfo, TaskType
+from ember.core.utils.data.initialization import initialize_dataset_registry
 from ember.core.utils.data.registry import (
     UNIFIED_REGISTRY,
     UnifiedDatasetRegistry,
 )
-from ember.core.utils.data.base.models import DatasetInfo, TaskType
-from ember.core.utils.data.initialization import initialize_dataset_registry
 
 
 class TestRegistryCompatibility(unittest.TestCase):

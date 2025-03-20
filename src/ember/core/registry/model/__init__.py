@@ -4,21 +4,44 @@ This module provides the core components for model registry functionality.
 """
 
 from __future__ import annotations
+
 from typing import List
 
-# Absolute imports for core schemas
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.registry.factory import ModelFactory
+
+# Registry components
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+
+# Absolute imports for core schemas
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.schemas.usage import (
-    UsageStats,
     UsageRecord,
+    UsageStats,
     UsageSummary,
 )
+
+# Services
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.base.services.usage_service import UsageService
+
+# Absolute imports for exceptions
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
+    ModelDiscoveryError,
+    ModelRegistrationError,
+)
+from ember.core.registry.model.config.model_enum import (
+    ModelEnum,
+    parse_model_str,
+)
+
+# Configuration and initialization - moved to avoid circular imports
+from ember.core.registry.model.config.settings import EmberSettings
 
 # Base provider classes
 from ember.core.registry.model.providers.base_provider import (
@@ -26,28 +49,8 @@ from ember.core.registry.model.providers.base_provider import (
     BaseProviderModel,
 )
 
-# Registry components
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.registry.factory import ModelFactory
-from ember.core.registry.model.config.model_enum import (
-    ModelEnum,
-    parse_model_str,
-)
-
-# Services
-from ember.core.registry.model.base.services.model_service import ModelService
-from ember.core.registry.model.base.services.usage_service import UsageService
-
-# Configuration and initialization - moved to avoid circular imports
-from ember.core.registry.model.config.settings import EmberSettings
-
 # These are already imported above using absolute imports, so we can remove these relative imports
 
-# Absolute imports for exceptions
-from ember.core.registry.model.base.utils.model_registry_exceptions import (
-    ModelRegistrationError,
-    ModelDiscoveryError,
-)
 
 
 # Add load_model function
@@ -124,8 +127,8 @@ def initialize_ember(
         stacklevel=2,
     )
 
-    from ember.core.registry.model.initialization import initialize_registry
     from ember.core.config.manager import create_config_manager
+    from ember.core.registry.model.initialization import initialize_registry
 
     config_manager = create_config_manager(config_path=config_path)
     return initialize_registry(

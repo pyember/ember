@@ -2,23 +2,24 @@
 Test XCS Implementation
 
 This example demonstrates the use of the XCS (eXecutable Computation System) API
-directly. It shows how to use JIT compilation, vectorization, and automatic 
+directly. It shows how to use JIT compilation, vectorization, and automatic
 graph building for high-performance operator execution.
 
 To run:
     poetry run pytest -xvs src/ember/examples/xcs/test_xcs_implementation.py
 """
 
-import pytest
-import sys
 import importlib.util
+import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import pytest
 
 # Use a try-except block to improve import reliability
 try:
     # First try to import from the standard location
-    from src.ember.xcs import jit, vmap, pmap, autograph, execute
+    from src.ember.xcs import autograph, execute, jit, pmap, vmap
 except ImportError:
     # If that fails, import the XCS module directly
     project_root = Path(__file__).parent.parent.parent.parent
@@ -83,9 +84,10 @@ except ImportError:
     autograph = xcs.autograph
     execute = xcs.execute
 
+import time
+
 # Now we can use the core XCS functionality
 from functools import partial
-import time
 
 
 def main():
@@ -157,8 +159,8 @@ def main():
         """Multiply two numbers."""
         return a * b
 
+    from ember.xcs.engine.xcs_engine import XCSNoOpScheduler, compile_graph
     from ember.xcs.graph.xcs_graph import XCSGraph
-    from ember.xcs.engine.xcs_engine import compile_graph, XCSNoOpScheduler
 
     # Create a graph directly
     graph = XCSGraph()

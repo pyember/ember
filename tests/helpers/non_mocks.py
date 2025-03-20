@@ -11,12 +11,13 @@ maintaining the same interfaces.
 """
 
 from __future__ import annotations
-from typing import Any, Dict, List, Optional, Union, TypeVar, Generic, ClassVar
+
 import logging
 from abc import ABC, abstractmethod
+from typing import Any, ClassVar, Dict, Generic, List, Optional, TypeVar, Union
 
-from tests.helpers.operator_base import Operator, Specification
 from tests.helpers.ember_model import EmberModel
+from tests.helpers.operator_base import Operator, Specification
 from tests.helpers.xcs_mocks import jit
 
 # Setup logger

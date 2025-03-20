@@ -16,7 +16,7 @@ Typical usage example:
       def fetch_models(self) -> Dict[str, Dict[str, Any]]:
           # Connect to provider API and retrieve model data
           models = my_api_client.list_models()
-          
+
           # Transform to Ember's expected format
           result = {}
           for model in models:

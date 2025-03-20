@@ -1,17 +1,15 @@
 """Unit tests for JIT functionality.
 
-This module tests the JIT capabilities as an alternative to a more complex 
+This module tests the JIT capabilities as an alternative to a more complex
 structural JIT implementation that may be implemented in the future.
 """
 
-import time
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Set, Tuple, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pytest
-
-from tests.helpers.stub_classes import Operator, EmberModel
 
 # Import available functions from tracer - these may be a subset
 # of what tests originally expected
@@ -23,7 +21,7 @@ from ember.xcs.tracer.xcs_tracing import (
     patch_operator,
     restore_operator,
 )
-
+from tests.helpers.stub_classes import EmberModel, Operator
 
 # -----------------------------------------------------------------------------
 # Test Operators

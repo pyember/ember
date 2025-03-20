@@ -1,23 +1,25 @@
 """
 Tests for the ember.core.utils.embedding_utils module.
 
-This module contains unit tests and property-based tests for embedding models, 
+This module contains unit tests and property-based tests for embedding models,
 similarity metrics, and text similarity calculations.
 """
 
 import math
 import string
-import pytest
-from typing import List, Optional, Callable
-from unittest.mock import Mock, MagicMock
+from typing import Callable, List, Optional
+from unittest.mock import MagicMock, Mock
+
 import hypothesis
-from hypothesis import given, strategies as st, assume, note
+import pytest
+from hypothesis import assume, given, note
+from hypothesis import strategies as st
 
 from ember.core.utils.embedding_utils import (
+    CosineSimilarity,
     EmbeddingModel,
     MockEmbeddingModel,
     SimilarityMetric,
-    CosineSimilarity,
     calculate_text_similarity,
 )
 
@@ -226,20 +228,20 @@ def test_main_block_coverage():
     """Execute the `if __name__ == "__main__"` block to ensure coverage."""
     # To ensure we cover the __main__ block in the embedding_utils.py file,
     # we'll temporarily monkey patch the __name__ variable and import the module
-    import sys
     import io
-    from contextlib import redirect_stdout
+    import sys
 
     # Use a sys.modules hack to force a reload of the module with __name__ = "__main__"
     import types
+    from contextlib import redirect_stdout
 
     # Create a fresh module object to avoid modifying the real one
     temp_module = types.ModuleType("ember.core.utils.embedding_utils")
 
     # Copy the required functions to our temporary module
     from ember.core.utils.embedding_utils import (
-        MockEmbeddingModel,
         CosineSimilarity,
+        MockEmbeddingModel,
         calculate_text_similarity,
     )
 

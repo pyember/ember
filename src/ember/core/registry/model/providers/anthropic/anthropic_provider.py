@@ -34,21 +34,21 @@ Usage example:
     ```python
     # Direct usage (prefer using ModelRegistry or API)
     from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
-    
+
     # Configure model information
     model_info = ModelInfo(
         id="anthropic:claude-3-sonnet",
         name="claude-3-sonnet",
         provider=ProviderInfo(name="Anthropic", api_key="sk-ant-...")
     )
-    
+
     # Initialize the model
     model = AnthropicModel(model_info)
-    
+
     # Generate a response
     response = model("What is the Ember framework?")
     print(response.data)  # The model's response text
-    
+
     # Access usage statistics
     print(f"Used {response.usage.total_tokens} tokens")
     ```
@@ -56,7 +56,7 @@ Usage example:
 For higher-level usage, prefer the model registry or API interfaces:
     ```python
     from ember.api.models import models
-    
+
     # Using the models API (automatically handles authentication)
     response = models.anthropic.claude_3_sonnet("Tell me about Ember")
     print(response.data)
@@ -74,7 +74,12 @@ from pydantic import Field, field_validator
 from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import TypedDict
 
-from ember.plugin_system import provider
+from ember.core.registry.model.base.schemas.chat_schemas import (
+    ChatRequest,
+    ChatResponse,
+    ProviderParams,
+)
+from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
@@ -83,12 +88,7 @@ from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
 )
-from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatRequest,
-    ChatResponse,
-    ProviderParams,
-)
-from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.plugin_system import provider
 
 
 class AnthropicProviderParams(ProviderParams):

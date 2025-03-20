@@ -4,25 +4,24 @@ Tests the complete data processing pipeline from loading to transformation.
 Uses minimal test doubles instead of actual implementations.
 """
 
-import pytest
-import tempfile
 import json
 import os
+import tempfile
+from typing import Any, Dict, List
+
 import numpy as np
-from typing import Dict, List, Any
+import pytest
 
 # Import minimal test doubles instead of actual implementations
-from tests.helpers.data_minimal_doubles import (
-    MinimalJsonLoader as JsonLoader,
-    MinimalCsvLoader as CsvLoader,
-    MinimalTextLoader as TextLoader,
-    MinimalTokenizer as Tokenizer,
-    MinimalShuffler as Shuffler,
-    MinimalFilter as Filter,
-    MinimalRandomSampler as RandomSampler,
-    MinimalSchemaValidator as SchemaValidator,
-    MinimalDataService as DataService,
-)
+from tests.helpers.data_minimal_doubles import MinimalCsvLoader as CsvLoader
+from tests.helpers.data_minimal_doubles import MinimalDataService as DataService
+from tests.helpers.data_minimal_doubles import MinimalFilter as Filter
+from tests.helpers.data_minimal_doubles import MinimalJsonLoader as JsonLoader
+from tests.helpers.data_minimal_doubles import MinimalRandomSampler as RandomSampler
+from tests.helpers.data_minimal_doubles import MinimalSchemaValidator as SchemaValidator
+from tests.helpers.data_minimal_doubles import MinimalShuffler as Shuffler
+from tests.helpers.data_minimal_doubles import MinimalTextLoader as TextLoader
+from tests.helpers.data_minimal_doubles import MinimalTokenizer as Tokenizer
 
 # Mark all tests as integration tests
 pytestmark = [pytest.mark.integration]

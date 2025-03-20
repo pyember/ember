@@ -2,44 +2,44 @@
 Unit tests for the pmap and pjit transforms.
 
 This module provides comprehensive testing for the parallel mapping (pmap) and
-parallel JIT (pjit) transformations in XCS, including basic functionality, 
+parallel JIT (pjit) transformations in XCS, including basic functionality,
 edge cases, error handling, performance characteristics, and concurrency behavior.
 """
 
-import os
-import pytest
-import time
-import threading
 import multiprocessing
-from typing import Dict, Any, List, Callable, Set, Tuple, Optional
-from unittest.mock import patch, MagicMock
+import os
+import threading
+import time
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Import the actual implementation for testing
 from src.ember.xcs.transforms.pmap import (
-    pmap,
-    pjit,
+    _combine_results,
     _get_default_num_workers,
     _shard_inputs,
-    _combine_results,
+    pjit,
+    pmap,
 )
 
 # Import test operators
 from tests.unit.xcs.transforms.mock_operators import (
+    AsyncBehaviorOperator,
     BasicOperator,
-    StatefulOperator,
-    NestedOperator,
+    ComplexInputOperator,
     ExceptionOperator,
     MockModule,
-    ComplexInputOperator,
-    AsyncBehaviorOperator,
+    NestedOperator,
+    StatefulOperator,
 )
 from tests.unit.xcs.transforms.test_utils import (
-    generate_batch_inputs,
     assert_processing_time,
-    time_function_execution,
     count_unique_threads,
+    generate_batch_inputs,
+    time_function_execution,
 )
-
 
 # =============================== Fixtures ===============================
 

@@ -1,9 +1,9 @@
 """Container Operator Example with JIT.
 
-This example demonstrates how to create a container operator that encapsulates 
+This example demonstrates how to create a container operator that encapsulates
 a complex pipeline, using JIT for tracing.
 
-Note: In the current implementation, the JIT decorator enables tracing but 
+Note: In the current implementation, the JIT decorator enables tracing but
 doesn't automatically build execution graphs. For automatic graph building
 and parallel execution, you'd still need to use XCSGraph and execute_graph
 (shown in the other examples).
@@ -16,12 +16,12 @@ import logging
 import time
 from typing import Any, ClassVar, Dict, List, Optional, Type
 
-from ember.core.types.ember_model import EmberModel
+from ember.core import non
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
-from ember.core import non
+from ember.core.types.ember_model import EmberModel
 from ember.xcs.tracer.tracer_decorator import jit
 
 

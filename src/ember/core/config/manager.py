@@ -10,9 +10,9 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Optional
 
-from .schema import EmberConfig
-from .loader import load_config
 from .exceptions import ConfigError
+from .loader import load_config
+from .schema import EmberConfig
 
 
 class ConfigManager:

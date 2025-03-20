@@ -2,35 +2,35 @@
 Test XCS Implementation
 
 This example demonstrates the use of the XCS (Accelerated Compound Systems)  API
-directly. It shows how to use JIT compilation, vectorization, and automatic 
+directly. It shows how to use JIT compilation, vectorization, and automatic
 graph building for high-performance operator execution.
 
 To run:
     poetry run python src/ember/examples/test_xcs_implementation.py
 """
 
-import sys
 import importlib.util
-from pathlib import Path
-from typing import List, Dict, Any
+import os
 
 # Import proper mock implementations instead of using ad-hoc imports
 # This approach follows best practices for testing with dependency injection
 import sys
-import os
+from pathlib import Path
+from typing import Any, Dict, List
 
 # Add project root to path if needed
 project_root = Path(__file__).parent.parent.parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-# Import from our production-quality mocks
-# This provides reliable testing behavior separated from implementation details
-from tests.helpers.xcs_mocks import jit, vmap, pmap, autograph, execute
+import time
 
 # Now we can use the core XCS functionality
 from functools import partial
-import time
+
+# Import from our production-quality mocks
+# This provides reliable testing behavior separated from implementation details
+from tests.helpers.xcs_mocks import autograph, execute, jit, pmap, vmap
 
 
 def test_jit_compilation():

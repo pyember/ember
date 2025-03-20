@@ -16,12 +16,13 @@ To run:
 
 import logging
 import time
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
+
+from ember.xcs.graph.xcs_graph import XCSGraph
 
 # For tracing with the autograph module
 from ember.xcs.tracer.autograph import AutoGraphBuilder
 from ember.xcs.tracer.xcs_tracing import TraceRecord
-from ember.xcs.graph.xcs_graph import XCSGraph
 
 ###############################################################################
 # Mock Execution Setup

@@ -268,11 +268,11 @@ def initialize_registry() -> None:
     """Initialize the dataset registry with core datasets."""
     # Register core datasets from legacy registry
     from ember.core.utils.data.datasets_registry import (
-        truthful_qa,
-        mmlu,
         commonsense_qa,
         halueval,
+        mmlu,
         short_answer,
+        truthful_qa,
     )
 
     # Register preppers from the legacy core registry

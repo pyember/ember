@@ -3,8 +3,8 @@
 import unittest
 
 from ember.core.utils.data.datasets_registry.halueval import (
-    HaluEvalPrepper,
     HaluEvalConfig,
+    HaluEvalPrepper,
 )
 
 

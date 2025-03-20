@@ -3,7 +3,7 @@ Network of Operators (NON) Pattern
 =================================
 
 The NON module provides composable building blocks for LLM application patterns.
-These high-level operators encapsulate common patterns for ensemble generation, 
+These high-level operators encapsulate common patterns for ensemble generation,
 aggregation, verification, and sequential processing.
 
 Core components:
@@ -20,7 +20,7 @@ from ember.non import UniformEnsemble, JudgeSynthesis, Sequential
 
 # Create an ensemble with 3 identical models
 ensemble = UniformEnsemble(
-    num_units=3, 
+    num_units=3,
     model_name="openai:gpt-4o",
     temperature=1.0
 )
@@ -46,10 +46,14 @@ try:
     # Import type-related items first to avoid circular imports
     from ember.core.registry.operator.core.ensemble import (
         EnsembleOperatorInputs as EnsembleInputs,
+    )
+    from ember.core.registry.operator.core.ensemble import (
         EnsembleOperatorOutputs,
     )
     from ember.core.registry.operator.core.most_common import (
         MostCommonAnswerSelectorOperatorInputs as MostCommonInputs,
+    )
+    from ember.core.registry.operator.core.most_common import (
         MostCommonAnswerSelectorOutputs,
     )
     from ember.core.registry.operator.core.synthesis_judge import (
@@ -58,11 +62,14 @@ try:
     )
     from ember.core.registry.operator.core.verifier import (
         VerifierOperatorInputs as VerifierInputs,
+    )
+    from ember.core.registry.operator.core.verifier import (
         VerifierOperatorOutputs as VerifierOutputs,
     )
 except ImportError:
     # For tests, define stub classes in case imports fail
-    from typing import Dict, Any, List
+    from typing import Any, Dict, List
+
     from pydantic import BaseModel
 
     # Stub classes for when imports fail during test collection
@@ -99,21 +106,20 @@ except ImportError:
 
 # Then, import the implementation modules which might have dependencies on the types
 try:
-    from ember.core.non import (
-        # Core operators
-        UniformEnsemble,
-        MostCommon,
+    from ember.core.non import (  # Core operators; Additional input types for VariedEnsemble
         JudgeSynthesis,
-        Verifier,
+        MostCommon,
         Sequential,
+        UniformEnsemble,
         VariedEnsemble,
-        # Additional input types for VariedEnsemble
         VariedEnsembleInputs,
         VariedEnsembleOutputs,
+        Verifier,
     )
 except ImportError:
     # Stub implementations for tests
-    from typing import Dict, Any, List, Optional
+    from typing import Any, Dict, List, Optional
+
     from pydantic import BaseModel
 
     class UniformEnsemble:

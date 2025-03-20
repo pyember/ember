@@ -5,11 +5,12 @@ It demonstrates the new simplified API for model registration.
 """
 
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
+
 from prettytable import PrettyTable
 
 from ember.api import models
-from ember.api.models import ModelInfo, ModelCost, RateLimit, ModelRegistry
+from ember.api.models import ModelCost, ModelInfo, ModelRegistry, RateLimit
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -178,9 +179,7 @@ def check_models(model_ids: List[str], registry: ModelRegistry) -> None:
 
                 logger.info(f"Model '{model_id}' is available and initialized")
             except Exception as e:
-                table.add_row(
-                    [model_id, "⚠️ Error", "Error", "Error", "Error", "Error"]
-                )
+                table.add_row([model_id, "⚠️ Error", "Error", "Error", "Error", "Error"])
                 logger.warning(f"Error getting model info for '{model_id}': {e}")
         else:
             table.add_row([model_id, "❌ Not Found", "N/A", "N/A", "N/A", "N/A"])

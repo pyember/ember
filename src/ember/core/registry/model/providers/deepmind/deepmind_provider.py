@@ -41,21 +41,21 @@ Typical usage example:
     ```python
     # Direct usage (prefer using ModelRegistry or API)
     from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
-    
+
     # Configure model information
     model_info = ModelInfo(
         id="deepmind:gemini-1.5-pro",
         name="gemini-1.5-pro",
         provider=ProviderInfo(name="Deepmind", api_key="YOUR_API_KEY")
     )
-    
+
     # Initialize the model
     model = GeminiModel(model_info)
-    
+
     # Basic usage
     response = model("What is the Ember framework?")
     print(response.data)  # The model's response text
-    
+
     # Advanced usage with more parameters
     response = model(
         "Generate creative ideas",
@@ -63,7 +63,7 @@ Typical usage example:
         temperature=0.7,
         provider_params={"top_p": 0.95, "top_k": 40}
     )
-    
+
     # Access usage information
     print(f"Used {response.usage.total_tokens} tokens")
     print(f"Prompt tokens: {response.usage.prompt_tokens}")
@@ -73,7 +73,7 @@ Typical usage example:
 For higher-level usage, prefer the model registry or API interfaces:
     ```python
     from ember.api.models import models
-    
+
     # Using the models API (automatically handles authentication)
     response = models.deepmind.gemini_15_pro("Tell me about Ember")
     print(response.data)
@@ -83,28 +83,28 @@ For higher-level usage, prefer the model registry or API interfaces:
 import logging
 from typing import Any, Dict, Optional
 
-from google.api_core.exceptions import NotFound
 import google.generativeai as genai
+from google.api_core.exceptions import NotFound
 from google.generativeai import GenerativeModel, types
 from pydantic import Field, field_validator
-from tenacity import retry, wait_exponential, stop_after_attempt
+from tenacity import retry, stop_after_attempt, wait_exponential
 from typing_extensions import TypedDict
 
-from ember.plugin_system import provider
-from ember.core.registry.model.base.utils.model_registry_exceptions import (
-    ProviderAPIError,
-    InvalidPromptError,
-)
-from ember.core.registry.model.providers.base_provider import (
-    BaseChatParameters,
-    BaseProviderModel,
-)
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
     ProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.registry.model.base.utils.model_registry_exceptions import (
+    InvalidPromptError,
+    ProviderAPIError,
+)
+from ember.core.registry.model.providers.base_provider import (
+    BaseChatParameters,
+    BaseProviderModel,
+)
+from ember.plugin_system import provider
 
 
 class DeepmindProviderParams(ProviderParams):

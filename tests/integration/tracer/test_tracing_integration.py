@@ -9,8 +9,8 @@ These tests verify:
 """
 
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.tracer.xcs_tracing import TracerContext
 from ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.tracer.xcs_tracing import TracerContext
 
 
 class DummySpecification:

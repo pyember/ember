@@ -23,37 +23,38 @@ import os
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Type
 
-from pydantic import BaseModel
 from prettytable import PrettyTable
+from pydantic import BaseModel
 
-# ember imports: use only the typed pipeline definitions (avoid direct registry references).
-from ember.core.non import UniformEnsemble, JudgeSynthesis, VariedEnsemble
-from ember.core.app_context import get_ember_context
 from ember.core import non
+from ember.core.app_context import get_ember_context
 from ember.core.config.manager import create_config_manager
 
-# For dataset usage:
-from ember.core.utils.data.base.models import DatasetEntry
-from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
-from ember.core.utils.data.service import DatasetService
-from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-from ember.core.utils.data.base.samplers import DatasetSampler
-from ember.core.utils.data.base.validators import DatasetValidator
-from ember.core.utils.data.initialization import initialize_dataset_registry
-from ember.xcs.scheduler import ExecutionPlan
+# ember imports: use only the typed pipeline definitions (avoid direct registry references).
+from ember.core.non import JudgeSynthesis, UniformEnsemble, VariedEnsemble
+from ember.core.registry.model.model_module.lm import LMModuleConfig
 from ember.core.registry.operator.base.operator_base import (
     LMModule,
     Operator,
     OperatorMetadata,
 )
 from ember.core.registry.specification.specification import Specification
-from ember.core.registry.model.model_module.lm import LMModuleConfig
+from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
+
+# For dataset usage:
+from ember.core.utils.data.base.models import DatasetEntry
+from ember.core.utils.data.base.samplers import DatasetSampler
+from ember.core.utils.data.base.validators import DatasetValidator
+from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
+from ember.core.utils.data.initialization import initialize_dataset_registry
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory
+from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
+from ember.core.utils.data.service import DatasetService
 
 # Import from XCS engine:
 from ember.xcs.engine.xcs_engine import execute_graph
 from ember.xcs.graph.xcs_graph import OperatorGraph
+from ember.xcs.scheduler import ExecutionPlan
 
 
 ###############################################################################

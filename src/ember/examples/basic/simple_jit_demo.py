@@ -18,19 +18,19 @@ Example usage:
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Type, ClassVar, Tuple
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
 
 from ember.api.xcs import jit
 from ember.core.registry.operator.base.operator_base import Operator, Specification
 from ember.core.types.ember_model import EmberModel, Field
 from ember.xcs.engine.execution_options import execution_options
-from ember.xcs.tracer.xcs_tracing import TracerContext
 from ember.xcs.engine.xcs_engine import (
-    compile_graph,
     TopologicalSchedulerWithParallelDispatch,
+    compile_graph,
 )
 from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
 from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.tracer.xcs_tracing import TracerContext
 
 # Configure logging
 logging.basicConfig(

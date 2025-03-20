@@ -21,7 +21,8 @@ import argparse
 import logging
 import os
 import sys
-from typing import ClassVar, Dict, Optional, Union, List, Type
+from typing import ClassVar, Dict, List, Optional, Type, Union
+
 from ember.core.types.ember_model import EmberModel, Field
 
 # ------------------------------------------------------------------------------------
@@ -83,9 +84,9 @@ def check_env() -> None:
 # Model Registration
 # ------------------------------------------------------------------------------------
 from ember.core.app_context import get_ember_context
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
 
@@ -231,11 +232,12 @@ class SimplePromptSpecification(Specification):
     )
 
 
+from ember.core.non import JudgeSynthesis, UniformEnsemble
+
 # ------------------------------------------------------------------------------------
 # Operators (Single-step LM calls using these specifications)
 # ------------------------------------------------------------------------------------
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.non import UniformEnsemble, JudgeSynthesis
 
 
 class SimplePromptOperator(Operator[SimplePromptInputs, SimplePromptOutput]):

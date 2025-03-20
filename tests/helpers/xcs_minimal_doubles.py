@@ -6,8 +6,8 @@ to test client code without duplicating the entire implementation. Following the
 principle of "avoid overmocking" from CLAUDE.md guidelines.
 """
 
-from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 import functools
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
 # Type variables
 T = TypeVar("T")

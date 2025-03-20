@@ -37,10 +37,10 @@ config_manager.set_provider_api_key("openai", "sk-your-key")
 ```
 """
 
-from .schema import EmberConfig, Provider, Model, Cost, RegistryConfig, LoggingConfig
+from .exceptions import ConfigError
 from .loader import load_config, merge_dicts, resolve_env_vars
 from .manager import ConfigManager, create_config_manager
-from .exceptions import ConfigError
+from .schema import Cost, EmberConfig, LoggingConfig, Model, Provider, RegistryConfig
 
 __all__ = [
     # Schema classes

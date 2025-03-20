@@ -4,18 +4,18 @@ Uses a dummy provider to simulate a full end-to-end scenario.
 
 import threading
 from pathlib import Path
-from typing import Any
 from textwrap import dedent
+from typing import Any
 
 import pytest
 
-from ember.core.registry.model.initialization import initialize_registry
 from ember.core.config.manager import create_config_manager
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
+from ember.core.registry.model.initialization import initialize_registry
 
 
 def create_dummy_config(tmp_path: Path) -> Path:

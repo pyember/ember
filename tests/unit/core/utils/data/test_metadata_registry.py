@@ -6,23 +6,23 @@ and DatasetMetadataRegistry classes.
 """
 
 import unittest
-from typing import Dict, List, Any, Optional, Type, cast
+from typing import Any, Dict, List, Optional, Type, cast
 from unittest import mock
 
 from ember.core.utils.data.base.models import DatasetInfo, TaskType
 from ember.core.utils.data.base.preppers import IDatasetPrepper
-from ember.core.utils.data.registry import (
-    UnifiedDatasetRegistry,
-    RegisteredDataset,
-    register,
-    UNIFIED_REGISTRY,
-    initialize_registry,
-)
 from ember.core.utils.data.metadata_registry import (
+    DatasetMetadataRegistry,
     DatasetRegistry,
     DatasetRegistryManager,
-    DatasetMetadataRegistry,
     register_dataset,
+)
+from ember.core.utils.data.registry import (
+    UNIFIED_REGISTRY,
+    RegisteredDataset,
+    UnifiedDatasetRegistry,
+    initialize_registry,
+    register,
 )
 
 
@@ -333,11 +333,11 @@ class TestCompatibilityLayer(unittest.TestCase):
         """Set up test fixtures."""
         # Import the compatibility layer
         from ember.core.utils.data.metadata_registry import (
+            UNIFIED_REGISTRY,
+            DatasetMetadataRegistry,
             DatasetRegistry,
             DatasetRegistryManager,
-            DatasetMetadataRegistry,
             register_dataset,
-            UNIFIED_REGISTRY,
         )
 
         self.DatasetRegistry = DatasetRegistry

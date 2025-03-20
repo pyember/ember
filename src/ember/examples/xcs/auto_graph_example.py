@@ -13,11 +13,11 @@ import time
 from typing import Any, Dict, List, Optional
 
 # ember imports
-from ember.core.non import UniformEnsemble as Ensemble, MostCommon
+from ember.core.non import MostCommon
+from ember.core.non import UniformEnsemble as Ensemble
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.tracer.tracer_decorator import jit
 from ember.xcs.engine.execution_options import execution_options
-
+from ember.xcs.tracer.tracer_decorator import jit
 
 ###############################################################################
 # JIT-Decorated Operators

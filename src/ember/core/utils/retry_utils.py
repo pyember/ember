@@ -1,6 +1,7 @@
 from __future__ import annotations
-from typing import Any, Callable, Generic, TypeVar
+
 from abc import ABC, abstractmethod
+from typing import Any, Callable, Generic, TypeVar
 
 try:
     from tenacity import retry, stop_after_attempt, wait_random_exponential

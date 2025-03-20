@@ -4,16 +4,17 @@ Tests that verify the complete XCS tracing and execution pipeline
 with various transforms and graph patterns. Uses minimal test doubles.
 """
 
-import pytest
+from typing import Any, Callable, Dict, List
+
 import numpy as np
-from typing import List, Dict, Any, Callable
+import pytest
 
 # Import minimal test doubles instead of actual implementations
 from tests.helpers.xcs_minimal_doubles import (
     minimal_autograph,
     minimal_jit,
-    minimal_vmap,
     minimal_pmap,
+    minimal_vmap,
 )
 
 # Mark all tests as integration tests

@@ -6,9 +6,9 @@ to test client code without duplicating the implementation. Following the
 principle of "avoid overmocking" from CLAUDE.md guidelines.
 """
 
-from typing import Any, Dict, List, Optional, Union, Callable
 import logging
 from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional, Union
 
 # Setup logger
 logger = logging.getLogger(__name__)

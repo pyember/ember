@@ -1,11 +1,11 @@
 """Tests for evaluators module."""
 
+import os
 import re
 import subprocess
-from typing import Any
 import sys
-import os
 import unittest
+from typing import Any
 from unittest import mock
 
 import pytest
@@ -21,19 +21,19 @@ except ImportError:
 
 try:
     from ember.core.utils.eval.evaluators import (
+        CodeExecutionEvaluator,
         ComposedEvaluator,
         ExactMatchEvaluator,
         NumericToleranceEvaluator,
         PartialRegexEvaluator,
-        CodeExecutionEvaluator,
     )
 except ImportError:
     from ember.core.utils.eval.evaluators import (
+        CodeExecutionEvaluator,
         ComposedEvaluator,
         ExactMatchEvaluator,
         NumericToleranceEvaluator,
         PartialRegexEvaluator,
-        CodeExecutionEvaluator,
     )
 
 try:

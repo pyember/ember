@@ -19,14 +19,14 @@ To run:
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Type, ClassVar
+from typing import Any, ClassVar, Dict, List, Optional, Type
 
+from pydantic import Field
+
+from ember.api.xcs import execution_options, jit
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-from ember.api.xcs import jit, execution_options
-from pydantic import Field
-
 
 ###############################################################################
 # Input/Output Models

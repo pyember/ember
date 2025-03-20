@@ -6,10 +6,11 @@ and execution using a mock operator.
 
 from typing import Any, Dict
 
+from ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.tracer.xcs_tracing import TracerContext
+
 # Use stub classes for testing to avoid import cycle issues
 from tests.helpers.stub_classes import Operator
-from ember.xcs.tracer.xcs_tracing import TracerContext
-from ember.xcs.tracer.tracer_decorator import jit
 
 
 @jit()

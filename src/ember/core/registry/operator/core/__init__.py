@@ -14,8 +14,8 @@ from .most_common import (
     MostCommonAnswerSelectorOutputs,
 )
 from .synthesis_judge import (
-    JudgeSynthesisOperator,
     JudgeSynthesisInputs,
+    JudgeSynthesisOperator,
     JudgeSynthesisOutputs,
     JudgeSynthesisSpecification,
 )

@@ -1,13 +1,13 @@
-import threading
 import logging
-from typing import Dict, List, Optional, Generic, TypeVar
+import threading
+from typing import Dict, Generic, List, Optional, TypeVar
 
 from ember.core.registry.model.base.registry.factory import ModelFactory
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ModelNotFoundError,
 )
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 # Type variable for model implementation
 M = TypeVar("M", bound=BaseProviderModel)
@@ -205,10 +205,10 @@ class ModelRegistry(Generic[M]):
             will not raise exceptions to the caller.
         """
         # Import here to avoid circular dependency issues
+        from ember.core.exceptions import EmberError
         from ember.core.registry.model.base.registry.discovery import (
             ModelDiscoveryService,
         )
-        from ember.core.exceptions import EmberError
 
         discovery_service = ModelDiscoveryService()
         self._logger.info("Initiating model discovery via ModelDiscoveryService")
@@ -260,9 +260,11 @@ class ModelRegistry(Generic[M]):
                         self._logger.debug(
                             "Attempting to register discovered model: %s (provider: %s)",
                             model_id,
-                            model_info.provider.name
-                            if model_info.provider
-                            else "unknown",
+                            (
+                                model_info.provider.name
+                                if model_info.provider
+                                else "unknown"
+                            ),
                         )
                         # Use register_model which has its own lock
                         self.register_model(model_info=model_info)
@@ -271,9 +273,11 @@ class ModelRegistry(Generic[M]):
                         self._logger.info(
                             "Successfully registered model: %s with provider %s",
                             model_id,
-                            model_info.provider.name
-                            if model_info.provider
-                            else "unknown",
+                            (
+                                model_info.provider.name
+                                if model_info.provider
+                                else "unknown"
+                            ),
                         )
                     except ValueError as registration_error:
                         # Expected error if model already exists

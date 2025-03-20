@@ -1,9 +1,9 @@
 """Tests for stateful_evaluators module."""
 
-from typing import Any
-import sys
 import os
+import sys
 import unittest
+from typing import Any
 from unittest import mock
 
 import pytest

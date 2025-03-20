@@ -6,22 +6,23 @@ across the codebase.
 
 Examples:
     from ember.api.types import EmberModel, Field
-    
+
     class MyInputModel(EmberModel):
         text: str = Field(description="Input text")
 """
 
-from typing import Any, Dict, List, Optional, TypeVar, Union, Generic, ClassVar, Type
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Type, TypeVar, Union
+
+from ember.core.types import (
+    EmberSerializable,
+    EmberTyped,
+    InputT,
+    OutputT,
+    TypeInfo,
+)
 
 # Re-export core types
 from ember.core.types.ember_model import EmberModel, Field
-from ember.core.types import (
-    InputT,
-    OutputT,
-    EmberTyped,
-    EmberSerializable,
-    TypeInfo,
-)
 
 
 # Utility function for extracting values from various response types

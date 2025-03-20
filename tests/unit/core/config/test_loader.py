@@ -4,20 +4,21 @@ This module contains tests for the configuration loading functionality in ember.
 """
 
 import os
-import pytest
-from typing import Dict, Any
 import tempfile
+from typing import Any, Dict
+
+import pytest
 import yaml
 
+from ember.core.config.exceptions import ConfigError
 from ember.core.config.loader import (
+    load_config,
+    load_from_env,
+    load_yaml_file,
     merge_dicts,
     resolve_env_vars,
-    load_yaml_file,
-    load_from_env,
-    load_config,
 )
 from ember.core.config.schema import EmberConfig
-from ember.core.config.exceptions import ConfigError
 
 
 class TestMergeDicts:

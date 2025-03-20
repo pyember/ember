@@ -8,15 +8,16 @@ remain within reasonable tolerances.
 
 """
 
-import time
-import statistics
 import concurrent.futures
 import logging
+import statistics
+import time
 from typing import Any, Dict, List, Tuple, Type
 
 from pydantic import BaseModel
-from ember.core.registry.specification.specification import Specification
+
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
 
 logger: logging.Logger = logging.getLogger(__name__)
 

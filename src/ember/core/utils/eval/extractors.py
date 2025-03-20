@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import re
 import abc
-from typing import Any, Optional, TypeVar, Generic
+import re
+from typing import Any, Generic, Optional, TypeVar
 
 # We no longer have ExtractionResult here.
 T_out = TypeVar("T_out")

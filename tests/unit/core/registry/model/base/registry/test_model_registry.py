@@ -7,26 +7,26 @@ import importlib
 import logging
 import threading
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 from ember.core.exceptions import EmberError, ModelNotFoundError
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.schemas.model_info import (
-    ModelInfo,
-    ProviderInfo,
-)
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.registry.factory import ModelFactory
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.schemas.model_info import (
+    ModelInfo,
+    ProviderInfo,
+)
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 
 # Define test providers directly in this module for test independence

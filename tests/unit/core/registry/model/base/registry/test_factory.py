@@ -4,19 +4,20 @@ Tests provider discovery, instantiation, and error handling in the model factory
 """
 
 import os
-import pytest
 import sys
 from types import ModuleType
 from typing import Any, Dict, Type
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from ember.core.registry.model.base.registry.factory import (
     ModelFactory,
     discover_providers_in_package,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )

@@ -5,10 +5,11 @@ with the model registry and other components.
 """
 
 import os
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
+
+import pytest
+import yaml
 
 from ember.core.app_context import create_ember_app, get_app_context
 from ember.core.config.manager import create_config_manager

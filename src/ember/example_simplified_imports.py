@@ -4,8 +4,8 @@ Example demonstrating the simplified import structure.
 This example shows how to use the new top-level imports for operators and NON components.
 """
 
+from ember.non import JudgeSynthesis, Sequential, UniformEnsemble
 from ember.operator import Operator
-from ember.non import UniformEnsemble, JudgeSynthesis, Sequential
 
 # Create an ensemble with 3 identical models
 ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o", temperature=1.0)

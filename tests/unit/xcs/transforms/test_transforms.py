@@ -1,49 +1,51 @@
 """
 Unit tests for XCS transformations.
 
-This module provides comprehensive testing for the vmap, pmap/pjit, and mesh 
+This module provides comprehensive testing for the vmap, pmap/pjit, and mesh
 transformations in XCS. Tests cover basic functionality, edge cases, error handling,
 and integration with different operator types.
 """
 
-import pytest
-import time
+import multiprocessing
 import random
 import threading
-import multiprocessing
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any, List, Tuple, Optional, Union, Callable
-import numpy as np
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from unittest.mock import MagicMock, patch
 
-from tests.helpers.stub_classes import Operator
+import numpy as np
+import pytest
 
-# Import directly from our fixed imports module to avoid 'module is not callable' errors
-from tests.unit.xcs.transforms.test_transform_imports import (
-    vmap,
-    pmap,
-    pjit,
-    DeviceMesh,
-    PartitionSpec,
-    mesh_sharded,
+from ember.xcs.engine.xcs_engine import (
+    TopologicalSchedulerWithParallelDispatch,
+    execute_graph,
 )
 from ember.xcs.graph.xcs_graph import XCSGraph
-from ember.xcs.engine.xcs_engine import (
-    execute_graph,
-    TopologicalSchedulerWithParallelDispatch,
-)
+from tests.helpers.stub_classes import Operator
 
 # Import our test operators
 from tests.unit.xcs.transforms.mock_operators import (
-    BasicOperator,
-    StatefulOperator,
-    NestedOperator,
-    ExceptionOperator,
-    MockModule as ModuleOperator,
-    ComplexInputOperator,
     AsyncBehaviorOperator,
+    BasicOperator,
+    ComplexInputOperator,
+    ExceptionOperator,
+)
+from tests.unit.xcs.transforms.mock_operators import MockModule as ModuleOperator
+from tests.unit.xcs.transforms.mock_operators import (
+    NestedOperator,
+    StatefulOperator,
 )
 
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import (
+    DeviceMesh,
+    PartitionSpec,
+    mesh_sharded,
+    pjit,
+    pmap,
+    vmap,
+)
 
 # ============================== VMAP Tests ==============================
 

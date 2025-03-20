@@ -15,16 +15,16 @@ import logging
 import time
 from typing import Any, Dict, List, Optional
 
+from ember.core.non import JudgeSynthesis, UniformEnsemble
+
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.non import UniformEnsemble, JudgeSynthesis
-from ember.xcs.tracer.tracer_decorator import jit
-from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.engine.xcs_engine import (
-    execute_graph,
     TopologicalSchedulerWithParallelDispatch,
+    execute_graph,
 )
-
+from ember.xcs.graph.xcs_graph import XCSGraph
+from ember.xcs.tracer.tracer_decorator import jit
 
 ###############################################################################
 # JIT-Decorated Ensemble Operators

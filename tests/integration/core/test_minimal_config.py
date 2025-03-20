@@ -9,13 +9,14 @@ import os
 import tempfile
 from contextlib import contextmanager
 from unittest.mock import patch
-import yaml
+
 import pytest
+import yaml
 
 # Import modules for centralized configuration testing
 try:
-    from ember.core.config.schema import EmberConfig, Model, Provider, Cost
     from ember.core.config.manager import ConfigManager, create_config_manager
+    from ember.core.config.schema import Cost, EmberConfig, Model, Provider
     from ember.core.registry.model.initialization import initialize_registry
 
     IMPORTS_AVAILABLE = True

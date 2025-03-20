@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Any
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 from ember.core.registry.model.base.services.model_service import ModelService

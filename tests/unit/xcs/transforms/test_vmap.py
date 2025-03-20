@@ -6,33 +6,34 @@ transformation in XCS, including basic functionality, edge cases, error handling
 and advanced usage patterns.
 """
 
-import pytest
 import threading
 import time
-from typing import Dict, Any, List, Callable, Set, Tuple
+from typing import Any, Callable, Dict, List, Set, Tuple
 
-# Import directly from our fixed imports module to avoid 'module is not callable' errors
-from tests.unit.xcs.transforms.test_transform_imports import vmap
+import pytest
+
 from ember.xcs.transforms.vmap import (
+    _combine_outputs,
     _get_batch_size,
     _prepare_batched_inputs,
-    _combine_outputs,
 )
 
 # Import test operators
 from tests.unit.xcs.transforms.mock_operators import (
     BasicOperator,
-    StatefulOperator,
-    NestedOperator,
+    ComplexInputOperator,
     ExceptionOperator,
     MockModule,
-    ComplexInputOperator,
-)
-from tests.unit.xcs.transforms.test_utils import (
-    generate_batch_inputs,
-    assert_processing_time,
+    NestedOperator,
+    StatefulOperator,
 )
 
+# Import directly from our fixed imports module to avoid 'module is not callable' errors
+from tests.unit.xcs.transforms.test_transform_imports import vmap
+from tests.unit.xcs.transforms.test_utils import (
+    assert_processing_time,
+    generate_batch_inputs,
+)
 
 # =============================== Fixtures ===============================
 

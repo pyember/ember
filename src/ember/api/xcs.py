@@ -7,31 +7,31 @@ just-in-time tracing, and parallel execution transformations.
 Examples:
     # Using JIT compilation for operators
     from ember.api import xcs
-    
+
     @xcs.jit
     class MyOperator(Operator):
         def forward(self, *, inputs):
             # Complex computation here
             return result
-    
+
     # Using structural JIT for optimized execution
     @xcs.structural_jit(execution_strategy="parallel")
     class CompositeOperator(Operator):
         def __init__(self):
             self.op1 = SubOperator1()
             self.op2 = SubOperator2()
-            
+
         def __call__(self, *, inputs):
             # Multi-step computation automatically parallelized
             result1 = self.op1(inputs=inputs)
             result2 = self.op2(inputs=inputs)
             return combine(result1, result2)
-    
+
     # Using vectorized mapping
     @xcs.vmap(in_axes=(0, None))
     def process_batch(inputs, model):
         return model(inputs)
-    
+
     # Using parallel execution
     @xcs.pmap
     def parallel_process(inputs):
@@ -39,29 +39,24 @@ Examples:
 """
 
 # Import from the implementation
+from ember.xcs import DeviceMesh  # Device mesh for distribution
+from ember.xcs import ExecutionResult  # Result of execution
+from ember.xcs import JITOptions  # Options for JIT
+from ember.xcs import PartitionSpec  # Partition specification
+from ember.xcs import TraceContextData  # Trace context data
+from ember.xcs import TracerContext  # Context for tracing
+from ember.xcs import TraceRecord  # Record of traces
+from ember.xcs import TransformOptions  # Options for transforms
+from ember.xcs import XCSExecutionOptions  # Options for execution
+from ember.xcs import autograph  # Automatic graph building
+from ember.xcs import execute  # Direct graph execution
+from ember.xcs import jit  # Just-in-time compilation
+from ember.xcs import mesh_sharded  # Sharded execution
+from ember.xcs import pmap  # Parallel mapping
+from ember.xcs import structural_jit  # Structural JIT compilation
+from ember.xcs import vmap  # Vectorized mapping
 from ember.xcs import (
-    # Core execution framework
-    xcs,  # XCS core interface
-    # Core functions
-    jit,  # Just-in-time compilation
-    structural_jit,  # Structural JIT compilation
-    autograph,  # Automatic graph building
-    execute,  # Direct graph execution
-    # Transforms
-    vmap,  # Vectorized mapping
-    pmap,  # Parallel mapping
-    mesh_sharded,  # Sharded execution
-    DeviceMesh,  # Device mesh for distribution
-    PartitionSpec,  # Partition specification
-    # Tracing
-    TracerContext,  # Context for tracing
-    TraceRecord,  # Record of traces
-    TraceContextData,  # Trace context data
-    # Types
-    XCSExecutionOptions,  # Options for execution
-    ExecutionResult,  # Result of execution
-    JITOptions,  # Options for JIT
-    TransformOptions,  # Options for transforms
+    xcs,  # Core execution framework; Core functions; Transforms; Tracing; Types; XCS core interface
 )
 
 # Import execution options directly - essential for controlling parallel execution

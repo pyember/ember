@@ -9,9 +9,8 @@ from typing import Any, Dict, Type
 import pytest
 from pydantic import BaseModel
 
-from tests.helpers.stub_classes import Operator
 from ember.xcs.tracer.tracer_decorator import jit
-
+from tests.helpers.stub_classes import Operator
 
 # ----------------------------------------------------------------------------
 # Dummy Models and Specification for Testing

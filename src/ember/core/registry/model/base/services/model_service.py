@@ -1,17 +1,17 @@
+import asyncio
 import logging
 from enum import Enum
-import asyncio
 from typing import Any, Optional, Union
 
+from ember.core.exceptions import ProviderAPIError
+from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
+from ember.core.registry.model.base.services.usage_service import UsageService
 from ember.core.registry.model.config.model_enum import (
     ModelEnum,
     parse_model_str,
 )
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
 from ember.core.registry.model.providers.base_provider import BaseProviderModel
-from ember.core.registry.model.base.services.usage_service import UsageService
-from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
-from ember.core.exceptions import ProviderAPIError
 
 
 class ModelService:

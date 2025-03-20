@@ -1,8 +1,8 @@
 """Integration tests for the eval module components working together."""
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 from typing import Any, Dict, List, Tuple
 
 # Print current path for debugging

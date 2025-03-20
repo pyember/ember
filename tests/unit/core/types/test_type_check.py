@@ -2,16 +2,17 @@
 Tests for the type checking utilities.
 """
 
-import pytest
-from typing import Dict, List, Optional, Union, Any, TypeVar, Generic, Tuple
+from typing import Any, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
-from ember.core.types.type_check import (
-    validate_type,
-    validate_instance_attrs,
-    type_check,
-)
+import pytest
+
 from ember.core.types.ember_model import EmberModel
 from ember.core.types.protocols import EmberTyped, TypeInfo
+from ember.core.types.type_check import (
+    type_check,
+    validate_instance_attrs,
+    validate_type,
+)
 
 
 def test_validate_type_simple():

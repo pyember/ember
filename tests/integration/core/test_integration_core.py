@@ -6,28 +6,29 @@ and verifies that inputs propagate correctly, prompts are rendered, and the fina
 output contains expected verification details.
 """
 
-import os
 import logging
-import pytest
-from typing import Dict, Any, List, Optional, Type, Callable, Union
+import os
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-from ember.core.app_context import create_ember_app
-from ember.core.exceptions import ProviderAPIError, ModelNotFoundError
+import pytest
 from pydantic import Field
 
-# Model components
-from ember.core.types.ember_model import EmberModel
-from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.app_context import create_ember_app
+from ember.core.exceptions import ModelNotFoundError, ProviderAPIError
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.base.services.model_service import ModelService
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.operator.base._module import static_field
 
 # Operator components
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
-from ember.core.registry.operator.base._module import static_field
+
+# Model components
+from ember.core.types.ember_model import EmberModel
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -245,11 +246,11 @@ def test_multi_stage_pipeline_integration() -> None:
     # The revised_answer may or may not be present depending on the verdict
 
 
-from ember.core.registry.model.providers.base_provider import BaseProviderModel
 from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatRequest,
     ChatResponse,
 )
+from ember.core.registry.model.providers.base_provider import BaseProviderModel
 
 
 class FailingProvider(BaseProviderModel):

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Unit tests for the AnthropicModel provider implementation.
-"""
+"""Unit tests for the AnthropicModel provider implementation."""
 
-import pytest
 from typing import Any
-import anthropic
 
-from ember.core.registry.model.providers.anthropic.anthropic_provider import (
-    AnthropicModel,
-    AnthropicChatParameters,
-)
+import anthropic
+import pytest
+
 from ember.core.registry.model.base.schemas.chat_schemas import (
-    ChatResponse,
     ChatRequest,
+    ChatResponse,
 )
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
-from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
+from ember.core.registry.model.providers.anthropic.anthropic_provider import (
+    AnthropicChatParameters,
+    AnthropicModel,
+)
 
 
 class DummyAnthropicResponse:

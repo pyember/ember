@@ -3,10 +3,11 @@
 This module contains tests for the configuration schema classes in ember.core.config.schema.
 """
 
-import pytest
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ember.core.config.schema import EmberConfig, RegistryConfig, Provider, Model, Cost
+import pytest
+
+from ember.core.config.schema import Cost, EmberConfig, Model, Provider, RegistryConfig
 
 
 class TestCost:

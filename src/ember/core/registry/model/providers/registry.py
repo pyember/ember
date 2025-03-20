@@ -4,7 +4,7 @@ This module maintains a registry of provider implementations and ensures proper
 synchronization with the global plugin system.
 """
 
-from typing import Dict, Type, Any, Callable, TypeVar
+from typing import Any, Callable, Dict, Type, TypeVar
 
 from ember.plugin_system import registered_providers
 

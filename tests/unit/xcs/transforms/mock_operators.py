@@ -5,11 +5,11 @@ These simplified mock operators don't use actual validation or complex logic,
 making them suitable for testing the transform functions.
 """
 
-from typing import Any, Dict, List, Optional, Protocol
+import dataclasses
+import random
 import threading
 import time
-import random
-import dataclasses
+from typing import Any, Dict, List, Optional, Protocol
 
 
 # Define our own simplified base classes to avoid import errors

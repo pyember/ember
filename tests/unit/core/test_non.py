@@ -1,7 +1,7 @@
 """Placeholder test for NON wrappers.
 
 Since the specification module has been removed and refactored to use Specification
-instead of Specification, this test file is a placeholder until the test can be 
+instead of Specification, this test file is a placeholder until the test can be
 properly updated to match the new architecture.
 """
 
