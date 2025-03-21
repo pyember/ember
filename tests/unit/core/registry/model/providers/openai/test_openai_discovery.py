@@ -53,7 +53,7 @@ def discovery_instance():
 
 def test_openai_discovery_empty_model_list(discovery_instance) -> None:
     """Test that OpenAIDiscovery handles empty model lists correctly.
-    
+
     Since the hardcoded fallback models were removed, the function should
     return an empty dictionary when API access fails without raising exceptions.
     """

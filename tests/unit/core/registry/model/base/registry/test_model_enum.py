@@ -15,11 +15,17 @@ def test_model_enum_creation() -> None:
     """Test that ModelEnum combines models from all provider enums."""
     # Get all values from the ModelEnum
     all_values = [item.value for item in ModelEnum]
-    
+
     # Check that at least one model from each provider exists in the enum
-    assert any(val.startswith("openai:") for val in all_values), "No OpenAI models found"
-    assert any(val.startswith("anthropic:") for val in all_values), "No Anthropic models found"
-    assert any(val.startswith("deepmind:") for val in all_values), "No Deepmind models found"
+    assert any(
+        val.startswith("openai:") for val in all_values
+    ), "No OpenAI models found"
+    assert any(
+        val.startswith("anthropic:") for val in all_values
+    ), "No Anthropic models found"
+    assert any(
+        val.startswith("deepmind:") for val in all_values
+    ), "No Deepmind models found"
 
 
 def test_known_model_enum() -> None:

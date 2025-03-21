@@ -35,7 +35,7 @@ def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
             DummyModel("gemini-1.5-pro"),
             DummyModel("gemini-1.5-flash"),
             DummyModel("gemini-2.0-pro"),  # Add new models from the enum
-            DummyModel("gemini-2.0-flash"), # Add new models from the enum
+            DummyModel("gemini-2.0-flash"),  # Add new models from the enum
             # This one should be filtered out due to missing generateContent
             DummyModel("other-model", []),
         ]

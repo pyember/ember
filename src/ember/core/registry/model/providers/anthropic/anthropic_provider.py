@@ -205,7 +205,12 @@ class AnthropicConfig:
                 # Also add the short form (assuming 'provider:shortname' format).
                 valid_models.add(model["model_id"].split(":")[-1])
         if not valid_models:
-            valid_models = {"claude-3-5-sonnet", "claude-3.7-sonnet", "claude-3-opus", "claude-3-haiku"}
+            valid_models = {
+                "claude-3-5-sonnet",
+                "claude-3.7-sonnet",
+                "claude-3-opus",
+                "claude-3-haiku",
+            }
         return valid_models
 
     @classmethod

@@ -53,7 +53,9 @@ class TestProviderDiscoveryIntegration:
                 model_id.startswith("openai:") for model_id in models.keys()
             ), "Model IDs do not follow expected pattern"
         else:
-            pytest.skip("No models returned from OpenAI discovery - API may be unreachable")
+            pytest.skip(
+                "No models returned from OpenAI discovery - API may be unreachable"
+            )
 
         # Check format of one model if models were found
         if models:
@@ -77,7 +79,9 @@ class TestProviderDiscoveryIntegration:
                 model_id.startswith("anthropic:") for model_id in models.keys()
             ), "Model IDs do not follow expected pattern"
         else:
-            pytest.skip("No models returned from Anthropic discovery - API may be unreachable")
+            pytest.skip(
+                "No models returned from Anthropic discovery - API may be unreachable"
+            )
 
         # Check format of one model if models were found
         if models:
@@ -103,7 +107,9 @@ class TestProviderDiscoveryIntegration:
                 model_id.startswith("deepmind:") for model_id in models.keys()
             ), "Model IDs do not follow expected pattern"
         else:
-            pytest.skip("No models returned from Google/Deepmind discovery - API may be unreachable")
+            pytest.skip(
+                "No models returned from Google/Deepmind discovery - API may be unreachable"
+            )
 
         # Check format of one model if models were found
         if models:
@@ -126,7 +132,7 @@ class TestProviderDiscoveryIntegration:
         # Note: May return empty results if API keys aren't set or discovery fails
         # This is expected behavior with fallbacks removed
         assert elapsed_time < 120, "Discovery took too long"
-        
+
         # Log discovered models for debugging
         discovered_models = registry.list_models()
         if discovered_models:

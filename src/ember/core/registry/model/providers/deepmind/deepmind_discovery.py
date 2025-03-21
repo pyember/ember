@@ -49,7 +49,9 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
                 app_context = get_app_context()
                 # Try both "deepmind" (preferred) and "google" (fallback) provider configs
                 config = app_context.config_manager.get_config()
-                provider_config = config.get_provider("deepmind") or config.get_provider("google")
+                provider_config = config.get_provider(
+                    "deepmind"
+                ) or config.get_provider("google")
                 if provider_config and provider_config.api_keys.get("default"):
                     self._api_key = provider_config.api_keys["default"].key
             except Exception as config_error:
@@ -114,11 +116,11 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
                 ):
                     # Only include models with generateContent support
                     model_name = model.name
-                    
+
                     # Remove 'models/' prefix if present
                     if model_name.startswith("models/"):
-                        model_name = model_name[len("models/"):]
-                    
+                        model_name = model_name[len("models/") :]
+
                     model_id: str = f"deepmind:{model_name}"
                     models[model_id] = {
                         "model_id": model_id,

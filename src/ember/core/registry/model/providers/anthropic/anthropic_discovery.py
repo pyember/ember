@@ -168,9 +168,7 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
 
             # Return discovered models, even if empty
             if not standardized_models:
-                logger.warning(
-                    "No Anthropic models found - API discovery required"
-                )
+                logger.warning("No Anthropic models found - API discovery required")
 
             duration = time.time() - start_time
             logger.info(
@@ -223,7 +221,7 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
     def _extract_base_model_id(self, raw_model_id: str) -> str:
         """
         Extract the base model ID, removing only date suffixes if present.
-        
+
         This function performs minimal normalization, primarily removing date
         suffixes to maintain consistency across model versions.
 
@@ -235,12 +233,13 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
         """
         # Log for debugging
         logger.debug(f"Processing model ID: {raw_model_id}")
-        
+
         # Simply remove date suffixes (YYYYMMDD format) if present
         import re
+
         date_pattern = r"(-\d{8})"
         base_id = re.sub(date_pattern, "", raw_model_id)
-        
+
         return base_id
 
     # Fallback methods removed in favor of direct API discovery

@@ -22,14 +22,14 @@ class OpenAIModelEnum(str, Enum):
     # GPT-4o models
     gpt_4o = "openai:gpt-4o"
     gpt_4o_mini = "openai:gpt-4o-mini"
-    
+
     # GPT-4 models
     gpt_4 = "openai:gpt-4"
     gpt_4_turbo = "openai:gpt-4-turbo"
-    
+
     # GPT-3.5 models
     gpt_3_5_turbo = "openai:gpt-3.5-turbo"
-    
+
     # Reasoning models, which may require special access
     # Note: o1 support is pending
     o1 = "openai:o1-2024-12-17"
@@ -38,18 +38,19 @@ class OpenAIModelEnum(str, Enum):
 class AnthropicModelEnum(str, Enum):
     """
     Current Anthropic Claude models based on official documentation.
-    
+
     This enum represents the currently available Claude models from Anthropic.
-    Claude 3 models represent the base versions, with newer 3.5 and 3.7 
+    Claude 3 models represent the base versions, with newer 3.5 and 3.7
     versions providing improved capabilities.
     """
+
     # Claude 3.7 models (latest generation)
     claude_3_7_sonnet = "anthropic:claude-3.7-sonnet"
-    
+
     # Claude 3.5 models (using hyphen format as returned by API)
-    claude_3_5_sonnet = "anthropic:claude-3-5-sonnet" 
+    claude_3_5_sonnet = "anthropic:claude-3-5-sonnet"
     claude_3_5_haiku = "anthropic:claude-3-5-haiku"
-    
+
     # Claude 3 models (original generation)
     claude_3_opus = "anthropic:claude-3-opus"
     claude_3_haiku = "anthropic:claude-3-haiku"
@@ -60,7 +61,7 @@ class DeepmindModelEnum(str, Enum):
     gemini_1_5_pro = "deepmind:gemini-1.5-pro"
     gemini_1_5_flash = "deepmind:gemini-1.5-flash"
     gemini_1_5_flash_8b = "deepmind:gemini-1.5-flash-8b"
-    
+
     # Gemini 2.0 models
     gemini_2_0_flash = "deepmind:gemini-2.0-flash"
     gemini_2_0_flash_lite = "deepmind:gemini-2.0-flash-lite"
@@ -76,7 +77,7 @@ ALL_PROVIDER_ENUMS: List[Type[Enum]] = [
 
 def create_model_enum() -> Type[Enum]:
     """Create a unified ModelEnum from all provider-specific model enums.
-    
+
     Returns:
         A new Enum type that includes all models from all providers.
     """

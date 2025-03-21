@@ -73,7 +73,7 @@ def test_anthropic_discovery_fetch_models(discovery_instance, monkeypatch) -> No
     # Mock the requests.get method to return a controlled response
     import requests
     from unittest.mock import MagicMock
-    
+
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "data": [
@@ -84,26 +84,26 @@ def test_anthropic_discovery_fetch_models(discovery_instance, monkeypatch) -> No
         ]
     }
     mock_response.raise_for_status = lambda: None
-    
+
     monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_response)
-    
+
     # Test model fetching with our mock
     models: Dict[str, Dict[str, Any]] = discovery_instance.fetch_models()
-    
+
     # For this test, we're using our mocked response, so we should get specific models
     expected_models = {
-        "anthropic:claude-3-opus",     # Base model extracted from claude-3-opus-20240229
-        "anthropic:claude-3-haiku",    # Base model extracted from claude-3-haiku-20240307
-        "anthropic:claude-3-5-sonnet", # Base model extracted from claude-3-5-sonnet-20240620
-        "anthropic:claude-3.7-sonnet", # Base model extracted from claude-3.7-sonnet-20250219
+        "anthropic:claude-3-opus",  # Base model extracted from claude-3-opus-20240229
+        "anthropic:claude-3-haiku",  # Base model extracted from claude-3-haiku-20240307
+        "anthropic:claude-3-5-sonnet",  # Base model extracted from claude-3-5-sonnet-20240620
+        "anthropic:claude-3.7-sonnet",  # Base model extracted from claude-3.7-sonnet-20250219
     }
-    
+
     actual_models = set(models.keys())
     for model in expected_models:
         assert model in actual_models, f"Missing expected model {model}"
-    
+
     # Verify structure of one model
-    model_id = "anthropic:claude-3-5-sonnet" 
+    model_id = "anthropic:claude-3-5-sonnet"
     entry = models[model_id]
     assert entry.get("model_id") == model_id
     assert entry.get("model_name") is not None
