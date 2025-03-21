@@ -119,24 +119,24 @@ results = sharded_fn(large_dataset)
 
 ## Execution Configuration
 
-Fine-tune execution behavior with `XCSExecutionOptions`:
+Fine-tune execution behavior with execution options:
 
 ```python
-from ember.api.xcs import XCSExecutionOptions
+from ember.xcs.engine.execution_options import execution_options
 
-with XCSExecutionOptions(
-    scheduler="parallel",    # Force parallel scheduling
-    max_workers=8,           # Control concurrency
-    timeout=30.0             # Set execution timeout
+with execution_options(
+    use_parallel=True,      # Control parallel execution
+    max_workers=8,          # Set concurrency level
+    timeout_seconds=30.0    # Set execution timeout
 ):
     results = complex_operation(data)
 ```
 
 ### Execution Configuration Best Practices
 
-1. **Match Scheduler to Workload**: Use "parallel" for parallelizable work, "sequential" for linear work
+1. **Match Execution Mode to Workload**: Use `use_parallel=True` for parallelizable work, `use_parallel=False` for linear work
 2. **Control Concurrency**: Set `max_workers` based on your system's capabilities
-3. **Set Timeouts**: Use timeouts to prevent runaway computations
+3. **Set Timeouts**: Use `timeout_seconds` to prevent runaway computations
 4. **Local Configuration**: Apply configuration at the smallest scope needed
 5. **Monitoring**: Use `trace_execution=True` to identify performance bottlenecks
 

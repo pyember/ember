@@ -51,9 +51,9 @@ def one_line_pattern():
 
     try:
         # Direct model invocation
-        response = models.openai.gpt4o("What is the capital of France?")
+        response = models.openai.gpt_4o("What is the capital of France?")
         print("\n=== One-line pattern result ===")
-        print(response.text)
+        print(response.data)
         return models  # Return for reuse in other examples
     except Exception as e:
         logger.exception("Error in one-line pattern: %s", str(e))
@@ -82,11 +82,12 @@ def standard_pattern():
         response = model.generate(prompt="Explain quantum computing in one sentence.")
 
         print("\n=== Standard pattern result ===")
-        print(f"Response: {response.text}")
+        print(f"Response: {response.data}")
 
         # Check usage statistics
-        print(f"Total tokens used: {response.token_count}")
-        print(f"Estimated cost: available through the models.usage API")
+        if response.usage:
+            print(f"Total tokens used: {response.usage.total_tokens}")
+            print(f"Estimated cost: available through the models.usage API")
 
         return model
     except Exception as e:
@@ -102,12 +103,14 @@ def direct_model_pattern():
     """
     try:
         # With the new API, we can use models directly
+        from ember.api.models import ModelAPI
 
         # Use the direct model ID pattern
-        response = models("openai:gpt-4o", "What is the tallest mountain in the world?")
+        model = ModelAPI(model_id="openai:gpt-4o")
+        response = model.generate(prompt="What is the tallest mountain in the world?")
 
         print("\n=== Direct model pattern result ===")
-        print(response.text)
+        print(response.data)
 
         return models
     except Exception as e:
@@ -119,10 +122,10 @@ def type_safe_enum_pattern() -> None:
     """Demonstrates using ModelEnum for type-safe model references."""
     try:
         # With the new API, we can use enums directly with models
-        from ember.api.models import ModelAPI
+        from ember.api.models import ModelAPI, get_registry
 
         # Use enum instead of string literals
-        model = ModelAPI.from_enum(ModelEnum.OPENAI_GPT4O)
+        model = ModelAPI.from_enum(ModelEnum.gpt_4o)
         response = model.generate(
             prompt="What's your favorite programming language and why?"
         )
@@ -130,12 +133,13 @@ def type_safe_enum_pattern() -> None:
         print("\n=== Type-safe enum pattern result ===")
         # Safely truncate long text
         truncated_text = (
-            response.text[:150] + "..." if len(response.text) > 150 else response.text
+            response.data[:150] + "..." if len(response.data) > 150 else response.data
         )
         print(f"Response: {truncated_text}")
 
         # Access model metadata
-        model_info = models.registry.get_model_info(ModelEnum.OPENAI_GPT4O)
+        registry = get_registry()
+        model_info = registry.get_model_info(model_id="openai:gpt-4o")
         print("\nModel metadata:")
         print(f"Name: {model_info.name}")
         print(f"Provider: {model_info.provider['name']}")
@@ -187,11 +191,11 @@ def batch_processing_pattern() -> None:
             """
             model_id, prompt = args
             try:
-                model = ModelAPI.from_id(model_id)
+                model = ModelAPI(model_id=model_id)
                 start_time = time.time()
                 response = model.generate(prompt=prompt)
                 duration = time.time() - start_time
-                return model_id, prompt, response.text, duration
+                return model_id, prompt, response.data, duration
             except Exception as e:
                 logger.warning(
                     "Error processing prompt with model %s: %s", model_id, str(e)
@@ -254,8 +258,11 @@ def batch_processing_pattern() -> None:
 def custom_model_pattern() -> None:
     """Demonstrates adding custom models to the registry."""
     try:
-        # With the new API, we register models directly with the registry
-        from ember.api.models import register_model
+        # With the new API, we get the registry and register models directly
+        from ember.api.models import get_registry
+
+        # Get the registry
+        registry = get_registry()
 
         # Register a custom model with realistic values
         custom_model = ModelInfo(
@@ -277,20 +284,28 @@ def custom_model_pattern() -> None:
             },
         )
 
-        # Register the model
-        register_model(custom_model)
+        # Check if model is already registered to avoid errors
+        if not registry.is_registered(custom_model.id):
+            # Register the model
+            registry.register_model(model_info=custom_model)
+            print(f"Registered custom model: {custom_model.id}")
+        else:
+            print(
+                f"Model {custom_model.id} already registered ✅ - using existing registration"
+            )
 
         # List all models
-        model_ids = models.registry.list_models()
+        model_ids = registry.list_models()
 
         print("\n=== Custom model registration ===")
-        print(f"Registered models: {model_ids}")
+        print(f"Registered models: {len(model_ids)} models found")
+        print(f"Sample models: {model_ids[:5]} ... and more")
 
         # Check model exists and get info
         model_id = "custom:my-advanced-llm"
-        exists = models.registry.model_exists(model_id)
+        exists = registry.is_registered(model_id)
         if exists:
-            info = models.registry.get_model_info(model_id)
+            info = registry.get_model_info(model_id)
             print("\nCustom model details:")
             print(f"ID: {info.id}")
             print(f"Name: {info.name}")

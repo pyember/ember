@@ -106,13 +106,30 @@ print(f"Total cost: ${total_usage.cost}")
 
 ## 7. Available Models
 
-You can use any of these models by their ID:
+You can use any of these models by their ID or corresponding ModelEnum:
 
-- `openai:gpt-4o`
-- `openai:gpt-4o-mini`
-- `openai:o1`
-- `anthropic:claude-3-5-sonnet`
-- `deepmind:gemini-1.5-pro`
+### OpenAI Models
+- `openai:gpt-4o` or `ModelEnum.gpt_4o`
+- `openai:gpt-4o-mini` or `ModelEnum.gpt_4o_mini`
+- `openai:gpt-4` or `ModelEnum.gpt_4`
+- `openai:gpt-4-turbo` or `ModelEnum.gpt_4_turbo`
+- `openai:gpt-3.5-turbo` or `ModelEnum.gpt_3_5_turbo`
+- `openai:o1-2024-12-17` or `ModelEnum.o1`
+
+### Anthropic Models
+- `anthropic:claude-3.7-sonnet` or `ModelEnum.claude_3_7_sonnet`
+- `anthropic:claude-3-5-sonnet` or `ModelEnum.claude_3_5_sonnet`
+- `anthropic:claude-3-5-haiku` or `ModelEnum.claude_3_5_haiku`
+- `anthropic:claude-3-opus` or `ModelEnum.claude_3_opus`
+- `anthropic:claude-3-haiku` or `ModelEnum.claude_3_haiku`
+
+### Deepmind Models
+- `deepmind:gemini-1.5-pro` or `ModelEnum.gemini_1_5_pro`
+- `deepmind:gemini-1.5-flash` or `ModelEnum.gemini_1_5_flash`
+- `deepmind:gemini-1.5-flash-8b` or `ModelEnum.gemini_1_5_flash_8b`
+- `deepmind:gemini-2.0-flash` or `ModelEnum.gemini_2_0_flash`
+- `deepmind:gemini-2.0-flash-lite` or `ModelEnum.gemini_2_0_flash_lite`
+- `deepmind:gemini-2.0-pro` or `ModelEnum.gemini_2_0_pro`
 
 ## 8. Error Handling
 
@@ -148,16 +165,14 @@ registry.register_model(custom_model)
 ## 10. Type-safe Model Invocation with Enums
 
 ```python
-from ember.core.registry.model.initialization import initialize_registry  
-from ember.core.config.manager import create_config_manager
-from ember.core.registry.model.config.model_enum import ModelEnum
+from ember import initialize_ember
+from ember.api.models import ModelEnum
 
-# Initialize the registry with configuration
-config_manager = create_config_manager()
-service = initialize_registry(config_manager=config_manager)
+# Initialize Ember with the simplified API
+service = initialize_ember(usage_tracking=True)
 
 # Use enum for type-safety
-response = service(ModelEnum.OPENAI_GPT4O, "Hello world!")
+response = service(ModelEnum.gpt_4o, "Hello world!")
 print(response.data)
 ```
 

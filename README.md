@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/ember_icon_400@2x.svg" alt="Ember Logo" width="150"/>
+  <img src="docs/assets/logo_ember_icon@2x.png" alt="Ember Logo" width="150"/>
 </p>
 <p align="center">
   <img src="docs/assets/ember_workmark.svg" alt="Ember" width="350"/>
@@ -10,11 +10,11 @@
 </p>
 
 <p align="center">
-In collaboration with the following early users, contributors, and reviewers:
+This repository is in collaboration with the following early users, contributors, and reviewers:
 </p>
 
 <p align="center">
-Jared Quincy Davis<sup>F,S</sup>, Marquita Ellis<sup>I</sup>, Diana Arroyo<sup>I</sup>, Pravein Govindan Kannan<sup>I</sup>, Paul Castro<sup>I</sup>, Siddharth Sharma<sup>F,S</sup>, Lingjiao Chen<sup>MS</sup>, Omar Khattab<sup>D,MT</sup>, Parth Asawa<sup>B</sup>, Allan Zhu<sup>B</sup>, Connor Chow<sup>B</sup>, Jason Lee<sup>B</sup>, Jay Adityanag Tipirneni<sup>B</sup>, Chad Ferguson<sup>B</sup>, Kathleen Ge<sup>B</sup>, Kunal Agrawal<sup>B</sup>, Rishab Bhatia<sup>B</sup>, Rohan Penmatcha<sup>B</sup>, Sai Kolasani<sup>B</sup>, Théo Jaffrelot Inizan<sup>B</sup>, Deepak Narayanan<sup>N</sup>, Long Fei<sup>F</sup>, Aparajit Raghavan<sup>F</sup>, Eyal Cidon<sup>F</sup>, Jacob Schein<sup>F</sup>, Prasanth Somasundar<sup>F</sup>, Boris Hanin<sup>F,P</sup>, James Zou<sup>S</sup>, Joey Gonzalez<sup>B</sup>, Peter Bailis<sup>G,S</sup>, Ion Stoica<sup>A,B,D</sup>, Matei Zaharia<sup>D,B</sup>
+Jared Quincy Davis<sup>F,S</sup>, Marquita Ellis<sup>I</sup>, Diana Arroyo<sup>I</sup>, Pravein Govindan Kannan<sup>I</sup>, Paul Castro<sup>I</sup>, Siddharth Sharma<sup>F,S</sup>, Lingjiao Chen<sup>MS</sup>, Omar Khattab<sup>D,MT</sup>, Alan Zhu<sup>B</sup>, Parth Asawa<sup>B</sup>, Connor Chow<sup>B</sup>, Jason Lee<sup>B</sup>, Jay Adityanag Tipirneni<sup>B</sup>, Chad Ferguson<sup>B</sup>, Kathleen Ge<sup>B</sup>, Kunal Agrawal<sup>B</sup>, Rishab Bhatia<sup>B</sup>, Rohan Penmatcha<sup>B</sup>, Sai Kolasani<sup>B</sup>, Théo Jaffrelot Inizan<sup>B</sup>, Deepak Narayanan<sup>N</sup>, Long Fei<sup>F</sup>, Aparajit Raghavan<sup>F</sup>, Eyal Cidon<sup>F</sup>, Jacob Schein<sup>F</sup>, Prasanth Somasundar<sup>F</sup>, Boris Hanin<sup>F,P</sup>, James Zou<sup>S</sup>, Joey Gonzalez<sup>B</sup>, Peter Bailis<sup>G,S</sup>, Ion Stoica<sup>A,B,D</sup>, Matei Zaharia<sup>D,B</sup>
 </p>
 
 <p align="center">
@@ -32,7 +32,7 @@ and XLA are to Neural Networks (NN) development. It's a compositional framework 
 execution affordances and graph execution optimization capabilities. It enables users to compose 
 complex NONs, and supports automatic parallelization and optimization of these. 
 
-Ember's vision is to enable development of **compound AI systems composed of, one day, millions-billions of calls** and beyond. Simple constructs--like **best-of-N graphs**, **verifier-prover structures**, and **ensembles with “voting-based” aggregation**--work surprisingly well in many regimes. 
+Ember's vision is to enable development of **compound AI systems composed of, one day, millions-billions of inference calls** and beyond. Simple constructs--like **best-of-N graphs**, **verifier-prover structures**, and **ensembles with “voting-based” aggregation**--work surprisingly well in many regimes. 
 
 This led us to believe that there is a rich architecture space for constructing and optimizing what we call “networks of networks” graphs, or **NONs**. This is analogous to how neural network architecture research uncovered many emergent properties of systems composed of simple artificial neurons. It would be frictionful to conduct NN research if we had to implement architectures from scratch via for-loops or implement bespoke libraries for vectorization and efficient execution. Similarly, it can be challenging at present to compose NON architectures of many calls, despite the **rapidly falling cost-per-token of intelligence**.
 
@@ -211,7 +211,7 @@ from ember.api.models import ModelEnum
 service = initialize_ember(usage_tracking=True)
 
 # Access models from different providers with the same API
-response = service(ModelEnum.OPENAI_GPT4O, "What is quantum computing?")
+response = service(ModelEnum.gpt_4o, "What is quantum computing?")
 print(response.data)
 
 # Track usage across providers

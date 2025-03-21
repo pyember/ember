@@ -164,7 +164,7 @@ def main() -> None:
 
     # Sequential execution demonstration
     print("\nUsing execution_options to control execution:")
-    with execution_options(scheduler="sequential"):
+    with execution_options(use_parallel=False):
         start_time = time.perf_counter()
         result = pipeline(inputs={"value": 20})
         sequential_time = time.perf_counter() - start_time

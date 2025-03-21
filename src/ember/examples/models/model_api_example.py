@@ -226,6 +226,8 @@ def custom_model_example(registry):
 
 def register_models(registry):
     """Register test models with the registry."""
+    registered_count = 0
+
     # Register OpenAI models
     openai_key = os.environ.get("OPENAI_API_KEY")
     if openai_key:
@@ -249,10 +251,16 @@ def register_models(registry):
             )
         ]
 
-        # Register the models
+        # Register the models, but check if they're already registered first
         for model_info in model_infos:
-            registry.register_model(model_info=model_info)
-            print(f"Registered model: {model_info.id}")
+            if not registry.is_registered(model_info.id):
+                registry.register_model(model_info=model_info)
+                print(f"Registered model: {model_info.id}")
+                registered_count += 1
+            else:
+                print(
+                    f"Model {model_info.id} already registered ✅ - using existing registration"
+                )
 
     # Register Anthropic models
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -276,10 +284,19 @@ def register_models(registry):
             )
         ]
 
-        # Register the models
+        # Register the models, but check if they're already registered first
         for model_info in model_infos:
-            registry.register_model(model_info=model_info)
-            print(f"Registered model: {model_info.id}")
+            if not registry.is_registered(model_info.id):
+                registry.register_model(model_info=model_info)
+                print(f"Registered model: {model_info.id}")
+                registered_count += 1
+            else:
+                print(
+                    f"Model {model_info.id} already registered ✅ - using existing registration"
+                )
+
+    # Return the number of newly registered models
+    return registered_count
 
 
 def main():

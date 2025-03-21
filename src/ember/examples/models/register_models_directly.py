@@ -65,8 +65,13 @@ def register_openai_models(api_key: str, registry: ModelRegistry) -> List[str]:
     # Register the models
     registered_ids = []
     for model_info in model_infos:
-        registry.register_model(model_info=model_info)
-        logger.info(f"Registered model: {model_info.id}")
+        if not registry.is_registered(model_info.id):
+            registry.register_model(model_info=model_info)
+            logger.info(f"Registered model: {model_info.id}")
+        else:
+            logger.info(
+                f"Model {model_info.id} already registered ✅ - using existing registration"
+            )
         registered_ids.append(model_info.id)
 
     return registered_ids
@@ -119,8 +124,13 @@ def register_anthropic_models(api_key: str, registry: ModelRegistry) -> List[str
     # Register the models
     registered_ids = []
     for model_info in model_infos:
-        registry.register_model(model_info=model_info)
-        logger.info(f"Registered model: {model_info.id}")
+        if not registry.is_registered(model_info.id):
+            registry.register_model(model_info=model_info)
+            logger.info(f"Registered model: {model_info.id}")
+        else:
+            logger.info(
+                f"Model {model_info.id} already registered ✅ - using existing registration"
+            )
         registered_ids.append(model_info.id)
 
     return registered_ids

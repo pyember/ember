@@ -143,7 +143,7 @@ def main() -> None:
     print(f"Time: {elapsed:.4f}s")
 
     print("\nUsing execution_options to control parallel execution:")
-    with execution_options(scheduler="sequential"):
+    with execution_options(use_parallel=False):
         start_time = time.perf_counter()
         result = pipeline(inputs={"query": "What is the speed of light?"})
         elapsed = time.perf_counter() - start_time
