@@ -237,14 +237,14 @@ ensemble = non.UniformEnsemble(
 # 2. Create a judge to synthesize the ensemble responses
 # This combines multiple perspectives into a coherent, reasoned answer
 judge = non.JudgeSynthesis(
-    model_name="anthropic:claude-3-sonnet",
+    model_name="anthropic:claude-3-5-sonnet",
     temperature=0.2
 )
 
 # 3. Create a verifier to independently check the final output
 # This adds a quality control layer for factual accuracy and coherence
 verifier = non.Verifier(
-    model_name="anthropic:claude-3-haiku",
+    model_name="anthropic:claude-3-5-haiku",
     temperature=0.0
 )
 
