@@ -97,22 +97,24 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
                     model_id=standardized_id, model_data=raw_model
                 )
 
+            # Return discovered models, even if empty
             if not standardized_models:
-                logger.info(
-                    "No OpenAI models found after filtering; adding fallback models"
+                logger.warning(
+                    "No OpenAI models found after filtering - API discovery required"
                 )
-                self._add_fallback_models(standardized_models)
 
             return standardized_models
 
         except APIError as api_err:
             logger.error("OpenAI API error: %s", api_err)
-            return self._get_fallback_models()
+            logger.warning("No fallback models provided - API discovery required")
+            return {}
         except Exception as unexpected_err:
             logger.exception(
                 "Unexpected error fetching OpenAI models: %s", unexpected_err
             )
-            return self._get_fallback_models()
+            logger.warning("No fallback models provided - API discovery required")
+            return {}
 
     def _filter_models(self, models: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -164,39 +166,4 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             "api_data": model_data,
         }
 
-    def _add_fallback_models(self, models_dict: Dict[str, Dict[str, Any]]) -> None:
-        """
-        Add fallback models to the provided dictionary.
-
-        Args:
-            models_dict (Dict[str, Dict[str, Any]]): The dictionary to populate with fallback models.
-        """
-        fallback_models: Dict[str, Dict[str, Any]] = self._get_fallback_models()
-        for model_id, model_data in fallback_models.items():
-            if model_id not in models_dict:
-                models_dict[model_id] = model_data
-
-    def _get_fallback_models(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Retrieve fallback models for cases when API discovery fails.
-
-        Returns:
-            Dict[str, Dict[str, Any]]: A dictionary containing fallback model data.
-        """
-        return {
-            "openai:gpt-4o": {
-                "model_id": "openai:gpt-4o",
-                "model_name": "gpt-4o",
-                "api_data": {"object": "model"},
-            },
-            "openai:gpt-4o-mini": {
-                "model_id": "openai:gpt-4o-mini",
-                "model_name": "gpt-4o-mini",
-                "api_data": {"object": "model"},
-            },
-            "openai:gpt-3.5-turbo": {
-                "model_id": "openai:gpt-3.5-turbo",
-                "model_name": "gpt-3.5-turbo",
-                "api_data": {"object": "model"},
-            },
-        }
+    # Fallback methods removed in favor of direct API discovery

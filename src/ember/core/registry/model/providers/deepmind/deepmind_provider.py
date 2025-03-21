@@ -310,7 +310,7 @@ class GeminiModel(BaseProviderModel):
         client: The configured Google Generative AI client instance.
     """
 
-    PROVIDER_NAME: str = "Google"
+    PROVIDER_NAME: str = "Deepmind"
 
     def create_client(self) -> Any:
         """Create and configure the Google Generative AI client.
@@ -431,13 +431,15 @@ class GeminiModel(BaseProviderModel):
                 if key != "generation_config"
             }
 
-            # Extract timeout from parameters or use default
-            timeout = additional_params.pop("timeout", 30) if additional_params else 30
+            # Gemini SDK doesn't accept timeout parameter directly
+            # Extract timeout and remove it from the parameters
+            if additional_params and "timeout" in additional_params:
+                additional_params.pop("timeout", None)
 
+            # Gemini API expects 'contents' parameter, not 'prompt'
             response = generative_model.generate_content(
-                prompt=request.prompt,
+                contents=request.prompt,
                 generation_config=generation_config,
-                timeout=timeout,
                 **additional_params,
             )
             logger.debug(

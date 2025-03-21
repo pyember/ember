@@ -327,7 +327,7 @@ class MultiModelEnsemble(
     def __init__(
         self,
         *,
-        model_name: str = "claude-3.5-sonnet-latest",
+        model_name: str = "claude-3-5-sonnet-latest",
         temperature: float = 0.7,
     ) -> None:
         """Initializes the MultiModelEnsemble pipeline.
@@ -596,10 +596,10 @@ def main() -> None:
         model_configs=[
             LMModuleConfig(model_name="openai:gpt-4o", temperature=0.6),
             LMModuleConfig(
-                model_name="anthropic:claude-3.5-sonnet-latest", temperature=0.8
+                model_name="anthropic:claude-3-5-sonnet-latest", temperature=0.8
             ),
-            LMModuleConfig(model_name="openai:o1", temperature=0.4),
-            LMModuleConfig(model_name="google:gemini-1.5-pro", temperature=0.5),
+            LMModuleConfig(model_name="openai:gpt-4-turbo", temperature=0.4),
+            LMModuleConfig(model_name="deepmind:gemini-1.5-pro", temperature=0.5),
         ]
     )
 

@@ -5,6 +5,13 @@ This guide will help you quickly get started with Ember, the compositional frame
 ## Installation
 
 ```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
+# or
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
+# or
+pip install uv  # Any platform
+
 # Quick install with uv (recommended)
 uv pip install ember-ai
 

@@ -64,7 +64,7 @@ dependencies = [
     "packaging>=24.1",
     "six>=1.16.0",
     "idna>=3.7",
-    "urllib3>=1.26.19",
+    "urllib3>=1.26.19,<2.0.0",
     "sniffio>=1.3.1",
 ]
 

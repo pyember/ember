@@ -64,7 +64,7 @@ service = ModelService(registry=registry)
 
 # Use the service to invoke models
 response = service.invoke_model(
-    model_id="anthropic:claude-3.5-sonnet", 
+    model_id="anthropic:claude-3-5-sonnet", 
     prompt="Explain quantum computing in 50 words"
 )
 print(response.data)
@@ -111,7 +111,7 @@ You can use any of these models by their ID:
 - `openai:gpt-4o`
 - `openai:gpt-4o-mini`
 - `openai:o1`
-- `anthropic:claude-3.5-sonnet`
+- `anthropic:claude-3-5-sonnet`
 - `deepmind:gemini-1.5-pro`
 
 ## 8. Error Handling

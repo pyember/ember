@@ -34,6 +34,8 @@ def patch_genai(monkeypatch: pytest.MonkeyPatch) -> None:
         return [
             DummyModel("gemini-1.5-pro"),
             DummyModel("gemini-1.5-flash"),
+            DummyModel("gemini-2.0-pro"),  # Add new models from the enum
+            DummyModel("gemini-2.0-flash"), # Add new models from the enum
             # This one should be filtered out due to missing generateContent
             DummyModel("other-model", []),
         ]
@@ -61,15 +63,17 @@ def test_deepmind_discovery_fetch_models(discovery_instance) -> None:
     models: Dict[str, Dict[str, Any]] = discovery_instance.fetch_models()
 
     # Should include models with generateContent support
-    assert "google:gemini-1.5-pro" in models
-    assert "google:gemini-1.5-flash" in models
+    assert "deepmind:gemini-1.5-pro" in models
+    assert "deepmind:gemini-1.5-flash" in models
+    assert "deepmind:gemini-2.0-pro" in models
+    assert "deepmind:gemini-2.0-flash" in models
 
     # Should filter out models without generateContent support
-    assert "google:other-model" not in models
+    assert "deepmind:other-model" not in models
 
     # Verify model structure
-    entry = models["google:gemini-1.5-pro"]
-    assert entry.get("model_id") == "google:gemini-1.5-pro"
+    entry = models["deepmind:gemini-1.5-pro"]
+    assert entry.get("model_id") == "deepmind:gemini-1.5-pro"
     assert entry.get("model_name") == "gemini-1.5-pro"
 
 
@@ -84,9 +88,7 @@ def test_deepmind_discovery_fetch_models_error(
 
     monkeypatch.setattr(genai, "list_models", mock_list_models_error)
 
-    # Check fallback behavior
+    # Check error handling behavior - should return empty dict
     models = discovery_instance.fetch_models()
-    assert len(models) > 0
-    # It should return fallback models
-    assert "google:gemini-1.5-pro" in models
-    assert "google:gemini-pro" in models
+    assert isinstance(models, dict)
+    assert len(models) == 0  # No fallbacks anymore

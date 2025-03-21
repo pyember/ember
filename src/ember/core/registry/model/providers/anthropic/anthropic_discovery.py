@@ -166,10 +166,11 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
                     },
                 )
 
-            # Always add fallbacks if no models found
+            # Return discovered models, even if empty
             if not standardized_models:
-                logger.info("No Anthropic models found; adding fallback models")
-                self._add_fallback_models(standardized_models)
+                logger.warning(
+                    "No Anthropic models found - API discovery required"
+                )
 
             duration = time.time() - start_time
             logger.info(
@@ -179,14 +180,14 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
 
         except requests.RequestException as req_err:
             logger.error("Error fetching Anthropic models via REST API: %s", req_err)
-            logger.info("Using fallback models due to API request error")
-            return self._get_fallback_models()
+            logger.warning("No fallback models provided - API discovery required")
+            return {}
         except Exception as unexpected_err:
             logger.exception(
                 "Unexpected error fetching Anthropic models: %s", unexpected_err
             )
-            logger.info("Using fallback models due to unexpected error")
-            return self._get_fallback_models()
+            logger.warning("No fallback models provided - API discovery required")
+            return {}
 
     def _generate_model_id(self, raw_model_id: str) -> str:
         """
@@ -221,115 +222,25 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
 
     def _extract_base_model_id(self, raw_model_id: str) -> str:
         """
-        Extract the base model ID by removing any version suffix.
+        Extract the base model ID, removing only date suffixes if present.
+        
+        This function performs minimal normalization, primarily removing date
+        suffixes to maintain consistency across model versions.
 
         Args:
             raw_model_id (str): The raw model identifier from the API.
 
         Returns:
-            str: The extracted base model identifier.
+            str: The model identifier without date suffix.
         """
-        # Log to help diagnose any issues with model ID extraction
-        logger.debug(f"Extracting base model ID from: {raw_model_id}")
-
-        # Strip date suffixes (YYYY-MM-DD format) if present
+        # Log for debugging
+        logger.debug(f"Processing model ID: {raw_model_id}")
+        
+        # Simply remove date suffixes (YYYYMMDD format) if present
         import re
-
-        # Match patterns like claude-3-sonnet-20240229 or claude-3-opus-20240229
         date_pattern = r"(-\d{8})"
         base_id = re.sub(date_pattern, "", raw_model_id)
-
-        # Handle specific common cases
-        if raw_model_id.startswith("claude-3-"):
-            # Map claude-3-sonnet-YYYYMMDD to claude-3-sonnet (preserve the model variant)
-            for model_type in ["sonnet", "opus", "haiku"]:
-                if model_type in raw_model_id:
-                    return f"claude-3-{model_type}"
-            return "claude-3"
-        elif raw_model_id.startswith("claude-3.5-"):
-            # Map claude-3.5-sonnet-YYYYMMDD to claude-3.5-sonnet (preserve the model variant)
-            for model_type in ["sonnet", "haiku"]:
-                if model_type in raw_model_id:
-                    return f"claude-3.5-{model_type}"
-            return "claude-3.5"
-        elif raw_model_id.startswith("claude-3.7-"):
-            # Map claude-3.7-sonnet-YYYYMMDD to claude-3.7-sonnet (preserve the model variant)
-            if "sonnet" in raw_model_id:
-                return "claude-3.7-sonnet"
-            return "claude-3.7"
-        elif raw_model_id == "claude-3":
-            return "claude-3"
-        elif raw_model_id == "claude-3.5":
-            return "claude-3.5"
-        elif raw_model_id == "claude-3.7":
-            return "claude-3.7"
-
-        # If we couldn't determine the base model, return the version without date
+        
         return base_id
 
-    def _add_fallback_models(self, models_dict: Dict[str, Dict[str, Any]]) -> None:
-        """
-        Add fallback models to the provided dictionary if they are missing.
-
-        Args:
-            models_dict (Dict[str, Dict[str, Any]]): The dictionary to which fallback models are added.
-        """
-        fallback_models: Dict[str, Dict[str, Any]] = self._get_fallback_models()
-        for model_id, model_data in fallback_models.items():
-            if model_id not in models_dict:
-                models_dict[model_id] = model_data
-
-    def _get_fallback_models(self) -> Dict[str, Dict[str, Any]]:
-        """
-        Retrieve fallback models when API discovery fails.
-
-        Returns:
-            Dict[str, Dict[str, Any]]: A dictionary containing fallback model data.
-        """
-        return {
-            "anthropic:claude-3-sonnet": {
-                "model_id": "anthropic:claude-3-sonnet",
-                "model_name": "claude-3-sonnet",
-                "api_data": {
-                    "id": "claude-3-sonnet",
-                    "object": "model",
-                    "display_name": "Claude 3 Sonnet",
-                },
-            },
-            "anthropic:claude-3-opus": {
-                "model_id": "anthropic:claude-3-opus",
-                "model_name": "claude-3-opus",
-                "api_data": {
-                    "id": "claude-3-opus",
-                    "object": "model",
-                    "display_name": "Claude 3 Opus",
-                },
-            },
-            "anthropic:claude-3-haiku": {
-                "model_id": "anthropic:claude-3-haiku",
-                "model_name": "claude-3-haiku",
-                "api_data": {
-                    "id": "claude-3-haiku",
-                    "object": "model",
-                    "display_name": "Claude 3 Haiku",
-                },
-            },
-            "anthropic:claude-3.5-sonnet": {
-                "model_id": "anthropic:claude-3.5-sonnet",
-                "model_name": "claude-3.5-sonnet",
-                "api_data": {
-                    "id": "claude-3.5-sonnet",
-                    "object": "model",
-                    "display_name": "Claude 3.5 Sonnet",
-                },
-            },
-            "anthropic:claude-3.7-sonnet": {
-                "model_id": "anthropic:claude-3.7-sonnet",
-                "model_name": "claude-3.7-sonnet",
-                "api_data": {
-                    "id": "claude-3.7-sonnet",
-                    "object": "model",
-                    "display_name": "Claude 3.7 Sonnet",
-                },
-            },
-        }
+    # Fallback methods removed in favor of direct API discovery

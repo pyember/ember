@@ -125,7 +125,7 @@ class EnsembleReasoner(Operator[QueryInput, ReasonedOutput]):
         )
         
         self.judge = non.JudgeSynthesis(
-            model_name="anthropic:claude-3.5-sonnet",
+            model_name="anthropic:claude-3-5-sonnet",
             temperature=0.2
         )
     
@@ -172,24 +172,32 @@ print(f"Confidence: {result.confidence:.2f}")
 
 ## Installation
 
+Ember uses [uv](https://github.com/astral-sh/uv) as its recommended package manager for significantly faster installations and dependency resolution.
+
 ```bash
+# First, install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
+# or 
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
+# or
+pip install uv  # Any platform
+
 # Quick install using uv (recommended)
 uv pip install ember-ai
 
-# Run directly without installing (fastest)
-uvx ember-ai  # If you have a CLI command
+# Run examples directly with uv (no activation needed)
+uv run python -c "import ember; print(ember.__version__)"
 
-# Or from source
+# Install from source for development
 git clone https://github.com/pyember/ember.git
 cd ember
 uv pip install -e ".[dev]"
 
-# Run examples directly with uv
-uv run python src/ember/examples/basic/minimal_example.py
-
-# Or install using pip (alternative)
+# Traditional pip installation (alternative, slower)
 pip install ember-ai
 ```
+
+For detailed installation instructions, troubleshooting, and environment management, see our [Installation Guide](INSTALLATION_GUIDE.md).
 
 ## Model Registry & Provider Integration
 

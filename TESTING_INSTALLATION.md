@@ -21,6 +21,11 @@ Before testing the installation, ensure you have the following:
 # Create a new directory for testing
 mkdir ember_test && cd ember_test
 
+# Install uv if needed
+curl -LsSf https://astral.sh/uv/install.sh | sh  # macOS/Linux
+# or
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"  # Windows
+
 # Create a virtual environment with uv
 uv venv
 

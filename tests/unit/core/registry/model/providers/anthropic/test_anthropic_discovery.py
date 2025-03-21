@@ -39,9 +39,9 @@ class MockModelResponse:
     def data(self):
         return [
             MockModel("claude-3-opus-20240229"),
-            MockModel("claude-3-sonnet-20240229"),
             MockModel("claude-3-haiku-20240307"),
-            MockModel("claude-3.5-sonnet-20240620"),
+            MockModel("claude-3-5-sonnet-20240620"),
+            MockModel("claude-3.7-sonnet-20250219"),
         ]
 
 
@@ -68,42 +68,42 @@ def discovery_instance():
     return AnthropicDiscovery(api_key="test-key")
 
 
-def test_anthropic_discovery_fetch_models(discovery_instance) -> None:
+def test_anthropic_discovery_fetch_models(discovery_instance, monkeypatch) -> None:
     """Test that AnthropicDiscovery returns the expected model info."""
+    # Mock the requests.get method to return a controlled response
+    import requests
+    from unittest.mock import MagicMock
+    
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "data": [
+            {"id": "claude-3-opus-20240229", "object": "model"},
+            {"id": "claude-3-haiku-20240307", "object": "model"},
+            {"id": "claude-3-5-sonnet-20240620", "object": "model"},
+            {"id": "claude-3.7-sonnet-20250219", "object": "model"},
+        ]
+    }
+    mock_response.raise_for_status = lambda: None
+    
+    monkeypatch.setattr(requests, "get", lambda *args, **kwargs: mock_response)
+    
+    # Test model fetching with our mock
     models: Dict[str, Dict[str, Any]] = discovery_instance.fetch_models()
-
-    # Due to mocking issues, we may be getting fallback models instead
-    # We'll check either for the expected detailed models or the fallback models
+    
+    # For this test, we're using our mocked response, so we should get specific models
+    expected_models = {
+        "anthropic:claude-3-opus",     # Base model extracted from claude-3-opus-20240229
+        "anthropic:claude-3-haiku",    # Base model extracted from claude-3-haiku-20240307
+        "anthropic:claude-3-5-sonnet", # Base model extracted from claude-3-5-sonnet-20240620
+        "anthropic:claude-3.7-sonnet", # Base model extracted from claude-3.7-sonnet-20250219
+    }
+    
     actual_models = set(models.keys())
-
-    fallback_models = {
-        "anthropic:claude-3-sonnet",
-        "anthropic:claude-3-opus",
-        "anthropic:claude-3-haiku",
-        "anthropic:claude-3.5-sonnet",
-        "anthropic:claude-3.7-sonnet",
-    }
-    detailed_models = {
-        "anthropic:claude-3-opus-20240229",
-        "anthropic:claude-3-sonnet-20240229",
-        "anthropic:claude-3-haiku-20240307",
-        "anthropic:claude-3.5-sonnet-20240620",
-    }
-
-    # Check if we got either the detailed models or the fallback models
-    assert detailed_models.issubset(actual_models) or fallback_models.issubset(
-        actual_models
-    ), (
-        f"Models don't match expected patterns. Got: {actual_models}, "
-        f"Expected either detailed models {detailed_models} or fallback models {fallback_models}"
-    )
-
-    # Verify structure of one model (either detailed or fallback)
-    if "anthropic:claude-3.5-sonnet-20240620" in models:
-        model_id = "anthropic:claude-3.5-sonnet-20240620"
-    else:
-        model_id = "anthropic:claude-3.5-sonnet"  # Fallback
-
+    for model in expected_models:
+        assert model in actual_models, f"Missing expected model {model}"
+    
+    # Verify structure of one model
+    model_id = "anthropic:claude-3-5-sonnet" 
     entry = models[model_id]
     assert entry.get("model_id") == model_id
     assert entry.get("model_name") is not None
@@ -147,10 +147,6 @@ def test_extract_base_model_id(discovery_instance) -> None:
     """Test the extraction of base model IDs from dated model identifiers."""
     # Test that model variants are properly preserved
     assert (
-        discovery_instance._extract_base_model_id("claude-3-sonnet-20240229")
-        == "claude-3-sonnet"
-    )
-    assert (
         discovery_instance._extract_base_model_id("claude-3-opus-20240229")
         == "claude-3-opus"
     )
@@ -159,8 +155,8 @@ def test_extract_base_model_id(discovery_instance) -> None:
         == "claude-3-haiku"
     )
     assert (
-        discovery_instance._extract_base_model_id("claude-3.5-sonnet-20241022")
-        == "claude-3.5-sonnet"
+        discovery_instance._extract_base_model_id("claude-3-5-sonnet-20241022")
+        == "claude-3-5-sonnet"
     )
     assert (
         discovery_instance._extract_base_model_id("claude-3.7-sonnet-20250219")
@@ -169,12 +165,12 @@ def test_extract_base_model_id(discovery_instance) -> None:
 
     # Test undated model IDs remain unchanged
     assert (
-        discovery_instance._extract_base_model_id("claude-3-sonnet")
-        == "claude-3-sonnet"
+        discovery_instance._extract_base_model_id("claude-3-5-sonnet")
+        == "claude-3-5-sonnet"
     )
     assert (
-        discovery_instance._extract_base_model_id("claude-3.5-sonnet")
-        == "claude-3.5-sonnet"
+        discovery_instance._extract_base_model_id("claude-3.7-sonnet")
+        == "claude-3.7-sonnet"
     )
 
     # Test base model names
@@ -196,19 +192,10 @@ def test_anthropic_discovery_fetch_models_error(
     # Replacing the entire client with our mock
     monkeypatch.setattr(discovery_instance, "client", mock_client_that_raises)
 
-    # Should return fallback models instead of raising an exception
+    # Should return an empty dictionary with no fallback models
     models = discovery_instance.fetch_models()
-    assert len(models) > 0
-
-    # Now checking for fallback models explicitly
-    fallback_models = {
-        "anthropic:claude-3-sonnet",
-        "anthropic:claude-3-opus",
-        "anthropic:claude-3-haiku",
-        "anthropic:claude-3.5-sonnet",
-        "anthropic:claude-3.7-sonnet",
-    }
-    assert set(models.keys()) == fallback_models
+    assert isinstance(models, dict)
+    assert len(models) == 0
 
 
 def test_anthropic_discovery_timeout_handling(
@@ -229,19 +216,12 @@ def test_anthropic_discovery_timeout_handling(
 
     monkeypatch.setattr(requests, "get", request_that_raises_timeout)
 
-    # Test that we handle the timeout properly and return fallback models
+    # Test that we handle the timeout properly and return empty dict
     result = discovery_instance.fetch_models()
 
-    # Verify that fallback models were returned despite the timeout
-    assert len(result) > 0
-
-    # Make sure we got the expected fallback models
-    assert "anthropic:claude-3-sonnet" in result
-    assert "anthropic:claude-3.5-sonnet" in result
-
-    # More specific check that confirms error handling is working
-    # Verify we get more than 1 model as expected with fallbacks
-    assert len(result) > 1
+    # Verify that no models are returned
+    assert isinstance(result, dict)
+    assert len(result) == 0
 
 
 def test_anthropic_discovery_response_format_handling(

@@ -37,10 +37,10 @@ def main() -> None:
 
         # Define models to test - using string IDs for consistency
         test_models: List[str] = [
-            "openai:o1",
+            "openai:gpt-4-turbo", 
             "openai:gpt-4o",
             "openai:gpt-4o-mini",
-            "anthropic:claude-3.5-sonnet",
+            "anthropic:claude-3-5-sonnet",
             "invalid:model",  # Expected to trigger an error
             "deepmind:gemini-1.5-pro",
         ]

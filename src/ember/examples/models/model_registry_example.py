@@ -75,7 +75,7 @@ def standard_pattern():
             ModelBuilder()
             .temperature(0.7)
             .max_tokens(100)
-            .build("anthropic:claude-3.5-sonnet")
+            .build("anthropic:claude-3-5-sonnet")
         )
 
         # Use the model

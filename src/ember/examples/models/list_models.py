@@ -110,7 +110,7 @@ def register_anthropic_models():
     # Create the models
     model_infos = [
         models.ModelInfo(
-            id="anthropic:claude-3.5-sonnet",
+            id="anthropic:claude-3-5-sonnet",
             name="Claude 3.5 Sonnet",
             context_window=200000,
             cost=models.ModelCost(
@@ -279,7 +279,7 @@ def main():
         [
             "openai:gpt-4o",
             "openai:gpt-4o-mini",
-            "anthropic:claude-3.5-sonnet",
+            "anthropic:claude-3-5-sonnet",
             "anthropic:claude-3-opus",
         ]
     )

@@ -17,7 +17,7 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
     This provider fetches available models from the Google Generative AI service
     using the latest SDK patterns. It ensures proper API configuration (including
     optional transport selection) and filters models that support the "generateContent"
-    capability. Each model is prefixed with 'google:' and returned as a dictionary of model details.
+    capability. Each model is prefixed with 'deepmind:' and returned as a dictionary of model details.
     """
 
     def __init__(self) -> None:
@@ -47,9 +47,9 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
         if not self._api_key:
             try:
                 app_context = get_app_context()
-                provider_config = app_context.config_manager.get_config().get_provider(
-                    "google"
-                )
+                # Try both "deepmind" (preferred) and "google" (fallback) provider configs
+                config = app_context.config_manager.get_config()
+                provider_config = config.get_provider("deepmind") or config.get_provider("google")
                 if provider_config and provider_config.api_keys.get("default"):
                     self._api_key = provider_config.api_keys["default"].key
             except Exception as config_error:
@@ -88,7 +88,7 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
         """Fetch models available from Google Gemini and structure them for the registry.
 
         Returns:
-            A dictionary where the keys are model IDs (prefixed with 'google:') and the
+            A dictionary where the keys are model IDs (prefixed with 'deepmind:') and the
             values are dictionaries containing:
                 - 'model_id': The unique model identifier.
                 - 'model_name': The model name.
@@ -113,44 +113,26 @@ class DeepmindDiscovery(BaseDiscoveryProvider):
                     or "generateContent" in model.supported_generation_methods
                 ):
                     # Only include models with generateContent support
-                    model_id: str = f"google:{model.name}"
+                    model_name = model.name
+                    
+                    # Remove 'models/' prefix if present
+                    if model_name.startswith("models/"):
+                        model_name = model_name[len("models/"):]
+                    
+                    model_id: str = f"deepmind:{model_name}"
                     models[model_id] = {
                         "model_id": model_id,
-                        "model_name": model.name,
+                        "model_name": model_name,
                         "api_data": model,
                     }
 
-            if not models:
-                return self._get_fallback_models()
-
+            # Return discovered models, or empty dict if none found
             return models
 
         except ModelDiscoveryError:
             raise
         except Exception as error:
             logger.exception(f"Failed to fetch models from Google Gemini: {error}")
-            return self._get_fallback_models()
-
-    def _get_fallback_models(self) -> Dict[str, Dict[str, Any]]:
-        """Retrieve fallback models when API discovery fails.
-
-        Returns:
-            A dict containing fallback model data.
-        """
-        return {
-            "google:gemini-pro": {
-                "model_id": "google:gemini-pro",
-                "model_name": "gemini-pro",
-                "api_data": {"object": "model"},
-            },
-            "google:gemini-ultra": {
-                "model_id": "google:gemini-ultra",
-                "model_name": "gemini-ultra",
-                "api_data": {"object": "model"},
-            },
-            "google:gemini-1.5-pro": {
-                "model_id": "google:gemini-1.5-pro",
-                "model_name": "gemini-1.5-pro",
-                "api_data": {"object": "model"},
-            },
-        }
+            # Return empty dictionary instead of fallbacks
+            logger.warning("No fallback models provided - API discovery required")
+            return {}

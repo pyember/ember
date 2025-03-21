@@ -205,7 +205,7 @@ class AnthropicConfig:
                 # Also add the short form (assuming 'provider:shortname' format).
                 valid_models.add(model["model_id"].split(":")[-1])
         if not valid_models:
-            valid_models = {"claude-3-", "claude-3.5-sonnet"}
+            valid_models = {"claude-3-5-sonnet", "claude-3.7-sonnet", "claude-3-opus", "claude-3-haiku"}
         return valid_models
 
     @classmethod
@@ -388,16 +388,14 @@ class AnthropicModel(BaseProviderModel):
         # Direct mapping from ember model names to Anthropic API model IDs
         model_mapping = {
             # Model ID to raw API name
-            "claude-3-sonnet": "claude-3-sonnet-20240229",
             "claude-3-opus": "claude-3-opus-20240229",
             "claude-3-haiku": "claude-3-haiku-20240307",
-            "claude-3.5-sonnet": "claude-3-5-sonnet-20240620",
+            "claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
             "claude-3.7-sonnet": "claude-3-7-sonnet-20250219",
             # Handle split IDs (provider:model)
-            "anthropic:claude-3-sonnet": "claude-3-sonnet-20240229",
             "anthropic:claude-3-opus": "claude-3-opus-20240229",
             "anthropic:claude-3-haiku": "claude-3-haiku-20240307",
-            "anthropic:claude-3.5-sonnet": "claude-3-5-sonnet-20240620",
+            "anthropic:claude-3-5-sonnet": "claude-3-5-sonnet-20240620",
             "anthropic:claude-3.7-sonnet": "claude-3-7-sonnet-20250219",
         }
 
@@ -411,7 +409,7 @@ class AnthropicModel(BaseProviderModel):
             return raw_name
 
         # Fallback to default model
-        default_model: str = "claude-3-sonnet-20240229"  # Most reliable fallback
+        default_model: str = "claude-3-5-sonnet-20240620"  # Most reliable fallback
         logger.warning(
             "Anthropic model '%s' not recognized in configuration. Falling back to '%s'.",
             raw_name,

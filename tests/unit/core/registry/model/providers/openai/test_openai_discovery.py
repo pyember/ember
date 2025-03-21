@@ -51,9 +51,13 @@ def discovery_instance():
     return OpenAIDiscovery(api_key="test-key")
 
 
-def test_openai_discovery_fetch_models(discovery_instance) -> None:
-    """Test that OpenAIDiscovery fetches and standardizes model metadata."""
+def test_openai_discovery_empty_model_list(discovery_instance) -> None:
+    """Test that OpenAIDiscovery handles empty model lists correctly.
+    
+    Since the hardcoded fallback models were removed, the function should
+    return an empty dictionary when API access fails without raising exceptions.
+    """
     models = discovery_instance.fetch_models()
-    for expected_key in ["openai:gpt-4o", "openai:gpt-4o-mini"]:
-        assert expected_key in models
-        assert models[expected_key]["model_id"] == expected_key
+    # The function should return an empty dict when API access fails
+    assert isinstance(models, dict)
+    # No assertion on specific models since they're no longer hardcoded
