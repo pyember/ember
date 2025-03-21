@@ -65,17 +65,17 @@ def patch_genai() -> None:
         genai.list_models = lambda: []
 
         # Create a dummy GenerativeModel and patch it on the module
-        def dummy_generative_model(model_ref):
-            return type(
-                "DummyGenerativeModel",
-                (),
-                {
-                    "generate_content": lambda self, prompt, generation_config, **kwargs: DummyGeminiResponse()
-                },
-            )()
+        class DummyGenerativeModel:
+            def __init__(self, model_ref):
+                self.model_ref = model_ref
+
+            def generate_content(self, *, contents, generation_config, **kwargs):
+                return DummyGeminiResponse()
+
+        deepmind_provider.GenerativeModel = DummyGenerativeModel
 
         # Apply the patch directly
-        deepmind_provider.GenerativeModel = dummy_generative_model
+        # This line was redundant since we already assigned DummyGenerativeModel above
 
         yield
     finally:
