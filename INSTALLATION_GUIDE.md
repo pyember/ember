@@ -168,6 +168,14 @@ uv pip install -e "." --no-deps
 uv pip install "specific-package==version"
 ```
 
+### Other Known Installation Issue Resolutions
+
+When using conda with or without uv, you may encounter known pyarrow installation issues.
+```
+# Try installing pyarrow from conda-forge
+conda install -c conda-forge pyarrow
+```
+
 ## Testing Your Installation
 
 After installation, verify everything is working:
