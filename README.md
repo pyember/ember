@@ -23,7 +23,7 @@ Jared Quincy Davis<sup>F,S</sup>, Marquita Ellis<sup>I</sup>, Diana Arroyo<sup>I
 
 # <span style="color:#0366d6;">Ember</span>: A Compositional Framework for Compound AI Systems
 
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 ## Ember in a Nutshell
 

@@ -9,14 +9,14 @@ maintainers = [
     {name = "Ember Team", email = "team@pyember.org"}
 ]
 readme = "README.md"
-license = {text = "Apache-2.0"}
+license = {text = "MIT"}
 requires-python = ">=3.9,<3.13"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
