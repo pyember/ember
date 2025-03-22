@@ -1,690 +1,470 @@
 """
-MCQ Experiment (MMLU) with parallel per-question scoring.
+MCQ Experiment Example: Multiple-Choice Question Evaluation Example
 
-This module defines three pipelines for evaluating multiple-choice questions using
-language models. The pipelines are:
+This simplified example demonstrates how to create and evaluate multiple-choice 
+questions using different answer strategies, without requiring external API calls.
 
-1. SingleModelBaseline:
-   - non.Ensemble(num_units=1) → EnsureValidChoiceOperator
-2. MultiModelEnsemble:
-   - non.Ensemble(num_units=3) → non.JudgeSynthesis → EnsureValidChoiceOperator
-3. VariedModelEnsemble:
-   - non.VariedEnsemble → non.JudgeSynthesis → EnsureValidChoiceOperator
-
-Usage:
-    python -m src.ember.examples.mcq_experiment_example \
-        --config_name="abstract_algebra" --num_samples=5 --max_workers=4
+To run:
+    uv run python src/ember/examples/data/mcq_experiment_example.py
 """
 
 import argparse
-import concurrent.futures
-import logging
-import os
-import sys
-from typing import Any, Dict, List, Optional, Tuple, Type
-
-from prettytable import PrettyTable
-from pydantic import BaseModel
-
-from ember.core import non
-from ember.core.app_context import get_ember_context
-from ember.core.config.manager import create_config_manager
-
-# ember imports: use only the typed pipeline definitions (avoid direct registry references).
-from ember.core.non import JudgeSynthesis, UniformEnsemble, VariedEnsemble
-from ember.core.registry.model.model_module.lm import LMModuleConfig
-from ember.core.registry.operator.base.operator_base import (
-    LMModule,
-    Operator,
-    OperatorMetadata,
-)
-from ember.core.registry.specification.specification import Specification
-from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader
-
-# For dataset usage:
-from ember.core.utils.data.base.models import DatasetEntry
-from ember.core.utils.data.base.samplers import DatasetSampler
-from ember.core.utils.data.base.validators import DatasetValidator
-from ember.core.utils.data.datasets_registry.mmlu import MMLUConfig
-from ember.core.utils.data.initialization import initialize_dataset_registry
-from ember.core.utils.data.loader_factory import DatasetLoaderFactory
-from ember.core.utils.data.metadata_registry import DatasetMetadataRegistry
-from ember.core.utils.data.service import DatasetService
-
-# Import from XCS engine:
-from ember.xcs.engine.xcs_engine import execute_graph
-from ember.xcs.graph.xcs_graph import OperatorGraph
-from ember.xcs.scheduler import ExecutionPlan
+import random
+from typing import Dict, List, Optional, Tuple, Union
 
 
-###############################################################################
-# A) EnsureValidChoiceOperator
-###############################################################################
-class EnsureValidChoiceInputs(BaseModel):
-    """Input data for the EnsureValidChoiceOperator."""
-
-    query: str
-    partial_answer: str
-    choices: Dict[str, str]
-
-
-class EnsureValidChoiceSpecification(Specification):
-    """Specification for the EnsureValidChoiceOperator."""
-
-    input_model: Type[BaseModel] = EnsureValidChoiceInputs
-    prompt_template: str = (
-        "We have a query:\n"
-        "{query}\n\n"
-        "We have a set of valid choices:\n"
-        "{choices}\n\n"
-        "We have a partial or malformed answer:\n"
-        "{partial_answer}\n\n"
-        "You must respond with EXACTLY one uppercase letter among the valid keys, "
-        "or 'Invalid' if no mapping is possible.\n"
-        "No additional explanation, just the letter or 'Invalid'."
-    )
-
-
-class EnsureValidChoiceOperator(Operator[EnsureValidChoiceInputs, Dict[str, Any]]):
-    """Operator that refines or validates a partial answer to ensure it is a valid choice.
-
-    This operator attempts to convert a partial or invalid answer into a valid choice key
-    using a language model (LM) fallback mechanism.
-    """
-
-    metadata: OperatorMetadata = OperatorMetadata(
-        code="ENSURE_VALID_CHOICE",
-        description="Refines or validates that final_answer is one of the valid choices, or tries to fix it via LM.",
-        specification=EnsureValidChoiceSpecification(),
-    )
+class DatasetEntry:
+    """A simple dataset entry with questions and choices."""
 
     def __init__(
-        self,
-        model_name: str = "openai:o1",
-        temperature: float = 0.0,
-        max_tokens: Optional[int] = 16,
-        max_retries: int = 1,
-        **kwargs: Any,
+        self, query: str, choices: Dict[str, str], metadata: Dict[str, str]
     ) -> None:
-        """Initializes the EnsureValidChoiceOperator.
+        """Initialize a dataset entry.
 
         Args:
-            model_name: The identifier of the language model.
-            temperature: Temperature setting for the language model.
-            max_tokens: The maximum token count for LM outputs.
-            max_retries: Maximum number of LM fallback attempts.
-            **kwargs: Additional keyword arguments.
+            query: The question text
+            choices: A dictionary of lettered choices
+            metadata: Additional information
         """
-        super().__init__(
-            name="EnsureValidChoiceOperator", specification=self.metadata.specification
-        )
-        lm_config: LMModuleConfig = LMModuleConfig(
-            model_name=model_name,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-        self.lm_modules: List[LMModule] = [LMModule(config=lm_config)]
-        self._max_retries: int = max_retries
+        self.query = query
+        self.choices = choices
+        self.metadata = metadata
 
-    def forward(self, inputs: EnsureValidChoiceInputs) -> Dict[str, Any]:
-        """Processes the input to ensure a valid choice is returned.
+
+class EnsureValidChoiceOperator:
+    """Validates and corrects answers to match the valid choices."""
+
+    def __init__(self, name: str = "EnsureValidChoice") -> None:
+        """Initialize the operator.
 
         Args:
-            inputs: The input data containing the query, partial answer, and valid choices.
+            name: The name of this operator
+        """
+        self.name = name
+
+    def __call__(
+        self, query: str, partial_answer: str, choices: Dict[str, str]
+    ) -> Dict[str, str]:
+        """Process the input to ensure a valid choice is returned.
+
+        Args:
+            query: The question text
+            partial_answer: The proposed answer that may need validation
+            choices: The valid choices
 
         Returns:
-            A dictionary containing the key 'final_answer' with a valid choice.
-
-        Raises:
-            ValueError: If a valid answer cannot be obtained within the retry limit.
+            A dictionary with the final answer
         """
-        if inputs.partial_answer in inputs.choices:
-            return {"final_answer": inputs.partial_answer}
+        # First check if the answer is already valid
+        if partial_answer in choices:
+            return {"final_answer": partial_answer}
 
-        logging.info(
-            f"[EnsureValidChoiceOperator] Invalid choice '{inputs.partial_answer}'. "
-            f"Valid keys: {list(inputs.choices.keys())}. Attempting fallback..."
-        )
+        # If not valid, try to match to the most similar valid choice
+        # In a real system, this would use an LLM, but here we'll do a simple mapping
 
-        refined_answer: str = inputs.partial_answer
-        for attempt_i in range(self._max_retries):
-            prompt_context: Dict[str, str] = {
-                "query": inputs.query,
-                "partial_answer": refined_answer,
-                "choices": "\n".join(f"{k}: {v}" for k, v in inputs.choices.items()),
-            }
-            prompt_str: str = self.build_prompt(prompt_context)
+        # First check if it's just a case mismatch
+        for choice in choices:
+            if choice.upper() == partial_answer.upper():
+                return {"final_answer": choice}
 
-            fallback_output: str = (
-                self.call_lm(prompt_str, self.lm_modules[0]).strip().upper()
-            )
-            logging.info(
-                f"Attempt {attempt_i + 1}/{self._max_retries}, LM suggested: '{fallback_output}'"
-            )
+        # Next, check if it's the text of an answer rather than the key
+        for choice, text in choices.items():
+            if partial_answer.lower() in text.lower():
+                return {"final_answer": choice}
 
-            if fallback_output in inputs.choices:
-                return {"final_answer": fallback_output}
-            refined_answer = fallback_output
+        # If all else fails, return the first choice as fallback
+        if choices:
+            return {"final_answer": next(iter(choices))}
 
-        raise ValueError(
-            f"[EnsureValidChoiceOperator] Could not map answer '{inputs.partial_answer}' "
-            f"to any valid choice {list(inputs.choices.keys())} after {self._max_retries} attempts."
-        )
+        # If no choices at all, return empty
+        return {"final_answer": ""}
 
 
-###############################################################################
-# 1) SingleModelBaseline pipeline
-###############################################################################
-class SingleModelBaselineInputs(BaseModel):
-    """Input data for the SingleModelBaseline pipeline."""
+class SingleModelBaseline:
+    """A simple model that makes a choice based on fixed probabilities."""
 
-    query: str
-    choices: Dict[str, str]
-
-
-class SingleModelBaselineOutputs(BaseModel):
-    """Output data for the SingleModelBaseline pipeline."""
-
-    final_answer: str
-
-
-class SingleModelBaselineSpecification(Specification):
-    """Specification for the SingleModelBaseline pipeline."""
-
-    input_model: Type[BaseModel] = SingleModelBaselineInputs
-
-
-class SingleModelBaseline(
-    non.Operator[SingleModelBaselineInputs, SingleModelBaselineOutputs]
-):
-    """One-model baseline pipeline that uses a single language model for answer extraction.
-
-    Pipeline steps:
-      1. non.UniformEnsemble with one unit to generate an answer.
-      2. EnsureValidChoiceOperator to validate the answer.
-    """
-
-    # Declare class variables
-    specification: ClassVar[Specification] = SingleModelBaselineSpecification()
-    metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
-        code="SINGLE_MODEL_BASELINE",
-        description="One-LM baseline with EnsureValidChoice.",
-        specification=specification,
-    )
-
-    # Declare instance variables
-    model_name: str
-    temperature: float
-    ensemble: non.UniformEnsemble
-    ensure_valid_choice: EnsureValidChoiceOperator
-
-    def __init__(
-        self,
-        *,
-        model_name: str = "gpt-4o",
-        temperature: float = 0.0,
-    ) -> None:
-        """Initializes the SingleModelBaseline pipeline.
+    def __init__(self, name: str = "SingleModelBaseline") -> None:
+        """Initialize the model.
 
         Args:
-            model_name: The identifier for the language model.
-            temperature: Temperature setting for the language model.
+            name: The name of this model
         """
-        # Store instance configuration
-        self.model_name = model_name
-        self.temperature = temperature
+        self.name = name
+        self.ensure_valid_choice = EnsureValidChoiceOperator()
 
-        # Create component operators
-        self.ensemble = non.UniformEnsemble(
-            num_units=1, model_name=model_name, temperature=temperature
-        )
-        self.ensure_valid_choice = EnsureValidChoiceOperator(
-            model_name=model_name,
-            temperature=0.0,
-            max_tokens=16,
-            max_retries=1,
-        )
-
-    def forward(
-        self, *, inputs: SingleModelBaselineInputs
-    ) -> SingleModelBaselineOutputs:
-        """Executes the SingleModelBaseline pipeline.
+    def __call__(self, query: str, choices: Dict[str, str]) -> Dict[str, str]:
+        """Process a question with a single model approach.
 
         Args:
-            inputs: Pipeline inputs with the query and corresponding choices.
+            query: The question text
+            choices: The available choices
 
         Returns:
-            An instance of SingleModelBaselineOutputs containing the validated final answer.
+            A dictionary with the final answer
         """
-        # Step 1: Generate responses using the ensemble
-        ensemble_output = self.ensemble(query=inputs.query)
-        responses = ensemble_output.responses
+        # In a real system, this would call a language model
+        # Here we'll simulate it with a biased random choice
 
-        # If we have a response, use the first one as our answer for example purposes
-        intermediate_answer = responses[0] if responses else ""
+        # Generate a mock response based on keywords in the query
+        if "capital" in query.lower():
+            # For capital questions, prefer C as answer
+            weights = {"A": 0.1, "B": 0.1, "C": 0.7, "D": 0.1}
+        elif "mammal" in query.lower() or "animal" in query.lower():
+            # For biology questions, prefer D
+            weights = {"A": 0.1, "B": 0.1, "C": 0.1, "D": 0.7}
+        elif any(keyword in query.lower() for keyword in ["math", "square", "number"]):
+            # For math questions, prefer B
+            weights = {"A": 0.1, "B": 0.7, "C": 0.1, "D": 0.1}
+        else:
+            # Otherwise equal chance
+            weights = {k: 1.0 / len(choices) for k in choices}
 
-        # Step 2: Ensure the answer is valid
-        valid_choice_output = self.ensure_valid_choice(
-            query=inputs.query,
-            partial_answer=intermediate_answer,
-            choices=inputs.choices,
+        # Make a weighted random choice
+        choices_list = list(weights.keys())
+        weights_list = [weights[k] for k in choices_list]
+        partial_answer = random.choices(choices_list, weights=weights_list, k=1)[0]
+
+        # Ensure it's a valid choice
+        result = self.ensure_valid_choice(
+            query=query, partial_answer=partial_answer, choices=choices
         )
-
-        # Return the final answer
-        return SingleModelBaselineOutputs(
-            final_answer=valid_choice_output.get("final_answer", "")
-        )
+        return {"final_answer": result["final_answer"]}
 
 
-###############################################################################
-# 2) MultiModelEnsemble pipeline
-###############################################################################
-class MultiModelEnsembleInputs(BaseModel):
-    """Input data for the MultiModelEnsemble pipeline."""
+class MultiModelEnsemble:
+    """Simulates an ensemble of models making independent predictions."""
 
-    query: str
-    choices: Dict[str, str]
-
-
-class MultiModelEnsembleOutputs(BaseModel):
-    """Output data for the MultiModelEnsemble pipeline."""
-
-    final_answer: str
-
-
-class MultiModelEnsembleSpecification(Specification):
-    """Specification for the MultiModelEnsemble pipeline."""
-
-    input_model: Type[BaseModel] = MultiModelEnsembleInputs
-
-
-class MultiModelEnsemble(
-    non.Operator[MultiModelEnsembleInputs, MultiModelEnsembleOutputs]
-):
-    """Multi-model ensemble pipeline that aggregates multiple LM responses.
-
-    Pipeline steps:
-      1. non.UniformEnsemble with three units.
-      2. non.JudgeSynthesis to aggregate responses.
-      3. EnsureValidChoiceOperator to verify the final answer.
-    """
-
-    # Declare class variables
-    specification: ClassVar[Specification] = MultiModelEnsembleSpecification()
-    metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
-        code="MULTI_MODEL_ENSEMBLE",
-        description="Multi-model ensemble aggregator with judge step.",
-        specification=specification,
-    )
-
-    # Declare instance variables
-    model_name: str
-    temperature: float
-    ensemble: non.UniformEnsemble
-    judge: non.JudgeSynthesis
-    ensure_answer_format_validity: EnsureValidChoiceOperator
-
-    def __init__(
-        self,
-        *,
-        model_name: str = "claude-3-5-sonnet-latest",
-        temperature: float = 0.7,
-    ) -> None:
-        """Initializes the MultiModelEnsemble pipeline.
+    def __init__(self, name: str = "MultiModelEnsemble", num_models: int = 3) -> None:
+        """Initialize the ensemble.
 
         Args:
-            model_name: The identifier for the language model.
-            temperature: Temperature setting for the language model.
+            name: The name of this ensemble
+            num_models: The number of models in the ensemble
         """
-        # Store instance configuration
-        self.model_name = model_name
-        self.temperature = temperature
+        self.name = name
+        self.num_models = num_models
+        self.ensure_valid_choice = EnsureValidChoiceOperator()
 
-        # Create component operators
-        self.ensemble = non.UniformEnsemble(
-            num_units=3, model_name=model_name, temperature=temperature
-        )
-        self.judge = non.JudgeSynthesis(model_name=model_name, temperature=temperature)
-        self.ensure_answer_format_validity = EnsureValidChoiceOperator(
-            model_name=model_name, temperature=0.1, max_tokens=16, max_retries=1
-        )
-
-    def forward(self, *, inputs: MultiModelEnsembleInputs) -> MultiModelEnsembleOutputs:
-        """Executes the MultiModelEnsemble pipeline.
+    def __call__(self, query: str, choices: Dict[str, str]) -> Dict[str, str]:
+        """Process a question with an ensemble approach.
 
         Args:
-            inputs: Pipeline inputs with the query and valid choices.
+            query: The question text
+            choices: The available choices
 
         Returns:
-            An instance of MultiModelEnsembleOutputs containing the aggregated final answer.
+            A dictionary with the final answer
         """
-        # Step 1: Generate diverse responses using ensemble
-        ensemble_output = self.ensemble(query=inputs.query)
-        responses = ensemble_output.responses
+        # Generate multiple responses simulating different models
+        responses = []
+        for _ in range(self.num_models):
+            # Each "model" has slightly different preferences
+            if "capital" in query.lower():
+                weights = {
+                    "A": 0.1,
+                    "B": 0.1,
+                    "C": 0.6 + random.uniform(-0.2, 0.2),
+                    "D": 0.1,
+                }
+            elif "mammal" in query.lower() or "animal" in query.lower():
+                weights = {
+                    "A": 0.1,
+                    "B": 0.1,
+                    "C": 0.1,
+                    "D": 0.6 + random.uniform(-0.2, 0.2),
+                }
+            elif any(
+                keyword in query.lower() for keyword in ["math", "square", "number"]
+            ):
+                weights = {
+                    "A": 0.1,
+                    "B": 0.6 + random.uniform(-0.2, 0.2),
+                    "C": 0.1,
+                    "D": 0.1,
+                }
+            else:
+                # Otherwise slightly different preferences per model
+                weights = {
+                    k: 1.0 / len(choices) + random.uniform(-0.1, 0.1) for k in choices
+                }
+                # Normalize weights
+                total = sum(weights.values())
+                weights = {k: v / total for k, v in weights.items()}
 
-        # Step 2: Synthesize responses using judge
-        judge_output = self.judge(query=inputs.query, responses=responses)
-        judge_answer = judge_output.final_answer
+            # Make a weighted random choice
+            choices_list = list(weights.keys())
+            weights_list = [weights[k] for k in choices_list]
+            choice = random.choices(choices_list, weights=weights_list, k=1)[0]
+            responses.append(choice)
 
-        # Step 3: Ensure the answer is valid
-        valid_choice_output = self.ensure_answer_format_validity(
-            query=inputs.query, partial_answer=judge_answer, choices=inputs.choices
+        # Synthesize responses (use majority vote in this simplified version)
+        # Count occurrences of each answer
+        vote_counts = {}
+        for response in responses:
+            vote_counts[response] = vote_counts.get(response, 0) + 1
+
+        # Find the majority answer
+        if vote_counts:
+            majority_answer = max(vote_counts.items(), key=lambda x: x[1])[0]
+        else:
+            majority_answer = next(iter(choices)) if choices else ""
+
+        # Ensure it's a valid choice
+        result = self.ensure_valid_choice(
+            query=query, partial_answer=majority_answer, choices=choices
         )
+        return {"final_answer": result["final_answer"]}
 
-        # Return the final answer
-        return MultiModelEnsembleOutputs(
-            final_answer=valid_choice_output.get("final_answer", "")
+
+class VariedModelEnsemble:
+    """Simulates different types of models in an ensemble."""
+
+    def __init__(self, name: str = "VariedModelEnsemble") -> None:
+        """Initialize the varied ensemble.
+
+        Args:
+            name: The name of this ensemble
+        """
+        self.name = name
+        self.ensure_valid_choice = EnsureValidChoiceOperator()
+
+    def __call__(self, query: str, choices: Dict[str, str]) -> Dict[str, str]:
+        """Process a question with a varied model ensemble approach.
+
+        Args:
+            query: The question text
+            choices: The available choices
+
+        Returns:
+            A dictionary with the final answer
+        """
+        # Simulate different model types with distinct characteristics
+        model_types = [
+            {"name": "fact_model", "strengths": ["capital", "country", "geography"]},
+            {"name": "science_model", "strengths": ["mammal", "animal", "biology"]},
+            {"name": "math_model", "strengths": ["math", "square", "number"]},
+        ]
+
+        # Generate responses from each model
+        responses = []
+        for model in model_types:
+            # Calculate the confidence based on model's strengths
+            confidence = 0.5  # baseline
+            for strength in model["strengths"]:
+                if strength in query.lower():
+                    confidence += 0.2  # boost confidence for relevant questions
+
+            # Generate answer based on model confidence and domain
+            if model["name"] == "fact_model" and "capital" in query.lower():
+                weights = {"A": 0.1, "B": 0.1, "C": 0.7 * confidence, "D": 0.1}
+            elif model["name"] == "science_model" and (
+                "mammal" in query.lower() or "animal" in query.lower()
+            ):
+                weights = {"A": 0.1, "B": 0.1, "C": 0.1, "D": 0.7 * confidence}
+            elif model["name"] == "math_model" and any(
+                keyword in query.lower() for keyword in ["math", "square", "number"]
+            ):
+                weights = {"A": 0.1, "B": 0.7 * confidence, "C": 0.1, "D": 0.1}
+            else:
+                # Less confident outside its domain
+                weights = {k: 1.0 / len(choices) for k in choices}
+
+            # Normalize weights
+            total = sum(weights.values())
+            if total > 0:
+                weights = {k: v / total for k, v in weights.items()}
+            else:
+                weights = {k: 1.0 / len(choices) for k in choices}
+
+            # Make a weighted random choice
+            choices_list = list(weights.keys())
+            weights_list = [weights[k] for k in choices_list]
+            choice = random.choices(choices_list, weights=weights_list, k=1)[0]
+            responses.append(choice)
+
+        # "Judge synthesis" - weight answers by confidence and domain relevance
+        # This is simplified; in real systems this would be more complex
+        if "capital" in query.lower() or "country" in query.lower():
+            # Trust fact_model more for geography
+            final_answer = responses[0]
+        elif (
+            "mammal" in query.lower()
+            or "animal" in query.lower()
+            or "biology" in query.lower()
+        ):
+            # Trust science_model more for biology
+            final_answer = responses[1]
+        elif any(keyword in query.lower() for keyword in ["math", "square", "number"]):
+            # Trust math_model more for math
+            final_answer = responses[2]
+        else:
+            # Otherwise take majority vote
+            vote_counts = {}
+            for response in responses:
+                vote_counts[response] = vote_counts.get(response, 0) + 1
+
+            if vote_counts:
+                final_answer = max(vote_counts.items(), key=lambda x: x[1])[0]
+            else:
+                final_answer = next(iter(choices)) if choices else ""
+
+        # Ensure it's a valid choice
+        result = self.ensure_valid_choice(
+            query=query, partial_answer=final_answer, choices=choices
         )
+        return {"final_answer": result["final_answer"]}
 
 
-###############################################################################
-# 2b) VariedModelEnsemble pipeline (refactored to match MultiModelEnsemble)
-###############################################################################
-class VariedModelEnsembleInputs(BaseModel):
-    """Input data for the VariedModelEnsemble pipeline."""
-
-    query: str
-    choices: Dict[str, str]
-
-
-class VariedModelEnsembleOutputs(BaseModel):
-    """Output data for the VariedModelEnsemble pipeline."""
-
-    final_answer: str
-
-
-class VariedModelEnsembleSpecification(Specification):
-    """Specification for the VariedModelEnsemble pipeline."""
-
-    input_model: Type[BaseModel] = VariedModelEnsembleInputs
-
-
-class VariedModelEnsemble(
-    non.Operator[VariedModelEnsembleInputs, VariedModelEnsembleOutputs]
-):
-    """Varied model ensemble pipeline using multiple language model configurations.
-
-    Pipeline steps:
-      1. non.VariedEnsemble to retrieve responses from varied models.
-      2. non.JudgeSynthesis to synthesize an aggregated answer.
-      3. EnsureValidChoiceOperator to validate the final answer.
-    """
-
-    # Declare class variables
-    specification: ClassVar[Specification] = VariedModelEnsembleSpecification()
-    metadata: ClassVar[OperatorMetadata] = OperatorMetadata(
-        code="VARIED_MODEL_ENSEMBLE",
-        description=(
-            "Multi-model pipeline aggregator with judge step, using VariedEnsemble for step #1."
+def create_mock_dataset() -> List[DatasetEntry]:
+    """Create a mock multiple-choice dataset in MMLU style."""
+    return [
+        DatasetEntry(
+            query="What is the capital of France?",
+            choices={"A": "Berlin", "B": "Madrid", "C": "Paris", "D": "Rome"},
+            metadata={"correct_answer": "C", "subject": "Geography"},
         ),
-        specification=specification,
-    )
-
-    # Declare instance variables
-    model_configs: List[LMModuleConfig]
-    ensemble: non.VariedEnsemble
-    judge: non.JudgeSynthesis
-    ensure_answer_format_validity: EnsureValidChoiceOperator
-    aggregator_model_name: str
-    aggregator_temp: float
-
-    def __init__(self, *, model_configs: List[LMModuleConfig]) -> None:
-        """Initializes the VariedModelEnsemble pipeline.
-
-        Args:
-            model_configs: A list of LMModuleConfig objects defining the model configurations.
-        """
-        # Store instance configuration
-        self.model_configs = model_configs
-
-        # Configure aggregator model parameters
-        self.aggregator_model_name = "openai:o1"
-        self.aggregator_temp = 0.7
-
-        # Create component operators
-        self.ensemble = non.VariedEnsemble(model_configs=model_configs)
-        self.judge = non.JudgeSynthesis(
-            model_name=self.aggregator_model_name, temperature=self.aggregator_temp
-        )
-        self.ensure_answer_format_validity = EnsureValidChoiceOperator(
-            model_name=self.aggregator_model_name,
-            temperature=self.aggregator_temp,
-            max_tokens=16,
-            max_retries=1,
-        )
-
-    def forward(
-        self, *, inputs: VariedModelEnsembleInputs
-    ) -> VariedModelEnsembleOutputs:
-        """Executes the VariedModelEnsemble pipeline.
-
-        Args:
-            inputs: Pipeline inputs with the query and valid choices.
-
-        Returns:
-            An instance of VariedModelEnsembleOutputs containing the final answer.
-        """
-        # Step 1: Generate diverse responses from multiple models
-        ensemble_output = self.ensemble(query=inputs.query)
-        responses = ensemble_output.responses
-
-        # Step 2: Synthesize responses using judge
-        judge_output = self.judge(query=inputs.query, responses=responses)
-        judge_answer = judge_output.final_answer
-
-        # Step 3: Ensure the answer is valid
-        valid_choice_output = self.ensure_answer_format_validity(
-            query=inputs.query,
-            partial_answer=judge_answer,
-            choices=inputs.choices,
-        )
-
-        # Return the final answer
-        return VariedModelEnsembleOutputs(
-            final_answer=valid_choice_output.get("final_answer", "")
-        )
+        DatasetEntry(
+            query="Which of these is a mammal?",
+            choices={"A": "Shark", "B": "Snake", "C": "Eagle", "D": "Dolphin"},
+            metadata={"correct_answer": "D", "subject": "Biology"},
+        ),
+        DatasetEntry(
+            query="What is the square root of 144?",
+            choices={"A": "10", "B": "12", "C": "14", "D": "16"},
+            metadata={"correct_answer": "B", "subject": "Mathematics"},
+        ),
+        DatasetEntry(
+            query="Who wrote 'Pride and Prejudice'?",
+            choices={
+                "A": "Jane Austen",
+                "B": "Charles Dickens",
+                "C": "Emily Brontë",
+                "D": "Mark Twain",
+            },
+            metadata={"correct_answer": "A", "subject": "Literature"},
+        ),
+        DatasetEntry(
+            query="Which planet is known as the Red Planet?",
+            choices={"A": "Jupiter", "B": "Venus", "C": "Mars", "D": "Saturn"},
+            metadata={"correct_answer": "C", "subject": "Astronomy"},
+        ),
+    ]
 
 
-###############################################################################
-# 3) Build each pipeline as a one-node OperatorGraph
-###############################################################################
-def build_pipeline_graph(pipeline_op: non.Operator) -> OperatorGraph:
-    """Wraps a single pipeline operator in an OperatorGraph.
+def score_entry(
+    entry: DatasetEntry, pipeline_name: str, prediction: str
+) -> Tuple[str, bool]:
+    """Score a prediction against the correct answer.
 
     Args:
-        pipeline_op: The pipeline operator to be wrapped.
+        entry: The dataset entry being evaluated
+        pipeline_name: Name of the pipeline making the prediction
+        prediction: The predicted answer
 
     Returns:
-        An OperatorGraph instance containing the given pipeline as a node.
+        A tuple with the pipeline name and whether the prediction was correct
     """
-    graph: OperatorGraph = OperatorGraph()
-    graph.add_node(pipeline_op, node_id=pipeline_op.name)
-    return graph
+    correct_answer = entry.metadata.get("correct_answer", "").upper()
+    prediction = prediction.upper()
+    is_correct = prediction == correct_answer
+    return (pipeline_name, is_correct)
 
 
-###############################################################################
-# 4) Main experiment code
-###############################################################################
 def parse_arguments() -> argparse.Namespace:
-    """Parses command-line arguments.
-
-    Returns:
-        An argparse.Namespace object containing the parsed arguments.
-    """
-    parser: argparse.ArgumentParser = argparse.ArgumentParser(
-        description="MCQ Experiment with Baseline vs. Multi-Model Ensemble."
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="MCQ Experiment Example demonstrating different answer strategies"
     )
     parser.add_argument(
-        "--config_name",
-        type=str,
-        default="abstract_algebra",
-        help="MMLU sub-config (e.g. 'abstract_algebra').",
+        "--num_samples", type=int, default=5, help="Number of samples to process"
     )
     parser.add_argument(
-        "--num_samples",
-        type=int,
-        default=5,
-        help="Number of MMLU samples to test on.",
-    )
-    parser.add_argument(
-        "--max_workers",
-        type=int,
-        default=None,
-        help="Number of threads for parallel scoring. Defaults to Python's choice.",
+        "--seed", type=int, default=42, help="Random seed for reproducibility"
     )
     return parser.parse_args()
 
 
-def setup_openai_api_key() -> None:
-    """Sets up the OpenAI API key from environment variables if available."""
-    api_key: Optional[str] = os.environ.get("OPENAI_API_KEY")
-    if api_key:
-        CONFIG.set("models", "openai_api_key", api_key)
-        logging.info("OpenAI API key set from environment.")
-    else:
-        logging.warning("No OPENAI_API_KEY found; continuing without it.")
-
-
 def main() -> None:
-    """Main function to run the MCQ experiment."""
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    args: argparse.Namespace = parse_arguments()
+    """Run the MCQ experiment example."""
+    # Parse command line arguments
+    args = parse_arguments()
 
-    # Initialize the system with the context's registry.
-    context = get_ember_context()
-    initialize_system(registry=context.registry)
-    setup_openai_api_key()
+    # Set random seed for reproducibility
+    random.seed(args.seed)
 
-    # Initialize the MMLU dataset environment.
-    metadata_registry: DatasetMetadataRegistry = DatasetMetadataRegistry()
-    loader_factory: DatasetLoaderFactory = DatasetLoaderFactory()
-    initialize_dataset_registry(metadata_registry, loader_factory)
+    print("Ember MCQ Experiment Example")
+    print("===========================")
 
-    # Obtain MMLU dataset info and create a prepper.
-    mmlu_info: Optional[Any] = metadata_registry.get("mmlu")
-    if mmlu_info is None:
-        logging.error("MMLU dataset not found. Ensure it is registered.")
-        sys.exit(1)
-    prepper_cls: Optional[Type] = loader_factory.get_prepper_class("mmlu")
-    if prepper_cls is None:
-        logging.error("No MMLU prepper found in the registry.")
-        sys.exit(1)
+    # Create dataset
+    dataset = create_mock_dataset()
+    dataset_size = min(args.num_samples, len(dataset))
+    sample = dataset[:dataset_size]  # Take the first N entries
 
-    mmlu_config: MMLUConfig = MMLUConfig(config_name=args.config_name, split="dev")
-    prepper = prepper_cls(config=mmlu_config)
+    # Create the pipelines
+    baseline = SingleModelBaseline()
+    ensemble = MultiModelEnsemble(num_models=3)
+    varied = VariedModelEnsemble()
 
-    dataset_service: DatasetService = DatasetService(
-        loader=HuggingFaceDatasetLoader(),
-        validator=DatasetValidator(),
-        sampler=DatasetSampler(),
-        transformers=[],
-    )
-    dataset_entries: List[DatasetEntry] = dataset_service.load_and_prepare(
-        dataset_info=mmlu_info,
-        prepper=prepper,
-        config=mmlu_config,
-        num_samples=args.num_samples,
-    )
-    logging.info(
-        f"Loaded {len(dataset_entries)} MMLU items (config={args.config_name})."
-    )
+    # Track results
+    results = {
+        "SingleModelBaseline": {"correct": 0, "total": 0},
+        "MultiModelEnsemble": {"correct": 0, "total": 0},
+        "VariedModelEnsemble": {"correct": 0, "total": 0},
+    }
 
-    # Build the pipeline operators using the typed wrappers.
-    baseline_op = SingleModelBaseline(model_name="gpt-4o", temperature=0.0)
-    ensemble_op = MultiModelEnsemble(model_name="gpt-4o", temperature=0.7)
-    varied_op = VariedModelEnsemble(
-        model_configs=[
-            LMModuleConfig(model_name="openai:gpt-4o", temperature=0.6),
-            LMModuleConfig(
-                model_name="anthropic:claude-3-5-sonnet-latest", temperature=0.8
-            ),
-            LMModuleConfig(model_name="openai:gpt-4-turbo", temperature=0.4),
-            LMModuleConfig(model_name="deepmind:gemini-1.5-pro", temperature=0.5),
-        ]
-    )
+    # Process each entry
+    for i, entry in enumerate(sample):
+        print(f"\nQuestion {i+1}: {entry.query}")
+        print(f"Subject: {entry.metadata.get('subject', 'Unknown')}")
 
-    baseline_graph: OperatorGraph = build_pipeline_graph(pipeline_op=baseline_op)
-    ensemble_graph: OperatorGraph = build_pipeline_graph(pipeline_op=ensemble_op)
-    varied_graph: OperatorGraph = build_pipeline_graph(pipeline_op=varied_op)
+        # Show choices
+        print("Choices:")
+        correct = entry.metadata.get("correct_answer", "")
+        for letter, text in entry.choices.items():
+            is_correct = "✓" if letter == correct else " "
+            print(f"  {letter}. {text} {is_correct}")
 
-    def score_single_entry(index: int, entry: DatasetEntry) -> Tuple[int, int, int]:
-        """Scores a single dataset entry using all three pipelines.
+        # Process with each pipeline
+        baseline_result = baseline(query=entry.query, choices=entry.choices)
+        ensemble_result = ensemble(query=entry.query, choices=entry.choices)
+        varied_result = varied(query=entry.query, choices=entry.choices)
 
-        Args:
-            index: The index of the dataset entry.
-            entry: The dataset entry to be scored.
+        # Get predictions
+        baseline_pred = baseline_result["final_answer"]
+        ensemble_pred = ensemble_result["final_answer"]
+        varied_pred = varied_result["final_answer"]
 
-        Returns:
-            A tuple of integers (baseline_correct, ensemble_correct, varied_correct),
-            where each value is 1 if the corresponding pipeline's answer matches the correct answer, otherwise 0.
-        """
-        logging.debug(f"Scoring Entry {index}: {entry}")
-        query: str = entry.query
-        choices: Dict[str, str] = entry.choices
-        correct_answer: str = entry.metadata.get("correct_answer", "").upper()
+        # Score and update results
+        for name, pred in [
+            ("SingleModelBaseline", baseline_pred),
+            ("MultiModelEnsemble", ensemble_pred),
+            ("VariedModelEnsemble", varied_pred),
+        ]:
+            pipeline_name, is_correct = score_entry(entry, name, pred)
+            results[pipeline_name]["total"] += 1
+            if is_correct:
+                results[pipeline_name]["correct"] += 1
 
-        # Evaluate the baseline pipeline:
-        baseline_out = execute_graph(
-            graph=baseline_graph,
-            global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
-        )
-        base_pred: str = getattr(baseline_out, "final_answer", "").upper()
-        baseline_correct: int = 1 if (base_pred == correct_answer) else 0
+            # Display prediction
+            correct_str = "✓" if is_correct else "✗"
+            print(f"{name} prediction: {pred} {correct_str}")
 
-        # Evaluate the ensemble pipeline:
-        ensemble_out = execute_graph(
-            graph=ensemble_graph,
-            global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
-        )
-        ens_pred: str = getattr(ensemble_out, "final_answer", "").upper()
-        ensemble_correct: int = 1 if (ens_pred == correct_answer) else 0
-
-        # Evaluate the varied pipeline:
-        varied_out = execute_graph(
-            graph=varied_graph,
-            global_input={"query": query, "choices": choices},
-            max_workers=args.max_workers,
-        )
-        varied_pred: str = getattr(varied_out, "final_answer", "").upper()
-        varied_correct: int = 1 if (varied_pred == correct_answer) else 0
-
-        return (baseline_correct, ensemble_correct, varied_correct)
-
-    baseline_total: int = 0
-    ensemble_total: int = 0
-    varied_total: int = 0
-    total_count: int = len(dataset_entries) or 1
-
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=args.max_workers
-    ) as executor:
-        future_map = {
-            executor.submit(score_single_entry, index=index, entry=entry): index
-            for index, entry in enumerate(dataset_entries)
-        }
-        for future in concurrent.futures.as_completed(future_map):
-            b_correct, e_correct, v_correct = future.result()
-            baseline_total += b_correct
-            ensemble_total += e_correct
-            varied_total += v_correct
-
-    baseline_acc: float = 100.0 * baseline_total / total_count
-    ensemble_acc: float = 100.0 * ensemble_total / total_count
-    varied_acc: float = 100.0 * varied_total / total_count
-
-    result_table: PrettyTable = PrettyTable()
-    result_table.field_names = ["Pipeline", "Accuracy (%)", "Num Samples"]
-    result_table.add_row(["SingleModelBaseline", f"{baseline_acc:.2f}", total_count])
-    result_table.add_row(
-        ["MultiModelEnsemble (Judge aggregator)", f"{ensemble_acc:.2f}", total_count]
-    )
-    result_table.add_row(["VariedModelEnsemble", f"{varied_acc:.2f}", total_count])
-
+    # Show final results
     print("\nFinal Results:")
-    print(result_table)
+    print("-------------")
+    header = f"{'Pipeline':<25} {'Accuracy':<10} {'Correct/Total'}"
+    print(header)
+    print("-" * len(header))
+
+    for name, result in results.items():
+        accuracy = (
+            (result["correct"] / result["total"]) * 100 if result["total"] > 0 else 0
+        )
+        print(f"{name:<25} {accuracy:.2f}%      {result['correct']}/{result['total']}")
+
+    print("\nNote: This example uses simulated models and predetermined outcomes.")
+    print("In a real Ember pipeline, these would use actual language models.")
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
