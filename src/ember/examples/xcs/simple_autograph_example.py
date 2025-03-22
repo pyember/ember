@@ -5,7 +5,7 @@ using simple mock operators that don't require external dependencies.
 It uses the new ember.api package structure.
 
 To run:
-    poetry run python src/ember/examples/simple_autograph_example.py
+    uv run python src/ember/examples/xcs/simple_autograph_example.py
 """
 
 import logging
@@ -26,7 +26,7 @@ from ember.xcs.engine.execution_options import execution_options
 class AddOperator(Operator):
     """Simple operator that adds a value to the input."""
 
-    specification = Specification(input_model=None, output_model=None)
+    specification = Specification(input_model=None, structured_output=None)
 
     def __init__(self, *, value: int = 1) -> None:
         self.value = value
@@ -40,7 +40,7 @@ class AddOperator(Operator):
 class MultiplyOperator(Operator):
     """Simple operator that multiplies the input by a value."""
 
-    specification = Specification(input_model=None, output_model=None)
+    specification = Specification(input_model=None, structured_output=None)
 
     def __init__(self, *, value: int = 2) -> None:
         self.value = value
@@ -54,7 +54,7 @@ class MultiplyOperator(Operator):
 class DelayOperator(Operator):
     """Simple operator that introduces a delay."""
 
-    specification = Specification(input_model=None, output_model=None)
+    specification = Specification(input_model=None, structured_output=None)
 
     def __init__(self, *, delay: float = 0.1) -> None:
         self.delay = delay
@@ -78,7 +78,7 @@ class CalculationPipeline(Operator):
     automatically, building a graph based on the actual execution trace.
     """
 
-    specification = Specification(input_model=None, output_model=None)
+    specification = Specification(input_model=None, structured_output=None)
 
     def __init__(
         self,

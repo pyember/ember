@@ -13,6 +13,8 @@ from ember.core.registry.model.providers.base_provider import BaseProviderModel
 M = TypeVar("M", bound=BaseProviderModel)
 
 logger: logging.Logger = logging.getLogger(__name__)
+# Set default log level to WARNING to reduce verbosity
+logger.setLevel(logging.WARNING)
 
 
 class ModelRegistry(Generic[M]):

@@ -2,6 +2,9 @@
 
 This script tests the automatic model discovery functionality in the model registry.
 It's a simple test script that directly uses the registry and discovery service.
+
+To run:
+    uv run python src/ember/examples/advanced/test_auto_discovery.py
 """
 
 import logging
@@ -10,9 +13,9 @@ from typing import Any, Dict, List
 
 import pytest
 
-# Import module directly from src path to avoid import issues
-from src.ember import initialize_ember as initialize_registry
-from src.ember.core.registry.model.base.schemas.model_info import ModelInfo
+# Import correctly from ember packages
+from ember.core.registry.model.initialization import initialize_registry
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

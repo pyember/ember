@@ -10,21 +10,32 @@ with the enhanced JIT API. It shows three patterns:
 All approaches benefit from automatic graph building and execution.
 
 To run:
-    poetry run python src/ember/examples/composition_example.py
+    uv run python src/ember/examples/composition_example.py
 """
 
 import logging
 import time
-from typing import Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import Any, Callable, ClassVar, Dict, List, Optional, Type, TypeVar, cast
 
 from prettytable import PrettyTable
 from pydantic import BaseModel
 
 # ember API imports
-from ember.api import non
-from ember.api.models import LMModule, LMModuleConfig
-from ember.api.operator import Operator, Specification
-from ember.api.xcs import execution_options, jit
+from ember.api import models
+from ember.api.models import (
+    ModelCost,
+    ModelInfo,
+    ModelRegistry,
+    RateLimit,
+    ProviderInfo,
+)
+from ember.core import non
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel
+from ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.engine.execution_options import execution_options
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -54,13 +65,13 @@ def compose(f: Callable[[U], V], g: Callable[[T], U]) -> Callable[[T], V]:
 ###############################################################################
 # Custom Operators
 ###############################################################################
-class QuestionRefinementInputs(BaseModel):
+class QuestionRefinementInputs(EmberModel):
     """Input model for QuestionRefinement operator."""
 
     query: str
 
 
-class QuestionRefinementOutputs(BaseModel):
+class QuestionRefinementOutputs(EmberModel):
     """Output model for QuestionRefinement operator."""
 
     refined_query: str
@@ -69,9 +80,9 @@ class QuestionRefinementOutputs(BaseModel):
 class QuestionRefinementSpecification(Specification):
     """Specification for QuestionRefinement operator."""
 
-    input_model = QuestionRefinementInputs
-    output_model = QuestionRefinementOutputs
-    prompt_template = (
+    input_model: Type[EmberModel] = QuestionRefinementInputs
+    structured_output: Type[EmberModel] = QuestionRefinementOutputs
+    prompt_template: str = (
         "You are an expert at refining questions to make them clearer and more precise.\n"
         "Please refine the following question:\n\n"
         "{query}\n\n"
@@ -86,12 +97,13 @@ class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOu
     specification: ClassVar[Specification] = QuestionRefinementSpecification()
     model_name: str
     temperature: float
+    lm_module: LMModule
 
     def __init__(self, *, model_name: str, temperature: float = 0.3) -> None:
         self.model_name = model_name
         self.temperature = temperature
 
-        # Configure internal LM module using the API
+        # Configure internal LM module
         self.lm_module = LMModule(
             config=LMModuleConfig(
                 model_name=model_name,
@@ -99,16 +111,16 @@ class QuestionRefinement(Operator[QuestionRefinementInputs, QuestionRefinementOu
             )
         )
 
-    def forward(self, *, inputs: QuestionRefinementInputs) -> Dict[str, Any]:
+    def forward(self, *, inputs: QuestionRefinementInputs) -> QuestionRefinementOutputs:
         prompt = self.specification.render_prompt(inputs=inputs)
         response = self.lm_module(prompt=prompt)
 
-        # Extract text from response
-        from ember.api.types import extract_value
+        # Get text from response
+        refined_query = (
+            response.strip() if isinstance(response, str) else str(response).strip()
+        )
 
-        refined_query = extract_value(response, "text", "").strip()
-
-        return {"refined_query": refined_query}
+        return QuestionRefinementOutputs(refined_query=refined_query)
 
 
 ###############################################################################
@@ -130,8 +142,8 @@ def create_functional_pipeline(*, model_name: str) -> Callable[[Dict[str, Any]],
 
     # Use partial application to adapt the interfaces
     def adapt_refiner_output(inputs: Dict[str, Any]) -> Dict[str, Any]:
-        result = refiner(inputs=inputs)
-        return {"query": result["refined_query"]}
+        result = refiner(inputs=QuestionRefinementInputs(**inputs))
+        return {"query": result.refined_query}
 
     def adapt_ensemble_output(inputs: Dict[str, Any]) -> Dict[str, Any]:
         result = ensemble(inputs=inputs)
@@ -146,9 +158,33 @@ def create_functional_pipeline(*, model_name: str) -> Callable[[Dict[str, Any]],
 ###############################################################################
 # Pipeline Pattern 2: Container Class with Nested Operators
 ###############################################################################
+class PipelineInput(EmberModel):
+    """Input for NestedPipeline."""
+
+    query: str
+
+
+class PipelineOutput(EmberModel):
+    """Output for NestedPipeline."""
+
+    final_answer: str
+
+
+class PipelineSpecification(Specification):
+    """Specification for NestedPipeline."""
+
+    input_model: Type[EmberModel] = PipelineInput
+    structured_output: Type[EmberModel] = PipelineOutput
+
+
 @jit(sample_input={"query": "What is the speed of light?"})
-class NestedPipeline(Operator[Dict[str, Any], Dict[str, Any]]):
+class NestedPipeline(Operator[PipelineInput, PipelineOutput]):
     """Pipeline implemented as a container class with nested operators."""
+
+    specification: ClassVar[Specification] = PipelineSpecification()
+    refiner: QuestionRefinement
+    ensemble: non.UniformEnsemble
+    aggregator: non.MostCommon
 
     def __init__(self, *, model_name: str) -> None:
         self.refiner = QuestionRefinement(model_name=model_name)
@@ -157,22 +193,22 @@ class NestedPipeline(Operator[Dict[str, Any], Dict[str, Any]]):
         )
         self.aggregator = non.MostCommon()
 
-    def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
+    def forward(self, *, inputs: PipelineInput) -> PipelineOutput:
         # Step 1: Refine the question
-        refined = self.refiner(inputs=inputs)
+        refined = self.refiner(inputs=QuestionRefinementInputs(query=inputs.query))
 
         # Step 2: Generate ensemble of answers
-        ensemble_result = self.ensemble(inputs={"query": refined["refined_query"]})
+        ensemble_result = self.ensemble(inputs={"query": refined.refined_query})
 
         # Step 3: Aggregate results
         final_result = self.aggregator(
             inputs={
-                "query": refined["refined_query"],
+                "query": refined.refined_query,
                 "responses": ensemble_result["responses"],
             }
         )
 
-        return final_result
+        return PipelineOutput(final_answer=final_result["final_answer"])
 
 
 ###############################################################################
@@ -194,11 +230,11 @@ def create_sequential_pipeline(*, model_name: str) -> Callable[[Dict[str, Any]],
 
     # Create the chained function
     def pipeline(inputs: Dict[str, Any]) -> Any:
-        refined = refiner(inputs=inputs)
-        ensemble_result = ensemble(inputs={"query": refined["refined_query"]})
+        refined = refiner(inputs=QuestionRefinementInputs(**inputs))
+        ensemble_result = ensemble(inputs={"query": refined.refined_query})
         final_result = aggregator(
             inputs={
-                "query": refined["refined_query"],
+                "query": refined.refined_query,
                 "responses": ensemble_result["responses"],
             }
         )
@@ -215,7 +251,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     # Define configuration parameters
-    model_name: str = "openai:gpt-4o-mini"
+    model_name: str = "openai:gpt-4"
 
     # Create pipelines using different patterns
     functional_pipeline = create_functional_pipeline(model_name=model_name)
@@ -244,12 +280,13 @@ def main() -> None:
 
         # Show details of pipeline execution
         print(f'Original query: "{question}"')
-        if "refined_query" in result:
+        final_answer = result.get("final_answer", "")
+        if isinstance(result, dict) and "refined_query" in result:
             print(f"Refined query: \"{result['refined_query']}\"")
         print(
-            f"Final answer: \"{result['final_answer'][:150]}...\""
-            if len(result["final_answer"]) > 150
-            else f"Final answer: \"{result['final_answer']}\""
+            f'Final answer: "{final_answer[:150]}..."'
+            if len(final_answer) > 150
+            else f'Final answer: "{final_answer}"'
         )
         print(f"Time: {elapsed:.4f}s")
 
@@ -258,11 +295,7 @@ def main() -> None:
             [
                 "Functional",
                 f"{elapsed:.4f}",
-                (
-                    result["final_answer"][:50] + "..."
-                    if len(result["final_answer"]) > 50
-                    else result["final_answer"]
-                ),
+                (final_answer[:50] + "..." if len(final_answer) > 50 else final_answer),
             ]
         )
 
@@ -274,10 +307,13 @@ def main() -> None:
         elapsed = time.perf_counter() - start_time
 
         # Show details of pipeline execution
+        final_answer = (
+            result.final_answer if hasattr(result, "final_answer") else str(result)
+        )
         print(
-            f"Final answer: \"{result['final_answer'][:150]}...\""
-            if len(result["final_answer"]) > 150
-            else f"Final answer: \"{result['final_answer']}\""
+            f'Final answer: "{final_answer[:150]}..."'
+            if len(final_answer) > 150
+            else f'Final answer: "{final_answer}"'
         )
         print(f"Time: {elapsed:.4f}s")
 
@@ -286,11 +322,7 @@ def main() -> None:
             [
                 "Nested",
                 f"{elapsed:.4f}",
-                (
-                    result["final_answer"][:50] + "..."
-                    if len(result["final_answer"]) > 50
-                    else result["final_answer"]
-                ),
+                (final_answer[:50] + "..." if len(final_answer) > 50 else final_answer),
             ]
         )
 
@@ -302,10 +334,13 @@ def main() -> None:
         elapsed = time.perf_counter() - start_time
 
         # Show details of pipeline execution
+        final_answer = (
+            result.get("final_answer", "") if isinstance(result, dict) else str(result)
+        )
         print(
-            f"Final answer: \"{result['final_answer'][:150]}...\""
-            if len(result["final_answer"]) > 150
-            else f"Final answer: \"{result['final_answer']}\""
+            f'Final answer: "{final_answer[:150]}..."'
+            if len(final_answer) > 150
+            else f'Final answer: "{final_answer}"'
         )
         print(f"Time: {elapsed:.4f}s")
 
@@ -314,11 +349,7 @@ def main() -> None:
             [
                 "Sequential",
                 f"{elapsed:.4f}",
-                (
-                    result["final_answer"][:50] + "..."
-                    if len(result["final_answer"]) > 50
-                    else result["final_answer"]
-                ),
+                (final_answer[:50] + "..." if len(final_answer) > 50 else final_answer),
             ]
         )
 
@@ -332,10 +363,13 @@ def main() -> None:
             elapsed = time.perf_counter() - start_time
 
             # Show details of pipeline execution
+            final_answer = (
+                result.final_answer if hasattr(result, "final_answer") else str(result)
+            )
             print(
-                f"Final answer: \"{result['final_answer'][:150]}...\""
-                if len(result["final_answer"]) > 150
-                else f"Final answer: \"{result['final_answer']}\""
+                f'Final answer: "{final_answer[:150]}..."'
+                if len(final_answer) > 150
+                else f'Final answer: "{final_answer}"'
             )
             print(f"Time: {elapsed:.4f}s")
             print(f"Execution mode: Sequential scheduler")
@@ -346,9 +380,9 @@ def main() -> None:
                     "Nested (Sequential)",
                     f"{elapsed:.4f}",
                     (
-                        result["final_answer"][:50] + "..."
-                        if len(result["final_answer"]) > 50
-                        else result["final_answer"]
+                        final_answer[:50] + "..."
+                        if len(final_answer) > 50
+                        else final_answer
                     ),
                 ]
             )

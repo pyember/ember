@@ -14,7 +14,7 @@ For a comprehensive explanation of the relationship between these approaches,
 see docs/xcs/JIT_OVERVIEW.md.
 
 To run:
-    poetry run python src/ember/examples/xcs/auto_graph_simplified.py
+    uv run python src/ember/examples/xcs/auto_graph_simplified.py
 """
 
 import logging
@@ -57,7 +57,7 @@ class AdditionSpec(Specification):
     """Specification for math operation operators."""
 
     input_model: Type[EmberModel] = AdditionInput
-    output_model: Type[EmberModel] = AdditionOutput
+    structured_output: Type[EmberModel] = AdditionOutput
 
 
 ###############################################################################

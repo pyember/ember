@@ -3,6 +3,9 @@
 This script is designed to pinpoint exactly why model auto-discovery isn't working.
 It adds detailed logging and performs targeted tests to identify issues in the model
 discovery process.
+
+To run:
+    uv run python src/ember/examples/advanced/diagnose_model_discovery.py
 """
 
 import importlib

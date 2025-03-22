@@ -8,23 +8,28 @@ decorated with @jit separately, and the graph must be built manually.
 Future versions will simplify this process.
 
 To run:
-    poetry run python src/ember/examples/parallel_pipeline_example.py
+    uv run python src/ember/examples/advanced/parallel_pipeline_example.py
 """
 
 import logging
 import time
-from typing import Any, Dict, List, Optional
-
-from ember.core.non import JudgeSynthesis, UniformEnsemble
+from typing import Any, ClassVar, Dict, List, Optional
 
 # ember imports
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
+from ember.core.registry.operator.core.verifier import VerifierOperator
+from ember.core.registry.specification.specification import Specification
 from ember.xcs.engine.xcs_engine import (
     TopologicalSchedulerWithParallelDispatch,
     execute_graph,
 )
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.tracer.tracer_decorator import jit
+
+# Use direct non import for ensemble
+from ember.core.non import UniformEnsemble
 
 ###############################################################################
 # JIT-Decorated Ensemble Operators
@@ -48,13 +53,6 @@ class CreativeEnsemble(UniformEnsemble):
 @jit()
 class DetailedEnsemble(UniformEnsemble):
     """Ensemble focused on detailed explanations."""
-
-    pass
-
-
-@jit()
-class JudgeOperator(JudgeSynthesis):
-    """Judge operator with JIT tracing."""
 
     pass
 
@@ -96,8 +94,14 @@ def build_multi_branch_pipeline(
         temperature=0.5,  # Medium temperature
     )
 
-    # Create the judge operator
-    judge = JudgeOperator(model_name="openai:gpt-4o")
+    # Create the judge operator directly from core implementation
+    lm_module = LMModule(
+        config=LMModuleConfig(
+            model_name="openai:gpt-4o",
+            temperature=0.0,
+        )
+    )
+    judge = JudgeSynthesisOperator(lm_module=lm_module)
 
     # Build the graph
     graph = XCSGraph()
@@ -151,7 +155,17 @@ def main() -> None:
     result = build_multi_branch_pipeline(query=query)
 
     print("\n=== Final Synthesized Answer ===")
-    print(result["synthesized_answer"])
+    # Handle the actual output format from JudgeSynthesisOperator
+    if "final_answer" in result:
+        print(result["final_answer"])
+    else:
+        print("No final answer found in result")
+        print(f"Available keys: {list(result.keys())}")
+
+    # Print reasoning if available
+    if "reasoning" in result:
+        print("\n=== Judge's Reasoning ===")
+        print(result["reasoning"])
 
 
 if __name__ == "__main__":

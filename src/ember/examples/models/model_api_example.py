@@ -5,7 +5,14 @@ This file shows how to use the models API to initialize and interact
 with language models from different providers.
 
 To run:
-    poetry run python src/ember/examples/model_api_example.py
+    uv run python src/ember/examples/models/model_api_example.py
+
+    # Or if in an activated virtual environment
+    python src/ember/examples/models/model_api_example.py
+
+Required environment variables:
+    OPENAI_API_KEY (optional): Your OpenAI API key for OpenAI model examples
+    ANTHROPIC_API_KEY (optional): Your Anthropic API key for Anthropic model examples
 """
 
 import logging

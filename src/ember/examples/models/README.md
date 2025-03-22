@@ -11,6 +11,40 @@ This directory contains examples demonstrating how to use Ember's model registry
 - `manual_model_registration.py` - Manually registering custom models
 - `register_models_directly.py` - Direct model registration example
 
+## Running Examples
+
+To run any example, use the following command format:
+
+```bash
+# Using uv (recommended)
+uv run python src/ember/examples/models/example_name.py
+
+# Or if in an activated virtual environment
+python src/ember/examples/models/example_name.py
+```
+
+Replace `example_name.py` with the desired example file, such as:
+
+```bash
+# Example: Run the model registry example
+uv run python src/ember/examples/models/model_registry_example.py
+
+# Example: List available models
+uv run python src/ember/examples/models/list_models.py
+```
+
+## Required Environment Variables
+
+Most examples require API keys for LLM providers to be set in your environment:
+
+```bash
+# Set your API keys before running examples
+export OPENAI_API_KEY="your-openai-key"
+export ANTHROPIC_API_KEY="your-anthropic-key"
+```
+
+Some examples (like `register_models_directly.py` and `model_registry_direct.py`) allow you to set API keys directly in the code as an alternative to environment variables.
+
 ## Best Practices
 
 ### 1. Accessing the Registry
@@ -76,28 +110,14 @@ registry = models.get_registry()
 registry.register_model(model_info=model_info)
 ```
 
-## Running Examples
+## Example-specific Instructions
 
-To run any example, use the following command format:
-
-```bash
-# Using uv (recommended)
-uv run python src/ember/examples/models/example_name.py
-
-# Or if in an activated virtual environment
-python src/ember/examples/models/example_name.py
-```
-
-Replace `example_name.py` with the desired example file.
-
-## API Keys
-
-Most examples require API keys for LLM providers to be set in your environment:
-
-```bash
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
-```
+- **list_models.py**: Lists all available models in the registry and shows their details.
+- **model_registry_example.py**: Demonstrates multiple patterns for working with the model registry.
+- **model_api_example.py**: Shows how to initialize and interact with models from different providers.
+- **manual_model_registration.py**: Demonstrates how to manually register models with the registry.
+- **model_registry_direct.py**: Example of using the registry with manually specified API keys.
+- **register_models_directly.py**: Registers models directly without environment variables.
 
 ## Next Steps
 

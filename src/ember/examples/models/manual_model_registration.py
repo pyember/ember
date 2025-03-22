@@ -2,6 +2,16 @@
 
 This example demonstrates how to manually register models with the ModelRegistry
 using the new simplified API.
+
+To run:
+    uv run python src/ember/examples/models/manual_model_registration.py
+
+    # Or if in an activated virtual environment
+    python src/ember/examples/models/manual_model_registration.py
+
+Required environment variables:
+    OPENAI_API_KEY (optional): Your OpenAI API key for registering OpenAI models
+    ANTHROPIC_API_KEY (optional): Your Anthropic API key for registering Anthropic models
 """
 
 import logging

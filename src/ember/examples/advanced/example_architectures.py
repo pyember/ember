@@ -3,15 +3,23 @@
 This module showcases best practices for defining and composing operators
 in Ember, following patterns from high-quality OSS libraries like JAX and PyTorch.
 It uses the Network of Operators (NON) pattern for standardized, composable LLM pipelines.
+
+To run:
+    uv run python src/ember/examples/advanced/example_architectures.py
 """
 
+import logging
 from typing import Any, ClassVar, Dict, List, Type
 
-# Import the non module directly from ember
-from ember import non
-from ember.api.operators import EmberModel, Field, Operator
+# Import the non module directly from ember core
+from ember.core import non
+from ember.core.types.ember_model import EmberModel, Field
+from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.app_context import get_ember_context
 from ember.core.registry.specification.specification import Specification
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class NetworkInput(EmberModel):
@@ -57,17 +65,23 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
     ensemble: non.UniformEnsemble
     verifier: non.Verifier
 
-    def __init__(self, *, model_name: str = "gpt-4o", num_units: int = 2) -> None:
+    def __init__(
+        self, *, model_name: str = "openai:gpt-4o", num_units: int = 2
+    ) -> None:
         """Initialize the SubNetwork with configurable components.
 
         Args:
             model_name: The model to use for both ensemble and verification
             num_units: Number of ensemble units to run in parallel
         """
+        logger.debug(
+            f"Initializing SubNetwork with model={model_name}, units={num_units}"
+        )
         self.ensemble = non.UniformEnsemble(
             num_units=num_units, model_name=model_name, temperature=0.0
         )
         self.verifier = non.Verifier(model_name=model_name, temperature=0.0)
+        logger.debug("SubNetwork initialization complete")
 
     def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
         """Process the input through the ensemble and verify the results.
@@ -78,16 +92,20 @@ class SubNetwork(Operator[NetworkInput, NetworkOutput]):
         Returns:
             A NetworkOutput with the verified answer
         """
+        logger.debug("Processing input through SubNetwork ensemble")
         ensemble_result = self.ensemble(query=inputs.query)
 
         # Extract the first response for verification
         candidate_answer = ensemble_result["responses"][0]
+        logger.debug("Selected candidate answer from ensemble")
 
+        logger.debug("Verifying candidate answer")
         verified_result = self.verifier(
             query=inputs.query, candidate_answer=candidate_answer
         )
 
         # Return structured output
+        logger.debug("SubNetwork processing complete")
         return NetworkOutput(final_answer=verified_result["revised_answer"])
 
 
@@ -121,9 +139,11 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
         Args:
             model_name: The model to use for all components
         """
+        logger.debug(f"Initializing NestedNetwork with model={model_name}")
         self.sub1 = SubNetwork(model_name=model_name)
         self.sub2 = SubNetwork(model_name=model_name)
         self.judge = non.JudgeSynthesis(model_name=model_name, temperature=0.0)
+        logger.debug("NestedNetwork initialization complete")
 
     def forward(self, *, inputs: NetworkInput) -> NetworkOutput:
         """Execute the nested network by processing through sub-networks and judging results.
@@ -134,15 +154,22 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
         Returns:
             A NetworkOutput with the final judged answer
         """
+        logger.debug("Starting NestedNetwork execution")
+
         # Process through parallel sub-networks
+        logger.debug("Processing through first sub-network")
         s1_out = self.sub1(inputs=inputs)
+
+        logger.debug("Processing through second sub-network")
         s2_out = self.sub2(inputs=inputs)
 
+        logger.debug("Applying judge synthesis to sub-network outputs")
         judged_result = self.judge(
             query=inputs.query, responses=[s1_out.final_answer, s2_out.final_answer]
         )
 
         # Return structured output
+        logger.debug("NestedNetwork execution complete")
         return NetworkOutput(final_answer=judged_result["synthesized_response"])
 
 
@@ -155,6 +182,7 @@ def create_nested_network(*, model_name: str = "gpt-4o") -> NestedNetwork:
     Returns:
         A configured NestedNetwork operator
     """
+    logger.info(f"Creating nested network with model: {model_name}")
     return NestedNetwork(model_name=model_name)
 
 
@@ -170,8 +198,10 @@ def create_pipeline(*, model_name: str = "gpt-4o") -> non.Sequential:
     Returns:
         A callable pipeline accepting standardized inputs
     """
+    logger.info(f"Creating declarative pipeline with model: {model_name}")
+
     # Create a pipeline using Sequential operator for cleaner composition
-    return non.Sequential(
+    pipeline = non.Sequential(
         operators=[
             # Generate 3 responses with the same model
             non.UniformEnsemble(
@@ -186,26 +216,36 @@ def create_pipeline(*, model_name: str = "gpt-4o") -> non.Sequential:
         ]
     )
 
+    logger.debug("Pipeline created successfully")
+    return pipeline
+
 
 if __name__ == "__main__":
+    # Use the centralized logging configuration with reduced verbosity
+    from ember.core.utils.logging import configure_logging
+
+    configure_logging(verbose=False)
+
     # Initialize the ember context
     context = get_ember_context()
+    logger.info("Ember context initialized")
 
     # Example 1: Using the object-oriented approach
-    print("\n=== Object-Oriented Style ===")
+    logger.info("=== Object-Oriented Style ===")
     network = NestedNetwork(model_name="gpt-4o")
     test_input = NetworkInput(
         query="What are three key principles of functional programming?"
     )
+    logger.info(f"Running network with query: {test_input.query}")
     test_result = network(inputs=test_input)
-    print(f"Query: {test_input.query}")
-    print(f"Answer: {test_result.final_answer}\n")
+    logger.info(f"Answer: {test_result.final_answer}")
 
     # Example 2: Using the declarative pipeline style
-    print("=== Declarative Pipeline Style ===")
+    logger.info("=== Declarative Pipeline Style ===")
     pipeline = create_pipeline(model_name="gpt-4o")
+    query = "What are three key principles of functional programming?"
 
     # For consistency, use kwargs pattern for pipeline invocation too
-    result = pipeline(query="What are three key principles of functional programming?")
-    print(f"Query: What are three key principles of functional programming?")
-    print(f"Answer: {result['revised_answer']}\n")
+    logger.info(f"Running pipeline with query: {query}")
+    result = pipeline(query=query)
+    logger.info(f"Answer: {result['revised_answer']}")

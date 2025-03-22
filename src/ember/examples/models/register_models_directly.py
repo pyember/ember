@@ -2,6 +2,18 @@
 
 This script registers models directly to the registry without using environment variables.
 It demonstrates the new simplified API for model registration.
+
+To run:
+    uv run python src/ember/examples/models/register_models_directly.py
+
+    # Or if in the virtual env
+    python src/ember/examples/models/register_models_directly.py
+
+Required environment variables:
+    OPENAI_API_KEY (optional): Your OpenAI API key for registering OpenAI models
+    ANTHROPIC_API_KEY (optional): Your Anthropic API key for registering Anthropic models
+
+Note: If your env variables are not set, you can also edit this file to add your API keys directly.
 """
 
 import logging

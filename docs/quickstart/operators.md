@@ -35,7 +35,7 @@ from ember.core.registry.specification import Specification
 # Define the specification (input/output schema + prompt template)
 class ClassifierSpecification(Specification):
     input_model = ClassifierInput
-    output_model = ClassifierOutput
+    structured_output = ClassifierOutput
     prompt_template = """Classify the following text into one of these categories: {categories}
     
 Text: {text}

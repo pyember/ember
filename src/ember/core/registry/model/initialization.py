@@ -18,6 +18,8 @@ from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.provider_info import ProviderInfo
 
 logger = logging.getLogger(__name__)
+# Set default log level to WARNING to reduce verbosity
+logger.setLevel(logging.WARNING)
 
 
 def _convert_model_config_to_model_info(

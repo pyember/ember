@@ -1,5 +1,16 @@
 """
 Direct Model Registry Example with manually specified API keys.
+
+This example demonstrates how to directly use the model registry with manually
+specified API keys instead of using environment variables.
+
+To run:
+    uv run python src/ember/examples/models/model_registry_direct.py
+
+    # Or if in an activated virtual environment
+    python src/ember/examples/models/model_registry_direct.py
+
+Note: You need to edit this file to replace the placeholder API keys with your actual keys.
 """
 
 import logging

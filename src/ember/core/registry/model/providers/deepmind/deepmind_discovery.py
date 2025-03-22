@@ -9,6 +9,8 @@ from ember.core.registry.model.providers.base_discovery import (
 )
 
 logger = logging.getLogger(__name__)
+# Set default log level to WARNING to reduce verbosity
+logger.setLevel(logging.WARNING)
 
 
 class DeepmindDiscovery(BaseDiscoveryProvider):

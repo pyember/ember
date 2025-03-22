@@ -15,7 +15,7 @@ For a comprehensive explanation of the relationship between these approaches,
 see docs/xcs/JIT_OVERVIEW.md.
 
 To run:
-    poetry run python src/ember/examples/xcs/jit_example.py
+    uv run python src/ember/examples/xcs/jit_example.py
 """
 
 import logging

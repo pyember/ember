@@ -104,7 +104,8 @@ class EnsembleSpecification(Specification):
     def __init__(self):
         """Initialize with appropriate models."""
         super().__init__(
-            input_model=EnsembleOperatorInputs, output_model=EnsembleOperatorOutputs
+            input_model=EnsembleOperatorInputs,
+            structured_output=EnsembleOperatorOutputs,
         )
 
 
@@ -188,7 +189,9 @@ class MostCommonSpecification(Specification):
 
     def __init__(self):
         """Initialize with appropriate models."""
-        super().__init__(input_model=MostCommonInputs, output_model=MostCommonOutputs)
+        super().__init__(
+            input_model=MostCommonInputs, structured_output=MostCommonOutputs
+        )
 
 
 class MostCommon(Operator[MostCommonInputs, MostCommonOutputs]):
@@ -241,7 +244,7 @@ class VerifierSpecification(Specification):
 
     def __init__(self):
         """Initialize with appropriate models."""
-        super().__init__(input_model=VerifierInputs, output_model=VerifierOutputs)
+        super().__init__(input_model=VerifierInputs, structured_output=VerifierOutputs)
 
 
 class Verifier(Operator[VerifierInputs, VerifierOutputs]):
@@ -324,7 +327,7 @@ class JudgeSynthesisSpecification(Specification):
     def __init__(self):
         """Initialize with appropriate models."""
         super().__init__(
-            input_model=JudgeSynthesisInputs, output_model=JudgeSynthesisOutputs
+            input_model=JudgeSynthesisInputs, structured_output=JudgeSynthesisOutputs
         )
 
 

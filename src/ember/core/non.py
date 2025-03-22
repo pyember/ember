@@ -427,7 +427,7 @@ class VariedEnsembleOutputs(BaseModel):
 
 class VariedEnsembleSpecification(Specification):
     input_model: Type[BaseModel] = VariedEnsembleInputs
-    output_model: Type[BaseModel] = VariedEnsembleOutputs
+    structured_output: Type[BaseModel] = VariedEnsembleOutputs
 
 
 class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
@@ -499,7 +499,9 @@ class Sequential(Operator[T_in, T_out]):
     """
 
     operators: List[Operator[Any, Any]]
-    specification: Specification = Specification(input_model=None, output_model=None)
+    specification: Specification = Specification(
+        input_model=None, structured_output=None
+    )
 
     def __init__(self, *, operators: List[Operator[Any, Any]]) -> None:
         self.operators = operators

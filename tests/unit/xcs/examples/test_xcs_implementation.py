@@ -6,7 +6,7 @@ directly. It shows how to use JIT compilation, vectorization, and automatic
 graph building for high-performance operator execution.
 
 To run:
-    poetry run python src/ember/examples/test_xcs_implementation.py
+    uv run python src/ember/examples/test_xcs_implementation.py
 """
 
 import importlib.util

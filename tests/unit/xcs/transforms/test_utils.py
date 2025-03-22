@@ -27,36 +27,38 @@ def generate_batch_inputs(
 def assert_processing_time(
     sequential_time: float,
     parallel_time: float,
-    min_speedup: float = 1.2,
-    max_overhead_factor: float = 3.0,  # Increased overhead factor for tests
+    min_speedup: float = 2.0,  # Increased from 1.2 for more rigorous testing
+    max_overhead_factor: float = 2.0,  # Decreased from 3.0 for stricter overhead limits
 ) -> None:
     """Assert that parallel processing is faster than sequential processing.
 
     Args:
         sequential_time: Time taken for sequential processing
         parallel_time: Time taken for parallel processing
-        min_speedup: Minimum expected speedup factor (default: 1.2)
-        max_overhead_factor: Maximum overhead factor for small inputs (default: 3.0)
+        min_speedup: Minimum expected speedup factor (default: 2.0)
+        max_overhead_factor: Maximum overhead factor for small inputs (default: 2.0)
 
     Raises:
         AssertionError: If the parallel time doesn't meet the speedup expectations
     """
     # For very small inputs or test environments, parallel might be slower due to overhead
-    # In CI environments especially, thread creation overhead can be significant
-    if sequential_time < 0.1:
-        # Skip performance checks for very small timings since they're unreliable
-        return
-    elif sequential_time < 0.5:
-        # For small inputs, allow significant overhead
+    # Still enforce some standards even for small inputs
+    if sequential_time < 0.05:  # Reduced threshold from 0.1
+        # Even for very small timings, ensure no extreme overhead
+        assert (
+            parallel_time < sequential_time * max_overhead_factor * 2
+        ), f"Extreme overhead for tiny inputs: {sequential_time:.6f}s vs {parallel_time:.6f}s"
+    elif sequential_time < 0.3:  # Reduced threshold from 0.5
+        # For small inputs, allow moderate overhead but still enforce limits
         assert (
             parallel_time < sequential_time * max_overhead_factor
-        ), f"Parallel processing overhead is too high: {sequential_time:.4f}s vs {parallel_time:.4f}s"
+        ), f"Parallel processing overhead is too high: {sequential_time:.6f}s vs {parallel_time:.6f}s"
     else:
-        # For substantial inputs, parallel should be faster
+        # For substantial inputs, parallel must demonstrate clear speedup
         speedup = sequential_time / parallel_time
         assert (
             speedup >= min_speedup
-        ), f"Expected minimum speedup of {min_speedup}x, but got {speedup:.2f}x"
+        ), f"Expected minimum speedup of {min_speedup}x, but got {speedup:.3f}x"
 
 
 def time_function_execution(

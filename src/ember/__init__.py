@@ -59,6 +59,7 @@ Examples:
 from __future__ import annotations
 
 import importlib.metadata
+import logging
 from typing import Any, Dict, Optional, Union
 
 # Import primary API components - these are the only public interfaces
@@ -72,6 +73,7 @@ from ember.api import xcs  # Execution optimization (xcs.jit, etc.)
 from ember.core.app_context import EmberAppContext, EmberContext, create_ember_app
 from ember.core.config.manager import ConfigManager, create_config_manager
 from ember.core.registry.model.base.registry.model_registry import ModelRegistry
+from ember.core.utils.logging import configure_logging, set_component_level
 
 # Version detection
 try:
@@ -94,6 +96,7 @@ def initialize_ember(
     api_keys: Optional[Dict[str, str]] = None,
     env_prefix: str = "EMBER_",
     initialize_context: bool = True,
+    verbose_logging: bool = False,
 ) -> Union[ModelRegistry, EmberAppContext]:
     """Initialize the Ember framework with a single, unified call.
 
@@ -120,6 +123,8 @@ def initialize_ember(
         env_prefix: Prefix for environment variables to consider. Defaults to "EMBER_".
         initialize_context: Whether to initialize the global application context.
                           Set to False to only initialize the model registry.
+        verbose_logging: Whether to use verbose logging. If False (default), reduces
+                       verbosity for non-essential components like model discovery and HTTP libraries.
 
     Returns:
         If initialize_context is True: A fully initialized EmberAppContext containing
@@ -140,6 +145,9 @@ def initialize_ember(
         registry = initialize_ember(initialize_context=False)
         model = registry.get_model("openai:gpt-4")
     """
+    # 0. Configure logging first
+    configure_logging(verbose=verbose_logging)
+
     # 1. Create the configuration manager with the provided config path
     config_manager = create_config_manager(config_path=config_path)
 
@@ -157,7 +165,7 @@ def initialize_ember(
 
     # 4. Initialize application context if requested
     if initialize_context:
-        app_context = create_ember_app(config_path=config_path)
+        app_context = create_ember_app(config_path=config_path, verbose=verbose_logging)
         # Set the unified ember context as global
         EmberContext.initialize(app_context=app_context)
         return app_context
@@ -174,5 +182,7 @@ __all__ = [
     "non",  # Network of Networks patterns
     "xcs",  # Execution optimization
     "initialize_ember",  # Global initialization function
+    "configure_logging",  # Logging configuration utility
+    "set_component_level",  # Fine-grained logging control
     "__version__",
 ]

@@ -14,7 +14,7 @@ Overview:
                   flows, providing labeled references and then labeling new flows.
 
 To run:
-    poetry run python src/ember/examples/custom_prompt_example_caravan.py
+    uv run python src/ember/examples/custom_prompt_example_caravan.py
 """
 
 import argparse

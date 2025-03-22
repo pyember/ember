@@ -5,7 +5,7 @@ API access. It shows how to create, compose, and execute ensemble operators with
 typing and simulation of multiple model responses.
 
 To run:
-    poetry run python src/ember/examples/operators/simplified_ensemble_example.py
+    uv run python src/ember/examples/operators/simplified_ensemble_example.py
 """
 
 import logging

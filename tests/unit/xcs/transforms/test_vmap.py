@@ -568,7 +568,12 @@ class TestVMapPerformance:
     """Tests focused on the performance characteristics of vmap."""
 
     def test_vmap_performance_with_varying_batch_size(self, basic_operator):
-        """Test how vmap performance scales with batch size."""
+        """Test how vmap performance scales with batch size.
+
+        This test verifies that:
+        1. Processing time scales roughly linearly with batch size
+        2. The vectorized implementation handles increasing batch sizes efficiently
+        """
         # Skip this test by default as it's a performance test
         try:
             if not pytest.config.getoption("--run-perf-tests", default=False):
@@ -577,29 +582,84 @@ class TestVMapPerformance:
             # Handle pytest.config not being available or other errors
             pytest.skip("Performance tests are disabled by default")
 
+        # Create a CPU-intensive operation that benefits from vectorization
+        def cpu_intensive_process(prompt):
+            # Perform actual computation instead of sleep which may not work reliably
+            result = 0
+            # Scale computation based on input length to ensure consistent work
+            iterations = max(10000, len(prompt) * 5000)
+            for i in range(iterations):
+                result += (i * i) % 100
+            return f"{prompt}_processed_{result}"
+
+        basic_operator.process_fn = cpu_intensive_process
         vectorized_op = vmap(basic_operator)
 
-        batch_sizes = [10, 100, 1000]
+        # Focus on a reasonable range of batch sizes
+        batch_sizes = [5, 20, 50]
         times = []
+
+        print("\n=== VMAP Performance Test Results ===")
 
         for size in batch_sizes:
             batch_inputs = generate_batch_inputs(size)
 
-            start_time = time.time()
-            result = vectorized_op(inputs=batch_inputs)
-            end_time = time.time()
+            # Measure vectorized implementation time (with warmup)
+            # Use median of multiple runs for stability
+            vectorized_times = []
+            for _ in range(3):
+                start_time = time.time()
+                result = vectorized_op(inputs=batch_inputs)
+                end_time = time.time()
+                vectorized_times.append(end_time - start_time)
 
+            vectorized_times.sort()
+            vectorized_time = vectorized_times[1]  # Use median
+            times.append(vectorized_time)
+
+            # Verify correct results
             assert len(result["results"]) == size
-            times.append(end_time - start_time)
 
-        # Verify that time scales roughly linearly with batch size
-        # (with some allowance for overhead and optimization)
-        assert (
-            times[1] < times[0] * 15
-        )  # 100 items should be less than 15x the time of 10 items
-        assert (
-            times[2] < times[1] * 15
-        )  # 1000 items should be less than 15x the time of 100 items
+            # Calculate and print per-item processing time
+            per_item_time = vectorized_time / size
+            print(
+                f"Batch size {size}: total={vectorized_time:.6f}s, per item={per_item_time:.8f}s"
+            )
+
+        # Verify that the per-item time doesn't increase significantly with batch size
+        # (should remain constant or decrease)
+        for i in range(1, len(batch_sizes)):
+            per_item_small = times[i - 1] / batch_sizes[i - 1]
+            per_item_large = times[i] / batch_sizes[i]
+            ratio = per_item_large / per_item_small
+
+            print(
+                f"Scaling efficiency {batch_sizes[i-1]} → {batch_sizes[i]}: {ratio:.2f}x per-item time ratio"
+            )
+
+            # Per-item time should not increase significantly (allowing up to 20% overhead)
+            assert ratio <= 1.2, (
+                f"Per-item processing time increased too much from batch size {batch_sizes[i-1]} to {batch_sizes[i]}: "
+                f"{per_item_small:.8f}s → {per_item_large:.8f}s ({ratio:.2f}x increase)"
+            )
+
+        # Verify linear scaling (or better) for total processing time
+        for i in range(1, len(batch_sizes)):
+            size_ratio = batch_sizes[i] / batch_sizes[i - 1]
+            time_ratio = times[i] / times[i - 1]
+            scaling_efficiency = time_ratio / size_ratio
+
+            print(
+                f"Time scaling {batch_sizes[i-1]} → {batch_sizes[i]}: "
+                f"{time_ratio:.2f}x time increase for {size_ratio:.2f}x items (efficiency: {scaling_efficiency:.2f})"
+            )
+
+            # Processing time should scale linearly or better with batch size
+            # Allowing some overhead (up to 20% beyond linear)
+            assert scaling_efficiency <= 1.2, (
+                f"Processing time increased faster than expected from batch size {batch_sizes[i-1]} to {batch_sizes[i]}: "
+                f"{times[i-1]:.6f}s → {times[i]:.6f}s (efficiency: {scaling_efficiency:.2f}, expected ≤ 1.2)"
+            )
 
 
 if __name__ == "__main__":

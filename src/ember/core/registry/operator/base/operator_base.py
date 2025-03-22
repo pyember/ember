@@ -96,7 +96,7 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
         2. Must be idempotent - repeated calls with same inputs yield same outputs
         3. Must not have side effects - computation only affects return value
         4. Must handle all input fields defined in specification.input_model
-        5. Must return value conforming to specification.output_model
+        5. Must return value conforming to specification.structured_output
 
         Optimizations:
         - forward() can assume inputs are valid (already validated by __call__)
@@ -213,10 +213,10 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
                 and hasattr(specification, "structured_output")
                 and specification.structured_output
             ):
-                output_model_type: Type[OutputT] = cast(
+                structured_output_type: Type[OutputT] = cast(
                     Type[OutputT], specification.structured_output
                 )
-                operator_output = output_model_type.model_validate(operator_output)
+                operator_output = structured_output_type.model_validate(operator_output)
 
             # Final validation to ensure type consistency
             validated_output: OutputT = cast(

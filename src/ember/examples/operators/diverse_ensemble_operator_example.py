@@ -4,18 +4,17 @@ This example demonstrates using the MultiPrefixEnsembleOperator with distinct pr
 for each language model to generate diverse responses to a query.
 
 To run:
-    poetry run python src/ember/examples/diverse_ensemble_operator_example.py
+    uv run python src/ember/examples/diverse_ensemble_operator_example.py
 """
 
 from random import sample
-from typing import ClassVar, Dict, List, Optional, Type
+from typing import ClassVar, Dict, List, Optional, Type, Any, cast
 
-from pydantic import Field
-
-from ember.api import models, non
-from ember.api.models import LMModule, LMModuleConfig
-from ember.api.operator import Operator, Specification
-from ember.api.types import EmberModel, extract_value
+from ember.core import non
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel, Field
 
 
 def usage_example() -> None:
@@ -110,7 +109,7 @@ class MultiPrefixEnsembleSpecification(Specification):
     """Specification for MultiPrefixEnsembleOperator."""
 
     input_model: Type[EmberModel] = MultiPrefixOperatorInputs
-    output_model: Type[EmberModel] = MultiPrefixOperatorOutputs
+    structured_output: Type[EmberModel] = MultiPrefixOperatorOutputs
 
 
 class MultiPrefixEnsembleOperator(
@@ -165,12 +164,11 @@ class MultiPrefixEnsembleOperator(
             # Call LM module
             response = lm(prompt=prompt)
 
-            # Extract text from response
-            text = extract_value(response, "text", "")
+            # Get text from response
+            text = response if isinstance(response, str) else str(response)
 
-            # Guard against None responses
-            if text is None:
-                text = ""
+            # Ensure we have a valid string
+            text = text.strip() if text else ""
 
             responses.append(text)
 

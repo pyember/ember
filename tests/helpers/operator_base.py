@@ -46,7 +46,7 @@ class SpecificationProtocol(Protocol):
     """Protocol defining the required interface for all specifications."""
 
     input_model: Optional[Type]
-    output_model: Optional[Type]
+    structured_output: Optional[Type]
     prompt_template: Optional[str]
 
     def validate_inputs(self, *, inputs: Any) -> Any:
@@ -68,7 +68,7 @@ class Specification:
     def __init__(
         self,
         input_model=None,
-        output_model=None,
+        structured_output=None,
         prompt_template=None,
         structured_output=None,
     ):
@@ -76,12 +76,12 @@ class Specification:
 
         Args:
             input_model: The model class for validating inputs
-            output_model: The model class for validating outputs
+            structured_output: The model class for validating outputs
             prompt_template: Template string for prompt rendering
-            structured_output: Alias for output_model for backwards compatibility
+            structured_output: Alias for structured_output for backwards compatibility
         """
         self.input_model = input_model
-        self.output_model = output_model or structured_output
+        self.structured_output = structured_output or structured_output
         self.prompt_template = prompt_template
 
     def validate_inputs(self, *, inputs: Any) -> Any:
@@ -111,8 +111,8 @@ class Specification:
             Validated output object
         """
         try:
-            if self.output_model and isinstance(output, dict):
-                return self.output_model(**output)
+            if self.structured_output and isinstance(output, dict):
+                return self.structured_output(**output)
             return output
         except Exception as e:
             logger.warning(f"Output validation failed: {e}")

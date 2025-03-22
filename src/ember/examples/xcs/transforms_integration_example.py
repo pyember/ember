@@ -17,7 +17,7 @@ For a comprehensive explanation of the transforms and execution options, see:
 - docs/xcs/JIT_OVERVIEW.md
 
 To run:
-    python src/ember/examples/xcs/transforms_integration_example.py
+    uv run python src/ember/examples/xcs/transforms_integration_example.py
 """
 
 import time
@@ -304,7 +304,16 @@ def demonstrate_basic_transforms():
                 # We're in pmap context, each worker will get a single text at specific index
                 batch_index = inputs["batch_index"]
                 texts = inputs["text"]
-                if 0 <= batch_index < len(texts):
+
+                # Handle case where batch_index is a list (pmap dispatch)
+                if isinstance(batch_index, list):
+                    if batch_index:  # Non-empty list
+                        batch_index = batch_index[0]  # Take first index
+                    else:
+                        return {"processed": "Empty batch index list"}
+
+                # Now we have a scalar index
+                if isinstance(batch_index, int) and 0 <= batch_index < len(texts):
                     # Process the text at our assigned index
                     return self.processor(inputs={"text": texts[batch_index]})
                 else:

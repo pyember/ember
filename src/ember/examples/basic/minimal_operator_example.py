@@ -4,7 +4,7 @@ This script demonstrates the recommended pattern for creating and using Ember op
 It shows how to create, configure, and execute operators with proper typing and error handling.
 
 To run:
-    poetry run python src/ember/examples/minimal_operator_example.py
+    uv run python src/ember/examples/basic/minimal_operator_example.py
 """
 
 # Import the minimal example

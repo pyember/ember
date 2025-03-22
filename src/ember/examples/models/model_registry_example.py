@@ -15,7 +15,14 @@ For comprehensive documentation, see:
 docs/quickstart/model_registry.md
 
 To run:
-    poetry run python src/ember/examples/models/model_registry_example.py
+    uv run python src/ember/examples/models/model_registry_example.py
+
+    # Or if in the virtual env
+    python src/ember/examples/models/model_registry_example.py
+
+Required environment variables:
+    OPENAI_API_KEY (optional): Your OpenAI API key for OpenAI model examples
+    ANTHROPIC_API_KEY (optional): Your Anthropic API key for Anthropic model examples
 """
 
 import logging

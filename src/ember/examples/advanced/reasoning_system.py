@@ -11,7 +11,7 @@ This is an advanced example that showcases:
 5. Automated parallelization
 
 To run:
-    poetry run python src/ember/examples/advanced/reasoning_system.py
+    uv run python src/ember/examples/advanced/reasoning_system.py
 """
 
 from dataclasses import dataclass, field
@@ -19,10 +19,15 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 
 # Ember API imports
 from ember.api.xcs import execution_options, jit
-from ember.core import non
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.operator.core.verifier import VerifierOperator
+from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel, Field
+
+# Keep non import for UniformEnsemble
+from ember.core import non
 
 ###############################################################################
 # Input/Output Models
@@ -137,14 +142,20 @@ class ReasoningVerifier(Operator[Dict[str, Any], Dict[str, Any]]):
     """Verifies each reasoning path for accuracy, coherence, and completeness."""
 
     # Class-level field declaration
-    verifier: non.Verifier
+    verifier: VerifierOperator
 
     def __init__(self, model_name: str = "anthropic:claude-3-sonnet"):
         """Initialize with configurable model."""
-        self.verifier = non.Verifier(
-            model_name=model_name,
-            verification_criteria=["factual_accuracy", "coherence", "completeness"],
+        # Create LM module for the verifier
+        lm_module = LMModule(
+            config=LMModuleConfig(
+                model_name=model_name,
+                temperature=0.2,
+            )
         )
+
+        # Use the core VerifierOperator directly
+        self.verifier = VerifierOperator(lm_module=lm_module)
 
     def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """Verify each reasoning path in the inputs."""
@@ -190,11 +201,20 @@ class ReasoningSynthesizer(Operator[Dict[str, Any], ReasoningOutput]):
     """Synthesizes a final answer from verified reasoning paths."""
 
     # Class-level field declaration
-    synthesizer: non.JudgeSynthesis
+    synthesizer: JudgeSynthesisOperator
 
     def __init__(self, model_name: str = "anthropic:claude-3-opus"):
         """Initialize with configurable model."""
-        self.synthesizer = non.JudgeSynthesis(model_name=model_name, temperature=0.2)
+        # Create LM module for the synthesizer
+        lm_module = LMModule(
+            config=LMModuleConfig(
+                model_name=model_name,
+                temperature=0.2,
+            )
+        )
+
+        # Use the core JudgeSynthesisOperator directly
+        self.synthesizer = JudgeSynthesisOperator(lm_module=lm_module)
 
     def forward(self, *, inputs: Dict[str, Any]) -> ReasoningOutput:
         """Synthesize a final answer from multiple verified reasoning paths."""

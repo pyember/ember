@@ -3,7 +3,7 @@
 This script checks if API keys are properly set in the environment variables.
 
 To run:
-    poetry run python src/ember/examples/check_env.py
+    uv run python src/ember/examples/check_env.py
 """
 
 import os

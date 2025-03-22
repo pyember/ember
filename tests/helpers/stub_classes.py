@@ -45,9 +45,9 @@ class OperatorProtocol(Protocol):
 class Specification:
     """Simplified specification that doesn't perform validation."""
 
-    def __init__(self, input_model=None, output_model=None):
+    def __init__(self, input_model=None, structured_output=None):
         self.input_model = input_model
-        self.output_model = output_model
+        self.structured_output = structured_output
         self.prompt_template = None
 
     def validate_inputs(self, *, inputs):

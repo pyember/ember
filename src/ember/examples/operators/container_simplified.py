@@ -4,7 +4,7 @@ This example demonstrates how to create a container operator that encapsulates
 a simple processing pipeline, using JIT for tracing.
 
 To run:
-    poetry run python src/ember/examples/container_simplified.py
+    uv run python src/ember/examples/container_simplified.py
 """
 
 import logging
@@ -53,7 +53,7 @@ class ProcessingSpecification(Specification):
     """Specification for text processing pipeline."""
 
     input_model: Type[EmberModel] = ProcessingInput
-    output_model: Type[EmberModel] = ProcessingOutput
+    structured_output: Type[EmberModel] = ProcessingOutput
 
 
 ###############################################################################
