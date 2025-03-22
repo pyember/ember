@@ -427,4 +427,4 @@ We welcome contributions to the Ember CLI! Follow these steps:
 
 ## License
 
-The Ember CLI is licensed under the Apache 2.0 License.
+The Ember CLI is licensed under the MIT License.

@@ -21,9 +21,9 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 # Initialize the registry with auto_discover=True
-# This will attempt to discover models automatically during initialization
+# Using the get_registry() function will initialize the registry if needed
 logger.info("Initializing registry with auto_discover=True...")
-registry = models.initialize_registry(auto_discover=True)
+registry = models.get_registry()
 
 # Check if models were discovered during initialization
 model_ids = registry.list_models()
@@ -90,12 +90,20 @@ def register_openai_models():
         ),
     ]
 
-    # Register the models
+    # Register the models, skipping any that are already registered
+    registered_models = []
     for model_info in model_infos:
-        registry.register_model(model_info=model_info)
-        logger.info(f"Registered model: {model_info.id}")
+        if not registry.is_registered(model_info.id):
+            try:
+                registry.register_model(model_info=model_info)
+                logger.info(f"Registered model: {model_info.id}")
+                registered_models.append(model_info.id)
+            except ValueError:
+                logger.info(f"Model {model_info.id} already registered, skipping")
+        else:
+            logger.info(f"Model {model_info.id} already registered, skipping")
 
-    return [m.id for m in model_infos]
+    return registered_models
 
 
 def register_anthropic_models():
@@ -143,12 +151,20 @@ def register_anthropic_models():
         ),
     ]
 
-    # Register the models
+    # Register the models, skipping any that are already registered
+    registered_models = []
     for model_info in model_infos:
-        registry.register_model(model_info=model_info)
-        logger.info(f"Registered model: {model_info.id}")
+        if not registry.is_registered(model_info.id):
+            try:
+                registry.register_model(model_info=model_info)
+                logger.info(f"Registered model: {model_info.id}")
+                registered_models.append(model_info.id)
+            except ValueError:
+                logger.info(f"Model {model_info.id} already registered, skipping")
+        else:
+            logger.info(f"Model {model_info.id} already registered, skipping")
 
-    return [m.id for m in model_infos]
+    return registered_models
 
 
 # Register models manually as a fallback

@@ -23,7 +23,7 @@ from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type
 from ember.api.xcs import jit
 from ember.core.registry.operator.base.operator_base import Operator, Specification
 from ember.core.types.ember_model import EmberModel, Field
-from ember.xcs.engine.execution_options import execution_options
+from ember.xcs.engine.execution_options import execution_options, get_execution_options
 from ember.xcs.engine.xcs_engine import (
     TopologicalSchedulerWithParallelDispatch,
     compile_graph,
@@ -615,7 +615,8 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
             results = []
 
             # Checking execution context for parallelism hints
-            use_parallel = execution_options.use_parallel
+            current_options = get_execution_options()
+            use_parallel = current_options.use_parallel
 
             if use_parallel:
                 # Parallel execution strategy using threading
@@ -659,30 +660,18 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
     # Benchmarking adaptive operator with sequential context
     logger.info("\nAdaptive Operator (Sequential Context):")
     start = time.time()
-    # Store current settings
-    current_parallel = execution_options.use_parallel
-    # Update settings for this execution
-    execution_options.use_parallel = False
-    try:
+    # Use execution options context manager for this execution
+    with execution_options(use_parallel=False):
         _ = adaptive_op(inputs=DelayInput(task_id="adaptive-seq"))
-    finally:
-        # Restore original settings
-        execution_options.use_parallel = current_parallel
     adaptive_seq_time = time.time() - start
     logger.info("  Completed in %.4fs", adaptive_seq_time)
 
     # Benchmarking adaptive operator with parallel context
     logger.info("\nAdaptive Operator (Parallel Context):")
     start = time.time()
-    # Store current settings
-    current_parallel = execution_options.use_parallel
-    # Update settings for this execution
-    execution_options.use_parallel = True
-    try:
+    # Use execution options context manager for this execution
+    with execution_options(use_parallel=True):
         _ = adaptive_op(inputs=DelayInput(task_id="adaptive-par"))
-    finally:
-        # Restore original settings
-        execution_options.use_parallel = current_parallel
     adaptive_par_time = time.time() - start
     logger.info("  Completed in %.4fs", adaptive_par_time)
 

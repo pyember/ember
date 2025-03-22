@@ -20,6 +20,13 @@ Ember provides three complementary approaches to JIT compilation:
    - `auto_graph_simplified.py` - Simplified version without LLM dependencies
    - `simple_autograph_example.py` - Basic introduction to the autograph context manager
 
+### Transform Integration
+
+- `transforms_integration_example.py` - Demonstrates combining multiple transforms (vmap, pmap, structural_jit) with execution options for optimized processing pipelines
+  - Shows proper operator definition and transform application
+  - Compares performance of different transform combinations
+  - Illustrates best practices for memory-efficient processing
+
 ### General Examples
 
 - `test_xcs_implementation.py` - Testing XCS core functionality
@@ -31,6 +38,7 @@ Ember provides three complementary approaches to JIT compilation:
 - **Want to understand JIT vs. structural_jit?** See `enhanced_jit_example.py`
 - **Need manual graph control?** Check out `auto_graph_simplified.py`
 - **Building complex operator compositions?** The hierarchical analysis in `enhanced_jit_example.py` is most relevant
+- **Need to optimize batch & parallel processing?** See `transforms_integration_example.py` for combining transforms
 
 ## Running Examples
 
@@ -47,7 +55,6 @@ python src/ember/examples/xcs/example_name.py
 Replace `example_name.py` with the desired example file.
 
 ## XCS Core Concepts
-
 
 The XCS system provides several key capabilities:
 
@@ -66,7 +73,15 @@ The XCS system provides several key capabilities:
   - pmap: Parallelization across worker threads
   - mesh_sharded: Distribution across device meshes
 
-For a comprehensive explanation of the relationships between jit, structural_jit, and autograph, see `docs/xcs/JIT_OVERVIEW.md`.
+- **Execution Control**:
+  - execution_options: Fine-grained control over execution behavior
+  - Adaptive scheduling based on workload characteristics
+  - Resource management for memory and compute
+
+For detailed documentation on these components, see:
+- `docs/xcs/JIT_OVERVIEW.md` - Understanding the JIT system
+- `docs/xcs/TRANSFORMS.md` - Working with transforms
+- `docs/xcs/EXECUTION_OPTIONS.md` - Controlling execution behavior
 
 ## Next Steps
 

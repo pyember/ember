@@ -336,4 +336,4 @@ print(f"Factual Accuracy: {results['factual_accuracy']:.2f}")
 
 ## License
 
-Ember is released under the [Apache 2.0 License](LICENSE).
+Ember is released under the [MIT License](LICENSE).
