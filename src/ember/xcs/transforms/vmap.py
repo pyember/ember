@@ -1,433 +1,313 @@
 """
 Vectorized Mapping (vmap): Batch Processing Transformation
 
-Providing the vmap transformation for parallel computation in the XCS framework.
-The vmap transformation vectorizes operators and functions to process batched
-inputs in parallel, similar to NumPy's vectorization or JAX's vmap, but
-specialized for the XCS execution model.
-
-Key features:
-1. Processing multiple inputs in parallel without manual batching logic
-2. Converting single-item operators to batched operators
-3. Combining with other transforms like pmap for nested parallelism
-4. Working with both primitive operators and complex pipelines
-
-Handling batch dimensions, broadcasting scalar values across batches,
-and merging results from batch processing.
-
-Example:
-    ```python
-    # Creating a single-item operator
-    class MyOperator(Operator):
-        def __call__(self, *, inputs):
-            return {"result": process_item(inputs["text"])}
-
-    # Creating a vectorized version that processes batches in parallel
-    batched_operator = vmap(MyOperator())
-
-    # Processing multiple items with a single call
-    results = batched_operator(inputs={
-        "text": ["item1", "item2", "item3"],
-        "options": {"format": "json"}  # Non-batched parameter applied to all items
-    })
-    # results == {"result": [processed1, processed2, processed3]}
-
-    # Combining with other transforms for advanced parallelism
-    distributed_batch_op = pmap(vmap(MyOperator()))
-    ```
+Implementing a generalized vectorization transformation for batch processing in the XCS
+framework. This module enables batched computation by transforming functions
+that process individual items into functions that process batches, similar to JAX's
+vmap but adapted for Ember's Operator-based architecture.
 """
 
-from functools import wraps
+from __future__ import annotations
 
-# Use stub classes to avoid import errors
+import functools
+import logging
 from typing import (
     Any,
     Callable,
     Dict,
     Generic,
     Iterable,
-    Iterator,
     List,
     Mapping,
     Optional,
     Sequence,
+    Tuple,
     TypeVar,
     Union,
     cast,
 )
 
-from typing_extensions import Protocol, TypedDict
+logger = logging.getLogger(__name__)
+
+# Type variables for generic typing support
+T = TypeVar("T")
+U = TypeVar("U")
+InputT = TypeVar("InputT", bound=Mapping[str, Any])
+OutputT = TypeVar("OutputT")
+ContainerT = TypeVar("ContainerT", bound=Sequence[Any])
+
+# Type alias for axis specification
+AxisSpec = Union[int, Dict[str, int], None]
 
 
-# Stub class for Operator to avoid circular imports
-class Operator:
-    """Temporary Operator stub class to avoid import errors."""
+def _get_batch_size(inputs: Mapping[str, Any], in_axes: AxisSpec) -> int:
+    """Determining batch size from input structure and axis specification.
 
-    def __call__(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """Placeholder for calling an operator."""
-        return {}
-
-
-# Use TypeVar for NodeInputT and NodeOutputT
-NodeInputT = TypeVar("NodeInputT", bound=Dict[str, Any])
-NodeOutputT = TypeVar("NodeOutputT", bound=Dict[str, Any])
-
-
-# Stub class for EmberModel
-class EmberModel:
-    """Temporary EmberModel stub class to avoid import errors."""
-
-    pass
-
-
-# Define more specific type variables
-InputItemT = TypeVar("InputItemT")
-OutputItemT = TypeVar("OutputItemT")
-BatchInputT = TypeVar("BatchInputT", bound=Mapping[str, object])
-BatchOutputT = TypeVar("BatchOutputT", bound=Mapping[str, object])
-
-
-ItemT_co = TypeVar(
-    "ItemT_co", covariant=True
-)  # Type of item in a batchable container (covariant)
-
-
-class BatchableInput(Protocol[ItemT_co]):
-    """Protocol for types that can be batched."""
-
-    def __len__(self) -> int:
-        ...
-
-    def __getitem__(self, index: int) -> ItemT_co:
-        ...
-
-
-class BatchAxis(TypedDict, total=False):
-    """Configuration for batch axis settings."""
-
-    axis: int
-    stack_results: bool
-    preserve_batch_dim: bool
-
-
-class VMapConfig(TypedDict, total=False):
-    """Configuration for vmap operation."""
-
-    strict_batch_size: bool
-    check_batch_consistency: bool
-    error_on_empty_batch: bool
-    empty_batch_policy: str  # 'return_empty' | 'skip' | 'error'
-
-
-def _get_batch_size(
-    inputs: Mapping[str, object], in_axes: Union[int, Mapping[str, int]]
-) -> int:
-    """Determining the consistent batch size from a dictionary of inputs.
-
-    Analyzing the input dictionary and batch axis specification
-    to find the appropriate batch size. Checking that all
-    batched inputs have consistent sizes.
-
-    The function follows this logic:
-    1. If in_axes is an integer, checking all sequence inputs for batch size
-    2. If in_axes is a mapping, only checking keys specified in the mapping
-    3. Verifying batch sizes are consistent
-    4. Defaulting to 1 (single item) if no batched dimensions are found
+    Analyzing inputs to find batch dimensions based on the axis specification,
+    checking for consistency across batched inputs to ensure proper vectorization.
 
     Args:
-        inputs: Dictionary containing the input values, some of which may be batched.
-        in_axes: Specification of which inputs should be treated as batched and
-                along which axis. Can be either an integer (applied to all inputs)
-                or a dictionary mapping specific input keys to their batch axes.
+        inputs: Dictionary of input values, potentially containing batched data.
+        in_axes: Specification of which inputs should be treated as batched.
+            Can be an integer (applied to all inputs), a dictionary mapping
+            specific keys to their batch axes, or None (no batching).
 
     Returns:
-        The inferred batch size for processing. Returns 1 if no batched inputs
-        are found, indicating single-item processing.
+        The batch size derived from consistent batch dimensions.
 
     Raises:
-        ValueError: If inconsistent batch sizes are detected across different
-                  batched inputs, which would make vectorization impossible.
+        ValueError: If inconsistent batch sizes are detected across batched inputs.
     """
-    batch_sizes: List[int] = []
+    batch_sizes = []
+
+    # Case 1: Integer axis specification applies to all inputs
     if isinstance(in_axes, int):
-        for _, value in inputs.items():
-            if isinstance(value, (list, tuple)):
-                batch_sizes.append(len(value))
-    else:
         for key, value in inputs.items():
-            if key in in_axes and isinstance(value, (list, tuple)):
+            if isinstance(value, (list, tuple)) and value:
                 batch_sizes.append(len(value))
 
-    if batch_sizes:
-        unique_sizes = set(batch_sizes)
-        if len(unique_sizes) > 1:
-            raise ValueError(f"Inconsistent batch sizes detected: {batch_sizes}.")
-        return batch_sizes[0]
-    return 1
+    # Case 2: Dictionary axis specification for specific inputs
+    elif isinstance(in_axes, dict):
+        for key, value in inputs.items():
+            if key in in_axes and isinstance(value, (list, tuple)) and value:
+                batch_sizes.append(len(value))
+
+    # Case 3: No batch dimension specified, try to auto-detect
+    elif in_axes is None:
+        for key, value in inputs.items():
+            if isinstance(value, (list, tuple)) and value:
+                batch_sizes.append(len(value))
+
+    # Check for consistent batch sizes
+    if not batch_sizes:
+        return 1  # No batch dimensions found, treat as single item
+
+    unique_sizes = set(batch_sizes)
+    if len(unique_sizes) > 1:
+        raise ValueError(
+            f"Inconsistent batch sizes detected across inputs: {batch_sizes}. "
+            f"All batched inputs must have the same length."
+        )
+
+    return batch_sizes[0]
 
 
 def _prepare_batched_inputs(
-    inputs: Mapping[str, object],
-    in_axes: Union[int, Mapping[str, int]],
-    batch_size: int,
-) -> Dict[str, List[object]]:
-    """Restructures inputs for element-wise batch processing.
+    inputs: Mapping[str, Any], in_axes: AxisSpec, batch_size: int
+) -> List[Dict[str, Any]]:
+    """Restructuring inputs for element-wise batch processing.
 
-    This function transforms a dictionary of mixed batch and non-batch inputs
-    into a format where each key maps to a list with one value per batch element.
-    This enables processing each batch element independently with consistent inputs.
-
-    The transformation process follows these rules:
-    1. Batched inputs are split into individual elements
-    2. Non-batched (scalar) inputs are broadcast (replicated) across all batch elements
-    3. Empty sequence inputs are handled specially to maintain batch consistency
-    4. Validation ensures all batched inputs have the correct length
-
-    This preprocessing step is critical for enabling vectorized execution
-    while maintaining the semantics of the original operator.
+    Transforming mixed batch and non-batch inputs into a format where each batch element
+    has its own complete set of inputs, handling broadcasting of scalar values.
 
     Args:
         inputs: Original input dictionary with mixed batch and scalar values.
         in_axes: Specification of which inputs are batched and along which axis.
-        batch_size: The expected size for all batched inputs, as determined by
-                   the _get_batch_size function.
+        batch_size: Expected size for all batched inputs.
 
     Returns:
-        A restructured dictionary where every key maps to a list with exactly
-        batch_size elements, arranged for element-wise processing.
+        List of input dictionaries, one for each batch element.
 
     Raises:
-        ValueError: If any batched input doesn't match the expected batch_size,
-                   which would make consistent vectorization impossible.
+        ValueError: If a batched input doesn't match the expected batch size.
     """
-    result: Dict[str, List[object]] = {}
+    # Prepare element-wise input dictionaries
+    element_inputs: List[Dict[str, Any]] = [{} for _ in range(batch_size)]
+
     for key, value in inputs.items():
-        if isinstance(in_axes, dict) and key not in in_axes:
-            result[key] = [value] * batch_size
-            continue
+        is_batched = False
 
-        if not isinstance(value, (list, tuple)):
-            result[key] = [value] * batch_size
-            continue
+        # Determine if this input should be batched
+        if isinstance(in_axes, int) and isinstance(value, (list, tuple)):
+            is_batched = True
+        elif (
+            isinstance(in_axes, dict)
+            and key in in_axes
+            and isinstance(value, (list, tuple))
+        ):
+            is_batched = True
+        elif in_axes is None and isinstance(value, (list, tuple)):
+            is_batched = True
 
-        if len(value) == 0 and batch_size > 0:
-            result[key] = [cast(List[object], [])] * batch_size
-            continue
+        # Handle batched input
+        if is_batched and value:
+            if len(value) != batch_size:
+                raise ValueError(
+                    f"Input '{key}' has length {len(value)}, but batch size is {batch_size}."
+                )
 
-        value_list = list(value)
-        if len(value_list) != batch_size:
-            raise ValueError(
-                f"Input '{key}' has length {len(value_list)}, but batch size is {batch_size}."
-            )
-        result[key] = value_list
+            # Distribute batched values to each element's inputs
+            for i in range(batch_size):
+                element_inputs[i][key] = value[i]
 
-    return result
+        # Handle non-batched input (broadcast to all elements)
+        else:
+            for i in range(batch_size):
+                element_inputs[i][key] = value
+
+    return element_inputs
 
 
-def _combine_outputs(
-    results: Sequence[object], out_axes: Union[int, Mapping[str, int]] = 0
-) -> Dict[str, object]:
-    """Merges individual outputs from batch processing into a consolidated result.
+def _combine_outputs(results: Sequence[Any], out_axes: AxisSpec = 0) -> Dict[str, Any]:
+    """Combining individual outputs into a cohesive batched result.
 
-    This function is the inverse of _prepare_batched_inputs, taking the separate
-    outputs from each batch element and combining them into a cohesive batched result.
-    It handles both homogeneous outputs (all dictionaries with the same keys) and
-    heterogeneous outputs (mixed types).
-
-    The combination strategy adapts to the output structure:
-    1. If all batch outputs are dictionaries:
-       - Each key across all dictionaries is collected into a list
-       - Single-item lists are automatically unwrapped for cleaner results
-    2. If outputs are not all dictionaries:
-       - All results are collected into a list under the key "result"
-
-    This adaptability ensures that the vectorized operator maintains semantics
-    similar to the original, just with batched inputs and outputs.
+    Merging outputs from individual batch elements into a single result structure
+    that preserves the semantics of the original function while supporting batching.
 
     Args:
-        results: Sequence of individual outputs from processing each batch element.
-        out_axes: Specification of how outputs should be combined. Currently used
-                 for interface consistency; future versions may implement more
-                 sophisticated output restructuring based on this parameter.
+        results: Sequence of individual outputs from batch element processing.
+        out_axes: Configuration for how outputs should be combined along dimensions.
 
     Returns:
-        A dictionary containing the combined results. The structure depends on
-        the input results but is guaranteed to preserve all output information
-        in a batched format.
+        Combined output dictionary with batched results.
     """
     if not results:
         return {}
 
-    # Combining results if all are mappings (dictionaries), by key
+    # Case 1: All results are dictionaries - combine by key
     if all(isinstance(r, Mapping) for r in results):
-        combined: Dict[str, object] = {}
-        first_result = cast(Mapping[str, object], results[0])
+        # Get all unique keys across all result dictionaries
+        all_keys = set()
+        for result in results:
+            all_keys.update(result.keys())
 
-        for key in first_result.keys():
-            values: List[object] = []
+        # Combine values for each key
+        combined: Dict[str, Any] = {}
+        for key in all_keys:
+            # Collect values for this key from all results
+            values = []
             for result in results:
-                result_dict = cast(Mapping[str, object], result)
-                if key in result_dict:
-                    value = result_dict[key]
-                    # Unwrap single-item lists
+                # Handle missing keys and unwrap single-item lists
+                if key in result:
+                    value = result[key]
                     if isinstance(value, list) and len(value) == 1:
                         values.append(value[0])
                     else:
                         values.append(value)
+
+            # Store combined values
             combined[key] = values
+
         return combined
 
-    # Otherwise, returning all results under the "result" key
+    # Case 2: Results are not all dictionaries - use standard result key
     return {"result": list(results)}
 
 
 def vmap(
-    operator_or_fn: Union[
-        Operator, Callable[[Mapping[str, object]], Mapping[str, object]]
-    ],
-    in_axes: Union[int, Dict[str, int]] = 0,
-    out_axes: Union[int, Dict[str, int]] = 0,
-) -> Callable[[Mapping[str, object]], Dict[str, object]]:
-    """Transforming a single-item operator/function into a vectorized batch processor.
-
-    Converting functions from processing individual items to handling batches. Applying
-    the wrapped function to each batch element and then combining the results. The
-    transformation maintains the original operator's semantics while adding
-    batch processing capabilities.
-
-    Handling several scenarios:
-    - Mixed batch and non-batch inputs (broadcasting scalars across the batch)
-    - Heterogeneous output structures
-    - Result merging with type preservation
-    - Edge cases (empty batches, single-item batches)
-
+    fn: Callable[..., T], *, in_axes: AxisSpec = 0, out_axes: AxisSpec = 0
+) -> Callable[..., Dict[str, Any]]:
+    """Vectorizing a function across its inputs.
+    
+    Transforms a function that operates on single elements into one that efficiently
+    processes multiple inputs in parallel. This transformation preserves the original
+    function's semantics while automatically handling batch processing capabilities, similar
+    to JAX's vmap but adapted for Ember's dictionary-based operators.
+    
+    The vectorization process automatically:
+    1. Identifies batched and non-batched inputs based on the in_axes specification
+    2. Computes a consistent batch size across all inputs
+    3. Creates per-element input dictionaries with appropriate values
+    4. Applies the original function to each element individually
+    5. Combines the results into a properly structured batched output
+    
     Args:
-        operator_or_fn: The target operator or function to vectorize. Can be either an
-                      Operator instance or a callable with the same signature.
-        in_axes: Specification of batch dimensions for inputs. Can be either:
-               - An integer (default 0) indicating the batch axis for all inputs
-               - A dictionary mapping specific input keys to their batch axes
-               Keys not specified in the dictionary are treated as non-batch (scalar) inputs.
-        out_axes: Specification of batch dimensions for outputs. Structure matches in_axes.
-                Default is 0, combining outputs along the first dimension.
-
+        fn: The function to vectorize. Should accept a dictionary of inputs with the
+            'inputs' keyword and return a dictionary.
+        in_axes: Specification of which inputs are batched and on which axis.
+            If an integer, applies to all inputs. If a dict, specifies axes
+            for specific keys. Keys not specified are treated as non-batch inputs
+            and will be broadcast to all elements.
+        out_axes: Configuration for how outputs should be combined along dimensions.
+            Currently used primarily to ensure API consistency with other transforms.
+    
     Returns:
-        A vectorized callable with the same signature as the input, but which processes
-        batched inputs and returns batched outputs.
-
+        A vectorized version of the input function that handles batched inputs
+        and produces batched outputs, preserving the original function's semantics.
+    
+    Raises:
+        ValueError: If inconsistent batch sizes are detected across inputs.
+    
     Example:
         ```python
-        # Creating a single-item operator
-        class Translator(Operator):
-            def __call__(self, *, inputs):
-                return {"translated": translate(inputs["text"])}
-
+        def process_item(*, inputs):
+            return {"processed": transform(inputs["data"])}
+            
         # Creating vectorized version
-        batch_translator = vmap(Translator())
-
-        # Processing a batch of texts in a single call
-        results = batch_translator(inputs={
-            "text": ["Hello", "World", "Example"],
-            "target_language": "Spanish",  # Non-batch parameter, applied to all items
-            "options": {"format": "json"}  # Complex non-batch parameter
-        })
-        # results == {"translated": ["Hola", "Mundo", "Ejemplo"]}
-
-        # Using with dictionary outputs
-        def process_item(item):
-            return {
-                "id": item["id"],
-                "processed": transform(item["data"]),
-                "timestamp": get_timestamp()
-            }
-
-        # Creating vectorized function
         batch_process = vmap(process_item)
-
-        # Processing multiple items with heterogeneous outputs
-        results = batch_process(inputs={
-            "id": [1, 2, 3],
-            "data": ["a", "b", "c"]
+        
+        # Processing multiple items at once
+        results = batch_process(inputs={"data": ["item1", "item2", "item3"]})
+        # results == {"processed": ["transformed_item1", "transformed_item2", "transformed_item3"]}
+        
+        # Using a specific in_axes specification
+        selective_batch = vmap(process_item, in_axes={"data": 0, "config": None})
+        results = selective_batch(inputs={
+            "data": ["item1", "item2", "item3"],
+            "config": {"param": "value"}  # Will be broadcast to all elements
         })
-        # results == {
-        #    "id": [1, 2, 3],
-        #    "processed": ["TRANSFORMED_A", "TRANSFORMED_B", "TRANSFORMED_C"],
-        #    "timestamp": [t1, t2, t3]
-        # }
         ```
     """
 
-    # Type-specialized execution function to handle different callables
-    def _execute_vectorized_op(
-        fn: Callable[..., object], *, inputs: Mapping[str, object]
-    ) -> Dict[str, object]:
-        """Execute the operator/function in a batched manner.
+    @functools.wraps(fn)
+    def vectorized_func(*, inputs: Mapping[str, Any]) -> Dict[str, Any]:
+        """Vectorized version of the original function.
 
-        Prepares the inputs for batch processing, applies the operator/function to each batch element,
-        and then combines the outputs.
+        Applying the original function to each batch element independently
+        and combining the results into a batched output.
 
         Args:
-            fn: The operator or function to be executed.
-            inputs: Input dictionary for batched processing.
+            inputs: Batch inputs to process.
 
         Returns:
-            The combined batched outputs.
+            Batched outputs with results for each input element.
+
+        Raises:
+            ValueError: If inconsistent batch sizes are detected.
         """
-        batch_size: int = _get_batch_size(inputs=inputs, in_axes=in_axes)
+        # Handle empty input case
+        if not inputs:
+            return fn(inputs=inputs)  # Let the function handle empty inputs
 
-        # Handling empty prompt batch case
-        if "prompts" not in inputs or (
-            isinstance(inputs.get("prompts"), (list, tuple))
-            and not inputs.get("prompts")
-        ):
-            return {"results": []}
+        # Handle empty batched inputs case
+        if any(isinstance(v, (list, tuple)) and not v for v in inputs.values()):
+            # Delegate to the function to handle correctly
+            return fn(inputs=inputs)
 
-        batched_inputs = _prepare_batched_inputs(
+        # Determine batch size from inputs and axes specification
+        batch_size = _get_batch_size(inputs=inputs, in_axes=in_axes)
+
+        # Handle non-batched case (single item)
+        if batch_size == 1:
+            # For non-batched inputs, just call the original function
+            return fn(inputs=inputs)
+
+        # Prepare inputs for each batch element
+        element_inputs = _prepare_batched_inputs(
             inputs=inputs, in_axes=in_axes, batch_size=batch_size
         )
 
-        batch_results: List[object] = []
-        for i in range(batch_size):
-            # Creating a single batch element input
-            batch_element = {key: value[i] for key, value in batched_inputs.items()}
+        # Process each batch element
+        results = []
+        for batch_element in element_inputs:
+            element_result = fn(inputs=batch_element)
+            results.append(element_result)
 
-            # Processing the individual batch element - handling both calling styles
-            if isinstance(fn, Operator):
-                item_result = fn(inputs=batch_element)
-            else:
-                # For regular functions, follow their expected calling convention
-                item_result = fn(inputs=batch_element)
+        # Combine results from all batch elements
+        return _combine_outputs(results=results, out_axes=out_axes)
 
-            batch_results.append(item_result)
+    # Preserving metadata for introspection
+    # Handle both functions and operator objects
+    if hasattr(fn, "__name__"):
+        vectorized_func.__name__ = f"vectorized_{fn.__name__}"
+    else:
+        # For operator objects, use class name
+        vectorized_func.__name__ = f"vectorized_{fn.__class__.__name__}"
+        
+    if hasattr(fn, "__doc__") and fn.__doc__:
+        vectorized_func.__doc__ = f"Vectorized version of: {fn.__doc__}"
 
-        return _combine_outputs(results=batch_results, out_axes=out_axes)
+    # Adding reference back to original function
+    setattr(vectorized_func, "_original_func", fn)
 
-    # Creating a generic vectorized callable type - works for both operator and function case
-    VectorizedCallable = Callable[[Mapping[str, object]], Dict[str, object]]
-
-    # Handling Operator case
-    if isinstance(operator_or_fn, Operator):
-        # Creating the wrapper function with the correct signature
-        def vectorized_operator(*, inputs: Mapping[str, object]) -> Dict[str, object]:
-            return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
-
-        # Preserving the name and docstring
-        vectorized_operator.__name__ = f"vectorized_{operator_or_fn.__class__.__name__}"
-        vectorized_operator.__doc__ = operator_or_fn.__doc__
-
-        # Attaching the vectorized version to the operator for reference
-        setattr(operator_or_fn, "vectorized", vectorized_operator)
-        return cast(VectorizedCallable, vectorized_operator)
-
-    # Handling plain function case
-    # Creating the wrapper function with the correct signature
-    def vectorized_fn(*, inputs: Mapping[str, object]) -> Dict[str, object]:
-        return _execute_vectorized_op(fn=operator_or_fn, inputs=inputs)
-
-    # Preserving the name and docstring
-    if hasattr(operator_or_fn, "__name__"):
-        vectorized_fn.__name__ = f"vectorized_{operator_or_fn.__name__}"
-    if hasattr(operator_or_fn, "__doc__") and operator_or_fn.__doc__:
-        vectorized_fn.__doc__ = operator_or_fn.__doc__
-
-    return cast(VectorizedCallable, vectorized_fn)
+    return vectorized_func
