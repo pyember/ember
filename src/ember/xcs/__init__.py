@@ -456,6 +456,7 @@ in_test_env = (
 # Import utils module
 try:
     from . import utils
+
     import_results["utils"] = True
 except ImportError as e:
     import_results["utils"] = str(e)

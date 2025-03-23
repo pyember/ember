@@ -20,7 +20,7 @@ from .structured_logging import (
 __all__ = [
     "LoggingConfig",
     "clear_context",
-    "configure_logging", 
+    "configure_logging",
     "enrich_exception",
     "get_context_value",
     "get_structured_logger",
