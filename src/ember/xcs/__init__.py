@@ -51,6 +51,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Mapping,
     Optional,
     Protocol,
     Tuple,
@@ -639,79 +640,142 @@ def structural_jit(
         return decorator
 
 
-# Vectorized mapping
-def vmap(func: Callable[..., T]) -> Callable[..., List[T]]:
-    """Vectorized mapping transformation.
+# Type alias for axis specification (matching vmap.py)
+AxisSpec = Union[int, Dict[str, int], None]
 
-    Transforms a function that operates on single elements into one that
-    operates on vectors (lists) of elements in a vectorized manner.
+
+# Vectorized mapping
+def vmap(
+    fn: Callable[..., T], *, in_axes: AxisSpec = 0, out_axes: AxisSpec = 0
+) -> Callable[..., Dict[str, Any]]:
+    """Vectorizing a function across its inputs.
+
+    Transforming a function that operates on single elements into one
+    that efficiently processes multiple inputs in parallel. The transformation preserves
+    the original function's semantics while enabling batch processing capabilities.
 
     Args:
-        func: The function to transform
+        fn: The function to vectorize. Should accept and return dictionaries.
+        in_axes: Specification of which inputs are batched and on which axis.
+            If an integer, applies to all inputs. If a dict, specifies axes
+            for specific keys. Keys not specified are treated as non-batch inputs.
+        out_axes: Configuration for how outputs should be combined along dimensions.
+            Currently used to ensure API consistency with other transforms.
 
     Returns:
-        A function that applies the original function to each element of input vectors
+        A vectorized version of the input function that handles batched inputs
+        and produces batched outputs.
 
     Example:
         ```python
-        def add_one(x: int) -> int:
-            return x + 1
+        def process_item(*, inputs):
+            return {"processed": transform(inputs["data"])}
 
-        batch_add_one = vmap(add_one)
-        results = batch_add_one([1, 2, 3])  # [2, 3, 4]
+        # Creating vectorized version
+        batch_process = vmap(process_item)
+
+        # Processing multiple items at once
+        results = batch_process(inputs={"data": ["item1", "item2", "item3"]})
+        # results == {"processed": ["transformed_item1", "transformed_item2", "transformed_item3"]}
         ```
     """
-    return _vmap(func)
+    return _vmap(fn, in_axes=in_axes, out_axes=out_axes)
 
 
 # Parallel mapping
-def pmap(func: Callable[..., T]) -> Callable[..., List[T]]:
-    """Parallel mapping transformation.
+def pmap(
+    func: Callable[[Mapping[str, Any]], Dict[str, Any]],
+    num_workers: Optional[int] = None,
+    devices: Optional[List[str]] = None,
+    sharding_options: Optional["ShardingOptions"] = None,
+    execution_options: Optional["ExecutionOptions"] = None,
+) -> Callable[[Mapping[str, Any]], Dict[str, Any]]:
+    """Parallelizing a function for concurrent execution.
 
-    Transforms a function that operates on single elements into one that
-    operates on vectors (lists) of elements in parallel.
+    Transforms a function to execute across multiple workers in parallel,
+    automatically distributing work and collecting results. This enables
+    efficient utilization of system resources for computation-intensive tasks.
 
     Args:
-        func: The function to transform
+        func: The function to parallelize, accepting a dictionary of inputs
+              and returning a dictionary of outputs
+        num_workers: Number of worker threads to use (defaults to system-based value)
+        devices: Optional list of device identifiers for specialized hardware
+        sharding_options: Configuration for input distribution behavior
+        execution_options: Configuration for parallel execution behavior
 
     Returns:
-        A function that applies the original function to each element of input vectors in parallel
+        A parallelized version of the function that automatically distributes
+        work across workers and aggregates results
 
     Example:
         ```python
-        def process_item(x: dict) -> dict:
-            # Some expensive processing
-            return processed_x
+        def process_item(*, inputs):
+            # Potentially expensive processing
+            return {"processed": transform(inputs["data"])}
 
-        parallel_processor = pmap(process_item)
-        results = parallel_processor(items)
+        # Create parallelized version with 4 workers
+        parallel_process = pmap(process_item, num_workers=4)
+
+        # Process multiple items concurrently
+        results = parallel_process(inputs={"data": ["item1", "item2", "item3", "item4"]})
         ```
     """
-    return _pmap(func)
+    return _pmap(
+        func,
+        num_workers=num_workers,
+        devices=devices,
+        sharding_options=sharding_options,
+        execution_options=execution_options,
+    )
 
 
 # Mesh sharding for distributed execution
-def mesh_sharded(func: Callable[..., T]) -> Callable[..., T]:
-    """Mesh sharding transformation.
+def mesh_sharded(
+    operator_or_fn: Union[Any, Callable[..., Any]],
+    mesh: Optional["DeviceMesh"] = None,
+    in_partition: Optional[Dict[str, "PartitionSpec"]] = None,
+    out_partition: Optional[Dict[str, "PartitionSpec"]] = None,
+) -> Callable[..., Any]:
+    """Transforms an operator or function to execute in a sharded manner across a device mesh.
 
-    Transforms a function to execute in a distributed mesh environment,
-    sharding computations across available resources.
+    This decorator partitions inputs and aggregates outputs to enable distributed execution
+    of the provided operator or function across a logical grid of devices.
 
     Args:
-        func: The function to transform
+        operator_or_fn: The operator instance or callable to be sharded
+        mesh: The device mesh defining available devices
+        in_partition: Mapping from input keys to PartitionSpec objects
+        out_partition: Mapping from output keys to PartitionSpec objects
 
     Returns:
-        A function that executes the original function in a distributed manner
+        A callable that executes the original operator/function in a distributed, sharded fashion
 
     Example:
         ```python
-        @mesh_sharded
-        def large_matrix_operation(matrix: np.ndarray) -> np.ndarray:
-            # Operation on a large matrix
-            return result
+        # Create a 2D mesh of devices
+        mesh = DeviceMesh(shape=(2, 2))
+
+        # Define input partitioning: shard 'prompts' along the first mesh dimension
+        partition = {"prompts": PartitionSpec(0, None)}
+
+        # Transform the operator to execute in a sharded manner
+        sharded_op = mesh_sharded(my_operator, mesh, in_partition=partition)
+
+        # Execute with automatic sharding
+        results = sharded_op(inputs={"prompts": ["Hello", "Hi", "Hey", "Howdy"]})
         ```
     """
-    return _mesh_sharded(func)
+    if mesh is None:
+        # Default to a simple mesh if none provided
+        mesh = DeviceMesh()
+
+    return _mesh_sharded(
+        operator_or_fn,
+        mesh=mesh,
+        in_partition=in_partition,
+        out_partition=out_partition,
+    )
 
 
 # Graph execution

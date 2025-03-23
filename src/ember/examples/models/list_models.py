@@ -6,13 +6,6 @@ and retrieve model information.
 
 To run:
     uv run python src/ember/examples/models/list_models.py
-
-    # Or if in an activated virtual environment
-    python src/ember/examples/models/list_models.py
-
-Required environment variables:
-    OPENAI_API_KEY (optional): Your OpenAI API key for discovering OpenAI models
-    ANTHROPIC_API_KEY (optional): Your Anthropic API key for discovering Anthropic models
 """
 
 import logging

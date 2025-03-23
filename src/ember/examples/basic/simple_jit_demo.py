@@ -12,7 +12,7 @@ Key concepts demonstrated:
 4. Latency improvements through execution strategy optimization
 
 Example usage:
-    python -m ember.examples.basic.simple_jit_demo
+    uv run python -m ember.examples.basic.simple_jit_demo
 """
 
 import logging
