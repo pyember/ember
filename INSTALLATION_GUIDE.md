@@ -34,7 +34,6 @@ This guide provides detailed instructions for installing Ember in different envi
    uv pip install ember-ai
    
    # Run examples without activating an environment
-   uv run python -c "import ember; print(ember.__version__)"
    ```
 
 3. **Install from source**:

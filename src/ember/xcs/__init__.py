@@ -453,6 +453,13 @@ in_test_env = (
     )  # any test runner
 )
 
+# Import utils module
+try:
+    from . import utils
+    import_results["utils"] = True
+except ImportError as e:
+    import_results["utils"] = str(e)
+
 # Only print import results when explicitly requested
 if os.environ.get("XCS_IMPORT_TEST") == "1":
     print("Import results:", import_results)
@@ -765,6 +772,7 @@ __all__ = [
     "JITOptions",
     "TransformOptions",
     "ExecutionResult",
+    "utils",
 ]
 
 # Export version information if available
