@@ -21,6 +21,12 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar
 
+from ember.core.exceptions import (
+    ParallelExecutionError,
+    TransformError,
+    ValidationError,
+)
+
 logger = logging.getLogger(__name__)
 
 # Type variables for generic typing
@@ -30,16 +36,7 @@ InputT = TypeVar("InputT", bound=Mapping[str, Any])
 OutputT = TypeVar("OutputT", bound=Mapping[str, Any])
 
 
-class ParallelizationError(Exception):
-    """Base exception for errors in parallel execution functionality."""
-
-
-class ShardingError(ParallelizationError):
-    """Exception raised when input data cannot be properly sharded."""
-
-
-class ExecutionError(ParallelizationError):
-    """Exception raised when parallel execution encounters problems."""
+# Legacy exceptions - using new hierarchy from ember.core.exceptions
 
 
 @dataclass
@@ -69,15 +66,20 @@ class ShardingOptions:
         """
         valid_strategies = {"even", "greedy", "dynamic"}
         if self.strategy not in valid_strategies:
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid sharding strategy '{self.strategy}'. "
-                f"Must be one of: {', '.join(valid_strategies)}"
+                f"Must be one of: {', '.join(valid_strategies)}",
+                context={
+                    "strategy": self.strategy,
+                    "valid_strategies": list(valid_strategies),
+                },
             )
 
         if self.max_shard_size < 0:
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid max_shard_size: {self.max_shard_size}. "
-                "Must be >= 0 (0 means no limit)"
+                "Must be >= 0 (0 means no limit)",
+                context={"max_shard_size": self.max_shard_size},
             )
 
 
@@ -107,15 +109,17 @@ class ExecutionOptions:
             ValueError: If any options have invalid values
         """
         if self.max_workers is not None and self.max_workers <= 0:
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid max_workers: {self.max_workers}. "
-                "Must be > 0 or None for automatic selection"
+                "Must be > 0 or None for automatic selection",
+                context={"max_workers": self.max_workers},
             )
 
         if self.timeout is not None and self.timeout <= 0:
-            raise ValueError(
+            raise ValidationError(
                 f"Invalid timeout: {self.timeout}. "
-                "Must be > 0 or None for no timeout"
+                "Must be > 0 or None for no timeout",
+                context={"timeout": self.timeout},
             )
 
 
@@ -195,10 +199,16 @@ def _validate_shard_inputs(
         ValueError: If inputs or options are invalid
     """
     if not isinstance(inputs, Mapping):
-        raise ValueError("Inputs must be a mapping (dictionary-like object)")
+        raise ValidationError(
+            "Inputs must be a mapping (dictionary-like object)",
+            context={"input_type": type(inputs).__name__},
+        )
 
     if num_shards <= 0:
-        raise ValueError(f"Number of shards must be positive, got {num_shards}")
+        raise ValidationError(
+            f"Number of shards must be positive, got {num_shards}",
+            context={"num_shards": num_shards},
+        )
 
 
 def _check_batch_size_consistency(
@@ -227,10 +237,13 @@ def _check_batch_size_consistency(
             if is_shardable and size > 0
         ]
         if len(set(shardable_info[k][1] for k in primary_keys)) > 1:
-            raise ShardingError(
-                "Inconsistent batch sizes detected across shardable inputs. "
+            sizes_dict = {k: shardable_info[k][1] for k in primary_keys}
+            raise TransformError.for_transform(
+                transform_name="pmap",
+                message="Inconsistent batch sizes detected across shardable inputs. "
                 f"Sizes: {', '.join(f'{k}={shardable_info[k][1]}' for k in primary_keys)}. "
-                "Set strict_batch_size=False in ShardingOptions to allow different sizes."
+                "Set strict_batch_size=False in ShardingOptions to allow different sizes.",
+                details={"shardable_sizes": sizes_dict},
             )
 
 
@@ -334,6 +347,7 @@ def _create_even_shards(
 @dataclass
 class ShardingProcessingInfo:
     """Information used during sharding process."""
+
     key_len: int
     item_idx: int
     shard_size: int
@@ -355,14 +369,14 @@ def _process_key_for_greedy_shard(
     """
     if not isinstance(inputs[key], (list, tuple)) or not inputs[key]:
         return inputs[key]
-    
+
     key_len = len(inputs[key])
-    
+
     if key_len <= info.min_size:
         # For shorter lists, use the same indices directly
         end_idx = min(info.item_idx + info.shard_size, key_len)
-        return inputs[key][info.item_idx:end_idx]
-    
+        return inputs[key][info.item_idx : end_idx]
+
     # For longer lists, scale the indices proportionally
     scale = key_len / info.min_size
     key_start = min(key_len - 1, int(info.item_idx * scale))
@@ -398,7 +412,7 @@ def _create_greedy_shards(
     while item_idx < min_size and shard_idx < actual_shards:
         shard = dict(inputs)
         shard_size = min(max_items, min_size - item_idx)
-        
+
         # Information for processing keys
         info = ShardingProcessingInfo(
             key_len=0, item_idx=item_idx, shard_size=shard_size, min_size=min_size
@@ -411,7 +425,7 @@ def _create_greedy_shards(
         shards[shard_idx] = shard
         item_idx += shard_size
         shard_idx += 1
-        
+
     return shards[:shard_idx]  # Only return non-empty shards
 
 
@@ -436,6 +450,7 @@ def _handle_non_shardable_inputs(
 @dataclass
 class ShardingContext:
     """Context data for sharding operations."""
+
     inputs: Mapping[str, Any]
     num_shards: int
     min_size: int
@@ -555,7 +570,7 @@ def _shard_inputs(
         min_size=min_size,
         shardable_keys=shardable_keys,
         options=options,
-        test_mode=test_mode
+        test_mode=test_mode,
     )
 
     # Determine sharding strategy and prepare arguments
@@ -646,11 +661,17 @@ def _validate_and_prepare_pmap_args(
     """
     # Validate callable
     if not callable(func):
-        raise ValueError(f"Expected a callable function, got {type(func)}")
+        raise ValidationError(
+            f"Expected a callable function, got {type(func)}",
+            context={"function_type": str(type(func))},
+        )
 
     # Handle negative workers as an error
     if num_workers is not None and num_workers < 0:
-        raise ValueError(f"num_workers must be non-negative, got {num_workers}")
+        raise ValidationError(
+            f"num_workers must be non-negative, got {num_workers}",
+            context={"num_workers": num_workers},
+        )
 
     # Handle zero workers as a special case - treat as None (use system default)
     if num_workers == 0:
@@ -676,16 +697,16 @@ def _create_parallelized_func(
     func: Callable[[Mapping[str, Any]], Dict[str, Any]],
     resolved_workers: int,
     sharding_options: ShardingOptions,
-    execution_options: ExecutionOptions
+    execution_options: ExecutionOptions,
 ) -> Callable[[Mapping[str, Any]], Dict[str, Any]]:
     """Create the actual parallelized function implementation.
-    
+
     Args:
         func: The function to parallelize
         resolved_workers: Resolved number of workers
         sharding_options: Validated sharding options
         execution_options: Validated execution options
-        
+
     Returns:
         The parallelized function
     """
@@ -702,19 +723,19 @@ def pmap(
     execution_options: Optional[ExecutionOptions] = None,
 ) -> Callable[[Mapping[str, Any]], Dict[str, Any]]:
     """Parallelizing a function for concurrent execution.
-    
+
     Transforms a function to execute across multiple workers in parallel,
     automatically distributing work and collecting results. This transformation enables
     efficient utilization of system resources for computation-intensive tasks by
     identifying batch dimensions in inputs and distributing them across workers.
-    
+
     The parallelization process:
     1. Analyzes input data structures to identify batchable dimensions
     2. Automatically shards inputs across available workers based on configuration
     3. Executes the original function concurrently on each shard
     4. Handles failures gracefully based on execution options
     5. Aggregates results from all workers into a consistent output structure
-    
+
     Args:
         func: The function to parallelize, accepting a dictionary of inputs with the
             'inputs' keyword and returning a dictionary of outputs.
@@ -726,30 +747,30 @@ def pmap(
             how inputs are split across workers. See ShardingOptions class for details.
         execution_options: Configuration for parallel execution behavior, including
             timeout handling and error recovery. See ExecutionOptions class for details.
-    
+
     Returns:
         A parallelized version of the function that automatically distributes
         work across workers and aggregates results, preserving the semantics of
         the original function.
-    
+
     Raises:
         ValueError: If any parameters are invalid
         ShardingError: If input data cannot be sharded properly
         ExecutionError: If parallel execution encounters unrecoverable problems
-    
+
     Example:
         ```python
         def process_item(*, inputs):
             # Potentially expensive processing
             return {"processed": transform(inputs["data"])}
-            
+
         # Create parallelized version with 4 workers
         parallel_process = pmap(process_item, num_workers=4)
-            
+
         # Process multiple items concurrently
         results = parallel_process(inputs={"data": ["item1", "item2", "item3", "item4"]})
         # results == {"processed": ["transformed_item1", "transformed_item2", "transformed_item3", "transformed_item4"]}
-            
+
         # With custom execution options for fault tolerance
         options = ExecutionOptions(continue_on_errors=True, timeout=60.0)
         robust_process = pmap(process_item, execution_options=options)
@@ -757,10 +778,17 @@ def pmap(
     """
     # If devices parameter is used, log that it's currently not functional
     if devices is not None:
-        logger.debug("The 'devices' parameter is currently unused but kept for API compatibility")
+        logger.debug(
+            "The 'devices' parameter is currently unused but kept for API compatibility"
+        )
 
     # Validate and prepare all arguments
-    func, resolved_workers, sharding_options, execution_options = _validate_and_prepare_pmap_args(
+    (
+        func,
+        resolved_workers,
+        sharding_options,
+        execution_options,
+    ) = _validate_and_prepare_pmap_args(
         func, num_workers, sharding_options, execution_options
     )
 
@@ -778,13 +806,13 @@ def pmap(
             ExecutionError: If continue_on_errors is False
         """
         if execution_options.continue_on_errors:
-            logger.warning(
-                "%s processing shard %d: %s", error_type, shard_index, exc
-            )
+            logger.warning("%s processing shard %d: %s", error_type, shard_index, exc)
         else:
-            raise ExecutionError(
-                f"{error_type} processing shard {shard_index}"
-            ) from exc
+            raise ParallelExecutionError.for_worker(
+                worker_id=f"shard-{shard_index}",
+                message=f"{error_type} processing shard {shard_index}",
+                cause=exc,
+            )
 
     def _process_future_result(
         future: Any, shard_index: int, results: List, errors: List
@@ -867,17 +895,25 @@ def pmap(
                 )
                 if len(errors) > 3:
                     error_details += f" and {len(errors) - 3} more errors"
-                raise ExecutionError(f"All shards failed processing: {error_details}")
+                raise ParallelExecutionError(
+                    message=f"All shards failed processing: {error_details}",
+                    context={
+                        "error_count": len(errors),
+                        "error_sample": str(errors[:3]),
+                    },
+                )
 
             # Combine and return results
             return _combine_results(results)
 
-        except ShardingError:
-            # Re-raise sharding errors
+        except TransformError:
+            # Re-raise transform errors directly
             raise
         except Exception as exc:
             # Wrap other exceptions
-            raise ExecutionError("Error during parallel execution") from exc
+            raise ParallelExecutionError(
+                message="Error during parallel execution", cause=exc
+            )
 
     # Preserve metadata for introspection
     try:
@@ -929,18 +965,20 @@ def pjit(
     devices: Optional[List[str]] = None,  # Unused, but kept for API compatibility
     sharding_options: Optional[ShardingOptions] = None,
     execution_options: Optional[ExecutionOptions] = None,
-    static_argnums: Optional[List[int]] = None,  # Reserved for future JIT implementation
+    static_argnums: Optional[
+        List[int]
+    ] = None,  # Reserved for future JIT implementation
 ) -> Callable[[Mapping[str, Any]], Dict[str, Any]]:
     """Parallel JIT compilation and execution for functions.
-    
+
     Combines JIT compilation with parallel execution for maximum performance.
     This transformation optimizes a function's execution plan and runs it
     concurrently across multiple workers, providing both the benefits of
     just-in-time compilation and parallel processing.
-    
+
     Note: Currently implemented as a direct wrapper for pmap. Future versions
     will integrate with XCS JIT compilation for additional optimization.
-    
+
     Args:
         func: The function to optimize and parallelize, accepting a dictionary
             of inputs with the 'inputs' keyword and returning a dictionary.
@@ -954,25 +992,25 @@ def pjit(
             timeout handling and error recovery. See ExecutionOptions class for details.
         static_argnums: Optional list of argument indices to treat as static during
             compilation (not used in current implementation, reserved for future use).
-    
+
     Returns:
         An optimized, parallelized version of the function that combines the benefits
         of JIT compilation and parallel execution.
-    
+
     Raises:
         ValueError: If any parameters are invalid
         ShardingError: If input data cannot be sharded properly
         ExecutionError: If parallel execution encounters unrecoverable problems
-    
+
     Example:
         ```python
         def process_item(*, inputs):
             # Potentially expensive processing with complex calculations
             return {"processed": complex_transform(inputs["data"])}
-            
+
         # Create optimized parallel version
         optimized_process = pjit(process_item, num_workers=4)
-            
+
         # Process batch of items with maximum performance
         results = optimized_process(inputs={"data": ["item1", "item2", "item3", "item4"]})
         ```
@@ -993,9 +1031,7 @@ def pjit(
         )
 
     if options.devices is not None:
-        logger.debug(
-            "devices parameter is not used in the current pjit implementation"
-        )
+        logger.debug("devices parameter is not used in the current pjit implementation")
 
     # Forward to pmap implementation
     return pmap(

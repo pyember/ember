@@ -27,6 +27,8 @@ from typing import (
     cast,
 )
 
+from ember.core.exceptions import TransformError
+
 logger = logging.getLogger(__name__)
 
 # Type variables for generic typing support
@@ -84,9 +86,11 @@ def _get_batch_size(inputs: Mapping[str, Any], in_axes: AxisSpec) -> int:
 
     unique_sizes = set(batch_sizes)
     if len(unique_sizes) > 1:
-        raise ValueError(
-            f"Inconsistent batch sizes detected across inputs: {batch_sizes}. "
-            f"All batched inputs must have the same length."
+        raise TransformError.for_transform(
+            transform_name="vmap",
+            message=f"Inconsistent batch sizes detected across inputs: {batch_sizes}. "
+            f"All batched inputs must have the same length.",
+            details={"batch_sizes": batch_sizes, "unique_sizes": list(unique_sizes)},
         )
 
     return batch_sizes[0]
@@ -132,8 +136,14 @@ def _prepare_batched_inputs(
         # Handle batched input
         if is_batched and value:
             if len(value) != batch_size:
-                raise ValueError(
-                    f"Input '{key}' has length {len(value)}, but batch size is {batch_size}."
+                raise TransformError.for_transform(
+                    transform_name="vmap",
+                    message=f"Input '{key}' has length {len(value)}, but batch size is {batch_size}.",
+                    details={
+                        "key": key,
+                        "actual_length": len(value),
+                        "batch_size": batch_size,
+                    },
                 )
 
             # Distribute batched values to each element's inputs
@@ -198,19 +208,19 @@ def vmap(
     fn: Callable[..., T], *, in_axes: AxisSpec = 0, out_axes: AxisSpec = 0
 ) -> Callable[..., Dict[str, Any]]:
     """Vectorizing a function across its inputs.
-    
+
     Transforms a function that operates on single elements into one that efficiently
     processes multiple inputs in parallel. This transformation preserves the original
     function's semantics while automatically handling batch processing capabilities, similar
     to JAX's vmap but adapted for Ember's dictionary-based operators.
-    
+
     The vectorization process automatically:
     1. Identifies batched and non-batched inputs based on the in_axes specification
     2. Computes a consistent batch size across all inputs
     3. Creates per-element input dictionaries with appropriate values
     4. Applies the original function to each element individually
     5. Combines the results into a properly structured batched output
-    
+
     Args:
         fn: The function to vectorize. Should accept a dictionary of inputs with the
             'inputs' keyword and return a dictionary.
@@ -220,26 +230,26 @@ def vmap(
             and will be broadcast to all elements.
         out_axes: Configuration for how outputs should be combined along dimensions.
             Currently used primarily to ensure API consistency with other transforms.
-    
+
     Returns:
         A vectorized version of the input function that handles batched inputs
         and produces batched outputs, preserving the original function's semantics.
-    
+
     Raises:
         ValueError: If inconsistent batch sizes are detected across inputs.
-    
+
     Example:
         ```python
         def process_item(*, inputs):
             return {"processed": transform(inputs["data"])}
-            
+
         # Creating vectorized version
         batch_process = vmap(process_item)
-        
+
         # Processing multiple items at once
         results = batch_process(inputs={"data": ["item1", "item2", "item3"]})
         # results == {"processed": ["transformed_item1", "transformed_item2", "transformed_item3"]}
-        
+
         # Using a specific in_axes specification
         selective_batch = vmap(process_item, in_axes={"data": 0, "config": None})
         results = selective_batch(inputs={
@@ -303,7 +313,7 @@ def vmap(
     else:
         # For operator objects, use class name
         vectorized_func.__name__ = f"vectorized_{fn.__class__.__name__}"
-        
+
     if hasattr(fn, "__doc__") and fn.__doc__:
         vectorized_func.__doc__ = f"Vectorized version of: {fn.__doc__}"
 
