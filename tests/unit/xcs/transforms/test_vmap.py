@@ -82,10 +82,12 @@ class TestVMapInternals:
         axes = {"prompts": 0, "other": 0}
         assert _get_batch_size(inputs, axes) == 2
 
-        # Case 4: Inconsistent batch sizes should raise ValueError
+        # Case 4: Inconsistent batch sizes should raise TransformError
         inputs = {"prompts": ["a", "b"], "other": ["x", "y", "z"]}
         axes = {"prompts": 0, "other": 0}
-        with pytest.raises(ValueError, match="Inconsistent batch sizes"):
+        from ember.core.exceptions import TransformError
+
+        with pytest.raises(TransformError, match="Inconsistent batch sizes"):
             _get_batch_size(inputs, axes)
 
         # Case 5: Empty list inputs
@@ -122,7 +124,7 @@ class TestVMapInternals:
         assert result[0]["config"] == {"mode": "test"}
         assert result[1]["config"] == {"mode": "test"}
 
-        # We don't test Case 4 (empty list) because our current implementation 
+        # We don't test Case 4 (empty list) because our current implementation
         # delegates empty list handling to the operator
 
     def test_combine_outputs(self):
@@ -400,12 +402,12 @@ class TestVMapProperties:
             # vmap delegates empty/special inputs to the base operator
             result = vectorized_op(inputs=inputs)
             expected = basic_operator(inputs=inputs)
-            
+
             # The core property we're testing: vmap's delegation behavior
             assert result == expected
-            assert "results" in result 
+            assert "results" in result
             assert isinstance(result["results"], list)
-            
+
             # Don't hardcode exact result values - this would make the test brittle
             # Instead, verify the actual operator behavior is preserved
 
@@ -574,7 +576,9 @@ class TestVMapEdgeCases:
         # Test with inconsistent lengths (should raise error)
         inconsistent_inputs = {"prompts": ["p1", "p2"], "contexts": ["c1", "c2", "c3"]}
 
-        with pytest.raises(ValueError, match="Inconsistent batch sizes"):
+        from ember.core.exceptions import TransformError
+
+        with pytest.raises(TransformError, match="Inconsistent batch sizes"):
             vectorized_fn(inputs=inconsistent_inputs)
 
 

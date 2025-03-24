@@ -83,6 +83,7 @@ from ember.core.registry.model.base.schemas.usage import UsageStats
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
+    ValidationError,
 )
 from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
@@ -315,10 +316,13 @@ class AnthropicChatParameters(BaseChatParameters):
             int: The validated token count.
 
         Raises:
-            ValueError: If the token count is less than 1.
+            ValidationError: If the token count is less than 1.
         """
         if value < 1:
-            raise ValueError(f"max_tokens must be >= 1, got {value}")
+            raise ValidationError(
+                message=f"max_tokens must be >= 1, got {value}",
+                context={"max_tokens": value, "min_allowed": 1},
+            )
         return value
 
     def to_anthropic_kwargs(self) -> Dict[str, Any]:

@@ -15,6 +15,9 @@ import logging
 import time
 from typing import Any, ClassVar, Dict, List, Optional
 
+# Use direct non import for ensemble
+from ember.core.non import UniformEnsemble
+
 # ember imports
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base.operator_base import Operator
@@ -27,9 +30,6 @@ from ember.xcs.engine.xcs_engine import (
 )
 from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.tracer.tracer_decorator import jit
-
-# Use direct non import for ensemble
-from ember.core.non import UniformEnsemble
 
 ###############################################################################
 # JIT-Decorated Ensemble Operators

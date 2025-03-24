@@ -13,9 +13,10 @@ from typing import Any, Dict, List
 
 import pytest
 
+from ember.core.registry.model.base.schemas.model_info import ModelInfo
+
 # Import correctly from ember packages
 from ember.core.registry.model.initialization import initialize_registry
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

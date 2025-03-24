@@ -89,8 +89,9 @@ def patch_genai() -> None:
 def test_deepmind_forward() -> None:
     """Test that GeminiModel.forward returns a valid ChatResponse."""
     # Fix the type checking issue by directly examining the response content
-    import sys
     import inspect
+    import sys
+
     from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 
     # Get the module where ChatResponse is defined

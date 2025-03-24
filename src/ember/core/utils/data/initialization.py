@@ -3,9 +3,7 @@ from typing import Dict, List, Type
 
 from ember.core.utils.data.base.models import DatasetInfo, TaskType
 from ember.core.utils.data.base.preppers import IDatasetPrepper
-from ember.core.utils.data.datasets_registry.commonsense_qa import (
-    CommonsenseQAPrepper,
-)
+from ember.core.utils.data.datasets_registry.commonsense_qa import CommonsenseQAPrepper
 from ember.core.utils.data.datasets_registry.halueval import HaluEvalPrepper
 from ember.core.utils.data.datasets_registry.mmlu import MMLUPrepper
 from ember.core.utils.data.datasets_registry.short_answer import ShortAnswerPrepper

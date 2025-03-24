@@ -163,8 +163,8 @@ class OpenAIDiscovery(BaseDiscoveryProvider):
             Dict[str, Any]: A dictionary containing the standardized model details.
         """
         return {
-            "model_id": model_id,
-            "model_name": model_data.get("id", ""),
+            "id": model_id,
+            "name": model_data.get("id", ""),
             "api_data": model_data,
         }
 

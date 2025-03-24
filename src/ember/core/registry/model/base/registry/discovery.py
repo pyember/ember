@@ -15,9 +15,7 @@ from ember.core.registry.model.providers.base_discovery import (
 from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
     DeepmindDiscovery,
 )
-from ember.core.registry.model.providers.openai.openai_discovery import (
-    OpenAIDiscovery,
-)
+from ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
 
 logger: logging.Logger = logging.getLogger(__name__)
 # Set default log level to WARNING to reduce verbosity

@@ -52,7 +52,7 @@ class MockDiscoveryProvider(BaseDiscoveryProvider):
             failure_msg: Message for the exception if should_fail is True
         """
         self.models = models or {
-            "mock:model": {"model_id": "mock:model", "model_name": "Mock Model"}
+            "mock:model": {"id": "mock:model", "name": "Mock Model"}
         }
         self.call_count = 0
         self.delay = delay
@@ -232,9 +232,7 @@ def test_discovery_service_merge_with_config() -> None:
     sys.modules["ember.core.registry.model.config.settings"] = mock_settings_module
 
     try:
-        discovered = {
-            "mock:model": {"model_id": "mock:model", "model_name": "Mock Model"}
-        }
+        discovered = {"mock:model": {"id": "mock:model", "name": "Mock Model"}}
 
         # Apply environment variable patches for API keys
         with patch.dict("os.environ", {"MOCK_API_KEY": "mock_key"}):

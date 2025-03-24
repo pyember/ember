@@ -1,8 +1,9 @@
 """
 Ember type system.
 
-This module provides the core type definitions for Ember, including protocols,
+Provides the core type definitions for Ember, including protocols, models,
 type variables, and utility types to ensure type safety throughout the codebase.
+This module centralizes and exports all type-related functionality.
 """
 
 from ember.core.types.config_types import (
@@ -11,7 +12,9 @@ from ember.core.types.config_types import (
     ModelConfigDict,
 )
 from ember.core.types.ember_model import EmberModel
-from ember.core.types.protocols import EmberSerializable, EmberTyped, TypeInfo
+from ember.core.types.protocols import EmberSerializable  # Legacy alias
+from ember.core.types.protocols import EmberTyped  # Legacy alias
+from ember.core.types.protocols import Serializable, TypedProtocol, TypeInfo
 from ember.core.types.type_check import (
     type_check,
     validate_instance_attrs,
@@ -38,10 +41,13 @@ from ember.core.types.xcs_types import (
 __all__ = [
     # Core model
     "EmberModel",
-    # Protocols
+    # Modern protocols
+    "TypedProtocol",
+    "Serializable",
+    "TypeInfo",
+    # Legacy protocol aliases
     "EmberTyped",
     "EmberSerializable",
-    "TypeInfo",
     # Type variables
     "T",
     "K",

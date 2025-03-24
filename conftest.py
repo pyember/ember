@@ -2,11 +2,12 @@
 Root conftest.py for pytest configuration
 """
 
-import pytest
-import sys
-import os
 import importlib
+import os
+import sys
 from pathlib import Path
+
+import pytest
 
 # Get absolute paths
 PROJECT_ROOT = Path(__file__).parent.absolute()
@@ -90,9 +91,9 @@ try:
 
     # Import the base registry module to fix test issues
     from src.ember.core.registry.model.base.registry import (
-        model_registry,
         discovery,
         factory,
+        model_registry,
     )
 
     sys.modules[
@@ -107,12 +108,13 @@ try:
     sys.modules["ember.plugin_system"] = plugin_system
 
     # Set up test provider classes for testing
-    from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
+    from typing import Any
+
     from src.ember.core.registry.model.base.schemas.chat_schemas import (
         ChatRequest,
         ChatResponse,
     )
-    from typing import Any
+    from src.ember.core.registry.model.providers.base_provider import BaseProviderModel
 
     # Create proper test providers
     class DummyServiceProvider(BaseProviderModel):
@@ -172,17 +174,17 @@ try:
     sys.modules["ember.core.registry.model.base.schemas.chat_schemas"] = chat_schemas
 
     # Import the services module to fix test issues
-    from src.ember.core.registry.model.base.services import usage_service, model_service
+    from src.ember.core.registry.model.base.services import model_service, usage_service
 
     sys.modules["ember.core.registry.model.base.services.usage_service"] = usage_service
     sys.modules["ember.core.registry.model.base.services.model_service"] = model_service
 
     # Import utilities module
     from src.ember.core.utils.data import (
-        registry,
-        metadata_registry,
         initialization,
         loader_factory,
+        metadata_registry,
+        registry,
     )
 
     sys.modules["ember.core.utils.data.registry"] = registry
@@ -192,7 +194,7 @@ try:
 
     # Import additional utility modules that are needed for tests
     try:
-        from src.ember.core.utils import retry_utils, embedding_utils, eval
+        from src.ember.core.utils import embedding_utils, eval, retry_utils
 
         sys.modules["ember.core.utils.retry_utils"] = retry_utils
         sys.modules["ember.core.utils.embedding_utils"] = embedding_utils
@@ -206,7 +208,7 @@ try:
         print(f"Warning: Could not import utility modules: {e}")
 
     # Import the base models module
-    from src.ember.core.utils.data.base import models, loaders, preppers
+    from src.ember.core.utils.data.base import loaders, models, preppers
 
     sys.modules["ember.core.utils.data.base.models"] = models
     sys.modules["ember.core.utils.data.base.loaders"] = loaders
@@ -214,11 +216,11 @@ try:
 
     # Import datasets registry
     from src.ember.core.utils.data.datasets_registry import (
-        truthful_qa,
-        mmlu,
         commonsense_qa,
         halueval,
+        mmlu,
         short_answer,
+        truthful_qa,
     )
 
     sys.modules["ember.core.utils.data.datasets_registry.truthful_qa"] = truthful_qa

@@ -32,10 +32,7 @@ from tests.unit.xcs.transforms.mock_operators import (
     ExceptionOperator,
 )
 from tests.unit.xcs.transforms.mock_operators import MockModule as ModuleOperator
-from tests.unit.xcs.transforms.mock_operators import (
-    NestedOperator,
-    StatefulOperator,
-)
+from tests.unit.xcs.transforms.mock_operators import NestedOperator, StatefulOperator
 
 # Import directly from our fixed imports module to avoid 'module is not callable' errors
 from tests.unit.xcs.transforms.test_transform_imports import (

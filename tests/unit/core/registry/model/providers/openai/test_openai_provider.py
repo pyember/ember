@@ -68,8 +68,9 @@ def patch_openai(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_openai_forward(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test that OpenAIModel.forward returns a valid ChatResponse."""
     # Fix the type checking issue by directly examining the response content
-    import sys
     import inspect
+    import sys
+
     from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 
     # Get the module where ChatResponse is defined

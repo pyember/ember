@@ -49,10 +49,7 @@ from ember.xcs.graph.xcs_graph import XCSGraph
 from ember.xcs.tracer.autograph import AutoGraphBuilder
 from ember.xcs.tracer.tracer_decorator import jit as raw_jit
 from ember.xcs.tracer.xcs_tracing import TraceRecord
-from ember.xcs.transforms.mesh import (
-    DeviceMesh,
-    PartitionSpec,
-)
+from ember.xcs.transforms.mesh import DeviceMesh, PartitionSpec
 from ember.xcs.transforms.mesh import mesh_sharded as raw_mesh_sharded
 from ember.xcs.transforms.pmap import pjit as raw_pjit
 from ember.xcs.transforms.pmap import pmap as raw_pmap

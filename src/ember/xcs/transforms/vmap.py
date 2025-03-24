@@ -88,9 +88,9 @@ def _get_batch_size(inputs: Mapping[str, Any], in_axes: AxisSpec) -> int:
     if len(unique_sizes) > 1:
         raise TransformError.for_transform(
             transform_name="vmap",
-            message=f"Inconsistent batch sizes detected across inputs: {batch_sizes}. "
+            message=f"Inconsistent batch sizes detected across inputs: {sorted(list(unique_sizes))}. "
             f"All batched inputs must have the same length.",
-            details={"batch_sizes": batch_sizes, "unique_sizes": list(unique_sizes)},
+            batch_sizes=sorted(list(unique_sizes)),
         )
 
     return batch_sizes[0]
@@ -113,7 +113,7 @@ def _prepare_batched_inputs(
         List of input dictionaries, one for each batch element.
 
     Raises:
-        ValueError: If a batched input doesn't match the expected batch size.
+        TransformError: If a batched input doesn't match the expected batch size.
     """
     # Prepare element-wise input dictionaries
     element_inputs: List[Dict[str, Any]] = [{} for _ in range(batch_size)]
@@ -139,11 +139,9 @@ def _prepare_batched_inputs(
                 raise TransformError.for_transform(
                     transform_name="vmap",
                     message=f"Input '{key}' has length {len(value)}, but batch size is {batch_size}.",
-                    details={
-                        "key": key,
-                        "actual_length": len(value),
-                        "batch_size": batch_size,
-                    },
+                    key=key,
+                    actual_length=len(value),
+                    batch_size=batch_size,
                 )
 
             # Distribute batched values to each element's inputs
@@ -236,7 +234,7 @@ def vmap(
         and produces batched outputs, preserving the original function's semantics.
 
     Raises:
-        ValueError: If inconsistent batch sizes are detected across inputs.
+        TransformError: If inconsistent batch sizes are detected across inputs.
 
     Example:
         ```python
@@ -273,7 +271,7 @@ def vmap(
             Batched outputs with results for each input element.
 
         Raises:
-            ValueError: If inconsistent batch sizes are detected.
+            TransformError: If inconsistent batch sizes are detected.
         """
         # Handle empty input case
         if not inputs:

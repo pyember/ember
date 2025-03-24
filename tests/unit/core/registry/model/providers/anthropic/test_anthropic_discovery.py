@@ -71,8 +71,9 @@ def discovery_instance():
 def test_anthropic_discovery_fetch_models(discovery_instance, monkeypatch) -> None:
     """Test that AnthropicDiscovery returns the expected model info."""
     # Mock the requests.get method to return a controlled response
-    import requests
     from unittest.mock import MagicMock
+
+    import requests
 
     mock_response = MagicMock()
     mock_response.json.return_value = {

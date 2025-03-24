@@ -26,28 +26,7 @@ from typing import (
 import numpy as np
 
 
-class MeshError(Exception):
-    """Base exception for all device mesh related errors."""
-
-    pass
-
-
-class MeshConfigurationError(MeshError):
-    """Raised when there's an error in the mesh configuration."""
-
-    pass
-
-
-class MeshShardingError(MeshError):
-    """Raised when there's an error in the sharding process."""
-
-    pass
-
-
-class PartitionSpecError(MeshError):
-    """Raised when there's an error with a partition specification."""
-
-    pass
+from ember.core.exceptions import TransformError
 
 
 # Use a placeholder class to avoid circular imports
@@ -62,17 +41,17 @@ class Operator(Protocol):
 
 class DeviceMesh:
     """Organizing computing resources into a logical N-dimensional grid for distributed computation.
-    
+
     A DeviceMesh creates a flexible structure for distributing workloads across multiple
     computing devices, enabling sophisticated sharding strategies that go beyond simple
     parallelization. The mesh coordinates provide a logical view that simplifies the
     distribution of work regardless of the physical device arrangement.
-    
+
     The device mesh concept is inspired by systems like JAX's device mesh, allowing
     computation and data to be distributed across devices in patterns that match
     the structure of the computation, potentially improving parallelism and reducing
     communication overhead.
-    
+
     Attributes:
         devices (List[str]): List of device identifiers (e.g., "cpu:0", "gpu:1").
         shape (Tuple[int, ...]): Logical shape of the mesh (e.g., (2, 3) for a 2×3 grid).
@@ -121,8 +100,14 @@ class DeviceMesh:
 
         mesh_size: int = int(np.prod(shape))
         if mesh_size != num_devices:
-            raise MeshConfigurationError(
-                f"Mesh shape {shape} requires {mesh_size} devices, but {num_devices} were provided."
+            raise TransformError.for_transform(
+                transform_name="mesh",
+                message=f"Mesh shape {shape} requires {mesh_size} devices, but {num_devices} were provided.",
+                details={
+                    "shape": shape,
+                    "mesh_size": mesh_size,
+                    "num_devices": num_devices,
+                },
             )
 
         device_indices: List[int] = list(range(num_devices))
@@ -198,19 +183,19 @@ class DeviceMesh:
 
 class PartitionSpec:
     """Specifying how to partition data across the dimensions of a device mesh.
-    
+
     A PartitionSpec maps data structure dimensions to corresponding mesh dimensions,
     defining how input data should be sharded for parallel processing. Each position in the
     PartitionSpec corresponds to a dimension in the data, and the value at that position
     indicates which mesh dimension to shard along (or None for replication).
-    
+
     The partition specification allows for sophisticated distribution strategies by
-    defining which dimensions of the data should be split across which dimensions of 
+    defining which dimensions of the data should be split across which dimensions of
     the device mesh. This enables complex partitioning schemes like:
     - Sharding along one dimension while replicating along others
     - Different sharding strategies for different inputs
     - Multi-dimensional sharding for optimal resource utilization
-    
+
     Attributes:
         mesh_axes: A tuple where each element indicates the mesh dimension to shard
             along, or None if the corresponding data dimension should be replicated.
@@ -257,9 +242,16 @@ class PartitionSpec:
         mesh_ndim = len(mesh.shape)
         for i, axis in enumerate(self.mesh_axes):
             if axis is not None and axis >= mesh_ndim:
-                raise PartitionSpecError(
-                    f"PartitionSpec has invalid mesh dimension {axis} at position {i}. "
-                    f"Mesh has shape {mesh.shape} with {mesh_ndim} dimensions."
+                raise TransformError.for_transform(
+                    transform_name="mesh",
+                    message=f"PartitionSpec has invalid mesh dimension {axis} at position {i}. "
+                    f"Mesh has shape {mesh.shape} with {mesh_ndim} dimensions.",
+                    details={
+                        "mesh_dimension": axis,
+                        "position": i,
+                        "mesh_shape": mesh.shape,
+                        "mesh_ndim": mesh_ndim,
+                    },
                 )
 
 
@@ -390,7 +382,7 @@ def _distribute_inputs(
         if key in inputs:
             try:
                 spec.validate_for_mesh(mesh)
-            except PartitionSpecError as e:
+            except TransformError as e:
                 logging.warning(f"Invalid partition spec for key '{key}': {e}")
                 # We'll handle the invalid spec during distribution
 
@@ -718,7 +710,12 @@ def _collect_outputs(
         except Exception as fallback_error:
             # Last resort: return error information
             logging.exception("Fallback aggregation failed: %s", fallback_error)
-            raise MeshShardingError(f"Failed to aggregate outputs: {e}") from e
+            raise TransformError.for_transform(
+                transform_name="mesh",
+                message=f"Failed to aggregate outputs: {e}",
+                details={"output_count": len(outputs)},
+                cause=e,
+            )
 
 
 def mesh_sharded(
@@ -728,22 +725,22 @@ def mesh_sharded(
     out_partition: Optional[Dict[str, PartitionSpec]] = None,
 ) -> Callable[..., Any]:
     """Transforming an operator or function to execute in a sharded manner across a device mesh.
-    
+
     Partitions inputs and aggregates outputs to enable sophisticated distributed execution
     of the provided operator or function across a logical N-dimensional grid of devices.
     This transformation creates a new callable that automatically handles data distribution
     and result collection based on the specified partitioning strategy.
-    
+
     The mesh sharding process:
     1. Validates the mesh configuration and partition specifications
     2. Distributes input data across devices according to the partition specs
     3. Executes the original function or operator on each device with its portion of the data
     4. Collects and aggregates results from all devices into a coherent output
-    
+
     Unlike simpler parallelization approaches, mesh sharding allows for multi-dimensional
     distribution patterns that can better match the structure of the computation and the
     underlying hardware topology.
-    
+
     Args:
         operator_or_fn: The operator instance or callable to be sharded. Should accept
             a dictionary of inputs with the 'inputs' keyword and return a dictionary.
@@ -754,30 +751,30 @@ def mesh_sharded(
             are treated as replicated (sent to all devices).
         out_partition: Mapping from output keys to PartitionSpec objects defining how
             results should be aggregated. Defaults to None for automatic aggregation.
-    
+
     Returns:
         A callable that executes the original operator/function in a distributed,
         sharded fashion across the device mesh, preserving the API of the original.
-    
+
     Raises:
         MeshConfigurationError: If the mesh configuration or partition specs are invalid.
         MeshShardingError: If a sharding error occurs during data distribution or execution.
-    
+
     Example:
         ```python
         # Create a 2D mesh of devices (2 rows x 2 columns)
         mesh = DeviceMesh(devices=["gpu:0", "gpu:1", "gpu:2", "gpu:3"], shape=(2, 2))
-        
+
         # Define input partitioning: shard 'prompts' along the first mesh dimension
         # This will distribute the prompts across rows while duplicating across columns
         partition = {"prompts": PartitionSpec(0, None)}
-        
+
         # Transform the operator to execute in a sharded manner
         sharded_op = mesh_sharded(my_operator, mesh, in_partition=partition)
-        
+
         # Execute with automatic sharding - prompts are distributed accordingly
         results = sharded_op(inputs={"prompts": ["Hello", "Hi", "Hey", "Howdy"]})
-        
+
         # More complex partitioning for multi-dimensional data
         complex_partition = {
             "prompts": PartitionSpec(0, None),  # Shard across first dimension
@@ -788,26 +785,36 @@ def mesh_sharded(
     """
     # Validate mesh configuration
     if not mesh.devices:
-        raise MeshConfigurationError("Device mesh has no devices")
+        raise TransformError.for_transform(
+            transform_name="mesh",
+            message="Device mesh has no devices",
+            details={"mesh_devices": mesh.devices},
+        )
 
     # Validate partition specs
     if in_partition:
         for key, spec in in_partition.items():
             try:
                 spec.validate_for_mesh(mesh)
-            except PartitionSpecError as e:
-                raise MeshConfigurationError(
-                    f"Invalid input partition spec for key '{key}': {e}"
-                ) from e
+            except TransformError as e:
+                raise TransformError.for_transform(
+                    transform_name="mesh",
+                    message=f"Invalid input partition spec for key '{key}': {e}",
+                    details={"key": key, "spec": str(spec)},
+                    cause=e,
+                )
 
     if out_partition:
         for key, spec in out_partition.items():
             try:
                 spec.validate_for_mesh(mesh)
-            except PartitionSpecError as e:
-                raise MeshConfigurationError(
-                    f"Invalid output partition spec for key '{key}': {e}"
-                ) from e
+            except TransformError as e:
+                raise TransformError.for_transform(
+                    transform_name="mesh",
+                    message=f"Invalid output partition spec for key '{key}': {e}",
+                    details={"key": key, "spec": str(spec)},
+                    cause=e,
+                )
 
     def _execute_sharded(
         op: Callable[..., Any],
@@ -853,7 +860,14 @@ def mesh_sharded(
 
         # If all devices failed, raise an error
         if error_count == len(inputs_to_distribute):
-            raise MeshShardingError("Execution failed on all mesh devices")
+            raise TransformError.for_transform(
+                transform_name="mesh",
+                message="Execution failed on all mesh devices",
+                details={
+                    "device_count": len(inputs_to_distribute),
+                    "error_count": error_count,
+                },
+            )
 
         return _collect_outputs(mesh_results, mesh_obj, out_spec)
 
@@ -873,12 +887,12 @@ def mesh_sharded(
             Raises:
                 MeshShardingError: If the sharding operation fails.
             """
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
-                _distribute_inputs(
-                    inputs=inputs,
-                    mesh=mesh,
-                    partition_specs=in_partition,
-                )
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
+                inputs=inputs,
+                mesh=mesh,
+                partition_specs=in_partition,
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition
@@ -902,12 +916,12 @@ def mesh_sharded(
             Raises:
                 MeshShardingError: If the sharding operation fails.
             """
-            distributed_inputs: Dict[Tuple[int, ...], Dict[str, Any]] = (
-                _distribute_inputs(
-                    inputs=inputs,
-                    mesh=mesh,
-                    partition_specs=in_partition,
-                )
+            distributed_inputs: Dict[
+                Tuple[int, ...], Dict[str, Any]
+            ] = _distribute_inputs(
+                inputs=inputs,
+                mesh=mesh,
+                partition_specs=in_partition,
             )
             return _execute_sharded(
                 operator_or_fn, distributed_inputs, mesh, out_partition

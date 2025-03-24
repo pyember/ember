@@ -84,13 +84,12 @@ from ember.core.registry.model.base.schemas.chat_schemas import (
 )
 from ember.core.registry.model.base.schemas.model_info import ModelInfo
 from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.exceptions import ModelProviderError, ValidationError
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
 )
-from ember.core.registry.model.base.utils.usage_calculator import (
-    DefaultUsageCalculator,
-)
+from ember.core.registry.model.base.utils.usage_calculator import DefaultUsageCalculator
 from ember.core.registry.model.providers.base_provider import (
     BaseChatParameters,
     BaseProviderModel,
@@ -211,10 +210,16 @@ class OpenAIChatParameters(BaseChatParameters):
             int: The validated token count.
 
         Raises:
-            ValueError: If the token count is less than 1.
+            ValidationError: If the token count is less than 1.
         """
         if value < 1:
-            raise ValueError(f"max_tokens must be >= 1, got {value}")
+            raise ValidationError.with_context(
+                f"max_tokens must be >= 1, got {value}",
+                field_name="max_tokens",
+                expected_range=">=1",
+                actual_value=value,
+                provider="OpenAI",
+            )
         return value
 
     def to_openai_kwargs(self) -> Dict[str, Any]:
@@ -302,11 +307,14 @@ class OpenAIModel(BaseProviderModel):
             Any: The configured OpenAI client module.
 
         Raises:
-            ProviderAPIError: If the API key is missing or invalid.
+            ModelProviderError: If the API key is missing or invalid.
         """
         api_key: Optional[str] = self.model_info.get_api_key()
         if not api_key:
-            raise ProviderAPIError("OpenAI API key is missing or invalid.")
+            raise ModelProviderError.for_provider(
+                provider_name=self.PROVIDER_NAME,
+                message="OpenAI API key is missing or invalid.",
+            )
         openai.api_key = api_key
         return openai
 
@@ -345,7 +353,11 @@ class OpenAIModel(BaseProviderModel):
             ProviderAPIError: For any unexpected errors during the API invocation.
         """
         if not request.prompt:
-            raise InvalidPromptError("OpenAI prompt cannot be empty.")
+            raise InvalidPromptError.with_context(
+                "OpenAI prompt cannot be empty.",
+                provider=self.PROVIDER_NAME,
+                model_name=self.model_info.name,
+            )
 
         logger.info(
             "OpenAI forward invoked",
@@ -403,4 +415,8 @@ class OpenAIModel(BaseProviderModel):
             raise
         except Exception as exc:
             logger.exception("Unexpected error in OpenAIModel.forward()")
-            raise ProviderAPIError(str(exc)) from exc
+            raise ProviderAPIError.for_provider(
+                provider_name=self.PROVIDER_NAME,
+                message=f"API error: {str(exc)}",
+                cause=exc,
+            )

@@ -3,10 +3,7 @@ from contextlib import contextmanager
 
 from ._context_types import TraceContextData
 from .autograph import AutoGraphBuilder
-from .xcs_tracing import (
-    TracerContext,
-    TraceRecord,
-)
+from .xcs_tracing import TracerContext, TraceRecord
 
 
 @contextmanager

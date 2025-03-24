@@ -1,20 +1,32 @@
 """
 Core protocols for the Ember type system.
 
-This module defines protocol classes that establish interfaces for
-various components in the Ember system, enabling structural typing
-and better interoperability between components.
+Defines the fundamental interface protocols that establish consistent contracts
+across the Ember framework. These protocols follow a focused, SOLID design:
+- Each protocol has a single responsibility
+- Interfaces are minimal and focused
+- Dependencies are inverted through protocol abstractions
+- Clear separation between type information and serialization concerns
 """
 
-from typing import Any, Dict, Optional, Protocol, Type, runtime_checkable
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    Optional,
+    Protocol,
+    Type,
+    TypeVar,
+    runtime_checkable,
+)
 
 
 class TypeInfo:
     """
-    Metadata container for type information.
+    Metadata container for runtime type information.
 
-    This class provides a simple, lightweight container for type metadata
-    that can be used at runtime for type inspection and validation.
+    Contains essential type metadata for runtime type checking, validation,
+    and introspection, enabling dynamic behavior based on types.
     """
 
     def __init__(
@@ -39,13 +51,16 @@ class TypeInfo:
         self.is_container = is_container
 
 
-@runtime_checkable
-class EmberTyped(Protocol):
-    """
-    Protocol for objects that participate in Ember's type system.
+T = TypeVar("T")
 
-    This is the most basic protocol that all typed objects in the Ember
-    system should implement. It provides methods for type introspection.
+
+@runtime_checkable
+class TypedProtocol(Protocol):
+    """
+    Protocol for objects with inspectable type information.
+
+    Provides basic type introspection capabilities, separated from serialization
+    concerns to follow Interface Segregation Principle.
     """
 
     def get_type_info(self) -> TypeInfo:
@@ -59,15 +74,15 @@ class EmberTyped(Protocol):
 
 
 @runtime_checkable
-class EmberSerializable(Protocol):
+class Serializable(Protocol, Generic[T]):
     """
-    Protocol for objects that can be serialized to/from primitive types.
+    Protocol for objects with consistent serialization and deserialization.
 
-    This protocol defines the interface for objects that need to be
-    serialized to and from various formats (dict, JSON, etc.)
+    Provides a clear interface for converting objects to and from different
+    serialization formats. Generic type parameter ensures type-safe deserialization.
     """
 
-    def as_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Convert to a dictionary representation.
 
@@ -76,7 +91,7 @@ class EmberSerializable(Protocol):
         """
         ...
 
-    def as_json(self) -> str:
+    def to_json(self) -> str:
         """
         Convert to a JSON string.
 
@@ -86,7 +101,7 @@ class EmberSerializable(Protocol):
         ...
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> Any:
+    def from_dict(cls: Type[T], data: Dict[str, Any]) -> T:
         """
         Create an instance from a dictionary.
 
@@ -94,6 +109,24 @@ class EmberSerializable(Protocol):
             data: Dictionary with serialized data
 
         Returns:
-            An instance of this class
+            An instance of this class with proper type
         """
         ...
+
+    @classmethod
+    def from_json(cls: Type[T], json_str: str) -> T:
+        """
+        Create an instance from a JSON string.
+
+        Args:
+            json_str: JSON string representation
+
+        Returns:
+            An instance of this class with proper type
+        """
+        ...
+
+
+# Legacy aliases for backward compatibility
+EmberTyped = TypedProtocol
+EmberSerializable = Serializable

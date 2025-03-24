@@ -10,9 +10,7 @@ import pytest
 from ember.xcs.engine.xcs_engine import (
     TopologicalSchedulerWithParallelDispatch as XCSScheduler,
 )
-from ember.xcs.engine.xcs_engine import (
-    compile_graph,
-)
+from ember.xcs.engine.xcs_engine import compile_graph
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 

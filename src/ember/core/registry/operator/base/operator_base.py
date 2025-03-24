@@ -41,9 +41,11 @@ import logging
 from typing import ClassVar, Generic, Optional, Type, cast
 
 from ember.core.registry.operator.base._module import EmberModule
-from ember.core.registry.operator.exceptions import (
+from ember.core.exceptions import (
+    OperatorError,
     OperatorExecutionError,
-    OperatorSpecificationNotDefinedError,
+    OperatorSpecificationError,
+    SpecificationValidationError,
 )
 from ember.core.registry.specification.specification import Specification
 from ember.core.types import InputT, OutputT
@@ -177,9 +179,11 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
         # Retrieve and validate the specification
         try:
             specification: Specification[InputT, OutputT] = self.specification
-        except OperatorSpecificationNotDefinedError as e:
-            raise OperatorSpecificationNotDefinedError(
-                message="Operator specification must be defined."
+        except OperatorSpecificationError as e:
+            raise OperatorSpecificationError.with_context(
+                "Operator specification must be defined.",
+                operator_name=self.__class__.__name__,
+                operator_type=type(self).__module__,
             ) from e
 
         try:
@@ -226,10 +230,13 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
 
         except Exception as e:
             # Catch any errors during execution and wrap them
-            if not isinstance(e, OperatorSpecificationNotDefinedError):
-                raise OperatorExecutionError(
-                    message=f"Error executing operator {self.__class__.__name__}: {str(e)}"
-                ) from e
+            if not isinstance(e, OperatorSpecificationError):
+                raise OperatorExecutionError.for_operator(
+                    operator_name=self.__class__.__name__,
+                    message=f"Error executing operator: {str(e)}",
+                    cause=e,
+                    operator_type=type(self).__module__,
+                )
             raise
 
     @property
@@ -272,7 +279,10 @@ class Operator(EmberModule, abc.ABC, Generic[InputT, OutputT]):
         if subclass_spec is None or subclass_spec is Operator.__dict__.get(
             "specification"
         ):
-            raise OperatorSpecificationNotDefinedError(
-                message="Operator specification must be explicitly defined in the concrete class."
+            raise OperatorSpecificationError.with_context(
+                "Operator specification must be explicitly defined in the concrete class.",
+                operator_name=self.__class__.__name__,
+                operator_type=type(self).__module__,
+                operator_class=type(self).__name__,
             )
         return cast(Specification[InputT, OutputT], subclass_spec)

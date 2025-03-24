@@ -6,10 +6,7 @@ from unittest import mock
 
 from datasets import Dataset
 
-from ember.core.utils.data.base.transformers import (
-    IDatasetTransformer,
-    NoOpTransformer,
-)
+from ember.core.utils.data.base.transformers import IDatasetTransformer, NoOpTransformer
 
 
 class TestIDatasetTransformer(unittest.TestCase):

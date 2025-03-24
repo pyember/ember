@@ -33,38 +33,7 @@ Typical usage example:
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-
-class ModelDiscoveryError(Exception):
-    """Custom exception for errors during model discovery.
-
-    This exception is raised when a discovery provider encounters problems during
-    the model discovery process, such as API errors, authentication failures,
-    rate limiting, or unexpected response formats.
-
-    Examples:
-        ```python
-        if not api_key:
-            raise ModelDiscoveryError("Missing API key for model discovery")
-
-        try:
-            models = api_client.list_models()
-        except ApiError as e:
-            raise ModelDiscoveryError(f"Failed to fetch models: {e}") from e
-        ```
-    """
-
-    def __init__(self, message: str, provider: str = None) -> None:
-        """Initialize the ModelDiscoveryError with enhanced context.
-
-        Args:
-            message: Detailed error description
-            provider: Optional provider name where the error occurred
-        """
-        if provider:
-            super().__init__(f"[{provider}] {message}")
-        else:
-            super().__init__(message)
-        self.provider = provider
+from ember.core.exceptions import ModelDiscoveryError, NotImplementedFeatureError
 
 
 class BaseDiscoveryProvider(ABC):
@@ -132,4 +101,4 @@ class BaseDiscoveryProvider(ABC):
             }
             ```
         """
-        raise NotImplementedError("Subclasses must implement fetch_models.")
+        raise NotImplementedFeatureError("Subclasses must implement fetch_models.")

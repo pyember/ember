@@ -36,15 +36,15 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     List,
     Optional,
+    Protocol,
     Set,
     Tuple,
     TypeVar,
     Union,
     cast,
-    Generic,
-    Protocol,
     overload,
 )
 

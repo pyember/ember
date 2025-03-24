@@ -8,16 +8,17 @@ To run:
     poetry run python src/ember/examples/example_simplified_xcs.py
 """
 
+from typing import Any, ClassVar, Dict, Optional, Type
+
 from ember.api.xcs import jit, pmap, vmap
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-from ember.xcs.engine.execution_options import execution_options
-from ember.xcs.tracer import autograph
 
 # Import the API for advanced configuration
 from ember.xcs.api.types import JITOptions
-from typing import ClassVar, Dict, Any, Optional, Type
+from ember.xcs.engine.execution_options import execution_options
+from ember.xcs.tracer import autograph
 
 
 # Create input/output models for our operators

@@ -35,10 +35,7 @@ from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ModelDiscoveryError,
     ModelRegistrationError,
 )
-from ember.core.registry.model.config.model_enum import (
-    ModelEnum,
-    parse_model_str,
-)
+from ember.core.registry.model.config.model_enum import ModelEnum, parse_model_str
 
 # Configuration and initialization - moved to avoid circular imports
 from ember.core.registry.model.config.settings import EmberSettings

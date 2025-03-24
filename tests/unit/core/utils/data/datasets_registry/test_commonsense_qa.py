@@ -2,9 +2,7 @@
 
 import unittest
 
-from ember.core.utils.data.datasets_registry.commonsense_qa import (
-    CommonsenseQAPrepper,
-)
+from ember.core.utils.data.datasets_registry.commonsense_qa import CommonsenseQAPrepper
 
 
 class TestCommonsenseQAPrepper(unittest.TestCase):

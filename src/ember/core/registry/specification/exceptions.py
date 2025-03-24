@@ -1,64 +1,66 @@
-from __future__ import annotations
+"""Exception definitions for specification module.
 
-from typing import Optional
+This module provides a compatibility layer that re-exports exceptions from the
+core exceptions module while maintaining backward compatibility with existing code.
+Prefer using the exceptions directly from ember.core.exceptions in new code.
+"""
+
+from ember.core.exceptions import (
+    EmberError,
+    InvalidArgumentError,
+    SpecificationValidationError,
+)
 
 
-class PromptSpecificationError(Exception):
+# Legacy exceptions for backward compatibility
+class PromptSpecificationError(SpecificationValidationError):
+    """Legacy base class for prompt specification errors.
+
+    This class is maintained for backward compatibility.
+    For new code, use SpecificationValidationError from ember.core.exceptions.
     """
-    Base class for all prompt specification related errors.
 
-    Attributes:
-        message (str): Description of the error.
-        error_code (Optional[int]): An optional error code representing the error type.
-    """
-
-    def __init__(self, message: str, error_code: Optional[int] = None) -> None:
-        super().__init__(message)
-        self.message: str = message
-        self.error_code: Optional[int] = error_code
-
-    def __str__(self) -> str:
-        return (
-            f"[Error {self.error_code}] {self.message}"
-            if self.error_code is not None
-            else self.message
-        )
+    pass
 
 
 class PlaceholderMissingError(PromptSpecificationError):
-    """
-    Raised when a required placeholder is missing in the prompt template.
+    """Raised when a required placeholder is missing in the prompt template.
+
+    This class uses the SpecificationValidationError from core.exceptions internally,
+    while maintaining the same interface for backward compatibility.
 
     Attributes:
-        missing_placeholder (Optional[str]): The name(s) of the missing placeholder(s).
+        missing_placeholder (str): The name of the missing placeholder.
     """
 
-    DEFAULT_ERROR_CODE: int = 1001
-
-    def __init__(self, message: str, missing_placeholder: Optional[str] = None) -> None:
+    def __init__(self, message: str, missing_placeholder: str = None) -> None:
         if missing_placeholder and missing_placeholder not in message:
             message = f"Missing placeholder(s) '{missing_placeholder}': {message}"
-        super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
-        self.missing_placeholder: Optional[str] = missing_placeholder
+        super().__init__(message)
+        self.missing_placeholder = missing_placeholder
+        self.add_context(missing_placeholder=missing_placeholder)
 
 
 class MismatchedModelError(PromptSpecificationError):
-    """
-    Raised when a provided Pydantic model instance does not match the expected type.
-    """
-
-    DEFAULT_ERROR_CODE: int = 1002
+    """Raised when a provided Pydantic model instance does not match the expected type."""
 
     def __init__(self, message: str) -> None:
-        super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
+        super().__init__(message)
+        self.add_context(error_type="model_mismatch")
 
 
 class InvalidInputTypeError(PromptSpecificationError):
-    """
-    Raised when the input or output data type is not a dict or a Pydantic model.
-    """
-
-    DEFAULT_ERROR_CODE: int = 1003
+    """Raised when the input or output data type is not a dict or a Pydantic model."""
 
     def __init__(self, message: str) -> None:
-        super().__init__(message, error_code=self.DEFAULT_ERROR_CODE)
+        super().__init__(message)
+        self.add_context(error_type="invalid_input_type")
+
+
+# Re-export all specification exceptions for backward compatibility
+__all__ = [
+    "PromptSpecificationError",
+    "PlaceholderMissingError",
+    "MismatchedModelError",
+    "InvalidInputTypeError",
+]

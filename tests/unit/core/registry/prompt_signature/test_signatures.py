@@ -4,10 +4,10 @@ from typing import Dict, Type
 
 import pytest
 
-from ember.core.registry.specification.exceptions import (
-    InvalidInputTypeError,
-    MismatchedModelError,
-    PlaceholderMissingError,
+from ember.core.exceptions import (
+    InvalidArgumentError,
+    InvalidPromptError,
+    SpecificationValidationError,
 )
 from ember.core.registry.specification.specification import Specification
 from ember.core.types import EmberModel
@@ -66,7 +66,7 @@ def test_render_prompt_missing_placeholder() -> None:
         input_model: Type[DummyInput] = DummyInput
         check_all_placeholders: bool = True
 
-    with pytest.raises(PlaceholderMissingError) as exc_info:
+    with pytest.raises(InvalidPromptError) as exc_info:
         _ = NoPlaceholderSpecification()  # Validation is triggered upon instantiation.
     assert "name" in str(exc_info.value)
 
@@ -92,7 +92,7 @@ def test_validate_inputs_with_model() -> None:
 def test_validate_inputs_invalid_type() -> None:
     """Test that validate_inputs raises an error when given an invalid input type."""
     dummy_specification: DummySpecification = DummySpecification()
-    with pytest.raises(InvalidInputTypeError):
+    with pytest.raises(InvalidArgumentError):
         dummy_specification.validate_inputs(inputs="invalid input type")
 
 
@@ -115,7 +115,7 @@ def test_misconfigured_specification_missing_input_model() -> None:
         check_all_placeholders: bool = True
 
     misconfigured_specification = MisconfiguredSpecification()
-    with pytest.raises(PlaceholderMissingError):
+    with pytest.raises(InvalidPromptError):
         misconfigured_specification.render_prompt(inputs={"name": "Test"})
 
 
@@ -136,9 +136,9 @@ def test_misconfigured_specification_incompatible_model() -> None:
 
     incompatible_specification = IncompatibleSpecification()
     wrong_input_instance: DummyInput = DummyInput(name="Test")
-    with pytest.raises(MismatchedModelError) as exc_info:
+    with pytest.raises(SpecificationValidationError) as exc_info:
         incompatible_specification.validate_inputs(inputs=wrong_input_instance)
-    assert "Input model mismatch" in str(exc_info.value)
+    assert "model mismatch" in str(exc_info.value)
 
 
 def test_render_prompt_with_no_template_but_input_model() -> None:
@@ -166,5 +166,5 @@ def test_render_prompt_no_template_no_input_model() -> None:
         check_all_placeholders: bool = False
 
     empty_specification = EmptySpecification()
-    with pytest.raises(PlaceholderMissingError):
+    with pytest.raises(InvalidPromptError):
         empty_specification.render_prompt(inputs={})

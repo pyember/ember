@@ -19,10 +19,7 @@ from ember.core.registry.model.base.schemas.chat_schemas import (
     ChatResponse,
 )
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
-from ember.core.registry.model.base.schemas.model_info import (
-    ModelInfo,
-    ProviderInfo,
-)
+from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     ProviderConfigError,
 )

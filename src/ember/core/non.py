@@ -30,55 +30,17 @@ Example usage:
 
 from __future__ import annotations
 
-# Ember package imports: use direct imports to avoid circular dependencies
-# Access the operator base directly to avoid circular imports
-# These paths need to be fixed for proper resolution
-import sys
-import types
-from typing import Any, Generic, List, Optional, Type, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union, cast
 
 from pydantic import BaseModel
 
-# Create placeholder type variables to avoid circular imports
-T_in = TypeVar("T_in")
-T_out = TypeVar("T_out")
-
-
-# Create a minimal Operator class that will be replaced at runtime
-# This is a temporary workaround to fix the import cycle
-class Operator(Generic[T_in, T_out]):
-    """Placeholder for Operator class to avoid circular imports."""
-
-    pass
-
-
-# Ensure modules are available
-if "ember.core.registry.operator.base" not in sys.modules:
-    sys.modules["ember.core.registry.operator.base"] = types.ModuleType(
-        "ember.core.registry.operator.base"
-    )
-
-
-# Create minimal EmberModule and ember_field
-class EmberModule:
-    """Placeholder for EmberModule class to avoid circular imports."""
-
-    pass
-
-
-def ember_field(init=False):
-    """Placeholder for ember_field decorator to avoid circular imports."""
-
-    def decorator(func):
-        return func
-
-    return decorator
-
-
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.operator.base._module import EmberModule, ember_field
 
-# Alias re-export types for backward compatibility with clients/tests from before our
-# registry refactor.
+# Import the actual Operator class and EmberModule
+from ember.core.registry.operator.base.operator_base import Operator
+
+# Import the concrete operator implementations
 from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
@@ -103,6 +65,11 @@ from ember.core.registry.operator.core.verifier import (
 )
 from ember.core.registry.specification.specification import Specification
 
+# Define type variables for use in generic operators
+T_in = TypeVar("T_in")
+T_out = TypeVar("T_out")
+
+# Alias re-export types for backward compatibility with clients/tests
 EnsembleInputs = EnsembleOperatorInputs
 MostCommonInputs = MostCommonAnswerSelectorOperatorInputs
 VerifierInputs = VerifierOperatorInputs
@@ -171,7 +138,9 @@ class UniformEnsemble(Operator[EnsembleInputs, EnsembleOperatorOutputs]):
             for _ in range(self.num_units)
         ]
         # Use our helper to set the computed field.
-        self.ensemble_op = EnsembleOperator(lm_modules=lm_modules)
+        self._init_field(
+            field_name="ensemble_op", value=EnsembleOperator(lm_modules=lm_modules)
+        )
 
     def forward(self, *, inputs: EnsembleInputs) -> EnsembleOperatorOutputs:
         """Delegates execution to the underlying EnsembleOperator."""
@@ -227,7 +196,9 @@ class MostCommon(Operator[MostCommonInputs, MostCommonAnswerSelectorOutputs]):
     most_common_op: MostCommonAnswerSelectorOperator = ember_field(init=False)
 
     def __init__(self) -> None:
-        self.most_common_op = MostCommonAnswerSelectorOperator()
+        self._init_field(
+            field_name="most_common_op", value=MostCommonAnswerSelectorOperator()
+        )
 
     def forward(self, *, inputs: MostCommonInputs) -> MostCommonAnswerSelectorOutputs:
         """Delegates execution to the underlying MostCommonOperator."""
@@ -373,7 +344,7 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
     model_name: str
     temperature: float
     max_tokens: Optional[int]
-    verifier_op: VerifierOperator
+    verifier_op: VerifierOperator = ember_field(init=False)
 
     def __init__(
         self,
@@ -393,7 +364,9 @@ class Verifier(Operator[VerifierInputs, VerifierOutputs]):
                 max_tokens=max_tokens,
             )
         )
-        self.verifier_op = VerifierOperator(lm_module=lm_module)
+        self._init_field(
+            field_name="verifier_op", value=VerifierOperator(lm_module=lm_module)
+        )
 
     def forward(self, *, inputs: VerifierInputs) -> VerifierOutputs:
         """Delegates execution to the underlying VerifierOperator."""
@@ -440,13 +413,15 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 
     specification: Specification = VariedEnsembleSpecification()
     model_configs: List[LMModuleConfig]
+    lm_modules: List[LMModule]
     varied_ensemble_op: EnsembleOperator = ember_field(init=False)
 
     def __init__(self, *, model_configs: List[LMModuleConfig]) -> None:
         self.model_configs = model_configs
-        self.lm_modules = tuple(LMModule(config=config) for config in model_configs)
-        self.varied_ensemble_op = EnsembleOperator(
-            lm_modules=tuple(LMModule(config=config) for config in model_configs)
+        self.lm_modules = [LMModule(config=config) for config in model_configs]
+        self._init_field(
+            field_name="varied_ensemble_op",
+            value=EnsembleOperator(lm_modules=self.lm_modules),
         )
 
     def build_prompt(self, *, inputs: VariedEnsembleInputs) -> str:
@@ -454,7 +429,10 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
 
         If a prompt_template is defined in the specification, it is used; otherwise, defaults to the query.
         """
-        if self.specification and self.specification.prompt_template:
+        if (
+            hasattr(self.specification, "prompt_template")
+            and self.specification.prompt_template
+        ):
             return self.specification.render_prompt(inputs=inputs)
         return str(inputs.query)
 
@@ -508,6 +486,7 @@ class Sequential(Operator[T_in, T_out]):
 
     def forward(self, *, inputs: T_in) -> T_out:
         """Executes the operators sequentially."""
+        current_input = inputs
         for op in self.operators:
-            inputs = op(inputs=inputs)
-        return inputs
+            current_input = op(inputs=current_input)
+        return cast(T_out, current_input)

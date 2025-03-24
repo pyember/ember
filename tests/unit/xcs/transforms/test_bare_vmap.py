@@ -6,9 +6,9 @@ used with vmap transform and execution_options context, verifying both
 functionality and performance benefits of parallel execution.
 """
 
-import time
 import random
-from typing import Any, Dict, List, ClassVar, Optional
+import time
+from typing import Any, ClassVar, Dict, List, Optional
 
 import pytest
 

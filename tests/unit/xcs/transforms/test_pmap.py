@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # Import the actual implementation for testing
-from src.ember.xcs.transforms.pmap import (
+from ember.xcs.transforms.pmap import (
     _combine_results,
     _get_default_num_workers,
     _shard_inputs,
@@ -101,7 +101,7 @@ class TestPMapInternals:
     def test_shard_inputs(self):
         """Test input sharding for parallel processing."""
         # Import ShardingOptions for configuring behavior
-        from src.ember.xcs.transforms.pmap import ShardingOptions
+        from ember.xcs.transforms.pmap import ShardingOptions
 
         # Case 1: Simple list input with even distribution
         inputs = {"prompts": ["a", "b", "c", "d"]}
@@ -641,7 +641,7 @@ class TestPMapEdgeCases:
         when strict_batch_size=False is specified.
         """
         # Import here to avoid circular imports
-        from src.ember.xcs.transforms.pmap import ShardingOptions
+        from ember.xcs.transforms.pmap import ShardingOptions
 
         # Create parallel operator with non-strict batch size checking
         parallel_op = pmap(

@@ -6,7 +6,9 @@ customization of dispatching strategy, parallelism, and device selection.
 """
 
 import dataclasses
-from typing import Any, Dict, Optional, Generator, TypeVar, cast
+from typing import Any, Dict, Generator, Optional, TypeVar, cast
+
+from ember.core.exceptions import InvalidArgumentError
 
 
 @dataclasses.dataclass
@@ -61,7 +63,11 @@ def set_execution_options(**kwargs: Any) -> None:
         elif hasattr(_global_options, key):
             setattr(_global_options, key, value)
         else:
-            raise ValueError(f"Invalid execution option: {key}")
+            raise InvalidArgumentError.with_context(
+                f"Invalid execution option: {key}",
+                option=key,
+                valid_options=list(dataclasses.asdict(_global_options).keys()),
+            )
 
 
 def get_execution_options() -> ExecutionOptions:

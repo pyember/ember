@@ -51,8 +51,9 @@ class AnthropicDiscovery(BaseDiscoveryProvider):
         """
         self._api_key: Optional[str] = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if not self._api_key:
-            raise ModelDiscoveryError(
-                "Anthropic API key is not set in config or environment"
+            raise ModelDiscoveryError.for_provider(
+                provider="anthropic",
+                reason="API key is not set in config or environment",
             )
         self._base_url: Optional[str] = base_url or "https://api.anthropic.com"
         client_kwargs: Dict[str, Any] = {"api_key": self._api_key}

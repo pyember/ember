@@ -8,9 +8,7 @@ import openai
 import pytest
 from openai import OpenAI
 
-from ember.core.registry.model.providers.openai.openai_discovery import (
-    OpenAIDiscovery,
-)
+from ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
 
 
 @pytest.fixture(autouse=True)

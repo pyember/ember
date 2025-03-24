@@ -96,6 +96,7 @@ from ember.core.registry.model.base.schemas.chat_schemas import (
     ProviderParams,
 )
 from ember.core.registry.model.base.schemas.usage import UsageStats
+from ember.core.exceptions import ModelProviderError, ValidationError
 from ember.core.registry.model.base.utils.model_registry_exceptions import (
     InvalidPromptError,
     ProviderAPIError,
@@ -244,10 +245,16 @@ class GeminiChatParameters(BaseChatParameters):
             int: The validated token count.
 
         Raises:
-            ValueError: If the token count is less than 1.
+            ValidationError: If the token count is less than 1.
         """
         if value < 1:
-            raise ValueError(f"max_tokens must be >= 1, got {value}")
+            raise ValidationError.with_context(
+                f"max_tokens must be >= 1, got {value}",
+                field_name="max_tokens",
+                expected_range=">=1",
+                actual_value=value,
+                provider="Deepmind",
+            )
         return value
 
     def to_gemini_kwargs(self) -> Dict[str, Any]:
@@ -326,7 +333,10 @@ class GeminiModel(BaseProviderModel):
         """
         api_key: Optional[str] = self.model_info.get_api_key()
         if not api_key:
-            raise ProviderAPIError("Google API key is missing or invalid.")
+            raise ModelProviderError.for_provider(
+                provider_name=self.PROVIDER_NAME,
+                message="Google API key is missing or invalid.",
+            )
 
         genai.configure(api_key=api_key)
         logger.info("Listing available Gemini models from Google Generative AI:")
@@ -397,7 +407,11 @@ class GeminiModel(BaseProviderModel):
             ProviderAPIError: If the provider returns an error or no content.
         """
         if not request.prompt:
-            raise InvalidPromptError("Gemini prompt cannot be empty.")
+            raise InvalidPromptError.with_context(
+                "Gemini prompt cannot be empty.",
+                provider=self.PROVIDER_NAME,
+                model_name=self.model_info.name,
+            )
 
         logger.info(
             "Gemini forward invoked",
@@ -448,7 +462,11 @@ class GeminiModel(BaseProviderModel):
 
             generated_text: str = response.text
             if not generated_text:
-                raise ProviderAPIError("Gemini returned no text.")
+                raise ProviderAPIError.for_provider(
+                    provider_name=self.PROVIDER_NAME,
+                    message="Gemini returned no text.",
+                    status_code=None,
+                )
 
             return ChatResponse(
                 data=generated_text,
@@ -457,10 +475,19 @@ class GeminiModel(BaseProviderModel):
             )
         except NotFound as nf:
             logger.exception("Gemini model not found or not accessible: %s", nf)
-            raise ProviderAPIError(str(nf)) from nf
+            raise ProviderAPIError.for_provider(
+                provider_name=self.PROVIDER_NAME,
+                message=f"Model not found or not accessible: {str(nf)}",
+                status_code=404,
+                cause=nf,
+            )
         except Exception as exc:
             logger.exception("Error in GeminiModel.forward")
-            raise ProviderAPIError(str(exc)) from exc
+            raise ProviderAPIError.for_provider(
+                provider_name=self.PROVIDER_NAME,
+                message=f"API error: {str(exc)}",
+                cause=exc,
+            )
 
     def calculate_usage(self, raw_output: Any) -> UsageStats:
         """Calculate usage statistics from the Gemini API response.

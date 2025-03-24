@@ -3,11 +3,7 @@
 from __future__ import annotations
 
 # Import and re-export core operator implementations
-from .ensemble import (
-    EnsembleOperator,
-    EnsembleOperatorInputs,
-    EnsembleOperatorOutputs,
-)
+from .ensemble import EnsembleOperator, EnsembleOperatorInputs, EnsembleOperatorOutputs
 from .most_common import (
     MostCommonAnswerSelectorOperator,
     MostCommonAnswerSelectorOperatorInputs,

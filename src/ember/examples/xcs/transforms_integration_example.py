@@ -20,19 +20,19 @@ To run:
     uv run python src/ember/examples/xcs/transforms_integration_example.py
 """
 
-import time
-import random
 import logging
-from typing import Dict, Any, ClassVar, List, Tuple
+import random
+import time
+from typing import Any, ClassVar, Dict, List, Tuple
+
+from ember.core.registry.operator.base.operator_base import Operator
 
 # Import Ember APIs
 from ember.core.registry.specification.specification import Specification
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.transforms.vmap import vmap
-from ember.xcs.transforms.pmap import pmap
-from ember.xcs.tracer.structural_jit import structural_jit
 from ember.xcs.engine.execution_options import execution_options
-
+from ember.xcs.tracer.structural_jit import structural_jit
+from ember.xcs.transforms.pmap import pmap
+from ember.xcs.transforms.vmap import vmap
 
 ###############################################################################
 # Basic Component Operators

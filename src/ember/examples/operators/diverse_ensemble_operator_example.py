@@ -8,7 +8,7 @@ To run:
 """
 
 from random import sample
-from typing import ClassVar, Dict, List, Optional, Type, Any, cast
+from typing import Any, ClassVar, Dict, List, Optional, Type, cast
 
 from ember.core import non
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig

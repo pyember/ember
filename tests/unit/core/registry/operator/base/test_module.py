@@ -30,11 +30,7 @@ from ember.core.registry.operator.base._module import (
     ember_field,
     static_field,
 )
-from ember.xcs.utils.tree_util import (
-    _pytree_registry,
-    tree_flatten,
-    tree_unflatten,
-)
+from ember.xcs.utils.tree_util import _pytree_registry, tree_flatten, tree_unflatten
 
 # -----------------------------------------------------------------------------
 # Field Creation Tests

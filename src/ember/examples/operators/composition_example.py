@@ -26,16 +26,16 @@ from ember.api.models import (
     ModelCost,
     ModelInfo,
     ModelRegistry,
-    RateLimit,
     ProviderInfo,
+    RateLimit,
 )
 from ember.core import non
 from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-from ember.xcs.tracer.tracer_decorator import jit
 from ember.xcs.engine.execution_options import execution_options
+from ember.xcs.tracer.tracer_decorator import jit
 
 T = TypeVar("T")
 U = TypeVar("U")

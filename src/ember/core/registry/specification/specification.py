@@ -5,10 +5,10 @@ from typing import Any, Dict, Generic, List, Optional, Type, TypeVar, Union
 
 from pydantic import BaseModel, model_validator
 
-from ember.core.registry.specification.exceptions import (
-    InvalidInputTypeError,
-    MismatchedModelError,
-    PlaceholderMissingError,
+from ember.core.exceptions import (
+    InvalidArgumentError,
+    InvalidPromptError,
+    SpecificationValidationError,
 )
 from ember.core.types import EmberModel
 
@@ -55,7 +55,7 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             Specification[InputModelT, OutputModelT]: The validated specification instance.
 
         Raises:
-            PlaceholderMissingError: If one or more required placeholders are missing in the prompt template.
+            InvalidPromptError: If one or more required placeholders are missing in the prompt template.
         """
         if (
             self.prompt_template is not None
@@ -69,10 +69,16 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
                 if f"{{{field}}}" not in self.prompt_template
             ]
             if missing_fields:
-                error_msg: str = f"Missing placeholders in prompt_template: {', '.join(missing_fields)}"
+                missing_placeholder = ", ".join(missing_fields)
+                error_msg: str = (
+                    f"Missing placeholders in prompt_template: {missing_placeholder}"
+                )
                 logger.error(error_msg)
-                raise PlaceholderMissingError(
-                    message=error_msg, missing_placeholder=", ".join(missing_fields)
+                raise InvalidPromptError.with_context(
+                    error_msg,
+                    missing_placeholders=missing_fields,
+                    required_fields=required_fields,
+                    template=self.prompt_template,
                 )
         return self
 
@@ -90,13 +96,17 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             str: The rendered prompt string.
 
         Raises:
-            PlaceholderMissingError: If placeholder validation is enabled without an input_model,
+            InvalidPromptError: If placeholder validation is enabled without an input_model,
                 if a required placeholder value is missing, or if neither a prompt_template nor an input_model is defined.
         """
         if self.check_all_placeholders and self.input_model is None:
             error_msg: str = "Missing input_model for placeholder validation."
             logger.error(error_msg)
-            raise PlaceholderMissingError(message=error_msg)
+            raise InvalidPromptError.with_context(
+                error_msg,
+                validation_enabled=self.check_all_placeholders,
+                input_model=None,
+            )
 
         # Convert inputs to dictionary if it's a model
         input_dict: Dict[str, Any] = inputs
@@ -108,10 +118,14 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
                 prompt: str = self.prompt_template.format(**input_dict)
                 return prompt
             except KeyError as key_err:
-                error_msg: str = f"Missing input for placeholder: {key_err}"
+                missing_key = str(key_err)
+                error_msg: str = f"Missing input for placeholder: {missing_key}"
                 logger.error(error_msg)
-                raise PlaceholderMissingError(
-                    message=error_msg, missing_placeholder=str(key_err)
+                raise InvalidPromptError.with_context(
+                    error_msg,
+                    missing_placeholder=missing_key,
+                    available_keys=list(input_dict.keys()),
+                    template=self.prompt_template,
                 ) from key_err
 
         if self.input_model is not None:
@@ -124,7 +138,11 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             "No prompt_template or input_model defined for rendering prompt."
         )
         logger.error(error_msg)
-        raise PlaceholderMissingError(message=error_msg)
+        raise InvalidPromptError.with_context(
+            error_msg,
+            prompt_template=self.prompt_template,
+            input_model=self.input_model,
+        )
 
     def model_json_schema(self, *, by_alias: bool = True) -> Dict[str, Any]:
         """Return the JSON schema for the input model.
@@ -157,8 +175,8 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             EmberModel: A validated instance of the specified model.
 
         Raises:
-            MismatchedModelError: If a EmberModel instance does not match the expected model.
-            InvalidInputTypeError: If the data is neither a dict nor a Pydantic model.
+            SpecificationValidationError: If a EmberModel instance does not match the expected model.
+            InvalidArgumentError: If the data is neither a dict nor a Pydantic model.
         """
         if isinstance(data, dict):
             return model.model_validate(data)
@@ -166,13 +184,26 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             if not isinstance(data, model):
                 error_msg: str = f"{model_label} model mismatch. Expected {model.__name__}, got {type(data).__name__}."
                 logger.error(error_msg)
-                raise MismatchedModelError(message=error_msg)
+                raise SpecificationValidationError.with_context(
+                    error_msg,
+                    error_type="model_mismatch",
+                    expected_model=model.__name__,
+                    actual_model=type(data).__name__,
+                    model_label=model_label,
+                )
             return data
+
         error_msg: str = (
             f"{model_label} must be a dict or an EmberModel, got {type(data).__name__}."
         )
         logger.error(error_msg)
-        raise InvalidInputTypeError(message=error_msg)
+        raise InvalidArgumentError.with_context(
+            error_msg,
+            error_type="invalid_input_type",
+            expected_types=["dict", "EmberModel"],
+            actual_type=type(data).__name__,
+            model_label=model_label,
+        )
 
     def validate_inputs(
         self, *, inputs: Union[Dict[str, Any], InputModelT]
@@ -186,8 +217,8 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             Union[InputModelT, Dict[str, Any]]: A validated input model instance or the original inputs.
 
         Raises:
-            MismatchedModelError: If the provided BaseModel does not match the expected input_model.
-            InvalidInputTypeError: If inputs are neither a dict nor a Pydantic model.
+            SpecificationValidationError: If the provided BaseModel does not match the expected input_model.
+            InvalidArgumentError: If inputs are neither a dict nor a Pydantic model.
         """
         if self.input_model is not None:
             return self._validate_data(
@@ -195,11 +226,18 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             )
         if isinstance(inputs, (dict, EmberModel)):
             return inputs
+
         error_msg: str = (
             f"Inputs must be a dict or an EmberModel, got {type(inputs).__name__}."
         )
         logger.error(error_msg)
-        raise InvalidInputTypeError(message=error_msg)
+        raise InvalidArgumentError.with_context(
+            error_msg,
+            error_type="invalid_input_type",
+            expected_types=["dict", "EmberModel"],
+            actual_type=type(inputs).__name__,
+            model_available=self.input_model is not None,
+        )
 
     def validate_output(
         self, *, output: Union[Dict[str, Any], OutputModelT]
@@ -213,8 +251,8 @@ class Specification(EmberModel, Generic[InputModelT, OutputModelT]):
             Union[OutputModelT, Dict[str, Any]]: A validated structured output instance or the original output.
 
         Raises:
-            MismatchedModelError: If the provided BaseModel does not match the expected structured_output.
-            InvalidInputTypeError: If output is neither a dict nor a Pydantic model when a structured_output model is defined.
+            SpecificationValidationError: If the provided BaseModel does not match the expected structured_output.
+            InvalidArgumentError: If output is neither a dict nor a Pydantic model when a structured_output model is defined.
         """
         if self.structured_output is not None:
             return self._validate_data(

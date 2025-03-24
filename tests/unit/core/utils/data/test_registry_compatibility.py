@@ -9,10 +9,7 @@ from unittest import mock
 
 from ember.core.utils.data.base.models import DatasetInfo, TaskType
 from ember.core.utils.data.initialization import initialize_dataset_registry
-from ember.core.utils.data.registry import (
-    UNIFIED_REGISTRY,
-    UnifiedDatasetRegistry,
-)
+from ember.core.utils.data.registry import UNIFIED_REGISTRY, UnifiedDatasetRegistry
 
 
 class TestRegistryCompatibility(unittest.TestCase):

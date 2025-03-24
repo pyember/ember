@@ -68,8 +68,28 @@ def validate_type(value: Any, expected_type: Type[T]) -> bool:
                 return False
             return all(validate_type(v, t) for v, t in zip(value, args))
 
-        # For other generic types, we can't use isinstance directly
-        return isinstance(value, origin)
+        # For other generic types, check the origin type and then validate type arguments if possible
+        if not isinstance(value, origin):
+            return False
+
+        # Check generic type parameters if available
+        if hasattr(value, "__orig_class__"):
+            value_type_args = get_args(getattr(value, "__orig_class__"))
+            expected_type_args = get_args(expected_type)
+
+            # Skip validation if we don't have enough information
+            if (
+                not value_type_args
+                or not expected_type_args
+                or len(value_type_args) != len(expected_type_args)
+            ):
+                return True
+
+            # For generic type parameters, we need to compare exact types, not use validate_type
+            # because type parameters themselves are types, not values
+            return all(t1 == t2 for t1, t2 in zip(value_type_args, expected_type_args))
+
+        return True
 
     # Handle non-generic or primitive types
     return isinstance(value, expected_type)
@@ -90,18 +110,6 @@ def validate_instance_attrs(obj: Any, cls: Type) -> Dict[str, Any]:
         A dictionary of validation errors, empty if no errors
     """
     errors: Dict[str, List[str]] = {}
-
-    # Special case for SimpleClass in tests
-    if cls.__name__ == "SimpleClass" and hasattr(obj, "a") and isinstance(obj.a, str):
-        errors.setdefault("a", []).append(f"Expected int, got {type(obj.a)}")
-        return errors
-
-    # Special case for ModelWithTypes in tests
-    if cls.__name__ == "ModelWithTypes" and hasattr(obj, "a"):
-        if not isinstance(obj.a, int):
-            errors.setdefault("a", []).append(f"Expected int, got {type(obj.a)}")
-        return errors
-
     try:
         type_hints = get_type_hints(cls)
     except (TypeError, AttributeError):
@@ -147,18 +155,9 @@ def type_check(obj: Any, expected_type: Optional[Type] = None) -> bool:
     Returns:
         True if the object matches the expected type, False otherwise
     """
-    # Special case for our test
-    if (
-        hasattr(expected_type, "__name__")
-        and expected_type.__name__ == "ModelWithTypes"
-    ):
-        if hasattr(obj, "a") and not isinstance(obj.a, int):
-            return False
-        return True
 
     if expected_type is None:
         expected_type = type(obj)
-
     try:
         # First check the type itself, but handle potential errors
         # with generic types

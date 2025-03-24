@@ -5,10 +5,7 @@ from typing import Any, Dict, List
 from unittest import mock
 
 from ember.core.utils.data.base.preppers import IDatasetPrepper
-from ember.core.utils.data.loader_factory import (
-    DatasetLoaderFactory,
-    discover_preppers,
-)
+from ember.core.utils.data.loader_factory import DatasetLoaderFactory, discover_preppers
 
 
 class MockPrepper(IDatasetPrepper):

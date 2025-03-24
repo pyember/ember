@@ -15,10 +15,7 @@ try:
 except ImportError:
     print("Trying alternative import path...")
     try:
-        from ember.core.utils.eval.base_evaluator import (
-            EvaluationResult,
-            IEvaluator,
-        )
+        from ember.core.utils.eval.base_evaluator import EvaluationResult, IEvaluator
     except ImportError as e:
         print(f"Import error: {e}")
         raise

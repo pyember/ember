@@ -8,10 +8,7 @@ from urllib.error import HTTPError
 
 from datasets import Dataset, DatasetDict
 
-from ember.core.utils.data.base.loaders import (
-    HuggingFaceDatasetLoader,
-    IDatasetLoader,
-)
+from ember.core.utils.data.base.loaders import HuggingFaceDatasetLoader, IDatasetLoader
 from ember.core.utils.data.base.models import DatasetInfo
 
 

@@ -23,7 +23,6 @@ Usage:
 import logging
 from typing import Dict, List, Optional, Union
 
-
 # Component groups allow configuring related loggers together
 COMPONENT_GROUPS = {
     "model_registry": [

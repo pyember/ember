@@ -1,19 +1,21 @@
 """Configuration exception module.
 
-This module defines exception types specific to the configuration system.
+This module re-exports exceptions from the core exceptions module to maintain
+backward compatibility for any code importing from here.
 """
 
-from ember.core.exceptions import EmberError
+from ember.core.exceptions import (
+    ConfigError,
+    ConfigFileError,
+    ConfigValidationError,
+    ConfigValueError,
+    MissingConfigError,
+)
 
-
-class ConfigError(EmberError):
-    """Exception raised for configuration errors.
-
-    This includes errors such as:
-    - Invalid configuration format
-    - Missing required configuration
-    - Configuration validation failures
-    - File access errors
-    """
-
-    pass
+__all__ = [
+    "ConfigError",
+    "ConfigFileError",
+    "ConfigValidationError",
+    "ConfigValueError",
+    "MissingConfigError",
+]

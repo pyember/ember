@@ -47,9 +47,7 @@ try:
     from ember.core.registry.operator.core.ensemble import (
         EnsembleOperatorInputs as EnsembleInputs,
     )
-    from ember.core.registry.operator.core.ensemble import (
-        EnsembleOperatorOutputs,
-    )
+    from ember.core.registry.operator.core.ensemble import EnsembleOperatorOutputs
     from ember.core.registry.operator.core.most_common import (
         MostCommonAnswerSelectorOperatorInputs as MostCommonInputs,
     )

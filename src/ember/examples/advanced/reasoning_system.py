@@ -19,15 +19,15 @@ from typing import Any, ClassVar, Dict, List, Optional, Type
 
 # Ember API imports
 from ember.api.xcs import execution_options, jit
-from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
-from ember.core.registry.operator.base.operator_base import Operator
-from ember.core.registry.operator.core.verifier import VerifierOperator
-from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
-from ember.core.registry.specification.specification import Specification
-from ember.core.types.ember_model import EmberModel, Field
 
 # Keep non import for UniformEnsemble
 from ember.core import non
+from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.operator.core.synthesis_judge import JudgeSynthesisOperator
+from ember.core.registry.operator.core.verifier import VerifierOperator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel, Field
 
 ###############################################################################
 # Input/Output Models

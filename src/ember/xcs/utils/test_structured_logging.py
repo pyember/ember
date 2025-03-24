@@ -170,9 +170,22 @@ class TestStructuredLogging(unittest.TestCase):
         # Test with an XCS error that supports context
         error = XCSError("Test error")
 
-        # Use direct debugging to verify initial state
-        self.assertEqual(
-            error.diagnostic_context, {}, "Initial context should be empty"
+        # Diagnostic context is now automatically populated with caller information
+        # Just verify that the context exists but doesn't contain our custom values yet
+        self.assertNotIn(
+            "operation_id",
+            error.diagnostic_context,
+            "Context should not contain our custom values yet",
+        )
+        self.assertNotIn(
+            "node_id",
+            error.diagnostic_context,
+            "Context should not contain our custom values yet",
+        )
+        self.assertNotIn(
+            "extra_context",
+            error.diagnostic_context,
+            "Context should not contain our custom values yet",
         )
 
         # Enrich the exception with context
@@ -298,7 +311,17 @@ def test_enrich_exception():
 
     # Test with an XCS error that supports context
     error = XCSError("Test error")
+
+    # Verify our custom values are not in context yet
+    assert "operation_id" not in error.diagnostic_context
+    assert "extra_context" not in error.diagnostic_context
+
+    # Enrich the exception with context
     enriched = enrich_exception(error, extra_context="value")
+
+    # Verify our values were added
+    assert enriched.diagnostic_context.get("operation_id") == "test_op"
+    assert enriched.diagnostic_context.get("extra_context") == "value"
 
     # Clean up
     clear_context()

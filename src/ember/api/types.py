@@ -13,13 +13,7 @@ Examples:
 
 from typing import Any, ClassVar, Dict, Generic, List, Optional, Type, TypeVar, Union
 
-from ember.core.types import (
-    EmberSerializable,
-    EmberTyped,
-    InputT,
-    OutputT,
-    TypeInfo,
-)
+from ember.core.types import EmberSerializable, EmberTyped, InputT, OutputT, TypeInfo
 
 # Re-export core types
 from ember.core.types.ember_model import EmberModel, Field

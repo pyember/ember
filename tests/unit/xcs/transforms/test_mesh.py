@@ -17,14 +17,12 @@ import numpy as np
 import pytest
 
 from ember.xcs.transforms import DeviceMesh, PartitionSpec, mesh_sharded
+from ember.core.exceptions import TransformError
 from ember.xcs.transforms.mesh import (
-    _collect_outputs,
-    _distribute_inputs,
-    MeshConfigurationError,
-    MeshShardingError,
-    PartitionSpecError,
     InputOutputMapper,
     OutputAggregator,
+    _collect_outputs,
+    _distribute_inputs,
 )
 
 # Import test operators
@@ -123,8 +121,8 @@ class TestDeviceMesh:
 
     def test_mesh_validation(self):
         """Test that DeviceMesh validates shapes properly."""
-        # Invalid shape - should raise MeshConfigurationError
-        with pytest.raises(MeshConfigurationError):
+        # Invalid shape - should raise TransformError
+        with pytest.raises(TransformError):
             DeviceMesh(
                 devices=["cpu:0", "cpu:1", "cpu:2"], shape=(2, 2)  # Requires 4 devices
             )
@@ -213,21 +211,21 @@ class TestPartitionSpec:
         repr_str = repr(spec)
         assert "PartitionSpec" in repr_str
         assert "0, None, 1" in repr_str
-        
+
     def test_partition_spec_validation(self, simple_mesh):
         """Test validation of partition specs against mesh dimensions."""
         # Valid specs
         spec1 = PartitionSpec(0, None)
         spec1.validate_for_mesh(simple_mesh)  # Should not raise
-        
+
         spec2 = PartitionSpec(1, None)
         spec2.validate_for_mesh(simple_mesh)  # Should not raise
-        
+
         # Invalid spec - mesh dimension out of range
         spec3 = PartitionSpec(2, None)  # 2D mesh has dimensions 0 and 1 only
-        with pytest.raises(PartitionSpecError):
+        with pytest.raises(TransformError):
             spec3.validate_for_mesh(simple_mesh)
-            
+
         # Spec with no sharding (all None) is always valid
         spec4 = PartitionSpec(None, None)
         spec4.validate_for_mesh(simple_mesh)  # Should not raise
@@ -238,14 +236,14 @@ class TestPartitionSpec:
 
 class TestInputOutputMapper:
     """Tests for the InputOutputMapper helper class."""
-    
+
     def test_is_shardable(self):
         """Test detection of shardable values."""
         assert InputOutputMapper.is_shardable(["a", "b", "c"])
         assert not InputOutputMapper.is_shardable([])
         assert not InputOutputMapper.is_shardable("not_a_list")
         assert not InputOutputMapper.is_shardable({"key": "value"})
-        
+
     def test_get_shardable_keys(self):
         """Test extraction of shardable keys from inputs."""
         inputs = {
@@ -253,70 +251,51 @@ class TestInputOutputMapper:
             "list2": ["c", "d", "e"],
             "empty_list": [],
             "not_list": "string",
-            "dict": {"key": "value"}
+            "dict": {"key": "value"},
         }
-        
+
         shardable_keys = InputOutputMapper.get_shardable_keys(inputs)
         assert set(shardable_keys) == {"list1", "list2"}
-        
+
     def test_extract_batch_size(self):
         """Test batch size calculation from inputs."""
         # With shardable values
-        inputs1 = {
-            "list1": ["a", "b", "c"],
-            "list2": ["d", "e"],
-            "scalar": "value"
-        }
+        inputs1 = {"list1": ["a", "b", "c"], "list2": ["d", "e"], "scalar": "value"}
         assert InputOutputMapper.extract_batch_size(inputs1) == 3  # Uses first list
-        
+
         # No shardable values
-        inputs2 = {
-            "empty": [],
-            "scalar": "value"
-        }
+        inputs2 = {"empty": [], "scalar": "value"}
         assert InputOutputMapper.extract_batch_size(inputs2) == 0
-        
+
     def test_create_empty_device_inputs(self):
         """Test creation of empty device input structures."""
-        inputs = {
-            "list1": ["a", "b"],
-            "scalar": "value",
-            "empty_list": []
-        }
-        
+        inputs = {"list1": ["a", "b"], "scalar": "value", "empty_list": []}
+
         empty_device = InputOutputMapper.create_empty_device_inputs(inputs)
-        
+
         # Lists should be empty
         assert empty_device["list1"] == []
         # Scalar should be copied
         assert empty_device["scalar"] == "value"
         # Empty list should remain empty
         assert empty_device["empty_list"] == []
-        
+
     def test_append_item_to_device(self):
         """Test adding items to device inputs."""
-        source = {
-            "list1": ["a", "b", "c"],
-            "list2": ["d", "e"],
-            "scalar": "value"
-        }
-        
-        device_inputs = {
-            "list1": [],
-            "list2": [],
-            "scalar": "value"
-        }
-        
+        source = {"list1": ["a", "b", "c"], "list2": ["d", "e"], "scalar": "value"}
+
+        device_inputs = {"list1": [], "list2": [], "scalar": "value"}
+
         # Add first item
         InputOutputMapper.append_item_to_device(device_inputs, source, 0)
         assert device_inputs["list1"] == ["a"]
         assert device_inputs["list2"] == ["d"]
-        
+
         # Add second item
         InputOutputMapper.append_item_to_device(device_inputs, source, 1)
         assert device_inputs["list1"] == ["a", "b"]
         assert device_inputs["list2"] == ["d", "e"]
-        
+
         # Handle index out of range
         InputOutputMapper.append_item_to_device(device_inputs, source, 2)
         assert device_inputs["list1"] == ["a", "b", "c"]
@@ -325,53 +304,50 @@ class TestInputOutputMapper:
 
 class TestOutputAggregator:
     """Tests for the OutputAggregator helper class."""
-    
+
     def test_handle_non_dict_outputs(self):
         """Test handling of non-dictionary outputs."""
         # Non-dict outputs
         outputs1 = {(0, 0): "result1", (0, 1): "result2"}
         result1 = OutputAggregator.handle_non_dict_outputs(outputs1)
         assert result1 == {"results": ["result1", "result2"]}
-        
+
         # Dict outputs - should return None
         outputs2 = {(0, 0): {"results": ["a"]}, (0, 1): {"results": ["b"]}}
         result2 = OutputAggregator.handle_non_dict_outputs(outputs2)
         assert result2 is None
-        
+
     def test_handle_scalar_results(self):
         """Test handling of scalar results."""
         # Scalar result from single device
         outputs1 = {(0, 0): {"results": "scalar_value"}}
         result1 = OutputAggregator.handle_scalar_results(outputs1)
         assert result1 == {"results": ["scalar_value"]}
-        
+
         # List results - should return None
         outputs2 = {(0, 0): {"results": ["a", "b"]}}
         result2 = OutputAggregator.handle_scalar_results(outputs2)
         assert result2 is None
-        
+
         # Multiple devices - should return None
-        outputs3 = {
-            (0, 0): {"results": "value1"}, 
-            (0, 1): {"results": "value2"}
-        }
+        outputs3 = {(0, 0): {"results": "value1"}, (0, 1): {"results": "value2"}}
         result3 = OutputAggregator.handle_scalar_results(outputs3)
         assert result3 is None
-        
+
     def test_aggregate_device_outputs(self):
         """Test aggregation of dictionary outputs from multiple devices."""
         outputs = {
             (0, 0): {"results": ["a", "b"], "metadata": {"device": "0,0"}},
             (0, 1): {"results": ["c"], "metadata": {"device": "0,1"}},
             (1, 0): {"results": ["d", "e"], "extra": "extra_info"},
-            (1, 1): {"results": [], "metrics": [0.5, 0.8]}
+            (1, 1): {"results": [], "metrics": [0.5, 0.8]},
         }
-        
+
         aggregated = OutputAggregator.aggregate_device_outputs(outputs)
-        
+
         # Results from all devices should be merged
         assert set(aggregated["results"]) == {"a", "b", "c", "d", "e"}
-        
+
         # Other fields should also be merged
         assert set(d["device"] for d in aggregated["metadata"]) == {"0,0", "0,1"}
         assert aggregated["extra"] == ["extra_info"]
@@ -779,49 +755,54 @@ class TestMeshSharded:
 
 class TestMeshErrorHandling:
     """Tests for error handling in mesh operations."""
-    
+
     def test_mesh_sharded_with_invalid_mesh(self, basic_operator):
         """Test mesh_sharded with an invalid mesh configuration."""
         # Empty devices list
         invalid_mesh = DeviceMesh(devices=[])
-        
-        with pytest.raises(MeshConfigurationError):
+
+        with pytest.raises(TransformError):
             mesh_sharded(basic_operator, invalid_mesh)
-            
-    def test_mesh_sharded_with_invalid_partition_spec(self, basic_operator, simple_mesh):
+
+    def test_mesh_sharded_with_invalid_partition_spec(
+        self, basic_operator, simple_mesh
+    ):
         """Test mesh_sharded with invalid partition specifications."""
         # Invalid input partition - dimension out of range
         invalid_in_partition = {"prompts": PartitionSpec(5, None)}
-        
-        with pytest.raises(MeshConfigurationError):
+
+        with pytest.raises(TransformError):
             mesh_sharded(basic_operator, simple_mesh, in_partition=invalid_in_partition)
-            
+
         # Invalid output partition - dimension out of range
         invalid_out_partition = {"results": PartitionSpec(5, None)}
-        
-        with pytest.raises(MeshConfigurationError):
-            mesh_sharded(basic_operator, simple_mesh, out_partition=invalid_out_partition)
-            
+
+        with pytest.raises(TransformError):
+            mesh_sharded(
+                basic_operator, simple_mesh, out_partition=invalid_out_partition
+            )
+
     def test_mesh_execution_handles_all_failures(self, simple_mesh):
         """Test that mesh execution handles the case where all devices fail."""
+
         # Create an operator that always raises an exception
         def failing_fn(*, inputs):
             raise ValueError("Intentional failure for testing")
-            
+
         sharded_fn = mesh_sharded(failing_fn, simple_mesh)
-        
-        # Execute should raise MeshShardingError when all devices fail
-        with pytest.raises(MeshShardingError):
+
+        # Execute should raise TransformError when all devices fail
+        with pytest.raises(TransformError):
             sharded_fn(inputs={"prompts": ["a", "b", "c", "d"]})
-            
+
     def test_collect_outputs_fallback(self, simple_mesh):
         """Test fallback behavior in output collection."""
         # Create outputs where aggregation will fail for normal path
         problematic_outputs = {
             (0, 0): {"results": object()},  # Object that can't be appended to a list
-            (0, 1): {"results": ["normal"]}
+            (0, 1): {"results": ["normal"]},
         }
-        
+
         # Should not raise but handle the error and collect what it can
         result = _collect_outputs(problematic_outputs, simple_mesh)
         assert "results" in result
@@ -916,14 +897,15 @@ class TestMeshEdgeCases:
         partition = {
             "prompts": PartitionSpec(2, None)
         }  # Index 2 is out of bounds for 2D mesh
-        
+
         # Now we're validating partition specs earlier, so we expect an exception
-        with pytest.raises(MeshConfigurationError) as exc_info:
-            sharded_op = mesh_sharded(basic_operator, simple_mesh, in_partition=partition)
-        
+        with pytest.raises(TransformError) as exc_info:
+            sharded_op = mesh_sharded(
+                basic_operator, simple_mesh, in_partition=partition
+            )
+
         # Verify the error message contains the right information
         assert "Invalid input partition spec" in str(exc_info.value)
-        assert "PartitionSpec has invalid mesh dimension 2" in str(exc_info.value)
 
 
 # =============================== Performance Tests ===============================

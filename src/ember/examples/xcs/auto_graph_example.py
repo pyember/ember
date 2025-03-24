@@ -13,15 +13,15 @@ import time
 from typing import ClassVar, Optional, Type
 
 # simplified import from ember API
-from ember.api.xcs import jit, execution_options
+from ember.api.xcs import execution_options, jit
+
+# Import pre-built operators from standard library
+from ember.core import non
 
 # ember imports
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-
-# Import pre-built operators from standard library
-from ember.core import non
 
 ###############################################################################
 # Input/Output Models
