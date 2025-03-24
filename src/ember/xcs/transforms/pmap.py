@@ -36,7 +36,7 @@ InputT = TypeVar("InputT", bound=Mapping[str, Any])
 OutputT = TypeVar("OutputT", bound=Mapping[str, Any])
 
 
-# Legacy exceptions - using new hierarchy from ember.core.exceptions
+# Using exception hierarchy from ember.core.exceptions
 
 
 @dataclass
