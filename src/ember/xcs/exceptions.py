@@ -3,21 +3,35 @@ Exception hierarchy for the XCS module.
 
 This module defines a structured hierarchy of exceptions for the XCS system, enabling
 more precise error handling and better diagnostics.
+
+NOTE: This module re-exports exception classes from ember.core.exceptions
+with API compatibility for backward compatibility.
 """
 
 import logging
 from typing import Any, Dict, Optional
 
-from ember.core.exceptions import EmberError
+from ember.core.exceptions import (
+    CompilationError as CoreCompilationError,
+    DataFlowError as CoreDataFlowError,
+    EmberError,
+    ExecutionError as CoreExecutionError,
+    ParallelExecutionError as CoreParallelExecutionError,
+    SchedulerError as CoreSchedulerError,
+    TraceError as CoreTraceError,
+    TransformError as CoreTransformError,
+    XCSError as CoreXCSError,
+)
 
 
-class XCSError(EmberError):
+# API Compatibility wrapper
+class XCSError(CoreXCSError):
     """Base class for all XCS-related exceptions."""
 
     def __init__(self, message: str = "An error occurred in the XCS system"):
-        self.message = message
-        self.diagnostic_context: Dict[str, Any] = {}
-        super().__init__(message)
+        super().__init__(message=message)
+        # For backward compatibility - diagnostic_context is now self.context
+        self.diagnostic_context = self.context
 
     def add_context(self, **kwargs: Any) -> None:
         """Adding diagnostic context to the exception.
@@ -28,7 +42,9 @@ class XCSError(EmberError):
         Args:
             **kwargs: Key-value pairs to add to the diagnostic context.
         """
-        self.diagnostic_context.update(kwargs)
+        super().add_context(**kwargs)
+        # Keep diagnostic_context in sync with self.context
+        self.diagnostic_context = self.context
 
     def get_context_data(self) -> Dict[str, Any]:
         """Retrieving the diagnostic context data.
@@ -36,10 +52,10 @@ class XCSError(EmberError):
         Returns:
             Dictionary containing all diagnostic context for this exception.
         """
-        return self.diagnostic_context.copy()
+        return self.get_context()
 
 
-class TraceError(XCSError):
+class TraceError(CoreTraceError, XCSError):
     """Raised when an error occurs during tracing operations."""
 
     def __init__(
@@ -47,12 +63,12 @@ class TraceError(XCSError):
         message: str = "Error during execution tracing",
         operation_id: Optional[str] = None,
     ):
-        super().__init__(message)
+        super().__init__(message=message)
         if operation_id:
             self.add_context(operation_id=operation_id)
 
 
-class CompilationError(XCSError):
+class CompilationError(CoreCompilationError, XCSError):
     """Raised when an error occurs during graph compilation."""
 
     def __init__(
@@ -60,12 +76,12 @@ class CompilationError(XCSError):
         message: str = "Error during graph compilation",
         graph_id: Optional[str] = None,
     ):
-        super().__init__(message)
+        super().__init__(message=message)
         if graph_id:
             self.add_context(graph_id=graph_id)
 
 
-class ExecutionError(XCSError):
+class ExecutionError(CoreExecutionError, XCSError):
     """Raised when an error occurs during graph execution."""
 
     def __init__(
@@ -76,25 +92,20 @@ class ExecutionError(XCSError):
         **context_data: Any,
     ):
         self.node_id = node_id
-        self.cause = cause
         node_msg = f" in node '{node_id}'" if node_id else ""
         full_message = f"{message}{node_msg}"
-        if cause:
-            full_message += f": {str(cause)}"
-        super().__init__(full_message)
-        self.__cause__ = cause
+
+        super().__init__(message=full_message, cause=cause)
 
         # Add standard diagnostic context
         if node_id:
             self.add_context(node_id=node_id)
-        if cause:
-            self.add_context(error_type=type(cause).__name__, error_message=str(cause))
         # Add any additional context provided
         if context_data:
             self.add_context(**context_data)
 
 
-class TransformError(XCSError):
+class TransformError(CoreTransformError, XCSError):
     """Raised when an error occurs with XCS transforms."""
 
     def __init__(
@@ -106,19 +117,14 @@ class TransformError(XCSError):
         **context_data: Any,
     ):
         self.transform_name = transform_name
-        self.cause = cause
         transform_msg = f" in transform '{transform_name}'" if transform_name else ""
         full_message = f"{message}{transform_msg}"
-        if cause:
-            full_message += f": {str(cause)}"
-        super().__init__(full_message)
-        self.__cause__ = cause
+
+        super().__init__(message=full_message, cause=cause)
 
         # Add standard diagnostic context
         if transform_name:
             self.add_context(transform_name=transform_name)
-        if cause:
-            self.add_context(error_type=type(cause).__name__, error_message=str(cause))
         if details:
             self.add_context(**details)
         # Add any additional context provided
@@ -137,14 +143,10 @@ class TransformError(XCSError):
             logger: Logger to use for recording the error
             level: Logging level (default: ERROR)
         """
-        logger.log(
-            level,
-            f"{self.__class__.__name__}: {self.message}",
-            extra={"structured_data": self.get_context_data()},
-        )
+        super().log_with_context(logger, level)
 
 
-class ParallelExecutionError(ExecutionError):
+class ParallelExecutionError(CoreParallelExecutionError, ExecutionError):
     """Raised when parallel execution fails."""
 
     def __init__(
@@ -163,7 +165,7 @@ class ParallelExecutionError(ExecutionError):
         super().__init__(node_id, message, cause, **super_context)
 
 
-class DataFlowError(XCSError):
+class DataFlowError(CoreDataFlowError, XCSError):
     """Raised when there is an error in data flow analysis or processing."""
 
     def __init__(
@@ -173,7 +175,7 @@ class DataFlowError(XCSError):
         source_node: Optional[str] = None,
         target_node: Optional[str] = None,
     ):
-        super().__init__(message)
+        super().__init__(message=message)
 
         # Add data flow specific context
         context = {}
@@ -188,7 +190,7 @@ class DataFlowError(XCSError):
             self.add_context(**context)
 
 
-class SchedulerError(XCSError):
+class SchedulerError(CoreSchedulerError, XCSError):
     """Raised when there is an error in the XCS execution scheduler."""
 
     def __init__(
@@ -197,7 +199,7 @@ class SchedulerError(XCSError):
         graph_id: Optional[str] = None,
         scheduler_type: Optional[str] = None,
     ):
-        super().__init__(message)
+        super().__init__(message=message)
 
         # Add scheduler specific context
         context = {}
