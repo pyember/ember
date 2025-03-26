@@ -30,7 +30,14 @@ def get_model_service() -> ModelService:
     service = ModelService(registry=registry)
     
     # Register Mistral-Large-Instruct-2407 if not already registered
-    if not service.get_model("huggingface:mistralai/Mistral-Large-Instruct-2407"):
+    try:
+        # Try to get the model - will raise an exception if not found
+        service.get_model("huggingface:mistralai/Mistral-Large-Instruct-2407")
+        logger.info("Mistral model already registered")
+    except Exception:
+        # Model not found, register it
+        logger.info("Registering Mistral model")
+        
         # Get API key from environment variable or use a default for testing
         api_key = os.environ.get("HUGGINGFACE_API_KEY", "your_api_key_here")
         
@@ -42,7 +49,7 @@ def get_model_service() -> ModelService:
         )
         
         # Register the model
-        service.register_model(model_info)
+        registry.register_model(model_info)
     
     return service
 
