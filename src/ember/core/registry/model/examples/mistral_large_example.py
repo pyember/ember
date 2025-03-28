@@ -198,7 +198,6 @@ def main() -> None:
         function_calling_example(service)
         structured_output_example(service)
         
-        print("\nAll examples completed successfully!")
         
     except Exception as error:
         logger.exception("Error during examples: %s", error)

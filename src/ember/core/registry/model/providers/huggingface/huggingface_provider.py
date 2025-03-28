@@ -69,6 +69,7 @@ For higher-level usage, prefer the model registry or API interfaces:
     ```
 """
 
+import os
 import logging
 from typing import Any, Dict, List, Optional, Set, Union, cast
 
@@ -167,6 +168,7 @@ class HuggingFaceChatParameters(BaseChatParameters):
     """
 
     max_tokens: Optional[int] = Field(default=None)
+    timeout: Optional[int] = Field(default=30)
 
     @field_validator("max_tokens", mode="before")
     def enforce_default_if_none(cls, value: Optional[int]) -> int:
@@ -200,6 +202,27 @@ class HuggingFaceChatParameters(BaseChatParameters):
             )
         return value
 
+    @classmethod
+    def from_chat_request(cls, request: ChatRequest) -> "HuggingFaceChatParameters":
+        """Create HuggingFaceChatParameters from a ChatRequest.
+        
+        Args:
+            request: The chat request to convert.
+            
+        Returns:
+            HuggingFaceChatParameters: The converted parameters.
+        """
+        # Get timeout from provider_params if available, otherwise use default
+        timeout = request.provider_params.get("timeout", 30)
+        
+        return cls(
+            prompt=request.prompt,
+            context=request.context,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            timeout=timeout
+        )
+
     def to_huggingface_kwargs(self) -> Dict[str, Any]:
         """Convert chat parameters into keyword arguments for the Hugging Face API."""
         # Create the prompt with system context if provided
@@ -209,7 +232,6 @@ class HuggingFaceChatParameters(BaseChatParameters):
             "prompt": prompt,
             "max_new_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "timeout": self.timeout,
         }
 
 
@@ -307,6 +329,20 @@ class HuggingFaceModel(BaseProviderModel):
         super().__init__(model_info)
         self.tokenizer = None
         self._local_model = None
+        
+        # Get API key from model info or environment
+        #api_key = self._get_api_key()
+        api_key = os.environ.get("HUGGINGFACE_API_KEY")
+        
+        # Initialize the client with a supported backend
+        # Change from 'vllm' to 'text-generation-inference'
+        self.client = InferenceClient(
+            model=None,  # Will be set per request
+            token=api_key,
+            timeout=30,  # Default timeout
+            # Remove any backend specification or use a supported one:
+            # backend="text-generation-inference"
+        )
 
     def _normalize_huggingface_model_name(self, raw_name: str) -> str:
         """Normalize the Hugging Face model name.
@@ -424,139 +460,121 @@ class HuggingFaceModel(BaseProviderModel):
         wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3), reraise=True
     )
     def forward(self, request: ChatRequest) -> ChatResponse:
-        """Send a ChatRequest to the Hugging Face model and process the response.
-
-        Supports both remote inference via the Inference API and local model inference
-        based on configuration. Converts Ember parameters to Hugging Face parameters
-        and normalizes the response.
-
+        """Process a chat request and return a response.
+        
+        This method handles the core functionality of processing a chat request
+        through the Hugging Face API or local model, including:
+        1. Parameter validation and conversion
+        2. API request formatting
+        3. Error handling with retries
+        4. Response parsing and formatting
+        
         Args:
-            request (ChatRequest): The chat request containing the prompt along with
-                provider-specific parameters.
-
+            request: The chat request containing the prompt and parameters.
+            
         Returns:
-            ChatResponse: Contains the response text, raw output, and usage statistics.
-
+            ChatResponse: The model's response to the chat request.
+            
         Raises:
-            InvalidPromptError: If the prompt in the request is empty.
-            ProviderAPIError: For any unexpected errors during the API invocation.
+            ProviderAPIError: If there's an error communicating with the API.
         """
-        if not request.prompt:
-            raise InvalidPromptError.with_context(
-                "HuggingFace prompt cannot be empty.",
-                provider=self.PROVIDER_NAME,
-                model_name=self.model_info.name,
+        logger.info("HuggingFace forward invoked")
+        
+        # Convert parameters to HuggingFace format
+        # Get timeout from provider_params if available, otherwise use default
+        timeout = request.provider_params.get("timeout", 30)
+        
+        # Update the client with the new timeout if needed
+        if self.client.timeout != timeout:
+            # Re-initialize the client with the new timeout
+            api_key = self._get_api_key()
+            self.client = InferenceClient(
+                model=None,  # Will be set per request
+                token=api_key,
+                timeout=timeout  # Set timeout here, not in the request
             )
-
-        logger.info(
-            "HuggingFace forward invoked",
-            extra={
-                "provider": self.PROVIDER_NAME,
-                "model_name": self.model_info.name,
-                "prompt_length": len(request.prompt),
-            },
+        
+        params = HuggingFaceChatParameters(
+            prompt=request.prompt,
+            context=request.context,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            timeout=timeout  # Still keep this for other uses
         )
-
-        # Convert the universal ChatRequest into HuggingFace-specific parameters
-        hf_parameters: HuggingFaceChatParameters = HuggingFaceChatParameters(
-            **request.model_dump(exclude={"provider_params"})
-        )
-        hf_kwargs: Dict[str, Any] = hf_parameters.to_huggingface_kwargs()
-
-        # Merge provider-specific parameters
-        provider_params = cast(HuggingFaceProviderParams, request.provider_params)
-        # Only include non-None values
-        hf_kwargs.update(
-            {k: v for k, v in provider_params.items() if v is not None}
-        )
-
-        # Get normalized model name
+        
+        # Get the model ID from the model info
         model_id = self._normalize_huggingface_model_name(self.model_info.name)
         
-        # Check if we should use local model inference
-        use_local = hf_kwargs.pop("use_local_model", False)
+        # Check if we should use a local model
+        use_local = request.provider_params.get("use_local_model", False)
         
         try:
             if use_local:
-                # Local model inference
-                if self._local_model is None:
+                # Use local model if requested
+                if not self._local_model:
                     self._local_model = self._load_local_model(model_id)
                 
-                # Extract parameters for local inference
-                prompt = hf_kwargs.pop("prompt")
-                max_new_tokens = hf_kwargs.pop("max_new_tokens", 512)
-                temperature = hf_kwargs.pop("temperature", 0.7)
-                
-                # Run local inference
-                result = self._local_model(
-                    prompt,  # Pass the prompt directly
-                    max_new_tokens=max_new_tokens,
-                    temperature=temperature,
-                    **hf_kwargs
-                )
-                
-                # Extract the generated text
-                if isinstance(result, list) and len(result) > 0:
-                    # Most pipelines return a list of dictionaries
-                    generated_text = result[0].get("generated_text", "")
-                    
-                    # Remove the input prompt from the output if present
-                    if generated_text.startswith(prompt):
-                        generated_text = generated_text[len(prompt):].lstrip()
-                else:
-                    generated_text = str(result)
-                
-                # Create a raw output structure similar to API responses
-                raw_output = {
-                    "generated_text": generated_text,
-                    "model": model_id,
-                    "usage": {
-                        "prompt_tokens": self._count_tokens(prompt),
-                        "completion_tokens": self._count_tokens(generated_text),
-                    }
+                # Generate with local model
+                local_params = {
+                    "text": params.build_prompt(),
+                    "max_new_tokens": params.max_tokens,
+                    "temperature": params.temperature,
                 }
+                
+                # Add any additional parameters from provider_params
+                for key, value in request.provider_params.items():
+                    if key not in ["use_local_model"]:
+                        local_params[key] = value
+                
+                # Generate text with local model
+                result = self._local_model(**local_params)
+                generated_text = result[0]["generated_text"]
+                
+                # Create a response object
+                return ChatResponse(
+                    data=generated_text,
+                    model_id=self.model_info.id,
+                    usage=UsageStats(
+                        prompt_tokens=self._count_tokens(params.build_prompt()),
+                        completion_tokens=self._count_tokens(generated_text),
+                        total_tokens=self._count_tokens(params.build_prompt()) + self._count_tokens(generated_text),
+                        cost_usd=0.0,  # Local inference has no direct API cost
+                    ),
+                )
             else:
-                # Remote inference via the Inference API
-                # Remove timeout from kwargs as it's handled separately
-                timeout = hf_kwargs.pop("timeout", 30)  # Default 30 seconds timeout
+                # Use the Hugging Face Inference API
+                # Convert parameters to kwargs for the API
+                kwargs = params.to_huggingface_kwargs()
                 
-                # Get the prompt from kwargs
-                prompt = hf_kwargs.pop("prompt")
-                
-                # Call the text-generation endpoint
+                # Remove any backend specification that might be causing issues
+                if "backend" in kwargs:
+                    del kwargs["backend"]
+                    
+                # Make the API request
                 response = self.client.text_generation(
-                    prompt=prompt,  # Pass as named parameter
                     model=model_id,
-                    **hf_kwargs,  # Other parameters like temperature, max_new_tokens, etc.
+                    **kwargs
                 )
                 
-                # Extract the response text
-                generated_text = response
-                
-                # Create a raw output structure for usage calculation
-                raw_output = {
-                    "generated_text": generated_text,
-                    "model": model_id,
-                    "usage": {
-                        "prompt_tokens": self._count_tokens(prompt),
-                        "completion_tokens": self._count_tokens(generated_text),
-                    }
-                }
-            
-            # Calculate usage statistics
-            usage_stats = self.calculate_usage(raw_output=raw_output)
-            
-            return ChatResponse(data=generated_text, raw_output=raw_output, usage=usage_stats)
-        
-        except requests.exceptions.HTTPError as http_err:
-            if 500 <= http_err.response.status_code < 600:
-                logger.error("HuggingFace server error: %s", http_err)
-            raise
+                # Create a response object
+                return ChatResponse(
+                    data=response,
+                    model_id=self.model_info.id,
+                    usage=UsageStats(
+                        prompt_tokens=self._count_tokens(params.build_prompt()),
+                        completion_tokens=self._count_tokens(response),
+                        total_tokens=self._count_tokens(params.build_prompt()) + self._count_tokens(response),
+                        cost_usd=0.0,  # We don't have accurate cost info from the API
+                    ),
+                )
         except Exception as exc:
-            logger.exception("Unexpected error in HuggingFaceModel.forward()")
+            # Log the error
+            logger.error("HuggingFace server error: %s", exc)
+            
+            # Raise a provider-specific error
             raise ProviderAPIError.for_provider(
                 provider_name=self.PROVIDER_NAME,
-                message=f"API error: {str(exc)}",
+                message=f"Error generating text with HuggingFace model: {exc}",
                 cause=exc,
             )
 
