@@ -1,0 +1,257 @@
+[project]
+name = "ember-ai"
+version = "0.1.0"
+description = "Compositional framework for building and orchestrating Compound AI Systems and Networks of Networks (NONs)."
+authors = [
+    {name = "Jared Quincy Davis", email = "jaredq@cs.stanford.edu"}
+]
+maintainers = [
+    {name = "Ember Team", email = "team@pyember.org"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9,<3.13"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Operating System :: OS Independent",
+]
+keywords = ["AI", "LLM", "Networks of Networks", "Machine Learning", "Compound AI", "Orchestration", "AI Framework", "LLM Orchestration", "AI System Design"]
+dependencies = [
+    # Core dependencies
+    "pandas>=1.0.0,<2.2.0",
+    "numpy>=1.21.0,<1.27.0",
+    "pydantic>=2.7.4",
+    "pydantic-core>=2.18.4",
+    "pydantic-settings>=2.3.0",
+    "PyYAML>=6.0.1",
+    "typing_extensions>=4.12.2",
+    
+    # LLM providers - Core providers
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+    
+    # HTTP and async - Critical core functionality
+    "aiohttp>=3.9.5",
+    "aiosignal>=1.3.1",
+    "httpx>=0.27.0",
+    "requests>=2.32.2",
+    
+    # Data processing
+    "datasets>=2.20.0",
+    
+    # Core utilities - Required for robust operation
+    "tqdm>=4.67.1",
+    "tenacity>=9.0.0",
+    "cachetools>=5.4.0",
+    "dill>=0.3.8",
+    "prettytable>=3.12.0",  # Required for examples
+    
+    # Basic required dependencies
+    "annotated-types>=0.7.0",
+    "anyio>=4.4.0",
+    "attrs>=23.2.0",
+    "certifi>=2024.6.2",
+    "charset-normalizer>=3.3.2",
+    "packaging>=24.1",
+    "six>=1.16.0",
+    "idna>=3.7",
+    "urllib3>=1.26.19,<2.0.0",
+    "sniffio>=1.3.1",
+]
+
+[project.optional-dependencies]
+# Main extras groups
+all = [
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.13.1",
+    "huggingface-hub>=0.26.5",
+    "pyarrow>=16.1.0",
+    "pyarrow-hotfix>=0.6",
+    "matplotlib>=3.9.1",
+    "prettytable>=3.12.0",
+    "google-ai-generativelanguage>=0.6.6",
+    "google-api-core>=2.19.1",
+    "google-api-python-client>=2.139.0",
+    "google-auth>=2.32.0",
+    "google-auth-httplib2>=0.2.0",
+    "googleapis-common-protos>=1.63.2",
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.23.4",
+    "parameterized>=0.9.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.99.0",
+    "mutmut>=2.4.4",
+    "tox>=4.11.4",
+    "jupyterlab>=4.0.6",
+    "ipykernel>=6.26.0",
+    "black>=23.12.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.1",
+    "pylint>=3.0.2",
+    "pre-commit>=3.5.0",
+    "ruff>=0.1.6",
+    "sphinx>=7.1.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "nbsphinx>=0.9.3",
+    "myst-parser>=2.0.0",
+    "jupyter",
+    "notebook",
+]
+minimal = ["openai>=1.57.2"]  # Minimal viable installation with just OpenAI
+
+# Provider-specific extras
+openai = ["openai>=1.57.2"]
+anthropic = ["anthropic>=0.40.0"]
+google = [
+    "google-generativeai>=0.8.3",
+    "google-ai-generativelanguage>=0.6.6",
+    "google-api-core>=2.19.1",
+    "google-api-python-client>=2.139.0",
+    "google-auth>=2.32.0",
+    "google-auth-httplib2>=0.2.0",
+    "googleapis-common-protos>=1.63.2",
+]
+allproviders = [
+    "openai>=1.57.2",
+    "anthropic>=0.40.0",
+    "google-generativeai>=0.8.3",
+]
+
+# Feature-specific extras
+data = [
+    "datasets>=2.20.0",
+    "scikit-learn>=1.6.0",
+    "scipy>=1.13.1",
+    "huggingface-hub>=0.26.5",
+    "pyarrow>=16.1.0",
+    "pyarrow-hotfix>=0.6",
+]
+viz = [
+    "matplotlib>=3.9.1",
+    "prettytable>=3.12.0",
+]
+
+# Developer extras
+dev = [
+    "pytest>=8.3.2",
+    "pytest-asyncio>=0.23.4",
+    "parameterized>=0.9.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.99.0",
+    "mutmut>=2.4.4",
+    "tox>=4.11.4",
+    "jupyterlab>=4.0.6",
+    "ipykernel>=6.26.0",
+    "black>=23.12.0",
+    "isort>=5.12.0",
+    "mypy>=1.7.1",
+    "pylint>=3.0.2",
+    "pre-commit>=3.5.0",
+    "ruff>=0.1.6",
+]
+docs = [
+    "sphinx>=7.1.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "nbsphinx>=0.9.3",
+    "myst-parser>=2.0.0",
+    "jupyter",
+    "notebook",
+]
+
+[project.urls]
+repository = "https://github.com/pyember/ember"
+documentation = "https://docs.pyember.org"
+homepage = "https://pyember.org"
+
+[project.entry-points."ember.dataset_preppers"]
+truthful_qa = "ember.core.utils.data.datasets_registry.truthful_qa:TruthfulQAPrepper"
+short_answer = "ember.core.utils.data.datasets_registry.short_answer:ShortAnswerPrepper"
+commonsense_qa = "ember.core.utils.data.datasets_registry.commonsense_qa:CommonsenseQAPrepper"
+halueval = "ember.core.utils.data.datasets_registry.halueval:HaluEvalPrepper"
+mmlu = "ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper"
+
+[tool.pytest.ini_options]
+pythonpath = [
+    "src",
+    "tests"
+]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+addopts = "--import-mode=importlib --cov=src/ember --cov-report=term --cov-report=html --cov-report=xml"
+
+[tool.coverage.run]
+source = ["src/ember"]
+omit = ["*/__init__.py", "*/test_*.py", "tests/*"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING",
+    "pass",
+    "\\.\\.\\."
+]
+fail_under = 90
+show_missing = true
+
+[tool.hypothesis]
+deadline = 500
+max_examples = 100
+verbosity = 1
+suppress_health_check = ["too_slow"]
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+line_length = 88
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+strict_optional = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+select = ["E", "F", "B", "I"]
+ignore = []
+
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["ember"]
+
+# CLI is being developed separately and is currently excluded
+# [project.scripts]
+# ember = "ember.cli:main"

@@ -1,0 +1,98 @@
+# Ember Configuration Example
+#
+# This file demonstrates the structure and options for configuring Ember.
+# Copy this file to 'config.yaml' in your project root and customize as needed.
+
+# Registry configuration controls the model registry behavior
+registry:
+  # Whether to automatically discover models from provider APIs
+  auto_discover: true
+  
+  # Provider configurations
+  providers:
+    # OpenAI provider
+    openai:
+      # Whether this provider is enabled
+      enabled: true
+      
+      # API keys with named profiles
+      api_keys:
+        default:
+          key: "${OPENAI_API_KEY}"
+        secondary:
+          key: "${OPENAI_BACKUP_API_KEY}"
+          org_id: "org-123456"
+      
+      # Optional provider-specific settings
+      base_url: "https://api.openai.com/v1"
+      timeout: 30.0
+      
+      # Model configurations as a list
+      models:
+        - id: "openai:gpt-4o"
+          name: "GPT-4o"
+          provider: "openai"
+          
+          # Cost configuration
+          cost:
+            input_cost_per_thousand: 5.0
+            output_cost_per_thousand: 15.0
+          
+          # Rate limiting
+          rate_limit:
+            tokens_per_minute: 100000
+            requests_per_minute: 500
+          
+          # Optional model-specific parameters
+          parameters:
+            temperature: 0.7
+            max_tokens: 1000
+            context_length: 128000
+            vision_enabled: true
+        
+        # Another model example
+        - id: "openai:gpt-3.5-turbo"
+          name: "GPT-3.5 Turbo"
+          provider: "openai"
+          cost:
+            input_cost_per_thousand: 0.5
+            output_cost_per_thousand: 1.5
+          rate_limit:
+            tokens_per_minute: 180000
+            requests_per_minute: 600
+    
+    # Anthropic provider
+    anthropic:
+      enabled: true
+      api_keys:
+        default:
+          key: "${ANTHROPIC_API_KEY}"
+      models:
+        - id: "anthropic:claude-3-opus"
+          name: "Claude 3 Opus"
+          provider: "anthropic"
+          cost:
+            input_cost_per_thousand: 15.0
+            output_cost_per_thousand: 75.0
+          
+        - id: "anthropic:claude-3-sonnet"
+          name: "Claude 3 Sonnet"
+          provider: "anthropic"
+          cost:
+            input_cost_per_thousand: 3.0
+            output_cost_per_thousand: 15.0
+
+# Logging configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+  
+  # Optional extended logging configuration
+  file: "ember.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Additional custom sections can be added as needed
+cache:
+  enabled: true
+  directory: ".cache"
+  ttl_seconds: 3600
