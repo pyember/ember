@@ -243,7 +243,7 @@ class HuggingFaceChatParameters(BaseChatParameters):
         """Convert chat parameters into keyword arguments for the Hugging Face API."""
         # Create the prompt with system context if provided
         prompt = self.build_prompt()
-        logger.info("prompt: ", prompt)
+        logger.info("prompt: %s", prompt)
         
         return {
             "prompt": prompt,
@@ -564,13 +564,13 @@ class HuggingFaceModel(BaseProviderModel):
                 # Use the Hugging Face Inference API
                 # Convert parameters to kwargs for the API
                 kwargs = params.to_huggingface_kwargs()
-                logger.info("kwargs: ", kwargs)
+                logger.info("kwargs: %s", kwargs)
                 # Remove any backend specification that might be causing issues
                 if "backend" in kwargs:
                     del kwargs["backend"]
                     
                 # Make the API request
-                logger.info("model_id: ", model_id)
+                logger.info("model_id: %s", model_id)
                 response = self.client.text_generation(
                     model=model_id,
                     **kwargs
@@ -623,32 +623,4 @@ class HuggingFaceModel(BaseProviderModel):
             # Fall back to a rough approximation if tokenizer fails
             return len(text.split())
 
-    def calculate_usage(self, raw_output: Any) -> UsageStats:
-        """Calculate usage statistics based on the model response.
-
-        Extracts token counts from the raw output and calculates cost based on
-        the model's cost configuration.
-
-        Args:
-            raw_output (Any): The raw response data containing token counts.
-
-        Returns:
-            UsageStats: An object containing token counts and cost metrics.
-        """
-        # Extract usage information from raw output
-        usage_data = raw_output.get("usage", {})
-        prompt_tokens = usage_data.get("prompt_tokens", 0)
-        completion_tokens = usage_data.get("completion_tokens", 0)
-        total_tokens = prompt_tokens + completion_tokens
-        
-        # Calculate cost based on model cost configuration
-        input_cost = (prompt_tokens / 1000.0) * self.model_info.cost.input_cost_per_thousand
-        output_cost = (completion_tokens / 1000.0) * self.model_info.cost.output_cost_per_thousand
-        total_cost = round(input_cost + output_cost, 6)
-        
-        return UsageStats(
-            total_tokens=total_tokens,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            cost_usd=total_cost,
-        ) 
+    

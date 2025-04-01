@@ -1,4 +1,4 @@
-"""Mistral-7B-Instruct-v0.2 usage example.
+"""Mistral-7B-Instruct-v0.2 usage example using Hugging Face Inference API.
 
 This module demonstrates how to use the Mistral-7B-Instruct-v0.2 model
 through the Ember framework, showcasing instruction following capabilities
@@ -13,8 +13,6 @@ from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.initialization import initialize_registry
-# from ember.core.registry.model.base.schemas.model_registry import models
-# from ember.core.registry.model.base.schemas.base_provider_model import BaseProviderModel
 from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 # Configure logging
