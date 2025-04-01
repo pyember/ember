@@ -1,8 +1,8 @@
-"""Mistral-Large-Instruct-2407 usage example.
+"""Mistral-7B-Instruct-v0.2 usage example.
 
-This module demonstrates how to use the Mistral-Large-Instruct-2407 model
-through the Ember framework, showcasing various capabilities including
-function calling and structured output.
+This module demonstrates how to use the Mistral-7B-Instruct-v0.2 model
+through the Ember framework, showcasing instruction following capabilities
+and chat-oriented generation.
 """
 
 import logging
@@ -13,6 +13,9 @@ from ember.core.registry.model.base.schemas.chat_schemas import ChatResponse
 from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
 from ember.core.registry.model.base.services.model_service import ModelService
 from ember.core.registry.model.initialization import initialize_registry
+# from ember.core.registry.model.base.schemas.model_registry import models
+# from ember.core.registry.model.base.schemas.base_provider_model import BaseProviderModel
+from ember.core.registry.model.base.schemas.cost import ModelCost, RateLimit
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,19 +23,19 @@ logger = logging.getLogger(__name__)
 
 
 def get_model_service() -> ModelService:
-    """Get the model service with Mistral-Large-Instruct-2407 registered.
+    """Get the model service with Mistral-7B-Instruct-v0.2 registered.
 
     Returns:
-        A ModelService instance with Mistral-Large-Instruct-2407 registered
+        A ModelService instance with Mistral-7B-Instruct-v0.2 registered
     """
     # Initialize the registry
     registry = initialize_registry(auto_discover=True)
     service = ModelService(registry=registry)
     
-    # Register Mistral-Large-Instruct-2407 if not already registered
+    # Register Mistral-7B-Instruct-v0.2 if not already registered
     try:
         # Try to get the model - will raise an exception if not found
-        service.get_model("huggingface:mistralai/Mistral-Large-Instruct-2407")
+        service.get_model("huggingface:mistralai/Mistral-7B-Instruct-v0.2")
         logger.info("Mistral model already registered")
     except Exception:
         # Model not found, register it
@@ -43,9 +46,13 @@ def get_model_service() -> ModelService:
         
         # Create model info
         model_info = ModelInfo(
-            id="huggingface:mistralai/Mistral-Large-Instruct-2407",
-            name="mistralai/Mistral-Large-Instruct-2407",
+            id="huggingface:mistralai/Mistral-7B-Instruct-v0.2",
+            name="mistralai/Mistral-7B-Instruct-v0.2",
             provider=ProviderInfo(name="HuggingFace", default_api_key=api_key),
+            cost=ModelCost(
+                input_cost_per_thousand=0.0,
+                output_cost_per_thousand=0.0,
+            ),
         )
         
         # Register the model
@@ -54,150 +61,100 @@ def get_model_service() -> ModelService:
     return service
 
 
-def basic_generation_example(service: ModelService) -> None:
-    """Demonstrate basic text generation with Mistral-Large-Instruct-2407.
+def basic_instruction_example(service: ModelService) -> None:
+    """Basic instruction following with Mistral-7B-Instruct-v0.2.
+    
+    This example shows how to provide instructions and get responses.
     
     Args:
-        service: The model service with Mistral-Large registered
+        service: The model service with Mistral-7B-Instruct-v0.2 registered
     """
-    logger.info("Running basic generation example...")
-    
     try:
-        # Example 1: Using the service to invoke the model
-        response = service.invoke_model(
-            model_id="huggingface:mistralai/Mistral-Large-Instruct-2407",
-            prompt="Explain quantum computing in simple terms.",
+        # Get the model
+        mistral_model = service.get_model("huggingface:mistralai/Mistral-7B-Instruct-v0.2")
+        
+        # Generate a response to an instruction
+        response = mistral_model(
+            "Explain what artificial intelligence is to a 10-year old child.",
             temperature=0.7,
-            max_tokens=256
+            max_tokens=150
         )
         
-        print("\n=== Basic Generation ===")
+        print("\n=== Basic Instruction ===")
         print(f"Response: {response.data}")
-        print(f"Token usage: {response.usage.total_tokens} tokens")
+        print(f"Used {response.usage.total_tokens} tokens")
         
     except Exception as error:
-        logger.exception("Error during basic generation: %s", error)
+        logger.exception("Error during basic instruction: %s", error)
 
 
-def function_calling_example(service: ModelService) -> None:
-    """Demonstrate function calling with Mistral-Large-Instruct-2407.
+def creative_writing_example(service: ModelService) -> None:
+    """Creative writing example with Mistral-7B-Instruct-v0.2.
+    
+    This example demonstrates using the model for creative writing tasks.
     
     Args:
-        service: The model service with Mistral-Large registered
+        service: The model service with Mistral-7B-Instruct-v0.2 registered
     """
-    logger.info("Running function calling example...")
-    
     try:
-        # Get the model directly
-        mistral_model = service.get_model("huggingface:mistralai/Mistral-Large-Instruct-2407")
+        # Get the model
+        mistral_model = service.get_model("huggingface:mistralai/Mistral-7B-Instruct-v0.2")
         
-        # Define a weather function
-        weather_function = {
-            "function": {
-                "name": "get_current_weather",
-                "description": "Get the current weather in a given location",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "location": {
-                            "type": "string",
-                            "description": "The city and state, e.g. San Francisco, CA",
-                        },
-                        "format": {
-                            "type": "string",
-                            "enum": ["celsius", "fahrenheit"],
-                            "description": "The temperature unit to use.",
-                        },
-                    },
-                    "required": ["location", "format"],
-                }
-            }
-        }
-        
-        # Call with function calling capabilities
+        # Create a short story prompt
         response = mistral_model(
-            "What's the weather like today in Paris and New York?",
-            temperature=0.2,  # Lower temperature for more deterministic outputs
-            provider_params={"tools": [weather_function]}
+            "Write a short story about a robot discovering emotions for the first time. Make it touching and meaningful.",
+            temperature=0.8,  # Higher temperature for more creativity
+            max_tokens=300
         )
         
-        print("\n=== Function Calling ===")
+        print("\n=== Creative Writing ===")
         print(f"Response: {response.data}")
-        print(f"Raw output: {response.raw_output}")
+        print(f"Used {response.usage.total_tokens} tokens")
         
     except Exception as error:
-        logger.exception("Error during function calling: %s", error)
+        logger.exception("Error during creative writing: %s", error)
 
 
-def structured_output_example(service: ModelService) -> None:
-    """Demonstrate structured output with Mistral-Large-Instruct-2407.
+def factual_qa_example(service: ModelService) -> None:
+    """Factual Q&A example with Mistral-7B-Instruct-v0.2.
+    
+    This example tests the model's ability to answer factual questions.
     
     Args:
-        service: The model service with Mistral-Large registered
+        service: The model service with Mistral-7B-Instruct-v0.2 registered
     """
-    logger.info("Running structured output example...")
-    
     try:
-        # Get the model directly
-        mistral_model = service.get_model("huggingface:mistralai/Mistral-Large-Instruct-2407")
+        # Get the model
+        mistral_model = service.get_model("huggingface:mistralai/Mistral-7B-Instruct-v0.2")
         
-        # Define a JSON schema for structured output
-        json_schema = {
-            "type": "object",
-            "properties": {
-                "cities": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "name": {"type": "string"},
-                            "country": {"type": "string"},
-                            "population": {"type": "integer"},
-                            "famous_landmarks": {
-                                "type": "array",
-                                "items": {"type": "string"}
-                            }
-                        },
-                        "required": ["name", "country", "population", "famous_landmarks"]
-                    }
-                }
-            },
-            "required": ["cities"]
-        }
-        
-        # Call with structured output
+        # Ask a factual question
         response = mistral_model(
-            "List the 3 most populous cities in Europe with their famous landmarks.",
-            temperature=0.3,
-            provider_params={"grammar": {"type": "json", "value": json_schema}}
+            "What are the main components of the solar system? List the planets in order from the sun.",
+            temperature=0.3,  # Lower temperature for more factual responses
+            max_tokens=200
         )
         
-        print("\n=== Structured Output ===")
+        print("\n=== Factual Q&A ===")
         print(f"Response: {response.data}")
-        
-        # You could parse this as JSON
-        # import json
-        # structured_data = json.loads(response.data)
-        # print(f"First city: {structured_data['cities'][0]['name']}")
+        print(f"Used {response.usage.total_tokens} tokens")
         
     except Exception as error:
-        logger.exception("Error during structured output: %s", error)
+        logger.exception("Error during factual Q&A: %s", error)
 
 
 def main() -> None:
-    """Run all Mistral-Large-Instruct-2407 examples."""
-    print("Mistral-Large-Instruct-2407 Usage Examples")
-    print("=========================================")
+    """Run all Mistral-7B-Instruct-v0.2 examples."""
+    print("Mistral-7B-Instruct-v0.2 Usage Examples")
+    print("========================================")
     
     try:
         # Get the model service with Mistral registered
         service = get_model_service()
         
         # Run examples
-        basic_generation_example(service)
-        function_calling_example(service)
-        structured_output_example(service)
-        
+        basic_instruction_example(service)
+        creative_writing_example(service)
+        factual_qa_example(service)
         
     except Exception as error:
         logger.exception("Error during examples: %s", error)

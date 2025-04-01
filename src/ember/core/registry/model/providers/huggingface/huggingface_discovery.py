@@ -37,9 +37,11 @@ class HuggingFaceDiscovery(ModelDiscoveryBase):
         
         # For now, just return a predefined list of popular models
         models = [
+            # Prioritize the Mistral Instruct model
             self._create_model_info("mistralai/Mistral-7B-Instruct-v0.2"),
             self._create_model_info("meta-llama/Llama-2-7b-chat-hf"),
-            self._create_model_info("mistralai/Mistral-Large-Instruct-2407"),
+            # Keep the base model for comparison
+            self._create_model_info("mistralai/Mistral-7B-v0.3"),
             self._create_model_info("google/gemma-7b-it"),
         ]
         

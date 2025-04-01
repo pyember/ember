@@ -57,6 +57,15 @@ Usage example:
 
     # Accessing usage statistics
     print(f"Used {response.usage.total_tokens} tokens")
+
+    # Using the default model
+    response = model("What is Ember?")
+
+    # Temporarily using a different model for a specific request
+    response = model(
+        "What is Ember?",
+        provider_params={"model_name": "mistralai/Mistral-7B-Instruct-v0.2"}
+    )
     ```
 
 For higher-level usage, prefer the model registry or API interfaces:
@@ -64,7 +73,7 @@ For higher-level usage, prefer the model registry or API interfaces:
     from ember.api.models import models
 
     # Using the models API (automatically handles authentication)
-    response = models.huggingface.mistral_7b("Tell me about Ember")
+    response = models.huggingface.mistral_7b_instruct("Tell me about Ember")
     print(response.data)
     ```
 """
@@ -119,6 +128,8 @@ class HuggingFaceProviderParams(ProviderParams):
     ```
 
     Attributes:
+        model_name: Optional string specifying an alternative model name to use for this
+            request, overriding the default model associated with this provider instance.
         top_p: Optional float between 0 and 1 for nucleus sampling, controlling the
             cumulative probability threshold for token selection.
         top_k: Optional integer limiting the number of tokens considered at each generation step.
@@ -131,8 +142,11 @@ class HuggingFaceProviderParams(ProviderParams):
         seed: Optional integer for deterministic sampling, ensuring repeatable outputs.
         use_local_model: Optional boolean to use a locally downloaded model instead of
             the Inference API. When True, the model will be downloaded and loaded locally.
+        tools: Optional list of tool definitions for function calling capabilities.
+        grammar: Optional grammar specification for structured output.
     """
 
+    model_name: Optional[str]
     top_p: Optional[float]
     top_k: Optional[int]
     max_new_tokens: Optional[int]
@@ -142,6 +156,8 @@ class HuggingFaceProviderParams(ProviderParams):
     stop_sequences: Optional[List[str]]
     seed: Optional[int]
     use_local_model: Optional[bool]
+    tools: Optional[List[Dict[str, Any]]]
+    grammar: Optional[Dict[str, Any]]
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -227,12 +243,14 @@ class HuggingFaceChatParameters(BaseChatParameters):
         """Convert chat parameters into keyword arguments for the Hugging Face API."""
         # Create the prompt with system context if provided
         prompt = self.build_prompt()
+        logger.info("prompt: ", prompt)
         
         return {
             "prompt": prompt,
             "max_new_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
+    
 
 
 class HuggingFaceConfig:
@@ -502,8 +520,9 @@ class HuggingFaceModel(BaseProviderModel):
             timeout=timeout  # Still keep this for other uses
         )
         
-        # Get the model ID from the model info
-        model_id = self._normalize_huggingface_model_name(self.model_info.name)
+        # Get model name - allow override via provider_params
+        model_name = request.provider_params.get("model_name", self.model_info.name)
+        model_id = self._normalize_huggingface_model_name(model_name)
         
         # Check if we should use a local model
         use_local = request.provider_params.get("use_local_model", False)
@@ -545,12 +564,13 @@ class HuggingFaceModel(BaseProviderModel):
                 # Use the Hugging Face Inference API
                 # Convert parameters to kwargs for the API
                 kwargs = params.to_huggingface_kwargs()
-                
+                logger.info("kwargs: ", kwargs)
                 # Remove any backend specification that might be causing issues
                 if "backend" in kwargs:
                     del kwargs["backend"]
                     
                 # Make the API request
+                logger.info("model_id: ", model_id)
                 response = self.client.text_generation(
                     model=model_id,
                     **kwargs
