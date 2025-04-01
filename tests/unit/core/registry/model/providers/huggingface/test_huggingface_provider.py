@@ -159,40 +159,4 @@ def test_huggingface_call_interface(hf_model):
         provider_params={"top_p": 0.95}
     )
     
-#     # Verify response
-#     assert "Test response from Hugging Face." in response.data
 
-
-# def test_local_model_inference(monkeypatch: pytest.MonkeyPatch):
-#     """Test local model inference path."""
-#     # Mock the client creation to avoid real API calls
-#     with patch("huggingface_hub.InferenceClient") as mock_client_cls:
-#         mock_client = MagicMock()
-#         mock_client.text_generation = MagicMock(return_value="Test response from Hugging Face.")
-#         mock_client_cls.return_value = mock_client
-        
-#         # Create model instance
-#         model = HuggingFaceModel(create_dummy_model_info())
-        
-#         # Replace the client to ensure our mock is used
-#         model.client = mock_client
-        
-#         # Create the local model mock
-#         mock_local_model = MagicMock()
-#         mock_local_model.return_value = [{"generated_text": "Local model response"}]
-        
-#         # Directly set the local model (don't rely on _load_local_model)
-#         model._local_model = mock_local_model
-        
-#         # Mock token counting
-#         monkeypatch.setattr(model, "_count_tokens", lambda x: len(x.split()))
-        
-#         # Test with local model flag
-#         response = model(
-#             "What is Ember?",
-#             provider_params={"use_local_model": True}
-#         )
-        
-#         # Verify response uses local model path
-#         assert "Local model response" in response.data
-#         mock_local_model.assert_called_once()
