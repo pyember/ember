@@ -2,3 +2,10 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Test files
+ember_test
+
+# Environment Files
+.venv
+.env
