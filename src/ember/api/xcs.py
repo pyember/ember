@@ -1,8 +1,8 @@
 """XCS API for Ember.
 
-This module provides a clean interface for working with the XCS execution framework
-in Ember, offering high-performance execution capabilities for computational graphs,
-just-in-time tracing, and parallel execution transformations.
+This module provides a clean interface for working with the XCS (Accelerated Compound Systems) 
+execution framework in Ember, offering high-performance execution capabilities for computational 
+graphs, just-in-time tracing, and parallel execution transformations.
 
 Examples:
     # Basic JIT compilation (defaults to trace-based)
@@ -34,12 +34,6 @@ Examples:
             result2 = self.op2(inputs=inputs)
             return combine(result1, result2)
 
-    # Legacy syntax (still supported but not recommended)
-    @xcs.structural_jit(execution_strategy="parallel")
-    class LegacyOperator(Operator):
-        # implementation...
-        pass
-
     # Using vectorized mapping
     @xcs.vmap(in_axes=(0, None))
     def process_batch(inputs, model):
@@ -51,39 +45,32 @@ Examples:
         return heavy_computation(inputs)
 """
 
-# Import from the implementation
+# Import from the unified implementation directly
 from ember.xcs import (
-    DeviceMesh,  # Device mesh for distribution
-    ExecutionResult,  # Result of execution
-    JITOptions,  # Options for JIT
-    PartitionSpec,  # Partition specification
-    TraceContextData,  # Trace context data
-    TracerContext,  # Context for tracing
-    TraceRecord,  # Record of traces
-    TransformOptions,  # Options for transforms
-    XCSExecutionOptions,  # Options for execution
-    autograph,  # Automatic graph building
-    execute,  # Direct graph execution
-    jit,  # Just-in-time compilation
-    mesh_sharded,  # Sharded execution
-    pmap,  # Parallel mapping
-    structural_jit,  # Structural JIT compilation
-    vmap,  # Vectorized mapping
-    xcs,  # Core execution framework; Core functions; Transforms; Tracing; Types; XCS core interface
+    DeviceMesh,
+    ExecutionResult,
+    JITOptions,
+    PartitionSpec,
+    TraceContextData,
+    TracerContext,
+    TraceRecord,
+    TransformOptions,
+    XCSExecutionOptions,
+    autograph,
+    execute_graph as execute,
+    jit,
+    mesh_sharded,
+    pmap,
+    vmap,
+    execution_options,
 )
 
-# Import execution options directly - essential for controlling parallel execution
-from ember.xcs.engine.execution_options import execution_options
-
 __all__ = [
-    # Core execution framework
-    "xcs",
     # Core functions
     "jit",
-    "structural_jit",  # Advanced structure-aware JIT
     "autograph",
     "execute",
-    "execution_options",  # Essential for execution control
+    "execution_options",
     # Transforms
     "vmap",
     "pmap",

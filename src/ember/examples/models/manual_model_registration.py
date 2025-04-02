@@ -3,6 +3,31 @@
 This example demonstrates how to manually register models with the ModelRegistry
 using the new simplified API.
 
+IMPORTANT: Model pricing and context window information must be manually configured!
+When models are discovered via API, they DO NOT include pricing or context window 
+information automatically. You must:
+
+1. Add this information in your config.yaml file in the project root:
+   ```yaml
+   model_registry:
+     providers:
+       openai:
+         models:
+           - id: "gpt-4o"
+             name: "GPT-4o"
+             context_window: 128000  # <-- Add this for context window
+             cost:
+               input_cost_per_thousand: 5.0
+               output_cost_per_thousand: 15.0
+   ```
+
+2. Or register models with complete information in code using the ModelInfo class
+   as shown in the register_openai_models() and register_anthropic_models() functions below.
+
+See model pricing and specifications:
+https://docs.anthropic.com/en/docs/about-claude/models/all-models
+https://openai.com/api/pricing/
+
 To run:
     uv run python src/ember/examples/models/manual_model_registration.py
 

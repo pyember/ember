@@ -1,232 +1,144 @@
-# Ember XCS: High-Performance Execution Framework
+# Ember XCS: Unified Execution Framework
 
-The Ember XCS (Accelerated Compound Systems) module provides a high-performance distributed
-execution framework for computational graphs. It implements a directed acyclic graph (DAG)
-architecture for operator composition, intelligent scheduling, and just-in-time tracing.
+XCS (Accelerated Compound Systems) provides a high-performance distributed execution framework for computational graphs. It implements a directed acyclic graph (DAG) architecture for operator composition, intelligent scheduling, and just-in-time compilation.
 
 ## Architecture
 
-XCS follows a clean, modular architecture with well-defined layers:
+XCS follows a clean, unified architecture with stratified layers:
 
-1. **Facade Layer** (`__init__.py`): Providing a simple, unified API that abstracts implementation details
-2. **Component Layer**:
-   - `tracer/`: JIT compilation and graph building mechanisms
-   - `engine/`: Execution scheduling and runtime optimization
-   - `transforms/`: Function transformations (vectorization, parallelization)
-   - `graph/`: Computational graph representation and manipulation
-   - `utils/`: Shared utilities and helper functions
+1. **Protocol Layer**: Core interfaces defining component contracts
+2. **Strategy Layer**: Pluggable strategy implementations for each component
+3. **Implementation Layer**: Concrete implementations with consistent interfaces
+4. **Facade Layer**: Simplified public API abstracting implementation details
 
 ## Key Components
 
-### JIT Tracing and Optimization
+### JIT Compilation
 
-The JIT (Just-In-Time) tracing system enables automatic optimization of operator execution
-by analyzing operator structure and execution patterns:
+The JIT system combines multiple compilation strategies under a consistent interface:
 
 ```python
-from ember.xcs import jit, structural_jit
+from ember.xcs import jit
 
-# Basic JIT compilation
+# Simple usage with automatic strategy selection
 @jit
-class SimpleOperator(Operator):
+class MyOperator(Operator):
     def forward(self, *, inputs):
-        # Simple processing logic
-        return {"result": process(inputs["query"])}
+        return {"result": process(inputs["data"])}
 
-# Advanced structural optimization for complex operators
-@structural_jit(execution_strategy="auto", parallel_threshold=3)
+# Parameterized usage with explicit strategy
+@jit(mode="enhanced", sample_input={"query": "example"})
 class CompositeOperator(Operator):
     def __init__(self):
         self.op1 = SubOperator1()
         self.op2 = SubOperator2()
-        self.op3 = SubOperator3()
     
     def forward(self, *, inputs):
-        # Multi-stage execution with automatic parallelization
-        stage1 = self.op1(inputs=inputs)
-        stage2 = self.op2(inputs=stage1)
-        return self.op3(inputs=stage2)
+        intermediate = self.op1(inputs=inputs)
+        return self.op2(inputs=intermediate)
 ```
 
-### Automatic Graph Building and Execution
+### Dependency Analysis
 
-Building execution graphs automatically from traced execution, enabling optimization
-and parallel execution:
+Provides unified dependency tracking and analysis for all graph operations:
+
+- Efficient transitive closure calculation
+- Topological sorting with cycle detection
+- Execution wave calculation for parallel scheduling
+
+### Execution Scheduling
+
+Unified scheduler implementations share a common interface and strategy pattern:
 
 ```python
-from ember.xcs import autograph, execute, execution_options
+from ember.xcs import jit, execution_options, create_scheduler
 
-# Recording operations into a graph
-with autograph() as graph:
-    # Operations are recorded, not executed
-    x = op1(inputs={"query": "Example"})
-    y = op2(inputs=x)
-    z = op3(inputs=y)
+# Using the JIT decorator with explicit execution options
+@jit
+class MyOperator(Operator):
+    def forward(self, *, inputs):
+        return {"result": process(inputs["data"])}
+
+# Create an instance of the operator
+op = MyOperator()
+
+# Control execution with context manager
+with execution_options(scheduler="wave", max_workers=4):
+    results = op(inputs={"query": "example"})
     
-# Configuring execution parameters
-opts = execution_options(
-    max_workers=4,    # Using 4 worker threads
-    scheduler="parallel"  # Enabling parallel execution
-)
-
-# Executing the graph with optimization
-results = execute(graph, options=opts)
-print(f"Final result: {results['z']}")
-
-# Selective execution of specific nodes
-subset_results = execute(graph, output_nodes=["y"])
+# Or create a custom scheduler directly
+scheduler = create_scheduler("parallel", max_workers=8)
 ```
 
 ### Function Transformations
 
-The transform system provides high-level operations for batching, parallelization, and
-distributed execution:
+High-level operations for batching and parallelization:
 
 ```python
-from ember.xcs import vmap, pmap, mesh_sharded
-from ember.xcs import DeviceMesh, PartitionSpec
+from ember.xcs import vmap, pmap, pjit, compose
 
-# Creating a simple function to transform
-def process_item(item):
-    return {"processed": transform(item["data"]), "id": item["id"]}
+# Vectorizing a function for batch processing
+batch_process = vmap(process_item)
+batch_results = batch_process(inputs={"data": ["item1", "item2", "item3"]})
 
-# Vectorizing for batch processing
-batch_fn = vmap(process_item)
-batch_results = batch_fn(inputs={
-    "data": ["item1", "item2", "item3"],
-    "id": [1, 2, 3],
-    "options": {"format": "json"}  # Non-batched param applied to all items
-})
-# batch_results == {"processed": ["ITEM1", "ITEM2", "ITEM3"], "id": [1, 2, 3]}
+# Parallelizing execution across multiple workers
+parallel_process = pmap(process_item, num_workers=4)
+parallel_results = parallel_process(inputs={"data": large_dataset})
 
-# Parallelizing for multi-core execution
-parallel_fn = pmap(process_item)
-parallel_results = parallel_fn(inputs={"data": ["a", "b", "c"], "id": [1, 2, 3]})
+# Combining transformations
+vectorized_parallel = compose(
+    vmap(batch_size=32), 
+    pmap(num_workers=4)
+)
+optimized_fn = vectorized_parallel(process_item)
 
-# Setting up distributed mesh execution
-devices = [0, 1, 2, 3]  # Available compute devices
-mesh = DeviceMesh(devices=devices, mesh_shape=(2, 2))
-pspec = PartitionSpec(0, 1)  # Partition specification
-
-# Creating a distributed function
-sharded_fn = mesh_sharded(process_item, mesh, pspec)
-distributed_results = sharded_fn(inputs=large_dataset)
-
-# Combining transforms for nested parallelism
-distributed_batch_fn = pmap(vmap(process_item))
+# Using combined JIT+parallel transformation
+optimized_fn = pjit(process_item, mode="enhanced")
 ```
 
-## Advanced API Design
+## Architectural Components
 
-The XCS module provides both simple direct interfaces and configurable advanced options:
+XCS is organized into the following key packages:
 
-```python
-# Core functionality through clean imports
-from ember.xcs import jit, vmap, pmap, autograph, execute
+- **jit/**: JIT compilation system with pluggable strategies
+  - **strategies/**: Different JIT compilation approaches (trace, structural, enhanced)
+  - **core.py**: Main JIT decorator implementation
+  - **cache.py**: Caching mechanism for compiled functions
 
-# Advanced configuration through explicit API
-from ember.xcs.api.types import JITOptions, XCSExecutionOptions
-from ember.xcs.api.core import XCSAPI
+- **schedulers/**: Unified execution scheduler system
+  - **base_scheduler.py**: Core scheduler interface
+  - **unified_scheduler.py**: Concrete scheduler implementations
+  - **factory.py**: Factory for creating appropriate schedulers
 
-# Creating customized API instance
-xcs = XCSAPI()
+- **graph/**: Graph representation and dependency analysis 
+  - **xcs_graph.py**: Core graph data structure
+  - **dependency_analyzer.py**: Dependency tracking and analysis
+  - **graph_builder.py**: Graph construction from traces
 
-# Using with detailed configuration
-@xcs.jit(options=JITOptions(
-    sample_input={"query": "test"},
-    force_trace=False,
-    recursive=True
-))
-class OptimizedOperator(Operator):
-    # Implementation details...
-    pass
-```
+- **engine/**: Unified execution engine
+  - **unified_engine.py**: Core execution functionality
+  - **execution_options.py**: Execution configuration
 
-## Error Handling and Fallbacks
+- **transforms/**: Function transformations
+  - **transform_base.py**: Shared foundation for all transforms
+  - **vmap.py**: Vectorization implementation
+  - **pmap.py**: Parallelization implementation
+  - **mesh.py**: Device mesh-based sharding
 
-The XCS module includes robust error handling with graceful fallbacks for testing environments:
+- **common/**: Shared data structures
+  - **plans.py**: Execution plan representations
 
-- Automatic fallback to stub implementations when dependencies aren't available
-- Clear warning messages with detailed diagnostics
-- Type-safe interfaces with runtime protocol checks
-- Testing helpers for isolating functionality
+- **tracer/**: Tracing infrastructure
+  - **xcs_tracing.py**: Core tracing functionality
+  - **autograph.py**: Automatic graph building
 
-```python
-# Testing with JIT disabled
-from ember.xcs.tracer.structural_jit import disable_structural_jit
+## Extension Points
 
-with disable_structural_jit():
-    # Code here runs without optimization for comparison/testing
-    result = my_operator(inputs=test_input)
-```
+XCS is designed for extensibility via clearly defined protocols:
 
-## Usage in Project
+- Create custom schedulers by implementing `BaseScheduler` or extending `BaseSchedulerImpl`
+- Add new JIT strategies by implementing the `Strategy` protocol
+- Implement custom graph transformations by extending `BaseTransformation`
+- Define custom execution policies using the execution options system
 
-XCS is accessible through two main import paths:
-
-1. **Direct imports** for power users:
-   ```python
-   from ember.xcs import jit, vmap, pmap
-   ```
-
-2. **API facade** for simplified access:
-   ```python
-   from ember.api.xcs import jit, vmap, pmap
-   ```
-
-## Real-World Examples
-
-### Optimizing a Multi-Stage Operator Pipeline
-
-```python
-from ember.xcs import jit, autograph, execute
-
-@jit
-class TextProcessor(Operator):
-    def __init__(self):
-        self.parser = ParserOperator()
-        self.analyzer = AnalyzerOperator()
-        self.transformer = TransformerOperator()
-        self.formatter = FormatterOperator()
-    
-    def forward(self, *, inputs):
-        # Automatically optimized multi-stage pipeline
-        parsed = self.parser(inputs=inputs)
-        analyzed = self.analyzer(inputs=parsed)
-        transformed = self.transformer(inputs=analyzed)
-        return self.formatter(inputs=transformed)
-
-# Creating and using the optimized operator
-processor = TextProcessor()
-result = processor(inputs={"text": "Process this text"})
-```
-
-### Batch Processing with Vectorization
-
-```python
-from ember.xcs import vmap
-
-def calculate_metrics(item):
-    """Processing a single data item."""
-    return {
-        "id": item["id"],
-        "score": compute_score(item["data"]),
-        "normalized": normalize(item["data"]),
-        "timestamp": get_current_time()
-    }
-
-# Creating vectorized version for batch processing
-batch_calculator = vmap(calculate_metrics)
-
-# Processing entire dataset at once
-dataset = {
-    "id": [101, 102, 103, 104, 105],
-    "data": [item1, item2, item3, item4, item5],
-    "metadata": global_metadata  # Applied to all items
-}
-
-# Efficient parallel processing of all items
-results = batch_calculator(inputs=dataset)
-```
-
-For more detailed information, see the documentation files and examples in the project repository.
+For more examples, see the `examples/` directory.

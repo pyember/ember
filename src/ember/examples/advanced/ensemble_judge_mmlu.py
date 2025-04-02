@@ -6,7 +6,7 @@ This example:
 2. Feeds ensemble responses to a judge operator
 3. Evaluates on MMLU dataset with selectable subjects
 4. Compares to a baseline single model operator
-5. Optimizes execution using XCS transforms
+5. Optimizes execution using XCS transforms and enhanced dependency analysis
 6. Visualizes performance results
 
 Usage:
@@ -27,14 +27,18 @@ Environment variables:
     MODEL_COUNT: Number of models to use in the ensemble (default: 2)
 """
 
+import logging
 import time
-from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union, cast
+from typing import Any, ClassVar, Dict, List, Optional, Set, Tuple, Type, Union, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 # Import necessary modules
 from ember.api import models, operators, Dataset, DatasetBuilder
@@ -46,7 +50,7 @@ from ember.core.registry.specification.specification import (
 )
 from ember.core.types.ember_model import EmberModel
 from ember.core.utils.data.base.models import DatasetEntry
-from ember.xcs import jit, pmap
+from ember.xcs import jit
 from ember.xcs.engine.execution_options import execution_options
 
 # Set up console for rich output
@@ -62,8 +66,6 @@ MMLU_SUBJECTS = [
     "philosophy",
 ]
 
-
-# Define input/output data structures using EmberModel for compatibility with XCS
 class MCQInput(EmberModel):
     """Input for multiple-choice question evaluation."""
 
@@ -90,6 +92,9 @@ class EnsembleJudgeInput(EmberModel):
 class EnsembleJudgeOutput(EmberModel):
     """Output for the judge operator."""
 
+    question: str
+    choices: Dict[str, str]
+    candidate_responses: List[MCQOutput]
     selected_answer: str
     confidence: float
     justification: str
@@ -234,8 +239,8 @@ class BaselineMCQSpecification(CoreSpecification):
     """Specification for baseline MCQ operator."""
 
     # Define both input and output models explicitly
-    input_model: Type[MCQInput] = MCQInput
-    structured_output: Type[MCQOutput] = MCQOutput
+    input_model: Type[EmberModel] = MCQInput
+    structured_output: Type[EmberModel] = MCQOutput
 
     prompt_template: str = """Answer the following multiple-choice question:
 
@@ -265,7 +270,7 @@ class BaselineMCQOperator(Operator[MCQInput, MCQOutput]):
 
     def __init__(
         self,
-        model_name: str = "anthropic:claude-3-haiku",
+        model_name: str = "anthropic:claude-3-sonnet-20240229",
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> None:
@@ -283,7 +288,7 @@ class BaselineMCQOperator(Operator[MCQInput, MCQOutput]):
         # Initialize the LM module
         self.lm_module = LMModule(
             config=LMModuleConfig(
-                model_name=model_name, temperature=temperature, max_tokens=max_tokens
+                id=model_name, temperature=temperature, max_tokens=max_tokens
             )
         )
 
@@ -310,7 +315,7 @@ class BaselineMCQOperator(Operator[MCQInput, MCQOutput]):
         # Fill in the template with standard Python format strings
         prompt = self.specification.prompt_template.format(**template_vars)
 
-        # Get model response
+        # Call LMModule with explicit named parameter to make it JIT-friendly
         response = self.lm_module(prompt=prompt)
 
         # Parse the response to extract answer and reasoning
@@ -465,8 +470,7 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
     """Ensemble operator using multiple model configurations for MCQ evaluation.
 
     This operator implements a varied ensemble approach where multiple language models
-    with different configurations evaluate the same question. The implementation is
-    structured to enable automatic parallelization by JIT optimization.
+    with different configurations evaluate the same question.
     """
 
     specification: ClassVar[Specification] = VariedEnsembleSpecification()
@@ -484,10 +488,9 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
         if model_configs is None:
             # Default model configurations with different models and parameters
             model_configs = [
-                {"model_name": "anthropic:claude-3-haiku", "temperature": 0.0},
-                {"model_name": "anthropic:claude-3-haiku", "temperature": 0.7},
-                {"model_name": "openai:gpt-3.5-turbo", "temperature": 0.0},
-                {"model_name": "openai:gpt-4", "temperature": 0.0},
+                {"model_name": "anthropic:claude-3-opus-20240229", "temperature": 0.0},
+                {"model_name": "anthropic:claude-3-sonnet-20240229", "temperature": 0.7},
+                # Use only available models to ensure functionality
             ]
 
         # Create LM modules for each configuration
@@ -496,7 +499,7 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
             self.lm_modules.append(
                 LMModule(
                     config=LMModuleConfig(
-                        model_name=config["model_name"],
+                        id=config["model_name"],
                         temperature=config["temperature"],
                         max_tokens=config.get("max_tokens", 1024),
                     )
@@ -520,6 +523,7 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
         Returns:
             Processed output with answer and reasoning
         """
+        
         # Pre-format choices as text for template insertion
         choices_text = "\n".join([f"{key}. {value}" for key, value in choices.items()])
 
@@ -532,7 +536,7 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
         # Fill in the template with standard Python format strings
         prompt = template.format(**template_vars)
 
-        # Get model response
+        # Call LMModule with explicit named parameter to make it JIT-friendly
         response = lm_module(prompt=prompt)
 
         # Parse the response
@@ -547,8 +551,8 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
     def forward(self, *, inputs: MCQInput) -> List[MCQOutput]:
         """Process a question with multiple models in the ensemble.
 
-        This implementation is structured to allow the compiler to recognize
-        the independent model calls, enabling automatic parallelization.
+        This implementation is structured with explicit dependency declaration
+        to enable the enhanced JIT to automatically parallelize the model calls.
 
         Args:
             inputs: Question and choices
@@ -565,7 +569,7 @@ class VariedEnsembleMCQOperator(Operator[MCQInput, List[MCQOutput]]):
             template_idx = i % len(templates)
             template = templates[template_idx]
 
-            # Process with this model - JIT optimizer can recognize these as independent operations
+            # Process with this model - enhanced JIT will parallelize these
             responses.append(
                 self._process_with_model(
                     question=inputs.question,
@@ -677,7 +681,7 @@ class JudgeOperator(Operator[EnsembleJudgeInput, EnsembleJudgeOutput]):
 
     def __init__(
         self,
-        model_name: str = "anthropic:claude-3-sonnet",
+        model_name: str = "anthropic:claude-3-sonnet-20240229",
         temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> None:
@@ -688,9 +692,10 @@ class JudgeOperator(Operator[EnsembleJudgeInput, EnsembleJudgeOutput]):
             temperature: Temperature parameter for generation
             max_tokens: Maximum tokens to generate
         """
+        self.model_name = model_name
         self.lm_module = LMModule(
             config=LMModuleConfig(
-                model_name=model_name, temperature=temperature, max_tokens=max_tokens
+                id=model_name, temperature=temperature, max_tokens=max_tokens
             )
         )
 
@@ -725,7 +730,7 @@ class JudgeOperator(Operator[EnsembleJudgeInput, EnsembleJudgeOutput]):
         # Fill in the template with standard Python format strings
         prompt = self.specification.prompt_template.format(**template_vars)
 
-        # Get model response
+        # Call LMModule with explicit named parameter to make it JIT-friendly
         response = self.lm_module(prompt=prompt)
 
         # Parse the judge's response
@@ -734,6 +739,9 @@ class JudgeOperator(Operator[EnsembleJudgeInput, EnsembleJudgeOutput]):
         )
 
         return EnsembleJudgeOutput(
+            question=inputs.question,
+            choices=inputs.choices,
+            candidate_responses=inputs.candidate_responses,
             selected_answer=selected_answer,
             confidence=confidence,
             justification=justification,
@@ -794,13 +802,11 @@ class JudgeOperator(Operator[EnsembleJudgeInput, EnsembleJudgeOutput]):
         return selected_answer, confidence, justification
 
 
-@jit(sample_input={"question": "What is 2+2?", "choices": {"A": "3", "B": "4"}})
 class EnsembleJudgePipeline(Operator[MCQInput, EnsembleJudgeOutput]):
     """JIT-optimized pipeline combining ensemble and judge operators.
-
-    This pipeline leverages JIT optimization to automatically parallelize independent
-    operations in the execution graph. The structural JIT implementation analyzes the
-    operator composition and identifies opportunities for concurrent execution.
+    
+    This pipeline uses the enhanced JIT system with automatic parallelization
+    detection to provide substantial performance benefits for ensemble-based workflows.
     """
 
     # Complete specification with input/output models
@@ -812,8 +818,9 @@ class EnsembleJudgePipeline(Operator[MCQInput, EnsembleJudgeOutput]):
 
     def __init__(
         self,
+        *,  # Add explicit keyword-only marker to ensure parameters are passed by name
         model_configs: Optional[List[Dict[str, Any]]] = None,
-        judge_model: str = "anthropic:claude-3-sonnet",
+        judge_model: str = "anthropic:claude-3-sonnet-20240229",
     ) -> None:
         """Initialize the pipeline with ensemble and judge operators.
 
@@ -827,8 +834,8 @@ class EnsembleJudgePipeline(Operator[MCQInput, EnsembleJudgeOutput]):
     def forward(self, *, inputs: MCQInput) -> EnsembleJudgeOutput:
         """Process a question through the ensemble and judge pipeline.
 
-        The JIT optimizer automatically identifies that ensemble_operator can run
-        parallel inference across multiple models, creating an optimized execution plan.
+        The enhanced JIT optimizer automatically identifies parallelization 
+        opportunities within the operator. No explicit hints needed.
 
         Args:
             inputs: Question and choices
@@ -850,11 +857,14 @@ class EnsembleJudgePipeline(Operator[MCQInput, EnsembleJudgeOutput]):
         # Get judge decision
         return self.judge_operator(inputs=judge_input)
 
+# Apply JIT manually after class definition to avoid initialization issues
+EnsembleJudgePipeline = jit(EnsembleJudgePipeline)
+
 
 # Simplified pipeline creation function
 def create_pipeline(
     model_configs: Optional[List[Dict[str, Any]]] = None,
-    judge_model: str = "anthropic:claude-3-sonnet",
+    judge_model: str = "anthropic:claude-3-sonnet-20240229",
 ) -> EnsembleJudgePipeline:
     """Create a pipeline combining ensemble and judge operators.
 
@@ -865,7 +875,11 @@ def create_pipeline(
     Returns:
         Ensemble-judge pipeline instance
     """
-    return EnsembleJudgePipeline(model_configs=model_configs, judge_model=judge_model)
+    # Now using explicit keyword arguments to match the updated __init__ method
+    return EnsembleJudgePipeline(
+        model_configs=model_configs, 
+        judge_model=judge_model
+    )
 
 
 class MMLUExperiment:
@@ -876,8 +890,8 @@ class MMLUExperiment:
         subject: str = "high_school_mathematics",
         sample_size: int = 3,
         model_configs: Optional[List[Dict[str, Any]]] = None,
-        baseline_model: str = "anthropic:claude-3-haiku",
-        judge_model: str = "anthropic:claude-3-sonnet",
+        baseline_model: str = "anthropic:claude-3-sonnet-20240229",
+        judge_model: str = "anthropic:claude-3-sonnet-20240229",
         use_acceleration: bool = True,
     ) -> None:
         """Initialize the experiment.
@@ -897,8 +911,10 @@ class MMLUExperiment:
         self.baseline_operator = BaselineMCQOperator(model_name=baseline_model)
 
         # Create a standard pipeline - use execution_options to control acceleration
+        # Using keyword-only parameters for the EnsembleJudgePipeline
         self.ensemble_judge_operator = EnsembleJudgePipeline(
-            model_configs=model_configs, judge_model=judge_model
+            model_configs=model_configs, 
+            judge_model=judge_model
         )
         # Note: acceleration is controlled at execution time using execution_options
 
@@ -911,6 +927,8 @@ class MMLUExperiment:
         Returns:
             Dictionary of experiment results
         """
+        # Create models for evaluation
+        
         # Load data samples
         mmlu_data = self.mmlu_dataset.load(max_samples=self.sample_size)
 
@@ -973,12 +991,13 @@ class MMLUExperiment:
             results["baseline"]["correct"] / results["baseline"]["total"]
         )
 
-        # Run ensemble-judge
+        # Run ensemble-judge with enhanced JIT + explicit parallel execution
         console.print(
             Panel(f"Running ensemble-judge on {self.subject}...", style="green")
         )
         ensemble_start = time.time()
 
+        # Use wave scheduler for optimal parallelization with the enhanced JIT system
         for item in mmlu_data:
             # Convert dict choices to key-value format
             choices = {k: v for k, v in item["choices"].items()}
@@ -986,8 +1005,14 @@ class MMLUExperiment:
 
             input_data = MCQInput(question=item["question"], choices=choices)
 
-            # Use execution_options context manager for parallel execution
-            with execution_options(use_parallel=True):
+            # Use execution_options context manager with enhanced settings
+            # The wave scheduler is optimized for this kind of parallel ensemble workload
+            with execution_options(
+                scheduler="wave", 
+                max_workers=len(self.ensemble_judge_operator.ensemble_operator.lm_modules),
+                enable_caching=True,  # Enable caching for better performance
+                device_strategy="auto"  # Let system choose the best device strategy
+            ):
                 output = self.ensemble_judge_operator(inputs=input_data)
 
             # Find which letter corresponds to the selected answer
@@ -1175,65 +1200,132 @@ class ExperimentVisualizer:
             benchmark_results: Dictionary containing benchmark measurements
             output_path: Path to save the plot image
         """
-        # Create figure with two subplots - execution time and relative speedup
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+        # Create figure with three subplots
+        fig = plt.figure(figsize=(18, 10))
+        gs = plt.GridSpec(2, 3, figure=fig, height_ratios=[3, 2])
+        
+        ax1 = fig.add_subplot(gs[0, 0:2])  # Execution time (top left, spanning 2 columns)
+        ax2 = fig.add_subplot(gs[0, 2])    # Relative speedup (top right)
+        ax3 = fig.add_subplot(gs[1, :])    # JIT metrics (bottom, spanning all columns)
 
-        # Setup data
-        strategies = ["Sequential", "Auto Parallel", "Explicit pmap"]
-        colors = ["firebrick", "goldenrod", "forestgreen"]
-        times = [
-            benchmark_results["sequential_time"],
-            benchmark_results["auto_parallel_time"],
-            benchmark_results["pmap_time"],
-        ]
+        # Setup data - ordered from slowest to fastest for better visual comparison
+        strategies = ["Sequential", "Wave", "Parallel", "Auto"]
+        
+        # Use a color scheme that shows progression from sequential (red) to fastest (green)
+        colors = ["firebrick", "darkorange", "royalblue", "forestgreen"]
+        
+        # Extract times
+        seq_time = benchmark_results["sequential_time"]
+        wave_time = benchmark_results["wave_time"]
+        parallel_time = benchmark_results["parallel_time"]
+        auto_time = benchmark_results["auto_time"]
+        
+        times = [seq_time, wave_time, parallel_time, auto_time]
 
-        # Compute speedups relative to sequential execution
-        speedups = [
-            1.0,  # Sequential baseline
-            benchmark_results["auto_parallel_speedup"],
-            benchmark_results["pmap_speedup"],
-        ]
+        # Calculate speedups relative to sequential
+        wave_speedup = seq_time / max(wave_time, 1e-6)
+        parallel_speedup = seq_time / max(parallel_time, 1e-6)
+        auto_speedup = seq_time / max(auto_time, 1e-6)
+        
+        speedups = [1.0, wave_speedup, parallel_speedup, auto_speedup]
 
-        # Plot execution times
-        bars1 = ax1.bar(strategies, times, color=colors)
-        ax1.set_ylabel("Execution Time (s)")
+        # Plot execution times - use horizontal bars for better readability
+        bars1 = ax1.barh(strategies, times, color=colors)
+        ax1.set_xlabel("Execution Time (seconds)")
         ax1.set_title("Execution Time by Strategy")
-        ax1.grid(axis="y", alpha=0.3)
+        ax1.grid(axis="x", alpha=0.3)
+        ax1.invert_yaxis()  # Put sequential at the top
 
-        # Add time values on top of bars
+        # Add time values at end of bars
         for bar in bars1:
-            height = bar.get_height()
+            width = bar.get_width()
             ax1.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height + 0.01,
-                f"{height:.4f}s",
-                ha="center",
-                va="bottom",
+                width + 0.01,
+                bar.get_y() + bar.get_height()/2,
+                f"{width:.4f}s",
+                va="center",
                 fontsize=10,
             )
 
-        # Plot speedups
-        bars2 = ax2.bar(strategies, speedups, color=colors)
-        ax2.set_ylabel("Speedup Factor (vs Sequential)")
+        # Plot speedups - use horizontal bars for consistency
+        bars2 = ax2.barh(strategies, speedups, color=colors)
+        ax2.set_xlabel("Speedup Factor (vs Sequential)")
         ax2.set_title("Relative Speedup by Strategy")
-        ax2.axhline(
-            y=1.0, color="black", linestyle="--", alpha=0.5
+        ax2.axvline(
+            x=1.0, color="black", linestyle="--", alpha=0.5
         )  # Add reference line at 1.0
-        ax2.grid(axis="y", alpha=0.3)
+        ax2.grid(axis="x", alpha=0.3)
+        ax2.invert_yaxis()  # Keep same order as first plot
 
-        # Add speedup values on top of bars
+        # Add speedup values at end of bars
         for bar in bars2:
-            height = bar.get_height()
+            width = bar.get_width()
             ax2.text(
-                bar.get_x() + bar.get_width() / 2.0,
-                height + 0.05,
-                f"{height:.2f}x",
-                ha="center",
-                va="bottom",
+                width + 0.05,
+                bar.get_y() + bar.get_height()/2,
+                f"{width:.2f}x",
+                va="center",
                 fontweight="bold",
             )
+            
+        # Plot JIT metrics if available
+        jit_metrics = benchmark_results.get("jit_metrics", {})
+        if jit_metrics:
+            # Convert metrics to cleaner format for display
+            metrics_to_show = [
+                ("Cache Hit Rate", jit_metrics.get("cache_hit_rate", 0) * 100, "%"),
+                ("Avg Compilation", jit_metrics.get("avg_compilation_time_ms", 0), "ms"),
+                ("Avg Execution", jit_metrics.get("avg_execution_time_ms", 0), "ms"),
+                ("Cache Hits", jit_metrics.get("cache_hits", 0), ""),
+                ("Cache Misses", jit_metrics.get("cache_misses", 0), ""),
+                ("Compilation Count", jit_metrics.get("compilation_count", 0), ""),
+                ("Execution Count", jit_metrics.get("execution_count", 0), ""),
+            ]
+            
+            # Create bar chart of metrics
+            metric_names = [m[0] for m in metrics_to_show]
+            metric_values = [m[1] for m in metrics_to_show]
+            metric_units = [m[2] for m in metrics_to_show]
+            
+            bars3 = ax3.bar(metric_names, metric_values, alpha=0.7, color="steelblue")
+            ax3.set_title("JIT Performance Metrics")
+            ax3.set_ylabel("Value")
+            ax3.grid(axis="y", alpha=0.3)
+            
+            # Add values on top of bars
+            for i, bar in enumerate(bars3):
+                height = bar.get_height()
+                unit = metric_units[i]
+                ax3.text(
+                    bar.get_x() + bar.get_width()/2,
+                    height + 0.1,
+                    f"{height:.2f}{unit}",
+                    ha="center",
+                    fontsize=9,
+                )
+            
+            # Add log scale if needed for large values
+            if any(v > 1000 for v in metric_values):
+                ax3.set_yscale("log")
+                ax3.set_ylabel("Value (log scale)")
+        else:
+            ax3.text(0.5, 0.5, "No JIT metrics available", 
+                    ha="center", va="center", fontsize=14, 
+                    transform=ax3.transAxes)
+            
+        # Add a note about the best strategy
+        best_strategy = benchmark_results.get("best_strategy", "auto").capitalize()
+        speedup = benchmark_results.get("speedup", 1.0)
+        
+        plt.figtext(
+            0.5, 0.01, 
+            f"Best strategy: {best_strategy} ({speedup:.2f}x speedup vs Sequential)", 
+            ha="center", 
+            fontsize=12, 
+            bbox={"facecolor": "lightyellow", "alpha": 0.5, "pad": 5}
+        )
 
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0.05, 1, 0.95])
 
         if output_path:
             plt.savefig(output_path, dpi=300, bbox_inches="tight")
@@ -1245,12 +1337,13 @@ class ExperimentVisualizer:
 def run_acceleration_benchmark(
     subject: str, sample_size: int, model_configs: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-    """Benchmark parallel vs sequential execution performance.
+    """Benchmark various scheduler strategies for parallelization.
 
-    Compares three execution strategies:
-    1. JIT with sequential execution (using execution_options to force sequential)
-    2. JIT with automatic parallelism (default structural JIT behavior)
-    3. JIT with pmap transform applied (explicit parallelism)
+    Compares execution strategies:
+    1. Sequential execution (using execution_options with scheduler="sequential")
+    2. Wave scheduler execution (using execution_options with scheduler="wave")
+    3. Parallel scheduler execution (using execution_options with scheduler="parallel")
+    4. Auto scheduler selection (using execution_options with scheduler="auto")
 
     Args:
         subject: MMLU subject to evaluate
@@ -1260,88 +1353,126 @@ def run_acceleration_benchmark(
     Returns:
         Dictionary of benchmark results
     """
+    from ember.xcs.jit import get_jit_stats
+    
     console.print(
         Panel(f"Benchmarking execution strategies on {subject}...", style="yellow")
     )
 
-    mmlu_data = MMLUDataset(subject=subject).load(max_samples=sample_size)
-    results = {}
-
-    # Prepare test input
-    if not mmlu_data:
-        console.print("[red]No test data available![/red]")
-        return {"subject": subject, "error": "No test data available"}
-
-    sample_item = mmlu_data[0]
-    test_input = MCQInput(
-        question=sample_item["question"],
-        choices={k: v for k, v in sample_item["choices"].items()},
-    )
-
-    # Create operators with different execution strategies
-    # 1. Sequential JIT (force sequential execution)
-    sequential_pipeline = EnsembleJudgePipeline(
-        model_configs=model_configs[:2]  # Use just 2 models for benchmark
-    )
-
-    # 2. Automatic parallel JIT (default behavior)
-    auto_parallel_pipeline = EnsembleJudgePipeline(
-        model_configs=model_configs[:2]  # Use just 2 models for benchmark
-    )
-
-    # 3. For explicit parallelization, we'll just use execution_options with the same pipeline
-
-    # Measure sequential execution time
-    console.print("Running sequential execution benchmark...")
-    sequential_start = time.perf_counter()  # Use perf_counter for high precision timing
-    with execution_options(use_parallel=False):  # Force sequential execution
-        sequential_result = sequential_pipeline(inputs=test_input)
-    sequential_time = time.perf_counter() - sequential_start
-
-    # Measure automatic parallel execution time
-    console.print("Running automatic parallel execution benchmark...")
-    auto_parallel_start = time.perf_counter()
-    # No execution_options context - let JIT automatically parallelize
-    auto_parallel_result = auto_parallel_pipeline(inputs=test_input)
-    auto_parallel_time = time.perf_counter() - auto_parallel_start
-
-    # Measure accelerated execution time (using execution_options consistently)
-    console.print("Running explicitly accelerated execution benchmark...")
-    pmap_start = time.perf_counter()
-    with execution_options(use_parallel=True):  # Ensure parallel execution
-        # We now use the same pipeline but with parallel execution enforced
-        pmap_result = auto_parallel_pipeline(inputs=test_input)
-    pmap_time = time.perf_counter() - pmap_start
-
-    # Calculate time differences as percentages relative to sequential
-    # This avoids implying a theoretical maximum speedup and focuses on actual measurements
-    auto_parallel_diff = (
-        ((sequential_time - auto_parallel_time) / sequential_time) * 100
-        if sequential_time > 0
-        else 0
-    )
-    pmap_diff = (
-        ((sequential_time - pmap_time) / sequential_time) * 100
-        if sequential_time > 0
-        else 0
-    )
-
-    # Return benchmark results
-    return {
-        "subject": subject,
-        "sequential_time": sequential_time,
-        "auto_parallel_time": auto_parallel_time,
-        "pmap_time": pmap_time,
-        "auto_parallel_diff": auto_parallel_diff,
-        "pmap_diff": pmap_diff,
-        "sequential_answer": sequential_result.selected_answer,
-        "auto_parallel_answer": auto_parallel_result.selected_answer,
-        "pmap_answer": pmap_result.selected_answer,
+    # Constants for benchmark configuration
+    WARMUP_RUNS = 2  # Number of warmup runs to stabilize JIT
+    MEASURE_RUNS = 3  # Number of measurement runs to average
+    
+    # Return empty results on error
+    empty_results = {
+        "subject": subject, 
+        "sequential_time": 0, 
+        "wave_time": 0,
+        "parallel_time": 0,
+        "auto_time": 0,
+        "speedup": 1.0,
+        "jit_metrics": {}
     }
+
+    try:
+        mmlu_data = MMLUDataset(subject=subject).load(max_samples=sample_size)
+        
+        # Prepare test input
+        if not mmlu_data:
+            console.print("[red]No test data available![/red]")
+            return empty_results
+
+        sample_item = mmlu_data[0]
+        test_input = MCQInput(
+            question=sample_item["question"],
+            choices={k: v for k, v in sample_item["choices"].items()},
+        )
+
+        # Create pipeline for benchmarking with multiple models
+        pipeline = EnsembleJudgePipeline(
+            model_configs=model_configs
+        )
+
+        # Number of worker threads for parallel execution
+        max_workers = len(model_configs)
+
+        # Define scheduler configurations to test
+        scheduler_configs = [
+            {"name": "sequential", "options": {"scheduler": "sequential", "enable_caching": False}},
+            {"name": "wave", "options": {"scheduler": "wave", "max_workers": max_workers, "enable_caching": False}},
+            {"name": "parallel", "options": {"scheduler": "parallel", "max_workers": max_workers, "enable_caching": False}},
+            {"name": "auto", "options": {"scheduler": "auto", "max_workers": max_workers, "enable_caching": False}}
+        ]
+        
+        results = {}
+        
+        # Run benchmarks for each scheduler configuration
+        for config in scheduler_configs:
+            name = config["name"]
+            options = config["options"]
+            
+            console.print(f"Running {name} scheduler benchmark...")
+            
+            # Perform warmup runs to stabilize JIT
+            console.print(f"  Performing {WARMUP_RUNS} warmup runs...")
+            for _ in range(WARMUP_RUNS):
+                with execution_options(**options):
+                    _ = pipeline(inputs=test_input)
+            
+            # Collect actual measurements
+            times = []
+            console.print(f"  Collecting {MEASURE_RUNS} measurement runs...")
+            for run in range(MEASURE_RUNS):
+                run_start = time.perf_counter()
+                with execution_options(**options):
+                    _ = pipeline(inputs=test_input)
+                run_time = time.perf_counter() - run_start
+                times.append(run_time)
+                console.print(f"    Run {run+1}: {run_time:.4f}s")
+            
+            # Calculate statistics
+            avg_time = sum(times) / len(times)
+            results[f"{name}_time"] = avg_time
+            
+            # Get JIT metrics after last run
+            if name == "auto":  # Only collect metrics for auto mode to avoid duplication
+                results["jit_metrics"] = get_jit_stats(pipeline)
+                
+            console.print(f"  {name.capitalize()} avg time: {avg_time:.4f}s")
+        
+        # Find the fastest parallel strategy (excluding sequential)
+        parallel_times = {
+            "wave": results["wave_time"],
+            "parallel": results["parallel_time"],
+            "auto": results["auto_time"]
+        }
+        best_strategy = min(parallel_times.items(), key=lambda x: x[1])[0]
+        best_time = parallel_times[best_strategy]
+        
+        # Calculate speedup ratio against sequential execution
+        sequential_time = results["sequential_time"]
+        speedup = sequential_time / max(best_time, 1e-6)
+
+        # Return comprehensive benchmark results
+        return {
+            "subject": subject,
+            "sequential_time": results["sequential_time"],
+            "wave_time": results["wave_time"],
+            "parallel_time": results["parallel_time"],
+            "auto_time": results["auto_time"],
+            "best_strategy": best_strategy,
+            "best_time": best_time,
+            "speedup": speedup,
+            "jit_metrics": results["jit_metrics"]
+        }
+        
+    except Exception as e:
+        console.print(f"[yellow]Benchmark setup error: {e}[/yellow]")
+        return empty_results
 
 
 def main() -> None:
-    """Main function to run the ensemble-judge MMLU evaluation example.
+    """Main function to run the ensemble-judge MMLU evaluation example with enhanced JIT.
 
     Environment variables:
       SAMPLE_SIZE: Number of samples per subject (default: 2)
@@ -1353,9 +1484,9 @@ def main() -> None:
     sample_size = int(os.environ.get("SAMPLE_SIZE", "2"))
     console.print(
         Panel.fit(
-            "MMLU Evaluation: Baseline vs. Ensemble+Judge Pipeline with XCS Optimization",
+            "MMLU Evaluation: Baseline vs. Ensemble+Judge Pipeline with Enhanced JIT Optimization",
             title="Ember Advanced Example",
-            subtitle="Demonstrating LLM Ensemble Techniques and XCS Acceleration",
+            subtitle="Demonstrating LLM Ensemble Techniques and Enhanced Parallelization",
             style="bold green",
         )
     )
@@ -1379,7 +1510,7 @@ def main() -> None:
                 "  - OPENAI_API_KEY\n"
                 "  - GOOGLE_API_KEY\n\n"
                 "Example:\n"
-                "  export ANTHROPIC_API_KEY=your_api_key_here\n\n"
+                "  export ANTHROPIC_API_KEY=sk_ant_xxxx\n\n"
                 "This example will showcase the code structure and architecture without making actual API calls.",
                 title="API Keys Required",
                 style="yellow",
@@ -1389,9 +1520,8 @@ def main() -> None:
 
     # Define model configurations
     model_configs = [
-        {"model_name": "anthropic:claude-3-haiku", "temperature": 0.0},
-        {"model_name": "anthropic:claude-3-haiku", "temperature": 0.7},
-        {"model_name": "openai:gpt-3.5-turbo", "temperature": 0.0},
+        {"model_name": "anthropic:claude-3-opus-20240229", "temperature": 0.0},
+        {"model_name": "anthropic:claude-3-sonnet-20240229", "temperature": 0.7},
     ]
 
     # Get subjects from environment with sensible default
@@ -1414,7 +1544,7 @@ def main() -> None:
 
             # Use environment variable to control model count with a sensible default
             model_count = min(
-                int(os.environ.get("MODEL_COUNT", "2")), len(model_configs)
+                int(os.environ.get("MODEL_COUNT", "7")), len(model_configs)
             )
 
             experiment = MMLUExperiment(
@@ -1431,7 +1561,7 @@ def main() -> None:
             ExperimentVisualizer.print_summary(results)
 
         # Run acceleration benchmarks to compare different strategies
-        console.print("\n[bold]Benchmarking XCS acceleration strategies:[/bold]")
+        console.print("\n[bold]Benchmarking enhanced JIT acceleration strategies:[/bold]")
         # For benchmark, use same model count as experiment
         benchmark_results = run_acceleration_benchmark(
             subject=subjects_to_evaluate[0],  # Use first subject
@@ -1440,25 +1570,64 @@ def main() -> None:
         )
 
         # Print comparison
-        acc_table = Table(title="XCS Acceleration Strategy Comparison")
+        acc_table = Table(title="Enhanced JIT Acceleration Strategy Comparison")
         acc_table.add_column("Metric", style="cyan")
         acc_table.add_column("Sequential", style="red")
-        acc_table.add_column("Auto Parallel", style="yellow")
-        acc_table.add_column("Explicit pmap", style="green")
+        acc_table.add_column("Wave", style="yellow")
+        acc_table.add_column("Parallel", style="blue")
+        acc_table.add_column("Auto", style="green")
 
         acc_table.add_row(
             "Execution Time",
             f"{benchmark_results['sequential_time']:.4f}s",
-            f"{benchmark_results['auto_parallel_time']:.4f}s",
-            f"{benchmark_results['pmap_time']:.4f}s",
+            f"{benchmark_results['wave_time']:.4f}s",
+            f"{benchmark_results['parallel_time']:.4f}s",
+            f"{benchmark_results['auto_time']:.4f}s"
         )
+
+        # Calculate speedups
+        wave_speedup = benchmark_results['sequential_time'] / max(benchmark_results['wave_time'], 1e-6)
+        parallel_speedup = benchmark_results['sequential_time'] / max(benchmark_results['parallel_time'], 1e-6)
+        auto_speedup = benchmark_results['sequential_time'] / max(benchmark_results['auto_time'], 1e-6)
 
         acc_table.add_row(
             "Speedup",
             "Baseline",
-            f"{benchmark_results['auto_parallel_speedup']:.2f}x",
-            f"{benchmark_results['pmap_speedup']:.2f}x",
+            f"{wave_speedup:.2f}x",
+            f"{parallel_speedup:.2f}x",
+            f"{auto_speedup:.2f}x"
         )
+        
+        # Highlight the best strategy
+        best_strategy = benchmark_results.get("best_strategy", "auto").capitalize()
+        acc_table.add_row(
+            "Best Strategy",
+            "",
+            "[bold green]✓[/bold green]" if best_strategy == "Wave" else "",
+            "[bold green]✓[/bold green]" if best_strategy == "Parallel" else "",
+            "[bold green]✓[/bold green]" if best_strategy == "Auto" else ""
+        )
+        
+        # Display JIT metrics
+        jit_metrics = benchmark_results.get("jit_metrics", {})
+        if jit_metrics:
+            # Create a table for JIT metrics
+            jit_table = Table(title="JIT Performance Metrics")
+            jit_table.add_column("Metric", style="cyan")
+            jit_table.add_column("Value", style="magenta")
+            
+            # Add key metrics
+            jit_table.add_row("Cache Hit Rate", f"{jit_metrics.get('cache_hit_rate', 0)*100:.2f}%")
+            jit_table.add_row("Avg Compilation Time", f"{jit_metrics.get('avg_compilation_time_ms', 0):.2f}ms")
+            jit_table.add_row("Avg Execution Time", f"{jit_metrics.get('avg_execution_time_ms', 0):.2f}ms")
+            jit_table.add_row("Cache Hits", str(jit_metrics.get('cache_hits', 0)))
+            jit_table.add_row("Cache Misses", str(jit_metrics.get('cache_misses', 0)))
+            jit_table.add_row("Compilation Count", str(jit_metrics.get('compilation_count', 0)))
+            jit_table.add_row("Execution Count", str(jit_metrics.get('execution_count', 0)))
+            
+            # Display both tables
+            console.print("\n[bold]JIT Performance Metrics:[/bold]")
+            console.print(jit_table)
 
         # Visualize acceleration benchmark results using our specialized visualization
         console.print("\n[bold]Acceleration Benchmark Visualization:[/bold]")
@@ -1474,7 +1643,6 @@ def main() -> None:
             console.print(f"[yellow]Visualization error: {e}[/yellow]")
 
         console.print(acc_table)
-
         # Skip visualizing results if matplotlib is not available
         try:
             # Visualize results if we have enough data

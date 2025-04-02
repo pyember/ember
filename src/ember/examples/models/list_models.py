@@ -4,6 +4,31 @@ This script demonstrates how to list available models in the Ember registry
 using the simplified API. The script shows how to check for model availability
 and retrieve model information.
 
+IMPORTANT: Model pricing and context window information must be manually configured!
+When models are discovered via API, they DO NOT include pricing or context window 
+information automatically. You must:
+
+1. Add this information in your config.yaml file in the project root:
+   ```yaml
+   model_registry:
+     providers:
+       openai:
+         models:
+           - id: "gpt-4o"
+             name: "GPT-4o"
+             context_window: 128000  # <-- Add this for context window
+             cost:
+               input_cost_per_thousand: 5.0
+               output_cost_per_thousand: 15.0
+   ```
+
+2. Or register models with complete information in code using the ModelInfo class
+   as shown in the register_openai_models() and register_anthropic_models() functions below.
+
+See model pricing and specifications:
+https://docs.anthropic.com/en/docs/about-claude/models/all-models
+https://openai.com/api/pricing/
+
 To run:
     uv run python src/ember/examples/models/list_models.py
 """
@@ -224,7 +249,7 @@ def list_available_models():
             providers["other"].append(model_id)
 
     # Print models by provider
-    print(f"\nFound {len(model_ids)} models across {len(providers)} providers")
+    logger.info(f"Found {len(model_ids)} models across {len(providers)} providers")
 
     # Add models to table
     for provider, ids in sorted(providers.items()):
@@ -251,7 +276,7 @@ def list_available_models():
             except Exception:
                 table.add_row([provider, model_id, "Error", "Error", "Error"])
 
-    print(table)
+    logger.info(f"Model table:\n{table}")
 
 
 def check_specific_models(model_ids: List[str]):
@@ -260,29 +285,23 @@ def check_specific_models(model_ids: List[str]):
     Args:
         model_ids: List of model IDs to check
     """
-    print("\nChecking specific models:")
+    logger.info("Checking specific models:")
     for model_id in model_ids:
         exists = registry.is_registered(model_id)
         if exists:
             info = registry.get_model_info(model_id)
             logger.info(f"✅ Model '{model_id}' is available")
-            print(
-                f"   - Provider: {info.provider.name if hasattr(info.provider, 'name') else 'Unknown'}"
-            )
+            logger.info(f"   - Provider: {info.provider.name if hasattr(info.provider, 'name') else 'Unknown'}")
             if hasattr(info, "cost") and info.cost:
-                print(
-                    f"   - Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens"
-                )
-                print(
-                    f"   - Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens"
-                )
+                logger.info(f"   - Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
+                logger.info(f"   - Output cost: ${info.cost.output_cost_per_thousand:.4f} per 1K tokens")
         else:
             logger.warning(f"❌ Model '{model_id}' is not available")
 
 
 def main():
     """Run the model discovery example."""
-    print("\n=== Ember Model Discovery Example ===\n")
+    logger.info("=== Ember Model Discovery Example ===")
 
     # Check if API keys are set
     check_api_keys()
@@ -301,15 +320,13 @@ def main():
     )
 
     # Example of the simpler usage pattern
-    print("\nUsing simpler direct model identification:")
-    print("To check if a model exists: registry.is_registered('openai:gpt-4o')")
-    print("To get model info: registry.get_model_info('openai:gpt-4o')")
-    print("To use a model: model_service = models.create_model_service(registry)")
-    print(
-        "               model_service.invoke_model('openai:gpt-4o', 'What is the capital of France?')"
-    )
-
-    print("\nExample completed!")
+    logger.info("Using simpler direct model identification:")
+    logger.info("To check if a model exists: registry.is_registered('openai:gpt-4o')")
+    logger.info("To get model info: registry.get_model_info('openai:gpt-4o')")
+    logger.info("To use a model: model_service = models.create_model_service(registry)")
+    logger.info("               model_service.invoke_model('openai:gpt-4o', 'What is the capital of France?')")
+    
+    logger.info("Example completed!")
 
 
 if __name__ == "__main__":

@@ -105,12 +105,18 @@ class XCSGraph:
         node_id: Optional[str] = None,
         name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        node_key: Optional[str] = None,  # Backward compatibility
+        input_mapping: Optional[Dict[str, str]] = None,  # Backward compatibility
     ) -> str:
         """Adds a computation node to the graph.
 
         Args:
             operator: Function or operator to execute at this node
             node_id: Unique identifier (auto-generated if None)
+            name: Human-readable label for the node
+            metadata: Additional properties for analysis and optimization
+            node_key: (Backward compatibility) Alternative name, takes precedence over name
+            input_mapping: (Backward compatibility) Field mappings for node inputs
             name: Human-readable label for the node
             metadata: Additional properties for analysis and optimization
 
@@ -120,15 +126,25 @@ class XCSGraph:
         Raises:
             ValueError: If node_id already exists in the graph
         """
+        # Handle backward compatibility parameters
+        if node_key is not None:
+            name = node_key  # node_key takes precedence over name for backward compatibility
+
         if node_id is None:
             node_id = str(uuid.uuid4())
 
         if node_id in self.nodes:
             raise ValueError(f"Node with ID '{node_id}' already exists.")
 
+        # Create actual node with combined metadata
+        node_metadata = metadata or {}
+        if input_mapping:
+            node_metadata["input_mapping"] = input_mapping
+            
         self.nodes[node_id] = XCSNode(
-            operator=operator, node_id=node_id, name=name, metadata=metadata or {}
+            operator=operator, node_id=node_id, name=name, metadata=node_metadata
         )
+        
         return node_id
 
     def add_edge(
@@ -214,9 +230,6 @@ class XCSGraph:
     ) -> Dict[str, Any]:
         """Prepares inputs for a node based on edge field mappings.
 
-        Uses the field mappings defined on edges to route specific output fields
-        from dependency nodes to the appropriate input fields of this node.
-
         Args:
             node_id: The node to prepare inputs for
             results: Dictionary mapping node IDs to their output results
@@ -224,9 +237,8 @@ class XCSGraph:
         Returns:
             Dictionary of inputs prepared for the node's execution
         """
+        # Build inputs dictionary from upstream results
         inputs = {}
-
-        # Get all incoming edges for this node
         incoming_node_ids = self.nodes[node_id].inbound_edges
 
         for from_id in incoming_node_ids:
@@ -237,15 +249,15 @@ class XCSGraph:
             edge = self.edges[edge_key]
             source_results = results[from_id]
 
-            # If edge has field mappings, use them to map outputs to inputs
+            # Map fields according to edge mappings
             if edge.field_mappings:
                 for output_field, input_field in edge.field_mappings.items():
                     if output_field in source_results:
                         inputs[input_field] = source_results[output_field]
             else:
-                # For backward compatibility, if no field mappings, merge all results
+                # Default behavior: merge all results
                 inputs.update(source_results)
-
+        
         return inputs
 
     def __str__(self) -> str:

@@ -18,19 +18,20 @@ Example usage:
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import ClassVar, List, Optional, Tuple, Type
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Type, Union
 
-from ember.api.xcs import jit
+from ember.xcs import (
+    jit, 
+    execution_options, 
+    ExecutionOptions,
+    XCSGraph, 
+    TracerContext,
+    BaseScheduler,
+    execute_graph
+)
+from ember.xcs.engine.execution_options import get_execution_options
 from ember.core.registry.operator.base.operator_base import Operator, Specification
 from ember.core.types.ember_model import EmberModel, Field
-from ember.xcs.engine.execution_options import execution_options, get_execution_options
-from ember.xcs.engine.xcs_engine import (
-    TopologicalSchedulerWithParallelDispatch,
-    compile_graph,
-)
-from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
-from ember.xcs.graph.xcs_graph import XCSGraph
-from ember.xcs.tracer.xcs_tracing import TracerContext
 
 # Configure logging
 logging.basicConfig(
@@ -480,28 +481,30 @@ def demo_explicit_parallel_execution(*, num_ops: int, delay: float) -> None:
             node_id=node_id,
         )
 
-    # Compiling the graph
-    plan = compile_graph(graph=graph)
+    # No need to explicitly compile the graph with the unified engine
+    # execute_graph handles graph compilation internally
 
     # Executing with different schedulers
     logger.info("\nExecuting with different schedulers:")
 
     # Sequential execution
     logger.info("  Sequential scheduler...")
-    seq_scheduler = XCSNoOpScheduler()
     start = time.time()
-    _ = seq_scheduler.run_plan(
-        plan=plan, global_input={"task_id": "sequential"}, graph=graph
+    _ = execute_graph(
+        graph=graph, 
+        inputs={"task_id": "sequential"}, 
+        options=ExecutionOptions(scheduler="wave")
     )
     seq_time = time.time() - start
     logger.info("    Completed in %.4fs", seq_time)
 
     # Parallel execution
     logger.info("  Parallel scheduler...")
-    par_scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=num_ops)
     start = time.time()
-    _ = par_scheduler.run_plan(
-        plan=plan, global_input={"task_id": "parallel"}, graph=graph
+    _ = execute_graph(
+        graph=graph, 
+        inputs={"task_id": "parallel"}, 
+        options=ExecutionOptions(scheduler="parallel", max_workers=num_ops)
     )
     par_time = time.time() - start
     logger.info("    Completed in %.4fs", par_time)
@@ -599,7 +602,7 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
             ]
             self.num_ops = num_ops
 
-        def forward(self, *, inputs: DelayInput) -> EnsembleOutput:
+        def forward(self, *, inputs: Union[DelayInput, Dict[str, Any]]) -> EnsembleOutput:
             """Executes with strategy based on context.
 
             Checks the execution context for configuration parameters
@@ -607,12 +610,21 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
             dynamically selects the appropriate strategy.
 
             Args:
-                inputs: Task context information containing task identifier
+                inputs: Task context information containing task identifier,
+                       either as DelayInput object or dictionary
 
             Returns:
                 Aggregated results from all child operations
             """
             results = []
+            
+            # Extract task_id from inputs, handling both object and dict formats
+            if isinstance(inputs, dict) and "task_id" in inputs:
+                task_id = inputs["task_id"]
+            elif hasattr(inputs, "task_id"):
+                task_id = inputs.task_id
+            else:
+                task_id = "unknown-task"
 
             # Checking execution context for parallelism hints
             current_options = get_execution_options()
@@ -623,7 +635,7 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
                 with ThreadPoolExecutor(max_workers=self.num_ops) as executor:
                     futures = []
                     for i, op in enumerate(self.operators):
-                        task_input = DelayInput(task_id=f"{inputs.task_id}-{i+1}")
+                        task_input = DelayInput(task_id=f"{task_id}-{i+1}")
                         futures.append(executor.submit(op, inputs=task_input))
 
                     for future in as_completed(futures):
@@ -632,11 +644,11 @@ def demo_execution_strategies(*, num_ops: int, delay: float) -> None:
             else:
                 # Sequential execution strategy
                 for i, op in enumerate(self.operators):
-                    task_input = DelayInput(task_id=f"{inputs.task_id}-{i+1}")
+                    task_input = DelayInput(task_id=f"{task_id}-{i+1}")
                     output = op(inputs=task_input)
                     results.append(output.result)
 
-            return EnsembleOutput(results=results, task_id=inputs.task_id)
+            return EnsembleOutput(results=results, task_id=task_id)
 
     # Creating the context-aware operator
     adaptive_op = ContextAwareOperator(num_ops=num_ops, delay=delay)

@@ -176,9 +176,4 @@ if __name__ == "__main__":
             raise RuntimeError("Simulated transient failure!")
         return x * 2
 
-    print("Demo: Executing a flaky function with backoff (up to 3 attempts).")
-    try:
-        result: int = run_with_backoff(flaky_function, 10)
-        print(f"Success, output is: {result}")
-    except Exception as exc:
-        print(f"Failed after retries: {exc}")
+    # Implementation for demonstration purposes

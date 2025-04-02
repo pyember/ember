@@ -188,7 +188,8 @@ class TestHuggingFaceDatasetLoader(unittest.TestCase):
 
         # Verify error message contains useful information
         self.assertIn(dataset_name, str(context.exception))
-        self.assertIn("Failed to download", str(context.exception))
+        self.assertIn("Error loading dataset", str(context.exception))
+        self.assertIn("HTTP Error 404", str(context.exception))
 
         # Verify correct cleanup
         self.mock_disable_caching.assert_called_once()

@@ -1,61 +1,71 @@
+"""Dataset loading utilities.
+
+This module contains the core interfaces and implementations for loading datasets
+from various sources, with appropriate error handling and caching.
+"""
+
 import logging
 import os
 from abc import ABC, abstractmethod
 from typing import Optional, Union
-from urllib.error import HTTPError
 
-from datasets import Dataset, DatasetDict, disable_caching, enable_caching, load_dataset
-from datasets.utils.logging import disable_progress_bar, enable_progress_bar
-from ember.core.exceptions import GatedDatasetAuthenticationError
+from datasets import Dataset, DatasetDict, disable_caching, enable_caching
+from datasets import disable_progress_bar, enable_progress_bar, load_dataset
 from huggingface_hub import HfApi
+from requests.exceptions import HTTPError
 
-logger: logging.Logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from ember.core.exceptions import GatedDatasetAuthenticationError
+
+logger = logging.getLogger(__name__)
 
 
 class IDatasetLoader(ABC):
-    """Interface for dataset loaders.
+    """Base interface for dataset loaders.
 
-    Subclasses must implement the load method to retrieve a dataset given a name and an optional configuration.
+    All dataset loaders must implement this interface to provide consistent
+    behavior for loading datasets from various sources.
     """
 
     @abstractmethod
     def load(
         self, *, dataset_name: str, config: Optional[str] = None
     ) -> Union[DatasetDict, Dataset]:
-        """Loads a dataset from a specified source.
+        """Load a dataset by name and optional configuration.
 
         Args:
-            dataset_name (str): The identifier of the dataset to load.
-            config (Optional[str]): An optional configuration name for the dataset.
+            dataset_name: The name of the dataset to load.
+            config: Optional configuration parameter for the dataset.
 
         Returns:
-            Union[DatasetDict, Dataset]: The loaded dataset.
+            The loaded dataset (either a DatasetDict or Dataset).
 
         Raises:
-            Exception: Subclasses should raise an appropriate Exception if loading fails.
+            ValueError: If the dataset cannot be found or loaded.
+            RuntimeError: If an error occurs during dataset loading.
         """
         pass
 
 
 class HuggingFaceDatasetLoader(IDatasetLoader):
-    """Loads datasets from the Hugging Face Hub.
+    """Loader for datasets from the Hugging Face Hub.
 
-    This class verifies the dataset's existence on the Hub before loading it,
-    utilizing caching and progress bar controls to enhance the user experience.
+    This loader handles dataset retrieval from the Hugging Face Hub, with appropriate
+    error handling, caching, and progress reporting.
     """
 
-    def __init__(self, *, cache_dir: Optional[str] = None) -> None:
-        """Initializes the Hugging Face dataset loader.
+    def __init__(self, cache_dir: Optional[str] = None) -> None:
+        """Initialize the loader with optional cache directory.
 
         Args:
-            cache_dir (Optional[str]): Custom directory path for caching datasets.
-                If not provided, defaults to "~/.cache/huggingface/datasets".
+            cache_dir: Custom cache directory for datasets. If not provided,
+                       the default Hugging Face cache location is used.
         """
-        self.cache_dir: str = cache_dir or os.path.join(
-            os.path.expanduser("~"), ".cache", "huggingface", "datasets"
-        )
-        os.makedirs(self.cache_dir, exist_ok=True)
+        if cache_dir is None:
+            cache_dir = os.path.join(
+                os.path.expanduser("~"), ".cache", "huggingface", "datasets"
+            )
+        os.makedirs(cache_dir, exist_ok=True)
+        self.cache_dir = cache_dir
 
     def load(
         self, *, dataset_name: str, config: Optional[str] = None
@@ -78,6 +88,7 @@ class HuggingFaceDatasetLoader(IDatasetLoader):
             RuntimeError: If an HTTP error occurs or an unexpected exception is raised during loading.
         """
         logger.info("Checking dataset existence on the Hub: %s", dataset_name)
+        
         api: HfApi = HfApi()
         try:
             api.dataset_info(dataset_name)

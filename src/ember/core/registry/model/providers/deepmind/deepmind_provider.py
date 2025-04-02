@@ -46,7 +46,7 @@ Typical usage example:
     model_info = ModelInfo(
         id="deepmind:gemini-1.5-pro",
         name="gemini-1.5-pro",
-        provider=ProviderInfo(name="Deepmind", api_key="YOUR_API_KEY")
+        provider=ProviderInfo(name="Deepmind", api_key="${GOOGLE_API_KEY}")
     )
 
     # Initialize the model
@@ -54,7 +54,9 @@ Typical usage example:
 
     # Basic usage
     response = model("What is the Ember framework?")
-    print(response.data)  # The model's response text
+    # Access response content with response.data
+    
+    # Example: "Ember is a Python framework for building AI applications..."
 
     # Advanced usage with more parameters
     response = model(
@@ -65,9 +67,10 @@ Typical usage example:
     )
 
     # Access usage information
-    print(f"Used {response.usage.total_tokens} tokens")
-    print(f"Prompt tokens: {response.usage.prompt_tokens}")
-    print(f"Completion tokens: {response.usage.completion_tokens}")
+    # Example response.usage attributes:
+    # - response.usage.total_tokens -> 320
+    # - response.usage.prompt_tokens -> 45
+    # - response.usage.completion_tokens -> 275
     ```
 
 For higher-level usage, prefer the model registry or API interfaces:
@@ -76,7 +79,7 @@ For higher-level usage, prefer the model registry or API interfaces:
 
     # Using the models API (automatically handles authentication)
     response = models.deepmind.gemini_15_pro("Tell me about Ember")
-    print(response.data)
+    # Access response with response.data
     ```
 """
 

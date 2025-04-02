@@ -1,11 +1,7 @@
 """Example architectures demonstrating clean Ember operator composition patterns.
 
 This module showcases best practices for defining and composing operators
-in Ember, following patterns from high-quality OSS libraries like JAX and PyTorch.
-It uses the Network of Operators (NON) pattern for standardized, composable LLM pipelines.
-
-To run:
-    uv run python src/ember/examples/advanced/example_architectures.py
+in Ember.
 """
 
 import logging
@@ -45,6 +41,7 @@ class NetworkOutput(EmberModel):
 class SubNetworkSpecification(Specification):
     """Specification for SubNetwork operator."""
 
+    # Use the pattern established in NestedNetworkSpecification
     input_model: Type[EmberModel] = NetworkInput
     structured_output: Type[EmberModel] = NetworkOutput
 
@@ -133,7 +130,7 @@ class NestedNetwork(Operator[NetworkInput, NetworkOutput]):
     sub2: SubNetwork
     judge: non.JudgeSynthesis
 
-    def __init__(self, *, model_name: str = "gpt-4o") -> None:
+    def __init__(self, *, model_name: str = "openai:gpt-4o") -> None:
         """Initialize the NestedNetwork with sub-networks and a judge.
 
         Args:
@@ -223,16 +220,17 @@ def create_pipeline(*, model_name: str = "gpt-4o") -> non.Sequential:
 if __name__ == "__main__":
     # Use the centralized logging configuration with reduced verbosity
     from ember.core.utils.logging import configure_logging
+    from ember.xcs.engine.execution_options import set_execution_options
 
     configure_logging(verbose=False)
-
+    
     # Initialize the ember context
     context = get_ember_context()
     logger.info("Ember context initialized")
 
     # Example 1: Using the object-oriented approach
     logger.info("=== Object-Oriented Style ===")
-    network = NestedNetwork(model_name="gpt-4o")
+    network = NestedNetwork(model_name="openai:gpt-4o")
     test_input = NetworkInput(
         query="What are three key principles of functional programming?"
     )
@@ -240,9 +238,9 @@ if __name__ == "__main__":
     test_result = network(inputs=test_input)
     logger.info(f"Answer: {test_result.final_answer}")
 
-    # Example 2: Using the declarative pipeline style
+    # Example 2: Using the declarative non.Sequential "pipeline" style
     logger.info("=== Declarative Pipeline Style ===")
-    pipeline = create_pipeline(model_name="gpt-4o")
+    pipeline = create_pipeline(model_name="openai:gpt-4o")
     query = "What are three key principles of functional programming?"
 
     # For consistency, use kwargs pattern for pipeline invocation too

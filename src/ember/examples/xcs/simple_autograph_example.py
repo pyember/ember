@@ -12,17 +12,16 @@ import logging
 import time
 from typing import Any, Dict
 
-from ember.api.xcs import jit
+from ember.xcs import jit, execution_options, JITMode, get_jit_stats
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
-from ember.xcs.engine.execution_options import execution_options
 
 ###############################################################################
 # Mock Operators
 ###############################################################################
 
 
-@jit()
+@jit(mode=JITMode.ENHANCED)
 class AddOperator(Operator):
     """Simple operator that adds a value to the input."""
 
@@ -164,7 +163,7 @@ def main() -> None:
 
     # Sequential execution demonstration
     print("\nUsing execution_options to control execution:")
-    with execution_options(use_parallel=False):
+    with execution_options(scheduler="sequential"):
         start_time = time.perf_counter()
         result = pipeline(inputs={"value": 20})
         sequential_time = time.perf_counter() - start_time
@@ -173,6 +172,13 @@ def main() -> None:
         print(f"Value: {result['value']}")
         print("Expected calculation: 20 + 10 = 30, then × 3 = 90")
         print(f"Time: {sequential_time:.4f}s (sequential execution)")
+        
+    # Get JIT statistics
+    stats = get_jit_stats(pipeline)
+    print("\nJIT Statistics:")
+    print(f"Cache hits: {stats.get('cache_hits', 0)}")
+    print(f"Cache misses: {stats.get('cache_misses', 0)}")
+    print(f"Strategy: {stats.get('strategy', 'unknown')}")
 
     # Add a summary
     print("\n=== Summary ===")

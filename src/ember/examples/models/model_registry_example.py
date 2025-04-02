@@ -35,6 +35,7 @@ from ember.api.models import (
     ModelCost,
     ModelEnum,
     ModelInfo,
+    ProviderInfo,
     RateLimit,
 )
 
@@ -108,7 +109,7 @@ def direct_model_pattern():
         from ember.api.models import ModelAPI
 
         # Use the direct model ID pattern
-        model = ModelAPI(id="openai:gpt-4o")
+        model = ModelAPI(model_id="openai:gpt-4o")
         response = model.generate(prompt="What is the tallest mountain in the world?")
 
         print("\n=== Direct model pattern result ===")
@@ -144,7 +145,7 @@ def type_safe_enum_pattern() -> None:
         model_info = registry.get_model_info(model_id="openai:gpt-4o")
         print("\nModel metadata:")
         print(f"Name: {model_info.name}")
-        print(f"Provider: {model_info.provider['name']}")
+        print(f"Provider: {model_info.provider.name}")
         print(
             f"Input cost per 1K tokens: ${model_info.cost.input_cost_per_thousand:.4f}"
         )
@@ -193,7 +194,7 @@ def batch_processing_pattern() -> None:
             """
             model_id, prompt = args
             try:
-                model = ModelAPI(id=model_id)
+                model = ModelAPI(model_id=model_id)
                 start_time = time.time()
                 response = model.generate(prompt=prompt)
                 duration = time.time() - start_time
@@ -279,11 +280,11 @@ def custom_model_pattern() -> None:
                 requests_per_minute=3000,  # 3K requests per minute
             ),
             context_window=128000,  # 128K context window
-            provider={
-                "name": "MyOrg AI",
-                "default_api_key": "${MYORG_API_KEY}",
-                "api_base": "https://api.myorg-ai.example.com/v1",
-            },
+            provider=ProviderInfo(
+                name="MyOrg AI",
+                default_api_key="${MYORG_API_KEY}",
+                api_base="https://api.myorg-ai.example.com/v1",
+            ),
         )
 
         # Check if model is already registered to avoid errors
@@ -311,8 +312,8 @@ def custom_model_pattern() -> None:
             print("\nCustom model details:")
             print(f"ID: {info.id}")
             print(f"Name: {info.name}")
-            print(f"Provider: {info.provider['name']}")
-            print(f"API Base URL: {info.provider.get('api_base', 'N/A')}")
+            print(f"Provider: {info.provider.name}")
+            print(f"API Base URL: {getattr(info.provider, 'api_base', 'N/A')}")
             print(f"Context window: {info.context_window} tokens")
             print(f"Input cost: ${info.cost.input_cost_per_thousand:.4f} per 1K tokens")
             print(

@@ -19,13 +19,70 @@ import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, TypeVar, Union, cast
 
 from ember.core.exceptions import (
     ParallelExecutionError,
     TransformError,
     ValidationError,
 )
+from ember.xcs.transforms.transform_base import BaseTransformation, ParallelOptions
+
+
+class ParallelTransformation(BaseTransformation):
+    """Transformation for parallel execution.
+    
+    Transforms a function to execute in parallel across multiple workers,
+    automatically distributing work and collecting results.
+    """
+    
+    def __init__(
+        self, 
+        *, 
+        num_workers=None, 
+        continue_on_errors=False,
+        timeout_seconds=None,
+        devices=None
+    ):
+        """Initialize the parallel transformation.
+        
+        Args:
+            num_workers: Number of worker threads to use
+            continue_on_errors: Whether to continue execution if errors occur
+            timeout_seconds: Maximum execution time before timeout
+            devices: Optional list of device identifiers (unused, for API compatibility)
+        """
+        super().__init__("pmap")
+        self.options = ParallelOptions(
+            num_workers=num_workers,
+            continue_on_errors=continue_on_errors,
+            timeout_seconds=timeout_seconds,
+            return_partial=True,
+        )
+        self.devices = devices
+        
+    def __call__(self, fn):
+        """Apply the parallel transformation to a function.
+        
+        Args:
+            fn: Function to parallelize
+            
+        Returns:
+            Parallelized function
+        """
+        # Call the lower-level pmap implementation using our options
+        parallelized = pmap(
+            fn,
+            num_workers=self.options.num_workers,
+            devices=self.devices,
+            execution_options=ExecutionOptions(
+                continue_on_errors=self.options.continue_on_errors,
+                timeout=self.options.timeout_seconds,
+                return_partial_on_timeout=self.options.return_partial,
+            ),
+        )
+        return self._preserve_function_metadata(fn, parallelized)
+
 
 logger = logging.getLogger(__name__)
 
@@ -710,18 +767,18 @@ def _create_parallelized_func(
     Returns:
         The parallelized function
     """
-    # Implementation will be moved here
-    pass
+    # Now implemented inline in the pmap function
+    return func  # Placeholder return to satisfy type checking
 
 
 def pmap(
-    func: Callable[[Mapping[str, Any]], Dict[str, Any]],
+    func: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None,
     *,
     num_workers: Optional[int] = None,
     devices: Optional[List[str]] = None,  # Unused, but kept for API compatibility
     sharding_options: Optional[ShardingOptions] = None,
     execution_options: Optional[ExecutionOptions] = None,
-) -> Callable[[Mapping[str, Any]], Dict[str, Any]]:
+) -> Union[Callable[[Dict[str, Any]], Dict[str, Any]], Callable[[Callable], Callable]]:
     """Parallelizing a function for concurrent execution.
 
     Transforms a function to execute across multiple workers in parallel,
@@ -776,6 +833,19 @@ def pmap(
         robust_process = pmap(process_item, execution_options=options)
         ```
     """
+    # Handle decorator style usage (@pmap)
+    if func is None:
+        # Return a decorator that will be called with the function
+        def decorator(f):
+            return pmap(
+                f,
+                num_workers=num_workers,
+                devices=devices,
+                sharding_options=sharding_options,
+                execution_options=execution_options,
+            )
+        return decorator
+
     # If devices parameter is used, log that it's currently not functional
     if devices is not None:
         logger.debug(
@@ -858,6 +928,9 @@ def pmap(
             ShardingError: If inputs cannot be properly sharded
             ExecutionError: If parallel execution encounters problems
         """
+        # Import here to avoid circular dependencies
+        from ember.xcs.utils.executor import Dispatcher
+        
         try:
             # Create input shards for parallel processing
             sharded_inputs = _shard_inputs(
@@ -868,43 +941,35 @@ def pmap(
             if not sharded_inputs:
                 return func(inputs=inputs)
 
-            # Determine actual worker count (may be less than requested)
-            actual_workers = min(resolved_workers, len(sharded_inputs))
-            safe_workers = max(1, actual_workers)  # Ensure at least one worker
-
-            # Execute shards in parallel
-            results: List[Dict[str, Any]] = []
-            errors: List[Tuple[int, Exception]] = []
-
-            with ThreadPoolExecutor(max_workers=safe_workers) as executor:
-                # Submit all jobs to the executor
-                future_to_shard = {
-                    executor.submit(func, inputs=shard): i
-                    for i, shard in enumerate(sharded_inputs)
-                }
-
-                # Collect results as they complete
-                for future in as_completed(future_to_shard):
-                    shard_index = future_to_shard[future]
-                    _process_future_result(future, shard_index, results, errors)
-
-            # If all shards failed, raise an error
-            if errors and not results:
-                error_details = ", ".join(
-                    f"shard {idx}: {str(exc)}" for idx, exc in errors[:3]
-                )
-                if len(errors) > 3:
-                    error_details += f" and {len(errors) - 3} more errors"
-                raise ParallelExecutionError(
-                    message=f"All shards failed processing: {error_details}",
-                    context={
-                        "error_count": len(errors),
-                        "error_sample": str(errors[:3]),
-                    },
-                )
-
-            # Combine and return results
-            return _combine_results(results)
+            # Extract executor type from environment
+            executor_type = os.environ.get("XCS_EXECUTION_ENGINE", "auto")
+            
+            # Create dispatcher for parallel execution
+            dispatcher = Dispatcher(
+                max_workers=resolved_workers,
+                timeout=execution_options.timeout if execution_options else None,
+                fail_fast=not (execution_options and execution_options.continue_on_errors),
+                executor=executor_type
+            )
+            
+            try:
+                # Format input dictionaries for dispatcher
+                input_dicts = [{"inputs": shard} for shard in sharded_inputs]
+                
+                # Execute tasks in parallel
+                shard_results = dispatcher.map(func, input_dicts)
+                
+                # Check for empty results
+                if not shard_results:
+                    raise ParallelExecutionError(
+                        message="No results returned from parallel execution",
+                        context={"num_shards": len(sharded_inputs)}
+                    )
+                
+                # Combine and return results
+                return _combine_results(shard_results)
+            finally:
+                dispatcher.close()
 
         except TransformError:
             # Re-raise transform errors directly

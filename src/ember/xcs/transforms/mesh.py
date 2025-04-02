@@ -3,6 +3,9 @@
 This module implements a flexible device mesh abstraction for distributed
 computation within XCS. It provides mechanisms for partitioning data and
 distributing computations across an N-dimensional grid of devices.
+
+It also provides the pjit transformation which combines parallel execution with
+Just-In-Time compilation for optimized performance.
 """
 
 import itertools
@@ -20,12 +23,13 @@ from typing import (
     Protocol,
     Tuple,
     Union,
+    TypeVar,
     runtime_checkable,
 )
 
 import numpy as np
 
-from ember.core.exceptions import TransformError
+from ember.xcs.transforms.transform_base import TransformError
 
 
 # Use a placeholder class to avoid circular imports
@@ -927,3 +931,67 @@ def mesh_sharded(
             )
 
         return sharded_fn
+
+
+def pjit(
+    fn: Optional[Callable[..., Any]] = None, 
+    *, 
+    devices: Optional[List[str]] = None,
+    mesh_shape: Optional[Tuple[int, ...]] = None,
+    in_specs: Optional[Dict[str, PartitionSpec]] = None,
+    out_specs: Optional[Dict[str, PartitionSpec]] = None,
+    mode: str = "enhanced",
+) -> Callable[..., Any]:
+    """Just-in-time compiled parallel execution across a device mesh.
+    
+    Combines the benefits of JIT compilation with parallel execution across
+    a device mesh. This transformation optimizes both the execution plan and
+    the data distribution for efficient parallel processing.
+    
+    Args:
+        fn: Function to transform
+        devices: List of device identifiers to use
+        mesh_shape: Shape of the device mesh
+        in_specs: Partition specifications for inputs
+        out_specs: Partition specifications for outputs
+        mode: JIT mode to use ("enhanced", "trace", "structural", or "auto")
+        
+    Returns:
+        A transformed function that executes with JIT optimization across devices
+        
+    Example:
+        ```python
+        @pjit(mesh_shape=(2, 2))
+        class MyEnsembleOperator(Operator):
+            def forward(self, *, inputs):
+                # Complex computation
+                return results
+        ```
+    """
+    # Import here to avoid circular imports
+    from ember.xcs.jit import jit
+    
+    # Handle both decorator styles (@pjit and @pjit())
+    if fn is None:
+        return lambda f: pjit(
+            f, 
+            devices=devices, 
+            mesh_shape=mesh_shape,
+            in_specs=in_specs, 
+            out_specs=out_specs,
+            mode=mode
+        )
+    
+    # Create the device mesh
+    mesh = DeviceMesh(devices=devices, shape=mesh_shape)
+    
+    # Create JIT-compiled function first with specified mode
+    jitted_fn = jit(fn, mode=mode)
+    
+    # Then apply mesh sharding
+    return mesh_sharded(
+        jitted_fn,
+        mesh=mesh,
+        in_partition=in_specs,
+        out_partition=out_specs
+    )

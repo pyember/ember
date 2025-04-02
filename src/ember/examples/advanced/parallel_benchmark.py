@@ -10,10 +10,10 @@ It uses the ensemble pattern from ensemble_judge_mmlu.py but focuses purely on
 measuring execution strategies with precise instrumentation.
 
 Usage:
-    MODEL_COUNT=3 python -m ember.examples.advanced.parallel_benchmark
+    MODEL_COUNT=10 uv run python -m ember.examples.advanced.parallel_benchmark
 
 Environment variables:
-    MODEL_COUNT: Number of models to use in the ensemble (default: 2)
+    MODEL_COUNT: Number of models to use in the ensemble (default: 10)
     REPEAT: Number of benchmark repetitions (default: 3)
 """
 
@@ -175,7 +175,7 @@ def run_benchmarks(
         Dictionary of benchmark results
     """
     # Create test input
-    test_input = BenchmarkInput(prompt="This is a benchmark test")
+    test_input = BenchmarkInput(prompt="What are compound AI systems?")
 
     # Create ensemble operator
     ensemble = EnsembleOperator(model_configs)
@@ -347,7 +347,7 @@ def main() -> None:
                 "  - OPENAI_API_KEY\n"
                 "  - GOOGLE_API_KEY\n\n"
                 "Example:\n"
-                "  export ANTHROPIC_API_KEY=your_api_key_here",
+                "  export ANTHROPIC_API_KEY=sk_ant_xxxx",
                 title="API Keys Required",
                 style="yellow",
             )

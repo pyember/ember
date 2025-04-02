@@ -39,8 +39,8 @@ Most examples require API keys for LLM providers to be set in your environment:
 
 ```bash
 # Set your API keys before running examples
-export OPENAI_API_KEY="your-openai-key"
-export ANTHROPIC_API_KEY="your-anthropic-key"
+export OPENAI_API_KEY="sk-xxxxxxxxxxxxx"
+export ANTHROPIC_API_KEY="sk_ant_xxxxxxxxxxxxx"
 ```
 
 Some examples (like `register_models_directly.py` and `model_registry_direct.py`) allow you to set API keys directly in the code as an alternative to environment variables.
@@ -100,7 +100,7 @@ model_info = ModelInfo(
     ),
     provider=ProviderInfo(
         name="Provider Name",
-        default_api_key="YOUR_API_KEY",
+        default_api_key="${PROVIDER_API_KEY}",  # Reference environment variable
         base_url="https://api.provider.com",
     ),
 )

@@ -17,15 +17,12 @@ import pytest
 from ember.core.registry.operator.base.operator_base import Operator
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
-from ember.xcs.engine.xcs_engine import (
-    TopologicalSchedulerWithParallelDispatch,
-    compile_graph,
-)
-from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
+from ember.xcs.engine.unified_engine import execute_graph, ExecutionOptions
+from ember.xcs.schedulers.unified_scheduler import NoOpScheduler, ParallelScheduler, SequentialScheduler, WaveScheduler
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 # Import JIT implementations
-from ember.xcs.tracer.tracer_decorator import jit
+from ember.xcs.jit import jit
 from ember.xcs.tracer.xcs_tracing import TracerContext
 
 # Configure logging
@@ -358,25 +355,24 @@ def test_jit_trace_to_graph_parallel_speedup():
             operator=lambda inputs, op=member: op(inputs=inputs), node_id=node_id
         )
 
-    # Compile the graph into an execution plan
-    plan = compile_graph(graph=graph)
-
     # Create input
     global_input = {"task_id": "graph-test"}
 
     # Execute with sequential scheduler
     logger.info("\nExecuting with sequential scheduler:")
-    seq_scheduler = XCSNoOpScheduler()
+    seq_scheduler = SequentialScheduler()
+    seq_options = ExecutionOptions(scheduler_type="sequential")
     start_seq = time.time()
-    _ = seq_scheduler.run_plan(plan=plan, global_input=global_input, graph=graph)
+    _ = execute_graph(graph, global_input, options=seq_options, scheduler=seq_scheduler)
     seq_time = time.time() - start_seq
     logger.info(f"  Sequential execution time: {seq_time:.4f}s")
 
     # Execute with parallel scheduler
     logger.info("\nExecuting with parallel scheduler:")
-    par_scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=ensemble_width)
+    par_scheduler = ParallelScheduler(max_workers=ensemble_width)
+    par_options = ExecutionOptions(scheduler_type="parallel", max_workers=ensemble_width)
     start_par = time.time()
-    _ = par_scheduler.run_plan(plan=plan, global_input=global_input, graph=graph)
+    _ = execute_graph(graph, global_input, options=par_options, scheduler=par_scheduler)
     par_time = time.time() - start_par
     logger.info(f"  Parallel execution time: {par_time:.4f}s")
 

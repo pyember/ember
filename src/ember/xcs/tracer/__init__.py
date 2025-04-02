@@ -1,44 +1,22 @@
-# Export the autograph context manager for public API
-from contextlib import contextmanager
+"""
+Tracing and Graph Building Infrastructure for XCS.
 
-from ._context_types import TraceContextData
-from .autograph import AutoGraphBuilder
-from .unified_jit import jit
-from .xcs_tracing import TracerContext, TraceRecord
+Provides tracing context management and data collection for building 
+computational graphs from execution traces. This module is a core 
+component of the XCS system that enables automatic graph construction.
+"""
 
-
-@contextmanager
-def autograph(*args, **kwargs):
-    """Context manager for automatic graph building.
-
-    Creates a computation graph context where operations are automatically
-    recorded as graph nodes rather than being executed immediately.
-
-    Yields:
-        An XCSGraph object that can be used to execute the recorded operations
-    """
-    from ember.xcs.graph.xcs_graph import XCSGraph
-
-    graph = XCSGraph()
-    try:
-        yield graph
-    finally:
-        # When exiting context, the graph has been built and can be used
-        pass
-
-
-# Expose individual JIT implementations for backwards compatibility
-from .structural_jit import disable_structural_jit, structural_jit
-from .tracer_decorator import jit as trace_jit
+from ember.xcs.tracer._context_types import TraceContextData
+from ember.xcs.tracer.xcs_tracing import TraceRecord, TracerContext
+from ember.xcs.tracer.autograph import AutoGraphBuilder, autograph
 
 __all__ = [
-    "TracerContext",
+    # Core tracing system
     "TraceRecord",
     "TraceContextData",
+    "TracerContext",
+    
+    # Graph building
     "AutoGraphBuilder",
     "autograph",
-    "jit",  # Unified JIT interface
-    "trace_jit",  # Legacy access to trace-based JIT
-    "structural_jit",  # Legacy access to structural JIT
-    "disable_structural_jit",  # Utility for disabling structural JIT
 ]

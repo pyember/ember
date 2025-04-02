@@ -31,14 +31,14 @@ class TestXCSBasic(unittest.TestCase):
         self.assertTrue(hasattr(module, "vmap"))
         self.assertTrue(hasattr(module, "pmap"))
         self.assertTrue(hasattr(module, "autograph"))
-        self.assertTrue(hasattr(module, "execute"))
+        self.assertTrue(hasattr(module, "execute_graph"))
         self.assertTrue(hasattr(module, "mesh_sharded"))
 
         # Test function types
         self.assertTrue(callable(module.jit))
         self.assertTrue(callable(module.vmap))
         self.assertTrue(callable(module.pmap))
-        self.assertTrue(callable(module.execute))
+        self.assertTrue(callable(module.execute_graph))
 
         # Test __all__ is defined correctly
         expected_exports = [
@@ -47,7 +47,7 @@ class TestXCSBasic(unittest.TestCase):
             "vmap",
             "pmap",
             "mesh_sharded",
-            "execute",
+            "execute_graph",
             "XCSGraph",
             "ExecutionOptions",
         ]

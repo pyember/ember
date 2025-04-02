@@ -1043,19 +1043,110 @@ class AutoGraphBuilder:
         operator_ref = (
             weakref.ref(trace_record.operator) if trace_record.operator else None
         )
+        
+        # Capture type information for reconstruction
+        input_type_paths = trace_record.input_type_paths
+        output_type_paths = trace_record.output_type_paths
 
         def operation_fn(*, inputs: Dict[str, Any]) -> Any:
             # Get the actual operator from the weak reference
             operator = operator_ref() if operator_ref else None
+            
             if operator is None:
-                # Fallback to replay mode if operator no longer exists
+                # Operator no longer exists - reconstruct outputs with correct types
+                if isinstance(trace_record.outputs, dict) and output_type_paths:
+                    return AutoGraphBuilder._reconstruct_with_types(trace_record.outputs, output_type_paths)
                 return trace_record.outputs
 
-            # Execute the actual operator with the provided inputs
+            # Execute with proper boundary crossing
             try:
-                return operator(inputs=inputs)
-            except Exception:
-                # Fallback to replay mode if execution fails
+                # Apply proper boundary crossing for inputs
+                # Convert inputs to proper EmberModel types using the operator's specification
+                typed_inputs = inputs
+                if hasattr(operator, "specification") and hasattr(operator.specification, "validate_inputs"):
+                    try:
+                        typed_inputs = operator.specification.validate_inputs(inputs=inputs)
+                    except Exception as e:
+                        # Log but continue with original inputs if validation fails
+                        import logging
+                        logging.warning(f"Input validation failed during JIT execution: {e}")
+                
+                # Execute operator with validated inputs
+                raw_output = operator(inputs=typed_inputs) if hasattr(operator, "__call__") else operator.forward(inputs=typed_inputs)
+                
+                # Apply proper boundary crossing for outputs
+                # Ensure the output is a properly validated EmberModel
+                if hasattr(operator, "specification") and hasattr(operator.specification, "validate_output"):
+                    try:
+                        return operator.specification.validate_output(output=raw_output)
+                    except Exception as e:
+                        # Log but continue with original output if validation fails
+                        import logging
+                        logging.warning(f"Output validation failed during JIT execution: {e}")
+                        return raw_output
+                        
+                return raw_output
+            except Exception as e:
+                # Fallback to reconstructed outputs on error
+                import logging
+                logging.exception(f"Error during JIT execution: {e}")
+                
+                if isinstance(trace_record.outputs, dict) and output_type_paths:
+                    return AutoGraphBuilder._reconstruct_with_types(trace_record.outputs, output_type_paths)
                 return trace_record.outputs
 
         return operation_fn
+        
+    @staticmethod
+    def _reconstruct_with_types(data: Dict[str, Any], type_paths: Dict[str, str]) -> Dict[str, Any]:
+        """Reconstruct dictionary values with their proper types.
+
+        Args:
+            data: Dictionary with values to potentially reconstruct
+            type_paths: Mapping of keys to type paths for reconstruction
+
+        Returns:
+            Dictionary with values reconstructed to proper types where possible
+        """
+        result = {}
+        
+        for key, value in data.items():
+            if key in type_paths and isinstance(value, dict):
+                type_path = type_paths[key]
+                try:
+                    # Import class
+                    last_dot = type_path.rfind('.')
+                    if last_dot > 0:
+                        module_name = type_path[:last_dot]
+                        class_name = type_path[last_dot+1:]
+                        
+                        module = __import__(module_name, fromlist=[class_name])
+                        cls = getattr(module, class_name)
+                        
+                        # Reconstruct proper type
+                        if hasattr(cls, "from_dict") and callable(getattr(cls, "from_dict")):
+                            result[key] = cls.from_dict(value)
+                            continue
+                except (ImportError, AttributeError):
+                    pass
+            
+            # Fallback to original value
+            result[key] = value
+        
+        return result
+
+
+def autograph(records=None):
+    """Creates an XCS graph from execution trace records.
+    
+    A convenience function that constructs an AutoGraphBuilder and builds
+    a graph from the provided trace records.
+    
+    Args:
+        records: List of trace records from operator executions
+        
+    Returns:
+        An XCS graph with nodes and edges based on the trace records
+    """
+    builder = AutoGraphBuilder()
+    return builder.build_graph(records=records)

@@ -9,8 +9,8 @@ These tests verify:
 """
 
 from ember.core.registry.operator.base.operator_base import Operator
-from ember.xcs.tracer.tracer_decorator import jit
-from ember.xcs.tracer.xcs_tracing import TracerContext
+from ember.xcs import jit, TracerContext
+from typing import Dict, Any
 
 
 class DummySpecification:
@@ -22,10 +22,13 @@ class DummySpecification:
 
 
 @jit()
-class DummyTracingOperator(Operator):
+class DummyTracingOperator(Operator[Dict[str, Any], Dict[str, Any]]):
     specification = DummySpecification()
-
-    def forward(self, *, inputs: dict) -> dict:
+    
+    def __init__(self, **kwargs) -> None:
+        pass
+        
+    def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
         return {"output": "traced"}
 
 
@@ -56,11 +59,14 @@ def test_convert_traced_graph_to_plan() -> None:
 
 def test_jit_operator_always_executes() -> None:
     @jit()
-    class DummyJITOperator(Operator):
+    class DummyJITOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         specification = DummySpecification()
         call_count = 0
+        
+        def __init__(self, **kwargs) -> None:
+            pass
 
-        def forward(self, *, inputs: dict) -> dict:
+        def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             type(self).call_count += 1
             # Mimic some transformation by appending "_processed"
             return {"value": inputs.get("value", "default") + "_processed"}
@@ -79,11 +85,14 @@ def test_jit_operator_always_executes() -> None:
 
 def test_force_trace() -> None:
     @jit(sample_input={"value": 1}, force_trace=True)
-    class DummyForceJITOperator(Operator):
+    class DummyForceJITOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         specification = DummySpecification()
         trace_count = 0
+        
+        def __init__(self, **kwargs) -> None:
+            pass
 
-        def forward(self, *, inputs: dict) -> dict:
+        def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             type(self).trace_count += 1
             return {"value": inputs.get("value", 0) + 1}
 
@@ -100,21 +109,24 @@ def test_force_trace() -> None:
 
 def test_nested_jit() -> None:
     @jit()
-    class InnerOperator(Operator):
+    class InnerOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         specification = DummySpecification()
+        
+        def __init__(self, **kwargs) -> None:
+            pass
 
-        def forward(self, *, inputs: dict) -> dict:
+        def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             return {"inner": inputs["value"] + "_inner"}
 
     @jit()
-    class OuterOperator(Operator):
+    class OuterOperator(Operator[Dict[str, Any], Dict[str, Any]]):
         specification = DummySpecification()
 
-        def __init__(self):
+        def __init__(self, **kwargs) -> None:
             # Only instance-level state needed is the inner operator.
             self.inner = InnerOperator()
 
-        def forward(self, *, inputs: dict) -> dict:
+        def forward(self, *, inputs: Dict[str, Any]) -> Dict[str, Any]:
             inner_out = self.inner(inputs=inputs)
             return {"outer": inner_out["inner"] + "_outer"}
 

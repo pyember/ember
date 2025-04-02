@@ -29,6 +29,8 @@ class TraceRecord:
         graph_node_id (Optional[str]): ID used in the graph representation, for autograph internals.
         operator (Any): The operator instance that was called.
         exception (Optional[Exception]): Exception raised during execution, if any.
+        input_type_paths (Dict[str, str]): Type paths for EmberModel inputs.
+        output_type_paths (Dict[str, str]): Type paths for EmberModel outputs.
     """
 
     operator_name: str
@@ -41,6 +43,26 @@ class TraceRecord:
     graph_node_id: Optional[str] = None
     operator: Any = None
     exception: Optional[Exception] = None
+    input_type_paths: Dict[str, str] = field(default_factory=dict)
+    output_type_paths: Dict[str, str] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """Extract and store type information from inputs/outputs."""
+        # Extract from inputs
+        from ember.core.types.ember_model import EmberModel
+        
+        if isinstance(self.inputs, dict):
+            for key, value in self.inputs.items():
+                if isinstance(value, EmberModel):
+                    model_type = type(value)
+                    self.input_type_paths[key] = f"{model_type.__module__}.{model_type.__qualname__}"
+        
+        # Extract from outputs
+        if isinstance(self.outputs, dict):
+            for key, value in self.outputs.items():
+                if isinstance(value, EmberModel):
+                    model_type = type(value)
+                    self.output_type_paths[key] = f"{model_type.__module__}.{model_type.__qualname__}"
 
     @property
     def timestamp(self) -> float:

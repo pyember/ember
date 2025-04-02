@@ -10,11 +10,8 @@ import logging
 import statistics
 import time
 
-from ember.xcs.engine.xcs_engine import (
-    TopologicalSchedulerWithParallelDispatch,
-    compile_graph,
-)
-from ember.xcs.engine.xcs_noop_scheduler import XCSNoOpScheduler
+from ember.xcs.engine.unified_engine import execute_graph, ExecutionOptions
+from ember.xcs.schedulers.unified_scheduler import NoOpScheduler, ParallelScheduler, SequentialScheduler, WaveScheduler
 from ember.xcs.graph.xcs_graph import XCSGraph
 
 # Configure logging
@@ -42,17 +39,15 @@ def test_sequential_vs_parallel_scheduler():
         )[1]
         graph.add_node(operator=sleep_op, node_id=node_id)
 
-    # Compile the graph
-    plan = compile_graph(graph=graph)
-
     # Test with sequential scheduler
     logger.info("\n=== Testing Sequential Scheduler ===")
-    seq_scheduler = XCSNoOpScheduler()
+    seq_scheduler = SequentialScheduler()
+    seq_options = ExecutionOptions(scheduler_type="sequential")
 
     seq_times = []
     for i in range(3):
         start_time = time.time()
-        seq_results = seq_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        seq_results = execute_graph(graph, {}, options=seq_options, scheduler=seq_scheduler)
         elapsed = time.time() - start_time
         seq_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")
@@ -62,12 +57,13 @@ def test_sequential_vs_parallel_scheduler():
 
     # Test with parallel scheduler
     logger.info("\n=== Testing Parallel Scheduler ===")
-    par_scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=num_nodes)
+    par_scheduler = ParallelScheduler(max_workers=num_nodes)
+    par_options = ExecutionOptions(scheduler_type="parallel", max_workers=num_nodes)
 
     par_times = []
     for i in range(3):
         start_time = time.time()
-        par_results = par_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        par_results = execute_graph(graph, {}, options=par_options, scheduler=par_scheduler)
         elapsed = time.time() - start_time
         par_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")
@@ -132,17 +128,15 @@ def test_sequential_with_dependencies():
 
         prev_node = node_id
 
-    # Compile the graph
-    plan = compile_graph(graph=graph)
-
     # Test with sequential scheduler
     logger.info("\n=== Testing Sequential Scheduler with Dependencies ===")
-    seq_scheduler = XCSNoOpScheduler()
+    seq_scheduler = SequentialScheduler()
+    seq_options = ExecutionOptions(scheduler_type="sequential")
 
     seq_times = []
     for i in range(3):
         start_time = time.time()
-        seq_results = seq_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        seq_results = execute_graph(graph, {}, options=seq_options, scheduler=seq_scheduler)
         elapsed = time.time() - start_time
         seq_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")
@@ -152,12 +146,13 @@ def test_sequential_with_dependencies():
 
     # Test with parallel scheduler
     logger.info("\n=== Testing Parallel Scheduler with Dependencies ===")
-    par_scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=num_nodes)
+    par_scheduler = ParallelScheduler(max_workers=num_nodes)
+    par_options = ExecutionOptions(scheduler_type="parallel", max_workers=num_nodes)
 
     par_times = []
     for i in range(3):
         start_time = time.time()
-        par_results = par_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        par_results = execute_graph(graph, {}, options=par_options, scheduler=par_scheduler)
         elapsed = time.time() - start_time
         par_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")
@@ -215,17 +210,15 @@ def test_diamond_pattern():
     graph.add_edge(from_id="B", to_id="D")
     graph.add_edge(from_id="C", to_id="D")
 
-    # Compile the graph
-    plan = compile_graph(graph=graph)
-
     # Test with sequential scheduler
     logger.info("\n=== Testing Sequential Scheduler with Diamond Pattern ===")
-    seq_scheduler = XCSNoOpScheduler()
+    seq_scheduler = SequentialScheduler()
+    seq_options = ExecutionOptions(scheduler_type="sequential")
 
     seq_times = []
     for i in range(3):
         start_time = time.time()
-        seq_results = seq_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        seq_results = execute_graph(graph, {}, options=seq_options, scheduler=seq_scheduler)
         elapsed = time.time() - start_time
         seq_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")
@@ -235,12 +228,13 @@ def test_diamond_pattern():
 
     # Test with parallel scheduler
     logger.info("\n=== Testing Parallel Scheduler with Diamond Pattern ===")
-    par_scheduler = TopologicalSchedulerWithParallelDispatch(max_workers=4)
+    par_scheduler = ParallelScheduler(max_workers=4)
+    par_options = ExecutionOptions(scheduler_type="parallel", max_workers=4)
 
     par_times = []
     for i in range(3):
         start_time = time.time()
-        par_results = par_scheduler.run_plan(plan=plan, global_input={}, graph=graph)
+        par_results = execute_graph(graph, {}, options=par_options, scheduler=par_scheduler)
         elapsed = time.time() - start_time
         par_times.append(elapsed)
         logger.info(f"Run {i+1}: {elapsed:.4f}s")

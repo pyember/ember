@@ -36,9 +36,9 @@ except ImportError as e:
         # Direct imports for XCS functionality
         # Import API singleton
         from ember.xcs.api.core import XCSAPI
-        from ember.xcs.engine.xcs_engine import execute_graph as execute
+        from ember.xcs.engine.unified_engine import execute_graph as execute
         from ember.xcs.tracer.autograph import AutoGraphBuilder as autograph
-        from ember.xcs.tracer.tracer_decorator import jit
+        from ember.xcs.jit import jit
         from ember.xcs.transforms.pmap import pmap
         from ember.xcs.transforms.vmap import vmap
 

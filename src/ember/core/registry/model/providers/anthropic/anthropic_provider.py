@@ -47,10 +47,12 @@ Usage example:
 
     # Generate a response
     response = model("What is the Ember framework?")
-    print(response.data)  # The model's response text
+    # Access response content with response.data
+    
+    # Example: "Ember is a framework for building composable LLM applications..."
 
     # Access usage statistics
-    print(f"Used {response.usage.total_tokens} tokens")
+    # Example: response.usage.total_tokens -> 256
     ```
 
 For higher-level usage, prefer the model registry or API interfaces:
@@ -59,7 +61,7 @@ For higher-level usage, prefer the model registry or API interfaces:
 
     # Using the models API (automatically handles authentication)
     response = models.anthropic.claude_3_sonnet("Tell me about Ember")
-    print(response.data)
+    # Access response with response.data
     ```
 """
 

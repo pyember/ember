@@ -29,10 +29,12 @@ from ember.core.registry.operator.base.operator_base import Operator
 
 # Import Ember APIs
 from ember.core.registry.specification.specification import Specification
-from ember.xcs.engine.execution_options import execution_options
-from ember.xcs.tracer.structural_jit import structural_jit
-from ember.xcs.transforms.pmap import pmap
-from ember.xcs.transforms.vmap import vmap
+from ember.xcs.engine import execution_options
+from ember.xcs.jit import jit
+from ember.xcs.transforms import pmap, vmap
+
+# Use the structural JIT strategy directly
+structural_jit = jit.structural
 
 ###############################################################################
 # Basic Component Operators

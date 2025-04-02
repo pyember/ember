@@ -4,6 +4,11 @@ This example shows how to create and compose operators using the simplified API,
 demonstrating basic operators, ensemble patterns, and advanced composition techniques.
 It follows the latest API patterns and includes proper error handling for when
 API keys are not available.
+
+Run this example with:
+```bash
+uv run python -m src.ember.examples.integration.api_operators_example
+```
 """
 
 import logging

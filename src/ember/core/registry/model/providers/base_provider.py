@@ -165,6 +165,19 @@ class BaseProviderModel(abc.ABC):
         """
         raise NotImplementedError("Subclasses must implement forward")
 
+    def get_api_model_name(self) -> str:
+        """Get the model name formatted for this provider's API requirements.
+        
+        This method provides a hook for provider implementations to normalize 
+        or transform the model name as required by their specific API format.
+        
+        By default, returns the model name unchanged.
+        
+        Returns:
+            str: The properly formatted model name for API requests.
+        """
+        return self.model_info.name
+        
     def __call__(self, prompt: str, **kwargs: Any) -> ChatResponse:
         """Allow the instance to be called as a function to process a prompt.
 

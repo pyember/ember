@@ -190,7 +190,7 @@ for name, model in model_configs:
 Run this to verify your environment is correctly set up:
 
 ```bash
-uvx python -m ember.examples.data.new_datasets_example --skip-model-calls
+uv run python -m ember.examples.data.new_datasets_example --skip-model-calls
 ```
 
-The script checks dataset availability and provides helpful error messages if any issues are found.
+The script checks dataset availability and attempts to provide helpful error messages if any issues are found.
