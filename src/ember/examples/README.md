@@ -68,6 +68,6 @@ You can try the following:
 3. Make sure you agree to share your contact information to access the model on the hugging face page (Click Agree and Access repository)
 4. Adding token to huggingface-hub
   a. uv pip install huggingface-hub
-  b. huggingface-hub login
+  b. huggingface-cli login
   c. Add token to huggingface-hub
 5. Try a different API key
