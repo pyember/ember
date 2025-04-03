@@ -270,8 +270,8 @@ class LiteLLMModel(BaseProviderModel):
             )
             
         # Initialize the LiteLLM client with the API key
-        client = completion(api_key=api_key)
-        return client
+        litellm.api_key = api_key
+        return litellm
 
     def get_api_model_name(self) -> str:
         """Get the model name formatted for LiteLLM's API requirements.
@@ -339,7 +339,7 @@ class LiteLLMModel(BaseProviderModel):
             )
     
             # Process the response
-            content = response.choices[0].message.content.strip()
+            content: str = response.choices[0].message.content.strip()
             usage_stats = self.usage_calculator.calculate(
                 raw_output=response,
                 model_info=self.model_info,
