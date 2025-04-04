@@ -68,7 +68,6 @@ from ember.core.registry.model.providers.base_provider import (
 )
 from ember.plugin_system import provider
 
-
 class LiteLLMProviderParams(ProviderParams):
     """LiteLLM-specific provider parameters for fine-tuning API requests.
    
@@ -337,7 +336,6 @@ class LiteLLMModel(BaseProviderModel):
                 model=model_name,
                 **liteLLM_kwargs
             )
-    
             # Process the response
             content: str = response.choices[0].message.content.strip()
             usage_stats = self.usage_calculator.calculate(
