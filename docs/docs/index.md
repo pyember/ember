@@ -40,14 +40,14 @@ Ember's goal is to help unlock research and practice along this new frontier.
 
 ## Documentation & Examples
 
-- [Architecture Overview](ARCHITECTURE.md)
-- [Quick Start Guide](QUICKSTART.md)
-- [Model Registry Guide](docs/quickstart/model_registry.md)
-- [Operators Guide](docs/quickstart/operators.md)
-- [NON Patterns](docs/quickstart/non.md)
-- [Data Processing](docs/quickstart/data.md)
-- [Configuration](docs/quickstart/configuration.md)
-- [Examples Directory](src/ember/examples)
+- [Architecture Overview](design/ARCHITECTURE.md)
+- [Quick Start Guide](quickstart/QUICKSTART.md)
+- [Model Registry Guide](quickstart/model_registry.md)
+- [Operators Guide](quickstart/operators.md)
+- [NON Patterns](quickstart/non.md)
+- [Data Processing](quickstart/data.md)
+- [Configuration](quickstart/configuration.md)
+- [Examples Directory](https://github.com/pyember/ember/tree/main/src/ember/examples#ember-examples)
 
 ## Simple Example: `horizontal` inference-time scaling with best-of-N
 

@@ -1,5 +1,5 @@
 site_name: Ember
-site_url: https://ember.ai # Example
+site_url: https://pyember.github.io/ember # https://squidfunk.github.io/mkdocs-material/publishing-your-site/
 theme:
   name: material # OOTB themes: mkdocs, readthedocs, material
   logo: assets/logo_ember_icon@2x.png
@@ -10,7 +10,7 @@ theme:
     code: Red Hat Mono
   features:
     - navigation.footer
-    - navigation.tabs
+#    - navigation.tabs
   palette:
     # Dark Mode
     - scheme: slate
