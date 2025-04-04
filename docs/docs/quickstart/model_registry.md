@@ -37,71 +37,67 @@ ANTHROPIC_API_KEY=your-anthropic-key
 GOOGLE_API_KEY=your-google-key
 ```
 
-## 3. Basic Usage (One Line)
+## 3. Basic Usage (Provider Namespaces)
 
 ```python
-import ember
+from ember.api import models
 
-# Initialize and use in one line (automatically uses configuration system)
-service = ember.init()
-response = service("openai:gpt-4o", "Hello world!")
+# Access provider models directly via namespaces
+response = models.openai.gpt4o("What is the capital of France?")
 print(response.data)
 ```
 
-## 4. Standard Usage Pattern
+## 4. Builder Pattern
 
 ```python
-from ember.core.registry.model.initialization import initialize_registry
-from ember.core.config.manager import create_config_manager
-from ember.core.registry.model.base.services.model_service import ModelService
+from ember.api.models import ModelBuilder
 
-# Initialize the configuration and registry
-config_manager = create_config_manager()
-registry = initialize_registry(config_manager=config_manager)
-
-# Create a service instance
-service = ModelService(registry=registry)
-
-# Use the service to invoke models
-response = service.invoke_model(
-    model_id="anthropic:claude-3-5-sonnet", 
-    prompt="Explain quantum computing in 50 words"
+# Create model with builder pattern
+model = (
+    ModelBuilder()
+    .temperature(0.7)
+    .max_tokens(100)
+    .build("anthropic:claude-3-5-sonnet")
 )
+
+# Generate response
+response = model.generate(prompt="Explain quantum computing in 50 words")
 print(response.data)
 ```
 
-## 5. Direct Model Access (Pytorch-like)
+## 5. Direct Model Access (ModelAPI)
 
 ```python
+from ember.api.models import ModelAPI
+
 # Get model directly for more control
-model = service.get_model("openai:gpt-4o")
+model = ModelAPI(id="openai:gpt-4o")
 
 # Use the model directly
-response = model("What's the capital of France?")
+response = model.generate(prompt="What's the capital of France?")
 print(response.data)
 ```
 
 ## 6. Usage Tracking
 
 ```python
-from ember.core.registry.model.initialization import initialize_registry
-from ember.core.config.manager import create_config_manager
-from ember.core.registry.model.base.services.model_service import ModelService
-from ember.core.registry.model.base.services.usage_service import UsageService
+from ember.api.models import get_usage_service
 
-# Initialize configuration and registry with usage tracking
-config_manager = create_config_manager()
-registry = initialize_registry(config_manager=config_manager)
-usage_service = UsageService()
-service = ModelService(registry=registry, usage_service=usage_service)
+# Access usage service
+usage_service = get_usage_service()
 
-# Make model requests
-response = service("openai:gpt-4o", "Hello world!")
+# Make model requests using any method
+response = models.anthropic.claude_3_5_sonnet("Hello world!")
 
-# Get usage statistics
-total_usage = usage_service.get_total_usage()
-print(f"Total tokens: {total_usage.tokens}")
-print(f"Total cost: ${total_usage.cost}")
+# Get usage statistics for a specific model
+model_id = "anthropic:claude-3-5-sonnet"
+usage_summary = usage_service.get_usage_summary(model_id=model_id)
+
+print(f"Model: {usage_summary.model_name}")
+print(f"Total tokens: {usage_summary.total_tokens_used}")
+print(f"Prompt tokens: {usage_summary.total_usage.prompt_tokens}")
+print(f"Completion tokens: {usage_summary.total_usage.completion_tokens}")
+print(f"Estimated cost: ${usage_summary.total_usage.cost_usd:.4f}")
 ```
 
 ## 7. Available Models
@@ -109,11 +105,11 @@ print(f"Total cost: ${total_usage.cost}")
 You can use any of these models by their ID or corresponding ModelEnum:
 
 ### OpenAI Models
-- `openai:gpt-4o` or `ModelEnum.gpt_4o`
-- `openai:gpt-4o-mini` or `ModelEnum.gpt_4o_mini`
-- `openai:gpt-4` or `ModelEnum.gpt_4`
-- `openai:gpt-4-turbo` or `ModelEnum.gpt_4_turbo`
-- `openai:gpt-3.5-turbo` or `ModelEnum.gpt_3_5_turbo`
+- `openai:gpt-4o` or `ModelEnum.gpt4o`
+- `openai:gpt-4o-mini` or `ModelEnum.gpt4o_mini`
+- `openai:gpt-4` or `ModelEnum.gpt4`
+- `openai:gpt-4-turbo` or `ModelEnum.gpt4_turbo`
+- `openai:gpt-3.5-turbo` or `ModelEnum.gpt3_5_turbo`
 - `openai:o1-2024-12-17` or `ModelEnum.o1`
 
 ### Anthropic Models
@@ -135,7 +131,7 @@ You can use any of these models by their ID or corresponding ModelEnum:
 
 ```python
 try:
-    response = service("openai:gpt-4o", "Hello world!")
+    response = models.openai.gpt4o("Hello world!")
     print(response.data)
 except Exception as e:
     print(f"Error: {str(e)}")
@@ -144,36 +140,85 @@ except Exception as e:
 ## 9. Advanced: Adding Custom Models
 
 ```python
-from ember.core.registry.model.base.registry.model_registry import ModelRegistry
-from ember.core.registry.model.base.schemas.model_info import ModelInfo
+from ember.api.models import get_registry, ModelInfo, ModelCost, RateLimit
+
+# Get registry
+registry = get_registry()
 
 # Create model info
 custom_model = ModelInfo(
     id="custom:my-model",
     name="my-custom-model",
+    cost=ModelCost(
+        input_cost_per_thousand=0.0005, 
+        output_cost_per_thousand=0.0015
+    ),
+    rate_limit=RateLimit(
+        tokens_per_minute=100000, 
+        requests_per_minute=3000
+    ),
     provider={
         "name": "CustomProvider",
-        "default_api_key": "${CUSTOM_API_KEY}"
+        "default_api_key": "${CUSTOM_API_KEY}",
+        "base_url": "https://api.custom-provider.com/v1"
     }
 )
 
 # Register custom model
-registry = ModelRegistry()
-registry.register_model(custom_model)
+registry.register_model(model_info=custom_model)
 ```
 
 ## 10. Type-safe Model Invocation with Enums
 
 ```python
-from ember import initialize_ember
-from ember.api.models import ModelEnum
+from ember.api.models import ModelAPI, ModelEnum
 
-# Initialize Ember with the simplified API
-service = initialize_ember(usage_tracking=True)
+# Create model using an enum for type safety
+model = ModelAPI.from_enum(ModelEnum.gpt4o)
 
-# Use enum for type-safety
-response = service(ModelEnum.gpt_4o, "Hello world!")
+# Generate response
+response = model.generate(prompt="Hello world!")
 print(response.data)
+```
+
+## 11. Batch Processing with Multiple Models
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+from ember.api.models import ModelAPI
+
+# Define prompts and models
+prompts = [
+    "What is machine learning?",
+    "Explain neural networks.",
+    "What is transfer learning?",
+    "Describe reinforcement learning."
+]
+
+model_ids = [
+    "openai:gpt-4o",
+    "anthropic:claude-3-5-sonnet",
+    "deepmind:gemini-1.5-pro",
+    "openai:gpt-4-turbo"
+]
+
+# Process in parallel
+def process_prompt(args):
+    model_id, prompt = args
+    model = ModelAPI(id=model_id)
+    response = model.generate(prompt=prompt)
+    return model_id, prompt, response.data
+
+# Execute in parallel with ThreadPoolExecutor
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(process_prompt, zip(model_ids, prompts)))
+
+# Print results
+for model_id, prompt, result in results:
+    print(f"Model: {model_id}")
+    print(f"Prompt: {prompt}")
+    print(f"Result: {result[:100]}...")  # Truncate for display
+    print()
 ```
 
 ## Next Steps

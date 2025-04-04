@@ -5,171 +5,135 @@ This guide introduces Ember's data processing system, which provides tools for l
 ## 1. Introduction to Ember Data
 
 Ember's data module provides:
-- **Standardized Dataset Loading**: Unified access to common benchmarks and custom datasets
+- **Standardized Dataset Access**: Unified interface to common benchmarks and custom datasets
 - **Flexible Transformations**: Pipelines for preprocessing and normalizing data
 - **Evaluation Framework**: Tools for measuring model performance across tasks
 - **Sampling Controls**: Methods for dataset subsampling and stratification
-- **Data Registry**: Registry of popular evaluation benchmarks with metadata
+- **Data Registry**: Central registry of popular evaluation benchmarks with metadata
 
-## 2. Loading Standard Datasets
+## 2. Loading Datasets - The Simple Way
 
 ```python
-from ember.core.utils.data.service import DataService
-from ember.core.utils.data.base.config import DatasetConfig
-
-# Initialize data service
-data_service = DataService()
+from ember.api import datasets
 
 # Load a standard benchmark dataset
-mmlu_data = data_service.load_dataset(
-    dataset_name="mmlu",
-    subset="high_school_biology",
-    split="test",
-    limit=100  # Optional limit
-)
+mmlu_data = datasets("mmlu", config={"subset": "high_school_biology", "split": "test"})
 
-# Access the data
-for item in mmlu_data:
-    print(f"Question: {item.question}")
-    print(f"Choices: {item.choices}")
-    print(f"Answer: {item.answer}")
+# Access dataset entries
+for entry in mmlu_data:
+    print(f"Question: {entry.query}")
+    print(f"Choices: {entry.choices}")
+    print(f"Answer: {entry.metadata.get('correct_answer')}")
     print("---")
 ```
 
-## 3. Using Dataset Transformers
+## 3. Using DatasetBuilder
 
 ```python
-from ember.core.utils.data.base.transformers import (
-    ShuffleChoicesTransformer,
-    ContextEnricherTransformer,
-    TextCleanerTransformer
-)
+from ember.api import DatasetBuilder
 
-# Create transformers
-shuffle_transformer = ShuffleChoicesTransformer(seed=42)
-cleaner_transformer = TextCleanerTransformer()
-context_transformer = ContextEnricherTransformer(
-    context_retriever=my_retriever_function
-)
+# Create and configure dataset using builder pattern
+transformed_data = (DatasetBuilder()
+    .from_registry("mmlu")
+    .subset("high_school_biology")
+    .split("test")
+    .sample(100)
+    .transform(lambda item: {
+        **item,
+        "question": f"Please answer: {item['question']}"
+    })
+    .build())
 
-# Apply transformations sequentially
-transformed_data = data_service.load_dataset(
-    dataset_name="mmlu",
-    subset="high_school_biology",
-    transformers=[
-        cleaner_transformer,
-        shuffle_transformer,
-        context_transformer
-    ]
-)
-
-# Access transformed data
-for item in transformed_data:
-    print(f"Question: {item.question}")
-    print(f"Context: {item.context}")  # Added by the context transformer
-    print(f"Shuffled Choices: {item.choices}")  # Shuffled by the transformer
+# Access the transformed data
+for entry in transformed_data:
+    print(f"Question: {entry.query}")
+    print(f"Choices: {entry.choices}")
+    print(f"Answer: {entry.metadata.get('correct_answer')}")
+    print("---")
 ```
 
 ## 4. Creating Custom Datasets
 
 ```python
-from ember.core.utils.data.base.models import DataItem, Dataset
+from ember.api import register, Dataset, DatasetEntry, TaskType
 from typing import List, Dict, Any
 import json
 
-# Define a function to load custom data
-def load_my_dataset() -> Dataset:
-    # Load data from a file
-    with open("my_dataset.json", "r") as f:
-        data = json.load(f)
-    
-    # Convert to DataItem objects
-    items: List[DataItem] = []
-    for entry in data:
-        item = DataItem(
-            id=entry["id"],
-            question=entry["question"],
-            choices=entry["options"],
-            answer=entry["correct_option"],
-            metadata={
-                "category": entry["category"],
-                "difficulty": entry["difficulty"]
-            }
-        )
-        items.append(item)
-    
-    # Create and return dataset
-    return Dataset(
-        name="my_custom_dataset",
-        items=items,
-        metadata={"source": "custom", "version": "1.0"}
-    )
-
-# Register custom dataset loader
-data_service.register_loader("my_dataset", load_my_dataset)
+# Define dataset class with registration decorator
+@register("my_dataset", source="custom/qa", task_type=TaskType.QUESTION_ANSWERING)
+class CustomDataset:
+    def load(self, config=None) -> List[DatasetEntry]:
+        # Load data from a file
+        with open("my_dataset.json", "r") as f:
+            data = json.load(f)
+        
+        # Convert to DatasetEntry objects
+        entries = []
+        for entry in data:
+            item = DatasetEntry(
+                id=entry["id"],
+                content={
+                    "question": entry["question"],
+                    "choices": entry["options"],
+                    "answer": entry["correct_option"]
+                },
+                metadata={
+                    "category": entry["category"],
+                    "difficulty": entry["difficulty"]
+                }
+            )
+            entries.append(item)
+        
+        return entries
 
 # Use it like any other dataset
-my_data = data_service.load_dataset("my_dataset")
+my_data = datasets("my_dataset")
 ```
 
-## 5. Sampling and Filtering
+## 5. Filtering and Transforming Datasets
 
 ```python
-from ember.core.utils.data.base.samplers import (
-    RandomSampler,
-    StratifiedSampler,
-    FilterSampler
-)
+from ember.api import DatasetBuilder
 
-# Create samplers
-random_sampler = RandomSampler(n=50, seed=42)
-stratified_sampler = StratifiedSampler(
-    n=50,
-    stratify_by="metadata.category",
-    seed=42
-)
-filter_sampler = FilterSampler(
-    filter_fn=lambda item: item.metadata.get("difficulty") == "hard"
-)
+# Custom transformation function
+def add_context_to_question(item):
+    return {
+        **item,
+        "question": f"In the context of {item['metadata']['category']}: {item['question']}"
+    }
 
-# Use with dataset loading
-hard_items = data_service.load_dataset(
-    dataset_name="mmlu",
-    sampler=filter_sampler
-)
+# Filtering to specific categories
+science_questions = (DatasetBuilder()
+    .from_registry("mmlu")
+    .subset("high_school_chemistry")
+    .filter(lambda item: "reaction" in item["question"].lower())
+    .transform(add_context_to_question)
+    .build())
 
-# Or apply to existing dataset
-random_subset = random_sampler.sample(my_dataset)
-stratified_subset = stratified_sampler.sample(my_dataset)
-
-print(f"Original size: {len(my_dataset)}")
-print(f"Random sample size: {len(random_subset)}")
-print(f"Stratified sample size: {len(stratified_subset)}")
+print(f"Found {len(science_questions)} chemistry reaction questions")
 ```
 
 ## 6. Evaluating Model Performance
 
 ```python
+from ember.api import datasets
 from ember.core.utils.eval.pipeline import EvaluationPipeline
-from ember.core.utils.eval.evaluators import (
-    ExactMatchEvaluator,
-    F1ScoreEvaluator,
-    MultipleChoiceEvaluator
-)
-from ember.core.registry.model.base.services import ModelService
+from ember.core.utils.eval.evaluators import MultipleChoiceEvaluator
+from ember.api.models import ModelBuilder
 
-# Initialize model service
-model_service = ModelService()
-model = model_service.get_model("openai:gpt-4o")
+# Load a dataset
+mmlu_data = datasets("mmlu", config={"subset": "high_school_biology", "split": "test"})
 
-# Create evaluators
-multiple_choice_evaluator = MultipleChoiceEvaluator()
-exact_match_evaluator = ExactMatchEvaluator()
+# Initialize model
+model = ModelBuilder().temperature(0.0).build("openai:gpt-4o")
 
-# Create evaluation pipeline
+# Create evaluator
+evaluator = MultipleChoiceEvaluator()
+
+# Set up and run evaluation pipeline
 eval_pipeline = EvaluationPipeline(
-    dataset=mmlu_data,
-    evaluators=[multiple_choice_evaluator],
+    dataset=mmlu_data.entries,
+    evaluators=[evaluator],
     model=model
 )
 
@@ -178,13 +142,12 @@ results = eval_pipeline.evaluate()
 
 # Print results
 print(f"Accuracy: {results.metrics['accuracy']:.2f}")
-print(f"Per-category breakdown: {results.metrics['category_accuracy']}")
+print(f"Per-category breakdown: {results.metrics.get('category_accuracy', {})}")
 ```
 
 ## 7. Working with Evaluation Results
 
 ```python
-from ember.core.utils.eval.pipeline import EvaluationResults
 import matplotlib.pyplot as plt
 
 # Assuming we have evaluation results
@@ -206,18 +169,19 @@ for item_result in results.item_results:
         print(f"  Expected: {expected}")
         print(f"  Model output: {model_answer}")
 
-# Plot results
-categories = results.metrics["category_accuracy"].keys()
-accuracies = [results.metrics["category_accuracy"][cat] for cat in categories]
-
-plt.figure(figsize=(10, 6))
-plt.bar(categories, accuracies)
-plt.title("Accuracy by Category")
-plt.xlabel("Category")
-plt.ylabel("Accuracy")
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.savefig("category_results.png")
+# Plot results if category data is available
+if "category_accuracy" in results.metrics:
+    categories = results.metrics["category_accuracy"].keys()
+    accuracies = [results.metrics["category_accuracy"][cat] for cat in categories]
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(categories, accuracies)
+    plt.title("Accuracy by Category")
+    plt.xlabel("Category")
+    plt.ylabel("Accuracy")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig("category_results.png")
 ```
 
 ## 8. Built-in Datasets
@@ -225,45 +189,42 @@ plt.savefig("category_results.png")
 Ember provides ready-to-use loaders for popular benchmarks:
 
 ```python
+from ember.api import datasets, list_available_datasets
+
+# List all available datasets
+available_datasets = list_available_datasets()
+print(f"Available datasets: {available_datasets}")
+
 # MMLU (Massive Multitask Language Understanding)
-mmlu = data_service.load_dataset(
-    dataset_name="mmlu",
-    subset="high_school_mathematics"
-)
+mmlu = datasets("mmlu", config={"subset": "high_school_mathematics"})
 
 # TruthfulQA
-truthful_qa = data_service.load_dataset(
-    dataset_name="truthful_qa",
-    subset="generation"
-)
+truthful_qa = datasets("truthful_qa", config={"subset": "generation"})
 
 # HaluEval (Hallucination Evaluation)
-halu_eval = data_service.load_dataset(
-    dataset_name="halueval",
-    subset="knowledge"
-)
+halu_eval = datasets("halueval", config={"subset": "knowledge"})
 
 # CommonsenseQA
-commonsense_qa = data_service.load_dataset(
-    dataset_name="commonsense_qa",
-    split="validation"
-)
+commonsense_qa = datasets("commonsense_qa", config={"split": "validation"})
 
-# Short Answer QA
-short_answer = data_service.load_dataset(
-    dataset_name="short_answer",
-    subset="factual"
-)
+# AIME (American Invitational Mathematics Examination)
+aime = datasets("aime")
+
+# GPQA (Graduate-level Physics Questions)
+gpqa = datasets("gpqa")
+
+# Codeforces Programming Problems
+codeforces = datasets("codeforces", config={"difficulty_range": (800, 1200)})
 ```
 
 ## 9. Best Practices
 
-1. **Cache Datasets**: Use the caching features to avoid reloading
-2. **Apply Transformers Carefully**: Consider the order of transformations
-3. **Stratified Sampling**: Ensure representative subsets when sampling
-4. **Multiple Evaluators**: Use multiple evaluators for comprehensive assessment
-5. **Metadata**: Add rich metadata to custom datasets for better filtering
-6. **Batch Processing**: Process data in batches for large datasets
+1. **Use the Builder Pattern**: `DatasetBuilder` provides a clean, fluent interface
+2. **Registry Integration**: Register custom datasets for seamless integration
+3. **Transformation Order**: Consider the sequence of transformations and filters
+4. **Stratified Sampling**: Ensure representative subsets with appropriate sampling
+5. **Multiple Evaluators**: Use specialized evaluators for comprehensive assessment
+6. **Configuration**: Use structured configs for reproducibility
 
 ## Next Steps
 

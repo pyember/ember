@@ -208,8 +208,7 @@ Key components:
 Operators are the fundamental computational units in Ember:
 
 ```python
-from ember.api.operator import Operator, Specification
-from ember.api.models import EmberModel
+from ember.api.operators import Operator, Specification, EmberModel
 
 class SummarizerInput(EmberModel):
     text: str
@@ -265,8 +264,7 @@ Key components:
 Specifications define the contract between inputs and outputs:
 
 ```python
-from ember.api.operator import Specification
-from ember.api.models import EmberModel
+from ember.api.operators import Specification, EmberModel
 
 class QuestionInput(EmberModel):
     question: str
@@ -317,10 +315,10 @@ Key features:
 
 ### Execution Engine (XCS)
 
-The XCS (eXecution Control System) handles graph-based execution:
+XCS handles graph-based execution:
 
 ```python
-from ember.api.xcs import XCSGraph, execute_graph, execution_options
+from ember.xcs import XCSGraph, execute_graph, execution_options
 
 # Create execution graph
 graph = XCSGraph()
@@ -329,10 +327,10 @@ graph.add_node(operator=judge, node_id="judge")
 graph.add_edge(from_id="ensemble", to_id="judge")
 
 # Execute with parallelization
-with execution_options(max_workers=3):
+with execution_options(scheduler="wave", max_workers=4):
     result = execute_graph(
         graph=graph,
-        global_input={"query": "What is quantum computing?"}
+        inputs={"query": "What is quantum computing?"}
     )
 ```
 
@@ -369,30 +367,26 @@ Key components:
 
 Ember provides three complementary approaches to Just-In-Time optimization:
 
-#### 1. JIT Decorator (@jit)
+#### JIT Strategy Pattern
 
-The `jit` decorator uses execution tracing to optimize operators:
+The `jit` decorator now uses a pluggable strategy pattern with multiple implementations:
 
 ```python
-from ember.api.xcs import jit
+from ember.xcs import jit, JITMode
+from ember.api.operators import Operator
+from ember.api import non
 
+# With automatic strategy selection
 @jit
 class MyEnsemble(Operator):
     def forward(self, *, inputs):
         # Complex computation automatically traced and optimized
-        ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o")
+        ensemble = non.UniformEnsemble(num_units=3, model_name="openai:gpt-4o")
         responses = ensemble(inputs={"query": inputs.query})
         return responses
-```
 
-#### 2. Structural JIT (@structural_jit)
-
-The `structural_jit` decorator analyzes operator composition without requiring execution:
-
-```python
-from ember.api.xcs import structural_jit
-
-@structural_jit(execution_strategy="parallel")
+# With explicit strategy selection
+@jit(mode=JITMode.ENHANCED)
 class Pipeline(Operator):
     def __init__(self):
         self.refiner = QuestionRefinement()
@@ -405,54 +399,122 @@ class Pipeline(Operator):
         return self.aggregator(inputs=answers)
 ```
 
-#### 3. Autograph Context Manager
+The JIT system now supports three strategies:
+
+1. **Trace Strategy** (`JITMode.TRACE`): Traditional execution tracing for dynamic flows
+2. **Structural Strategy** (`JITMode.STRUCTURAL`): Analyzes operator structure without requiring execution 
+3. **Enhanced Strategy** (`JITMode.ENHANCED`): Combines static and dynamic analysis for optimal parallelization
+
+#### Autograph Context Manager
 
 For explicit graph construction:
 
 ```python
-from ember.api.xcs import autograph, execute
+from ember.xcs import autograph, execute_graph, execution_options
 
 with autograph() as graph:
     intermediate = op1(inputs={"query": "Example"})
     result = op2(inputs=intermediate)
     
 # Execute the graph with optimized scheduling
-results = execute(graph)
+results = execute_graph(
+    graph=graph,
+    options=execution_options(scheduler="wave", max_workers=4)
+)
 ```
 
-#### JIT System Component Architecture
+#### Unified JIT System Architecture
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                          Enhanced JIT System                           │
+│                         Unified JIT System                             │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │   JIT Decorator │─────►│Function Tracing │─────►│ Graph Building  │ │
+│  │  JIT Decorator  │─────►│Strategy Selector│─────►│  JIT Cache      │ │
 │  └────────┬────────┘      └────────┬────────┘      └────────┬────────┘ │
 │           │                        │                        │          │
 │           ▼                        ▼                        ▼          │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │ Structural JIT  │─────►│Structure Analysis│────►│Hierarchical Deps│ │
+│  │ Trace Strategy  │─────►│ Structural Strat│─────►│Enhanced Strategy│ │
 │  └────────┬────────┘      └────────┬────────┘      └────────┬────────┘ │
 │           │                        │                        │          │
 │           ▼                        ▼                        ▼          │
 │  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
-│  │   Autograph     │─────►│ Execution Engine│─────►│Parallel Dispatch│ │
+│  │   Autograph     │─────►│Graph Dependency │─────►│ Unified Engine  │ │
 │  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
 │                                                                        │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 Key features:
-- Multiple approaches for different optimization needs:
-  - Trace-based JIT for dynamic execution patterns 
-  - Structural JIT for analyzing operator composition without execution
-  - Autograph for explicit graph construction when needed
-- Advanced dependency analysis with hierarchical operator support
-- Automatic parallelization of independent operations
-- Caching of execution plans for repeated invocations
+- Unified strategy pattern with pluggable implementations:
+  - `trace`: Optimized for dynamic execution patterns
+  - `structural`: Static analysis of operator composition 
+  - `enhanced`: Combines static and dynamic analysis for optimal parallelism
+- Automatic strategy selection based on operator characteristics 
+- Consistent caching mechanism across all strategies
+- Advanced dependency analysis with wave-based scheduling
+- Transformation composition for complex optimizations
+- Comprehensive metrics and introspection tools
 
 For a comprehensive explanation of the JIT system, see [JIT Overview](docs/xcs/JIT_OVERVIEW.md).
+
+### Function Transformation System
+
+The transformation system provides high-level operations for data and computation transformations:
+
+```python
+from ember.xcs import vmap, pmap, compose, DeviceMesh, PartitionSpec, mesh_sharded
+
+# Vectorized mapping for batch processing
+batch_processor = vmap(process_item)
+batch_results = batch_processor(inputs={"data": [item1, item2, item3]})
+
+# Parallel execution across multiple workers
+parallel_processor = pmap(process_item, num_workers=4)
+parallel_results = parallel_processor(inputs=complex_data)
+
+# Combine transformations for complex pipelines
+pipeline = compose(
+    vmap(batch_size=32),
+    pmap(num_workers=4)
+)(process_item)
+
+# Device mesh sharding for multi-device execution
+mesh = DeviceMesh(devices=["gpu:0", "gpu:1", "gpu:2", "gpu:3"], mesh_shape=(2, 2))
+partition = PartitionSpec("batch", "model")
+sharded_op = mesh_sharded(pipeline, mesh=mesh, partition_spec=partition)
+```
+
+#### Transform System Architecture
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                       Transform System                                 │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
+│  │BaseTransformation│─────►│TransformProtocol│─────►│ BatchingOptions │ │
+│  └────────┬────────┘      └─────────────────┘      └────────┬────────┘ │
+│           │                                                 │          │
+│           ▼                                                 ▼          │
+│  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
+│  │    vmap         │─────►│      pmap       │─────►│ParallelOptions  │ │
+│  └────────┬────────┘      └────────┬────────┘      └────────┬────────┘ │
+│           │                        │                        │          │
+│           ▼                        ▼                        ▼          │
+│  ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐ │
+│  │ mesh_sharded    │─────►│    compose      │─────►│  Unified JIT    │ │
+│  └─────────────────┘      └─────────────────┘      └─────────────────┘ │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+Key features:
+- Common base class (`BaseTransformation`) with consistent interface
+- Compositional design for combining transformations 
+- Integration with the JIT system for optimized execution
+- Support for both data parallelism and model parallelism
+- Extensible design for custom transformations
 
 ### Data Processing System
 
@@ -688,11 +750,10 @@ The code is organized into the following package structure:
 Ember organizes imports through the `ember.api` namespace:
 
 ```python
-from ember.api.operator import Operator, Specification
-from ember.api.xcs import jit, execution_options
-from ember.api.models import EmberModel, LMModule
+from ember.api.operators import Operator, Specification, EmberModel
+from ember.xcs import jit, execution_options
+from ember.api import models, non
 from ember.api.data import DataLoader
-from ember.core import non
 ```
 
 This approach:

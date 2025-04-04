@@ -1,31 +1,30 @@
-# Ember NON (Networks of Networks) - Quickstart Guide
+# Ember NON (Networks of Networks)
 
-This guide introduces Ember's Networks of Networks (NON) module, which provides high-level abstractions for building complex AI systems through compositional patterns.
+This guide introduces Ember's Networks of Networks (NON) module, which provides composable patterns for building robust CAIS workflows.
 
-## 1. Understanding NON
+## Core Operators
 
-The NON module provides ready-to-use operators that implement common compositional patterns:
-
-- **Ensembles**: Run multiple models in parallel for robust results
-- **Judges**: Evaluate and synthesize responses from multiple sources
-- **Verifiers**: Check and potentially correct candidate answers
-- **Sequential Pipelines**: Chain multiple operators together
-- **Varied Model Combinations**: Blend different models and configurations
-
-These abstractions make it easier to build reliable, high-performance AI systems.
-
-## 2. Basic NON Operators
+The NON module provides reusable operator implementations:
 
 ```python
 from ember.core.non import (
-    UniformEnsemble,
-    JudgeSynthesis,
-    MostCommon,
-    Verifier,
-    Sequential
+    UniformEnsemble,    # Multiple identical model instances
+    VariedEnsemble,     # Different model configurations  
+    JudgeSynthesis,     # Analyze and synthesize multiple responses
+    MostCommon,         # Statistical majority voting
+    Verifier,           # Validate and correct candidate answers
+    Sequential          # Chain multiple operators
 )
+```
 
-# Create a simple ensemble of identical models
+## Basic Usage
+
+### UniformEnsemble
+
+Creates multiple instances of the same model to mitigate non-determinism.
+
+```python
+# Create an ensemble with 3 identical instances
 ensemble = UniformEnsemble(
     num_units=3,
     model_name="openai:gpt-4o",
@@ -33,217 +32,247 @@ ensemble = UniformEnsemble(
     max_tokens=100
 )
 
-# Create a judge to synthesize ensemble outputs
+# Execute the ensemble
+result = ensemble(inputs={"query": "What causes earthquakes?"})
+responses = result.responses  # List of responses from each model
+```
+
+### JudgeSynthesis
+
+Analyzes multiple responses and synthesizes a better answer.
+
+```python
+# Create a judge with a high-quality model
 judge = JudgeSynthesis(
     model_name="anthropic:claude-3-sonnet",
     temperature=0.1
 )
 
-# Create a simple voting mechanism
-majority_vote = MostCommon()
+# Synthesize responses
+result = judge(inputs={
+    "query": "What causes earthquakes?",
+    "responses": ensemble_responses
+})
 
+final_answer = result.final_answer
+```
+
+### MostCommon
+
+Implements majority voting across multiple responses.
+
+```python
+# Create a most-common selector
+majority = MostCommon()
+
+# Find the most common answer
+result = majority(inputs={
+    "query": "What is 2+2?",
+    "responses": ["4", "4", "3", "4", "5"]
+})
+
+most_common_answer = result.final_answer  # "4"
+```
+
+### Verifier
+
+Checks answers for correctness and provides corrections when needed.
+
+```python
 # Create a verification operator
-answer_verifier = Verifier(
+verifier = Verifier(
     model_name="openai:gpt-4o",
     temperature=0.2
 )
+
+# Verify an answer
+result = verifier(inputs={
+    "query": "What is the capital of Australia?",
+    "candidate_answer": "Sydney is the capital of Australia."
+})
+
+verdict = result.verdict           # "incorrect"
+explanation = result.explanation   # Explains the error
+revised_answer = result.revised_answer  # "Canberra is the capital of Australia."
 ```
 
-## 3. Building a Simple Ensemble + Judge Pipeline
+## Building Complex Pipelines
+
+### Ensemble-Judge-Verifier Pipeline
+
+Create a robust multi-step pipeline with JIT optimization:
 
 ```python
-from ember.xcs.graph import XCSGraph
-from ember.xcs.engine import execute_graph
+from ember.core.non import UniformEnsemble, JudgeSynthesis, Verifier, Sequential
+from ember.xcs import jit
 
-# Define operators
-ensemble = UniformEnsemble(num_units=3, model_name="openai:gpt-4o", temperature=0.7)
-judge = JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
+# Define a JIT-optimized pipeline class
+@jit
+class RobustQAPipeline(Sequential):
+    """Pipeline that combines ensemble, judge, and verification steps."""
+    
+    ensemble: UniformEnsemble
+    judge: JudgeSynthesis
+    verifier: Verifier
+    
+    def __init__(self):
+        # Create the ensemble operator
+        self.ensemble = UniformEnsemble(
+            num_units=3, 
+            model_name="openai:gpt-4o",
+            temperature=0.7
+        )
+        
+        # Create the judge operator
+        self.judge = JudgeSynthesis(
+            model_name="anthropic:claude-3-opus",
+            temperature=0.1
+        )
+        
+        # Create the verifier operator
+        self.verifier = Verifier(
+            model_name="openai:gpt-4o",
+            temperature=0.2
+        )
+        
+        # Chain the operators in sequence
+        super().__init__(operators=[self.ensemble, self.judge, self.verifier])
+    
+    def forward(self, *, inputs):
+        # First, run the ensemble to get multiple answers
+        ensemble_result = self.ensemble(inputs=inputs)
+        
+        # Next, judge the ensemble responses
+        judge_result = self.judge(inputs={
+            "query": inputs["query"],
+            "responses": ensemble_result.responses
+        })
+        
+        # Finally, verify the judge's answer
+        verifier_result = self.verifier(inputs={
+            "query": inputs["query"],
+            "candidate_answer": judge_result.final_answer
+        })
+        
+        return verifier_result
 
-# Create a graph
-graph = XCSGraph()
-graph.add_node(operator=ensemble, node_id="ensemble")
-graph.add_node(operator=judge, node_id="judge")
-graph.add_edge(from_id="ensemble", to_id="judge")
+# Create and use the optimized pipeline
+pipeline = RobustQAPipeline()
+result = pipeline(inputs={"query": "What is the speed of light?"})
 
-# Execute the graph
-result = execute_graph(
-    graph=graph,
-    global_input={"query": "What are the three laws of thermodynamics?"},
-    max_workers=3  # Parallelize ensemble execution
-)
-
-# Access the final answer
-print(f"Final answer: {result.final_answer}")
+print(f"Verdict: {result.verdict}")
+print(f"Final answer: {result.revised_answer}")
+print(f"Explanation: {result.explanation}")
 ```
 
-## 4. Advanced NON Patterns
+### Multi-model Pipeline
 
-### Self-verification Pipeline
-
-```python
-from ember.core.non import UniformEnsemble, Verifier, Sequential
-
-# Define a self-verification pipeline
-def create_self_verification_pipeline(question):
-    # Generate initial answer
-    initial_model = UniformEnsemble(
-        num_units=1,  # Just one model for initial answer
-        model_name="openai:gpt-4o",
-        temperature=0.3
-    )
-    
-    # Verify the answer
-    verifier = Verifier(
-        model_name="anthropic:claude-3-sonnet",
-        temperature=0.1
-    )
-    
-    # Create sequential pipeline
-    pipeline = Sequential(operators=[initial_model, verifier])
-    
-    # Execute the pipeline
-    initial_response = initial_model(inputs={"query": question})
-    candidate_answer = initial_response.responses[0]
-    
-    verification_result = verifier(
-        inputs={
-            "query": question,
-            "candidate_answer": candidate_answer
-        }
-    )
-    
-    return {
-        "original_answer": candidate_answer,
-        "verdict": verification_result.verdict,
-        "explanation": verification_result.explanation,
-        "revised_answer": verification_result.revised_answer if verification_result.verdict == "incorrect" else candidate_answer
-    }
-
-# Use the pipeline
-result = create_self_verification_pipeline("What is the capital of Australia?")
-print(f"Final answer: {result['revised_answer']}")
-print(f"Explanation: {result['explanation']}")
-```
-
-### Diverse Ensemble with Varied Models
+Combine different model types with automatic parallelization:
 
 ```python
 from ember.core.non import VariedEnsemble, JudgeSynthesis
 from ember.core.registry.model.model_module import LMModuleConfig
+from ember.xcs.engine.execution_options import execution_options
 
-# Create configurations for different models
+# Define varied model configurations
 model_configs = [
     LMModuleConfig(model_name="openai:gpt-4o", temperature=0.3),
     LMModuleConfig(model_name="anthropic:claude-3-haiku", temperature=0.4),
-    LMModuleConfig(model_name="openai:gpt-4o-mini", temperature=0.5),
-    LMModuleConfig(model_name="deepmind:gemini-1.5-pro", temperature=0.2)
+    LMModuleConfig(model_name="openai:gpt-4o-mini", temperature=0.5)
 ]
 
-# Create a varied ensemble
+# Create operators
 varied_ensemble = VariedEnsemble(model_configs=model_configs)
-
-# Create a judge
 judge = JudgeSynthesis(model_name="anthropic:claude-3-sonnet")
 
-# Execute the ensemble
-responses = varied_ensemble(inputs={"query": "What are the main challenges in quantum computing?"})
+# Execute with auto-parallelization
+with execution_options(scheduler="wave", max_workers=len(model_configs)):
+    # Get responses from the diverse models
+    ensemble_result = varied_ensemble(inputs={"query": "Explain quantum computing."})
+    
+    # Synthesize into a single answer
+    final_result = judge(inputs={
+        "query": "Explain quantum computing.",
+        "responses": ensemble_result.responses
+    })
 
-# Judge the responses
-final_result = judge(
-    inputs={
-        "query": "What are the main challenges in quantum computing?",
-        "responses": responses.responses
-    }
-)
-
-print(f"Final synthesized answer: {final_result.final_answer}")
+print(f"Final answer: {final_result.final_answer}")
 ```
 
-## 5. Auto-parallelization
+## Creating Custom NON Operators
 
-One of the key advantages of NON operators is automatic parallelization:
+Create specialized operators that follow Ember's patterns:
 
 ```python
-from ember.xcs.engine import execute_graph
-from ember.xcs.graph import XCSGraph
-from ember.core.non import UniformEnsemble, MostCommon
+from typing import ClassVar, Type
+from ember.core.non import UniformEnsemble
+from ember.core.registry.operator.base.operator_base import Operator
+from ember.core.registry.specification.specification import Specification
+from ember.core.types.ember_model import EmberModel
 
-# Create a large ensemble
-ensemble = UniformEnsemble(
-    num_units=10,  # 10 parallel model calls
-    model_name="openai:gpt-4o-mini",
-    temperature=0.8
-)
+class FactCheckerInput(EmberModel):
+    """Input for the fact checker operator."""
+    query: str
+    domain: str
 
-majority = MostCommon()
+class FactCheckerOutput(EmberModel):
+    """Output from the fact checker operator."""
+    facts: list[str]
+    sources: list[str]
+    confidence: float
 
-# Build graph
-graph = XCSGraph()
-graph.add_node(operator=ensemble, node_id="ensemble")
-graph.add_node(operator=majority, node_id="majority")
-graph.add_edge(from_id="ensemble", to_id="majority")
+class FactCheckerSpecification(Specification):
+    """Specification for the FactChecker operator."""
+    input_model: Type[EmberModel] = FactCheckerInput
+    structured_output: Type[EmberModel] = FactCheckerOutput
+    
+    prompt_template = """Check the following statement for factual accuracy in the {domain} domain.
+    Statement: {query}
+    
+    Provide a list of verified facts and their sources.
+    """
 
-# Execute with parallelization
-result = execute_graph(
-    graph=graph,
-    global_input={"query": "Is P=NP a solved problem?"},
-    max_workers=10  # Control parallel execution
-)
+class FactChecker(Operator[FactCheckerInput, FactCheckerOutput]):
+    """Custom operator for domain-specific fact checking."""
+    
+    # Class-level specification
+    specification: ClassVar[Specification] = FactCheckerSpecification()
+    
+    # Instance attributes
+    ensemble: UniformEnsemble
+    confidence_threshold: float
+    
+    def __init__(self, *, confidence_threshold: float = 0.7):
+        self.ensemble = UniformEnsemble(
+            num_units=3,
+            model_name="openai:gpt-4o",
+            temperature=0.2
+        )
+        self.confidence_threshold = confidence_threshold
+    
+    def forward(self, *, inputs: FactCheckerInput) -> FactCheckerOutput:
+        # Generate responses with the ensemble
+        ensemble_result = self.ensemble(inputs={"query": inputs.query})
+        
+        # Process responses to extract facts and sources
+        # (implementation details omitted for brevity)
+        facts = ["Earth orbits the Sun", "A day on Earth is approximately 24 hours"]
+        sources = ["Astronomy textbook", "NASA website"]
+        confidence = 0.95
+        
+        return FactCheckerOutput(
+            facts=facts,
+            sources=sources,
+            confidence=confidence
+        )
 
-print(f"Most common answer: {result.final_answer}")
+# Use the custom operator
+fact_checker = FactChecker(confidence_threshold=0.8)
+result = fact_checker(inputs={"query": "The Earth orbits the Sun", "domain": "astronomy"})
 ```
 
-## 6. Using NON with JIT Compilation
+## Related Documentation
 
-```python
-from ember.xcs.tracer import jit
-from ember.core.non import UniformEnsemble, JudgeSynthesis
-
-# Define a JIT-compiled function with NON operators
-@jit
-def robust_qa_pipeline(question):
-    # This will be automatically traced and optimized
-    ensemble = UniformEnsemble(
-        num_units=3,
-        model_name="openai:gpt-4o",
-        temperature=0.7
-    )
-    
-    judge = JudgeSynthesis(
-        model_name="anthropic:claude-3-sonnet",
-        temperature=0.1
-    )
-    
-    # Execute the operators (will be parallelized)
-    ensemble_results = ensemble(inputs={"query": question})
-    final_result = judge(
-        inputs={
-            "query": question,
-            "responses": ensemble_results.responses
-        }
-    )
-    
-    return final_result.final_answer
-
-# Use the optimized pipeline
-answer = robust_qa_pipeline("Explain the concept of neural networks in simple terms.")
-print(f"Answer: {answer}")
-```
-
-## 7. Best Practices
-
-1. **Start Simple**: Begin with UniformEnsemble and JudgeSynthesis before exploring advanced patterns
-2. **Tune Temperature**: Use higher temperature for ensemble diversity, lower for verification
-3. **Optimize Workers**: Set max_workers to match your ensemble size for optimal performance
-4. **Mix Providers**: Use a mix of providers (OpenAI, Anthropic, etc.) for robust answers
-5. **Monitor Costs**: Track API costs when using large ensembles of powerful models
-6. **Use Different Judge Models**: For best results, use a different model for judging than for ensemble members
-
-## Next Steps
-
-Learn more about:
 - [Operators](operators.md) - Building custom computation units
-- [Prompt Specifications](specifications.md) - Type-safe prompt engineering
 - [Model Registry](model_registry.md) - Managing LLM configurations
-- [XCS Graphs](../advanced/xcs_graphs.md) - Advanced parallel execution
-- [Enhanced JIT](../advanced/enhanced_jit.md) - Optimized tracing and execution
+- [Enhanced JIT](../xcs/JIT_OVERVIEW.md) - Optimized tracing and execution
