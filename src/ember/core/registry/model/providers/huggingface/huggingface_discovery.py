@@ -8,13 +8,16 @@ available through the Hugging Face Hub.
 import logging
 from typing import Dict, List, Optional, Set
 
-from ember.core.registry.model.base.discovery.model_discovery import ModelDiscoveryBase
+from ember.core.registry.model.providers.base_discovery import (
+    BaseDiscoveryProvider,
+    ModelDiscoveryError
+)
 from ember.core.registry.model.base.schemas.model_info import ModelInfo, ProviderInfo
 
 logger = logging.getLogger(__name__)
 
 
-class HuggingFaceDiscovery(ModelDiscoveryBase):
+class HuggingFaceDiscovery(BaseDiscoveryProvider):
     """Discovery implementation for Hugging Face models.
     
     This class provides methods to discover models available through the

@@ -17,13 +17,10 @@ from ember.core.registry.model.providers.deepmind.deepmind_discovery import (
 )
 from ember.core.registry.model.providers.openai.openai_discovery import OpenAIDiscovery
 
-<<<<<<< HEAD
-=======
 from ember.core.registry.model.providers.huggingface.huggingface_discovery import (
     HuggingFaceDiscovery,
 ) 
 
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
 logger: logging.Logger = logging.getLogger(__name__)
 # Set default log level to WARNING to reduce verbosity
 logger.setLevel(logging.WARNING)
@@ -87,14 +84,11 @@ class ModelDiscoveryService:
                 "GOOGLE_API_KEY",
                 lambda: {"api_key": os.environ.get("GOOGLE_API_KEY", "")},
             ),
-<<<<<<< HEAD
-=======
             (
                 HuggingFaceDiscovery,
                 "HUGGINGFACE_API_KEY", #Now searches for Hugging Face API key
                 lambda: {"api_key": os.environ.get("HUGGINGFACE_API_KEY", "")},
             ),
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
         ]
 
         # Initializing providers with available credentials
@@ -248,11 +242,7 @@ class ModelDiscoveryService:
         """
         import os
 
-<<<<<<< HEAD
         from ember.core.config.schema import EmberSettings
-=======
-        from ember.core.registry.model.config.settings import EmberSettings
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
 
         settings = EmberSettings()
 
@@ -261,7 +251,6 @@ class ModelDiscoveryService:
 
         # Check if registry has models attribute before accessing it
         if hasattr(settings.registry, "models"):
-<<<<<<< HEAD
             try:
                 # Handle both actual Model objects and test objects
                 local_models = {
@@ -277,11 +266,6 @@ class ModelDiscoveryService:
                     )
             except Exception as e:
                 logger.error(f"Error loading models from settings: {e}")
-=======
-            local_models = {
-                model.id: model.model_dump() for model in settings.registry.models
-            }
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
 
         # Map provider prefixes to their environment variable keys
         provider_api_keys: Dict[str, str] = {
@@ -289,10 +273,8 @@ class ModelDiscoveryService:
             "anthropic": os.environ.get("ANTHROPIC_API_KEY", ""),
             "google": os.environ.get("GOOGLE_API_KEY", ""),
             "deepmind": os.environ.get("GOOGLE_API_KEY", ""),  # Uses same key as Google
-<<<<<<< HEAD
+            "huggingface": os.environ.get("HUGGINGFACE_API_KEY", ""),
             "mock": os.environ.get("MOCK_API_KEY", ""),  # For testing purposes
-=======
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
         }
 
         def get_provider_from_model_id(model_id: str) -> str:
@@ -310,10 +292,7 @@ class ModelDiscoveryService:
             if model_id in local_models:
                 # Local configuration overrides API metadata except for API keys
                 # which we take from environment if available.
-<<<<<<< HEAD
                 # Order is important here - local_models should override api_metadata
-=======
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
                 merged_data: Dict[str, Any] = {**api_metadata, **local_models[model_id]}
 
                 # Override with environment API key if available and not explicitly set
@@ -337,11 +316,7 @@ class ModelDiscoveryService:
                 merged_data = {
                     "id": model_id,
                     "name": api_metadata.get(
-<<<<<<< HEAD
                         "name", api_metadata.get("model_name", model_id.split(":")[-1])
-=======
-                        "model_name", api_metadata.get("name", model_id.split(":")[-1])
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
                     ),
                     "cost": {
                         "input_cost_per_thousand": 0.0,
@@ -496,11 +471,7 @@ class ModelDiscoveryService:
                 return {
                     "success": False,
                     "provider": provider_name,
-<<<<<<< HEAD
                     "error": "Timeout after 15 seconds",
-=======
-                    "error": f"Timeout after 15 seconds",
->>>>>>> 356d99d1aae16dcf5a06b0f5725477598dc57848
                 }
             except Exception as e:
                 logger.error(f"Error in async fetch from {provider_name}: {e}")
