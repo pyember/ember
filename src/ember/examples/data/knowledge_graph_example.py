@@ -1,20 +1,33 @@
 """
 Knowledge Graph Example: Demonstrating hallucination mitigation using knowledge graphs
 
-This simplified example shows how to create and use a knowledge graph to verify
-and enhance LLM outputs without requiring external API calls. You can use this as a
-rough template if you want to implement this with LLM calls. 
+This example shows how to create and use a knowledge graph to verify
+and enhance LLM outputs using actual LLM calls through Ember.
 
 To run:
     uv run python src/ember/examples/data/knowledge_graph_example.py
 """
 
 from typing import Dict, List, Set
-import random
 from dataclasses import dataclass
 from collections import defaultdict
-
+import os
 from ember.api.operators import Operator, Specification, EmberModel
+from ember.api.models import ModelService, ModelRegistry, ModelInfo, ProviderInfo
+
+# Create global model registry and service -- change model as desired
+MODEL_REGISTRY = ModelRegistry()
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+
+MODEL_INFO = ModelInfo(
+    id="anthropic:claude-3-haiku",
+    provider=ProviderInfo(name="anthropic", default_api_key=ANTHROPIC_API_KEY)
+)
+
+MODEL_REGISTRY.register_model(MODEL_INFO)
+
+MODEL_SERVICE = ModelService(registry=MODEL_REGISTRY)
 
 @dataclass
 class Entity:
@@ -88,138 +101,277 @@ class EntityExtractionSpec(Specification):
     """Specification for entity extraction."""
     input_model: type[EntityExtractionInput] = EntityExtractionInput
     structured_output: type[EntityExtractionOutput] = EntityExtractionOutput
-    # In a real implementation, this could include a prompt template
-    # prompt_template = "Extract entities from the following text:\n\n{text}"
+    prompt_template: str = """
+    Extract entities from the following text. For each entity, provide:
+    1. A unique ID
+    2. The entity name
+    3. The entity type (person, organization, concept, etc.)
+    4. Any relevant attributes
+
+    Text: {text}
+
+    Return the entities in this format:
+    [
+      {{"id": "unique_id", "name": "Entity Name", "type": "entity_type", "attributes": {{"key": "value"}}}},
+      ...
+    ]
+    """
 
 class EntityExtractorOperator(Operator[EntityExtractionInput, EntityExtractionOutput]):
-    """Extracts entities from text (simulated in this example)."""
+    """Extracts entities from text using an LLM."""
     
     specification = EntityExtractionSpec()
     
+    def __init__(self, model_service: ModelService = MODEL_SERVICE):
+        self.model_service = model_service
+        self.model = self.model_service.get_model("anthropic:claude-3-haiku")
+    
     def forward(self, *, inputs: EntityExtractionInput) -> EntityExtractionOutput:
-        """Extract entities from text."""
-        keywords = {
-            "Einstein": ("scientist", {"field": "physics"}),
-            "physics": ("field", {"domain": "science"}),
-            "photosynthesis": ("process", {"domain": "biology"}),
-            "plants": ("organism", {"kingdom": "plantae"}),
-            "DNA": ("molecule", {"type": "nucleic_acid"}),
-        }
+        """Extract entities from text using an LLM."""
+        prompt = self.specification.prompt_template.format(text=inputs.text)
         
+        response = self.model(prompt=prompt, max_tokens=1000)
+        response_text = str(response)
+        
+        # Parse the response to extract entities
+        try:
+            import json
+            import re
+            
+            # Extract JSON array from response
+            json_match = re.search(r'\[(.*?)\]', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                entity_dicts = json.loads(json_str)
+                
+                entities = []
+                for e in entity_dicts:
+                    entities.append(Entity(
+                        id=e.get("id", "unknown"),
+                        name=e.get("name", "Unknown"),
+                        type=e.get("type", "unknown"),
+                        attributes=e.get("attributes", {})
+                    ))
+                return EntityExtractionOutput(entities=entities)
+        except Exception as e:
+            print(f"Error parsing entity extraction response: {e}")
+            print(f"Response text: {response_text[:200]}...")
+        
+        # Fallback: If parsing fails, extract entities using simple pattern matching
         entities = []
-        for keyword, (type_, attrs) in keywords.items():
-            if keyword.lower() in inputs.text.lower():
-                entities.append(Entity(
-                    id=f"{keyword.lower()}_1",
-                    name=keyword,
-                    type=type_,
-                    attributes=attrs
-                ))
+        
+        # Extract DNA-related entities if they appear in the query
+        if "dna" in inputs.text.lower():
+            entities.append(Entity(
+                id="dna_extracted",
+                name="DNA",
+                type="molecule",
+                attributes={"type": "nucleic_acid"}
+            ))
+            entities.append(Entity(
+                id="nucleotide_extracted",
+                name="Nucleotide",
+                type="component",
+                attributes={"part_of": "DNA"}
+            ))
+            
+        # Extract Einstein-related entities
+        if "einstein" in inputs.text.lower():
+            entities.append(Entity(
+                id="einstein_extracted",
+                name="Einstein",
+                type="scientist",
+                attributes={"field": "physics"}
+            ))
+            
+        # Extract photosynthesis-related entities
+        if "photosynthesis" in inputs.text.lower():
+            entities.append(Entity(
+                id="photosynthesis_extracted",
+                name="Photosynthesis",
+                type="process",
+                attributes={"domain": "biology"}
+            ))
+            entities.append(Entity(
+                id="plants_extracted",
+                name="Plants",
+                type="organism",
+                attributes={"process": "photosynthesis"}
+            ))
+            
         return EntityExtractionOutput(entities=entities)
 
 class RelationMapperOperator:
-    """Maps relationships between entities (simulated in this example)."""
+    """Maps relationships between entities using an LLM."""
+    
+    def __init__(self, model_service: ModelService = MODEL_SERVICE):
+        self.model_service = model_service
+        self.model = self.model_service.get_model("anthropic:claude-3-haiku")
     
     def __call__(self, entities: List[Entity], text: str) -> List[Relationship]:
-        """Map relationships between entities."""
+        """Map relationships between entities using an LLM."""
+        if not entities or len(entities) < 2:
+            return []
+            
+        # Create a prompt to identify relationships
+        entity_descriptions = "\n".join([f"- {e.name} ({e.type})" for e in entities])
+        prompt = f"""
+        Identify relationships between the following entities based on this text:
+        
+        Text: {text}
+        
+        Entities:
+        {entity_descriptions}
+        
+        For each relationship, provide:
+        1. Source entity ID
+        2. Target entity ID
+        3. Relationship type
+        4. Confidence score (0.0 to 1.0)
+        
+        Return the relationships in this format:
+        [
+          {{"source_id": "entity1_id", "target_id": "entity2_id", "relation_type": "relationship", "confidence": 0.9}},
+          ...
+        ]
+        """
+        
+        response = self.model(prompt=prompt, max_tokens=1000)
+        response_text = str(response)
+        
+        # Parse the response to extract relationships
+        try:
+            import json
+            import re
+            
+            # Extract JSON array from response
+            json_match = re.search(r'\[(.*?)\]', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                rel_dicts = json.loads(json_str)
+                
+                relationships = []
+                for r in rel_dicts:
+                    relationships.append(Relationship(
+                        source_id=r.get("source_id", "unknown"),
+                        target_id=r.get("target_id", "unknown"),
+                        relation_type=r.get("relation_type", "unknown"),
+                        confidence=float(r.get("confidence", 0.5))
+                    ))
+                return relationships
+        except Exception as e:
+            print(f"Error parsing relationship mapping response: {e}")
+            
+        # Fallback: If parsing fails, create relationships based on entity types
         relationships = []
         
-        # Predefined relationships for demonstration
-        relationship_patterns = {
-            ("einstein_1", "physics_1"): "contributed_to",
-            ("photosynthesis_1", "plants_1"): "occurs_in",
-        }
+        # Create relationships based on entity types
+        for entity1 in entities:
+            for entity2 in entities:
+                if entity1.id != entity2.id:
+                    # DNA-related relationships
+                    if entity1.type == "molecule" and entity1.name == "DNA" and entity2.type == "component":
+                        relationships.append(Relationship(
+                            source_id=entity1.id,
+                            target_id=entity2.id,
+                            relation_type="contains",
+                            confidence=0.9
+                        ))
+                    
+                    # Einstein-related relationships
+                    if entity1.name == "Einstein" and entity2.type == "field" and entity2.name == "Physics":
+                        relationships.append(Relationship(
+                            source_id=entity1.id,
+                            target_id=entity2.id,
+                            relation_type="contributed_to",
+                            confidence=0.95
+                        ))
+                    
+                    # Photosynthesis-related relationships
+                    if entity1.name == "Photosynthesis" and entity2.name == "Plants":
+                        relationships.append(Relationship(
+                            source_id=entity1.id,
+                            target_id=entity2.id,
+                            relation_type="occurs_in",
+                            confidence=0.9
+                        ))
         
-        # Create relationships between entities that appear together
-        entity_ids = [e.id for e in entities]
-        for (source, target), relation in relationship_patterns.items():
-            if source in entity_ids and target in entity_ids:
-                relationships.append(Relationship(
-                    source_id=source,
-                    target_id=target,
-                    relation_type=relation,
-                    confidence=0.9
-                ))
-                
         return relationships
 
 class FactVerifierOperator:
     """Verifies generated text against knowledge graph."""
     
-    def __init__(self, knowledge_graph: KnowledgeGraph):
+    def __init__(self, knowledge_graph: KnowledgeGraph, model_service: ModelService = MODEL_SERVICE):
         self.knowledge_graph = knowledge_graph
+        self.model_service = model_service
+        self.model = self.model_service.get_model("anthropic:claude-3-haiku")
         
     def __call__(self, inputs: Dict[str, str]) -> Dict[str, float]:
         """Verify facts in generated text."""
         generated_text = inputs.get("response", "")
         
-        explicit_statements = self._extract_statements(generated_text)
-        implicit_statements = self._extract_implicit_claims(generated_text)
-        
+        # Extract statements using LLM
+        statements = self._extract_statements_with_llm(generated_text)
         results = {}
         
-        # Verify explicit statements against the knowledge graph
-        for subject, predicate, object_ in explicit_statements:
-            confidence = self.knowledge_graph.verify_statement(subject, predicate, object_)
-            if subject in self.knowledge_graph.entities and object_ in self.knowledge_graph.entities:
-                statement = f"{self.knowledge_graph.entities[subject].name} {predicate} {self.knowledge_graph.entities[object_].name}"
-                results[statement] = confidence
-        
-        # Check implicit claims against the knowledge graph
-        for claim, entities in implicit_statements:
-            confidence = self._verify_implicit_claim(claim, entities)
-            results[claim] = confidence
+        # Verify statements against the knowledge graph
+        for statement in statements:
+            subject_id = self._find_entity_id(statement["subject"])
+            object_id = self._find_entity_id(statement["object"])
+            
+            if subject_id and object_id:
+                confidence = self.knowledge_graph.verify_statement(
+                    subject_id, statement["predicate"], object_id
+                )
+                statement_text = f"{statement['subject']} {statement['predicate']} {statement['object']}"
+                results[statement_text] = confidence
             
         return results
     
-    def _extract_statements(self, text: str) -> List[tuple]:
-        """Extract explicit subject-predicate-object statements from text."""
-        statements = []
+    def _extract_statements_with_llm(self, text: str) -> List[Dict[str, str]]:
+        """Extract statements from text using an LLM."""
+        prompt = f"""
+        Extract factual statements from the following text. For each statement, identify:
+        1. The subject
+        2. The predicate (relationship)
+        3. The object
         
-        if "einstein" in text.lower() and "physics" in text.lower():
-            statements.append(("einstein_1", "contributed_to", "physics_1"))
-        if "relativity" in text.lower() and "einstein" in text.lower():
-            statements.append(("einstein_1", "discovered", "relativity_1"))
-        if "photosynthesis" in text.lower() and "plants" in text.lower():
-            statements.append(("photosynthesis_1", "occurs_in", "plants_1"))
+        Text: {text}
+        
+        Return the statements in this format:
+        [
+          {{"subject": "Einstein", "predicate": "discovered", "object": "relativity"}},
+          ...
+        ]
+        """
+        
+        response = self.model(prompt=prompt, max_tokens=100)
+        
+        # Convert response to string
+        response_text = str(response)
+        
+        # Parse the response
+        try:
+            import json
+            import re
             
-        return statements
+            # Extract JSON array from response
+            json_match = re.search(r'\[(.*?)\]', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                statements = json.loads(json_str)
+                return statements
+        except Exception as e:
+            print(f"Error parsing statement extraction response: {e}")
+        
+        return []
     
-    def _extract_implicit_claims(self, text: str) -> List[tuple]:
-        """Extract implicit claims that need verification."""
-        claims = []
-        
-        if "einstein" in text.lower() and "telephone" in text.lower():
-            claims.append(("Einstein invented the telephone", ["einstein_1"]))
-        
-        if "einstein" in text.lower() and "discovered" in text.lower() and "photosynthesis" in text.lower():
-            claims.append(("Einstein discovered photosynthesis", ["einstein_1", "photosynthesis_1"]))
-            
-        return claims
-    
-    def _verify_implicit_claim(self, claim: str, entity_ids: List[str]) -> float:
-        """Verify an implicit claim using the knowledge graph structure."""
-        
-        if "telephone" in claim.lower() and "einstein_1" in entity_ids:
-            # Check if Einstein has any "invented" relationships
-            for rel in self.knowledge_graph.relationships:
-                if rel.source_id == "einstein_1" and rel.relation_type == "invented":
-                    return 0.3
-
-            return 0.1
-            
-        # For the Einstein/photosynthesis example:
-        if "photosynthesis" in claim.lower() and "einstein_1" in entity_ids and "photosynthesis_1" in entity_ids:
-            # Check if Einstein has any relationship with photosynthesis
-            for rel in self.knowledge_graph.relationships:
-                if (rel.source_id == "einstein_1" and rel.target_id == "photosynthesis_1") or \
-                   (rel.target_id == "einstein_1" and rel.source_id == "photosynthesis_1"):
-                    return rel.confidence
-            # No relationship found between Einstein and photosynthesis
-            return 0.0
-            
-        # Default case - we don't have enough information
-        return 0.5
+    def _find_entity_id(self, entity_name: str) -> str:
+        """Find entity ID by name (case-insensitive)."""
+        for entity_id, entity in self.knowledge_graph.entities.items():
+            if entity.name.lower() == entity_name.lower():
+                return entity_id
+        return None
 
 def create_mock_knowledge_graph() -> KnowledgeGraph:
     """Create a mock knowledge graph for demonstration."""
@@ -248,53 +400,52 @@ def create_mock_knowledge_graph() -> KnowledgeGraph:
     
     return kg
 
-def simulate_llm_response(inputs: Dict) -> Dict[str, str]:
-    """Simulate an LLM response (with potential hallucinations)."""
-    prompt = inputs.get("text", "")
+def generate_llm_response(query: str, context: List[Entity], model_service: ModelService = MODEL_SERVICE) -> Dict[str, str]:
+    """Generate a response using an LLM with context from the knowledge graph."""
+    model = model_service.get_model("anthropic:claude-3-haiku")
     
-    responses = {
-        "Einstein": (
-            "Einstein made significant contributions to physics, "
-            "particularly in the development of the theory of relativity. "
-            "His work revolutionized our understanding of space and time."
-        ),
-        "photosynthesis": (
-            "Photosynthesis is a crucial process that occurs in plants, "
-            "converting sunlight into energy. This fundamental process "
-            "enables plants to produce their own food."
-        ),
-        "DNA": (
-            "DNA is a double-helix molecule that contains genetic information. "
-            "It serves as the blueprint for life, though our knowledge of its "
-            "structure came long after Einstein's discoveries."  # Adding a potential hallucination
-        ),
-    }
+    # Format context from entities
+    context_str = ""
+    if context:
+        context_str = "Context:\n" + "\n".join([
+            f"- {entity.name}: {entity.type}" + 
+            (f", {', '.join([f'{k}={v}' for k, v in entity.attributes.items()])}" if entity.attributes else "")
+            for entity in context
+        ])
     
-    # Find matching response based on keywords
-    for keyword, response in responses.items():
-        if keyword.lower() in prompt.lower():
-            # Add some randomized "hallucinations" to demonstrate verification
-            if random.random() < 0.3:
-                if keyword == "Einstein":
-                    response += " He also invented the telephone."  # Hallucination
-                elif keyword == "photosynthesis":
-                    response += " The process was first discovered by Einstein."
-            return {"response": response}
-            
-    return {"response": "I don't have enough information to answer that question."}
+    prompt = f"""
+    {context_str}
+    
+    Question: {query}
+    
+    Please provide a concise, factual answer based on the context provided.
+    """
+    
+    response = model(prompt=prompt, max_tokens=500)
+    return {"response": response}
 
 def process_query_with_graph(query: str, 
                             entity_extractor: EntityExtractorOperator,
-                            fact_verifier: FactVerifierOperator) -> Dict:
-    """Process a query using Ember's XCS execution engine."""
+                            relation_mapper: RelationMapperOperator,
+                            fact_verifier: FactVerifierOperator,
+                            model_service: ModelService) -> Dict:
+    """Process a query using knowledge graph and LLMs."""
     
-    # This simplifies the example while we debug the issues
+    # Extract entities from query
     extracted_entities = entity_extractor(inputs=EntityExtractionInput(text=query)).entities
-    llm_response = simulate_llm_response({"text": query})
+    
+    # Map relationships between entities
+    relationships = relation_mapper(extracted_entities, query)
+    
+    # Generate response with context
+    llm_response = generate_llm_response(query, extracted_entities, model_service)
+    
+    # Verify response against knowledge graph
     verification_results = fact_verifier(llm_response)
     
     return {
         "entities": extracted_entities,
+        "relationships": relationships,
         "response": llm_response["response"],
         "verification_results": verification_results
     }
@@ -304,10 +455,16 @@ def main():
     print("Ember Knowledge Graph Example")
     print("============================")
     
+    # Use the global model service
+    model_service = MODEL_SERVICE
+    
+    # Create components
     knowledge_graph = create_mock_knowledge_graph()
     entity_extractor = EntityExtractorOperator()
+    relation_mapper = RelationMapperOperator()
     fact_verifier = FactVerifierOperator(knowledge_graph)
     
+    # Example queries to test
     queries = [
         "Tell me about Einstein's contributions to physics.",
         "What is the relationship between photosynthesis and plants?",
@@ -315,38 +472,89 @@ def main():
     ]
     
     for i, query in enumerate(queries, 1):
-        print(f"\nQuery {i}: {query}")
+        print(f"\n\n{'='*80}")
+        print(f"QUERY {i}: {query}")
+        print(f"{'='*80}")
         
         result = process_query_with_graph(
             query=query,
             entity_extractor=entity_extractor,
-            fact_verifier=fact_verifier
+            relation_mapper=relation_mapper,
+            fact_verifier=fact_verifier,
+            model_service=model_service
         )
         
-        # 1. Extract relevant context from knowledge graph
-        extracted_entities = result["entities"]
-        print("\nExtracted Entities:")
-        for entity in extracted_entities:
-            print(f"- {entity.name} ({entity.type})")
+        # Display results with improved formatting
+        print("\n\nKnowledge Graph Analysis")
+        print("-------------------------")
         
-        # 2. Generate response with context
-        response = result["response"]
-        print(f"\nGenerated Response:\n{response}")
-        
-        # 3. Verify response against knowledge graph
-        verification_results = result["verification_results"]
-        
-        # 4. Display verification results
-        print("\nVerification Results:")
-        if verification_results:
-            for statement, confidence in verification_results.items():
-                status = "✓" if confidence > 0.8 else "?"
-                print(f"{status} {statement}: {confidence:.2f} confidence")
+        print("\n\nExtracted Entities:")
+        if result["entities"]:
+            for entity in result["entities"]:
+                attrs = ", ".join([f"{k}={v}" for k, v in entity.attributes.items()]) if entity.attributes else "none"
+                print(f"  • {entity.name} (ID: {entity.id})")
+                print(f"    Type: {entity.type}")
+                print(f"    Attributes: {attrs}")
         else:
-            print("No verifiable statements found in response.")
+            print("  No entities extracted")
+        
+        print("\n\nIdentified Relationships:")
+        if result.get("relationships"):
+            for rel in result["relationships"]:
+                source = next((e.name for e in result["entities"] if e.id == rel.source_id), rel.source_id)
+                target = next((e.name for e in result["entities"] if e.id == rel.target_id), rel.target_id)
+                print(f"  • {source} {rel.relation_type} {target}")
+                print(f"    Confidence: {rel.confidence:.2f}")
+        else:
+            print("  No relationships identified")
+        
+        print("\n\nLLM Response:")
+        response_text = str(result['response'])
+        # Clean up the response text to show only the actual content
+        if "data=" in response_text and "raw_output=" in response_text:
+            response_text = response_text.split("data=")[1].split(" raw_output=")[0].strip('"')
+        print(f"  {response_text.replace(chr(10), chr(10)+'  ')}")
+        
+        print("\n\nFact Verification")
+        if result["verification_results"]:
+            high_conf = []
+            medium_conf = []
+            low_conf = []
             
-    print("\nNote: This example uses simulated responses and verification.")
-    print("In a real Ember pipeline, these would use actual language models. This file can be modified to include LLM calls with the knowledge graph implementation")
+            for statement, confidence in result["verification_results"].items():
+                if confidence > 0.8:
+                    high_conf.append((statement, confidence))
+                elif confidence > 0.4:
+                    medium_conf.append((statement, confidence))
+                else:
+                    low_conf.append((statement, confidence))
+            
+            if high_conf:
+                print("  VERIFIED FACTS:")
+                for statement, confidence in high_conf:
+                    print(f"  ✓ {statement}")
+                    print(f"    Confidence: {confidence:.2f}")
+            
+            if medium_conf:
+                print("\n  UNCERTAIN CLAIMS:")
+                for statement, confidence in medium_conf:
+                    print(f"  ? {statement}")
+                    print(f"    Confidence: {confidence:.2f}")
+            
+            if low_conf:
+                print("\n  POTENTIAL HALLUCINATIONS:")
+                for statement, confidence in low_conf:
+                    print(f"  ✗ {statement}")
+                    print(f"    Confidence: {confidence:.2f}")
+        else:
+            print("  No verifiable statements found in response")
+        
+        print("\n\nKnowledge Graph Statistics:")
+        print(f"  • Total entities in graph: {len(knowledge_graph.entities)}")
+        print(f"  • Total relationships in graph: {len(knowledge_graph.relationships)}")
+        print(f"  • Entities in response: {len(result['entities'])}")
+        print(f"  • Verified facts: {len([s for s, c in result['verification_results'].items() if c > 0.8])}")
+        print(f"  • Potential hallucinations: {len([s for s, c in result['verification_results'].items() if c < 0.4])}")
 
 if __name__ == "__main__":
     main()
