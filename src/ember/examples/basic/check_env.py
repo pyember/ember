@@ -28,6 +28,13 @@ def main():
         )
     else:
         print("ANTHROPIC_API_KEY: Not set")
+    
+    # Check for Google API key
+    google_key = os.environ.get("GOOGLE_API_KEY")
+    if google_key:
+        print(f"GOOGLE_API_KEY: {'*' * (len(google_key) - 4) + google_key[-4:]}")
+    else:
+        print("GOOGLE_API_KEY: Not set")
 
     print("\nAll environment variables:")
     for key, value in os.environ.items():
