@@ -3,9 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Test files
+# Example test files
 ember_test
 
 # Environment Files
 .venv
 .env
+
+# Dependencies
+ember_ai.egg-info
+uv.lock
