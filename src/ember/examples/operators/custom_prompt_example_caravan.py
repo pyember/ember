@@ -11,10 +11,31 @@ Example:
 Overview:
     1) 'simple': minimal single-sentence Q&A pipeline.
     2) 'caravan': more advanced prompt that references the UNSW-NB15 dataset
-                  flows, providing labeled references and then labeling new flows.
+                  flows, providing labeled references and then labeling new flows,
+                  derived from the work cited below.
 
 To run:
     uv run python src/ember/examples/custom_prompt_example_caravan.py
+
+References:
+    https://github.com/Per-Packet-AI/Caravan-Artifact-OSDI24
+    @inproceedings{10.1145/3704742.3704964,
+    author = {Zhang, Qizheng and Imran, Ali and Bardhi, Enkeleda and Swamy, Tushar and Zhang, Nathan and Shahbaz, Muhammad and Olukotun, Kunle},
+    title = {Caravan: Practical Online Learning of In-Network ML Models with Labeling Agents},
+    year = {2024},
+    isbn = {9798400713569},
+    publisher = {Association for Computing Machinery},
+    address = {New York, NY, USA},
+    url = {https://doi.org/10.1145/3704742.3704964},
+    doi = {10.1145/3704742.3704964},
+    abstract = {Recent work on in-network machine learning (ML) anticipates offline models to operate well in modern networking environments. However, upon deployment, these models struggle to cope with fluctuating traffic patterns and network conditions and, therefore, must be validated and updated frequently in an online fashion.This abstract presents Caravan, a practical online learning system for in-network ML models. We tackle two primary challenges in facilitating online learning for networking: (a) the automatic labeling of evolving traffic and (b) the efficient monitoring and detection of model performance degradation to trigger retraining. Caravan repurposes existing systems (e.g., heuristics, access control lists, and foundation models)---not directly suitable for such dynamic environments---into high-quality labeling sources for generating labeled data for online learning. Caravan also introduces a new metric, accuracy proxy, to track model degradation and potential drift to efficiently trigger retraining. Our evaluations show that Caravan's labeling strategy enables in-network ML models to closely follow the changes in the traffic dynamics with a 30.3\% improvement in F1 score (on average), compared to offline models. Moreover, Caravan sustains comparable inference accuracy to that of a continuous-learning system while consuming 61.3\% less GPU compute time (on average) via accuracy proxy and retraining triggers.This abstract summarizes a previously published work [53] at the 18th USENIX Symposium on Operating Systems Design and Implementation (OSDI 24).},
+    booktitle = {Proceedings of the 3rd Workshop on Practical Adoption Challenges of ML for Systems},
+    pages = {17–20},
+    numpages = {4},
+    keywords = {Generative Agent, In-network Machine Learning, Online Learning},
+    location = {Austin, TX, USA},
+    series = {PACMI '24}
+    }
 """
 
 import argparse
