@@ -210,6 +210,7 @@ def init(
         response = service(models.ModelEnum.gpt_4o, "What is quantum computing?")
         usage = service.usage_service.get_total_usage()
     """
+    from ember.core.config.manager import ConfigManager, create_config_manager
     from ember.api.models import initialize_registry, ModelService, UsageService
 
     # Initialize configuration if needed
