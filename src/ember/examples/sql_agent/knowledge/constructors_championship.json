@@ -1,0 +1,36 @@
+{
+  "table_name": "constructors_championship",
+  "table_description": "Contains data for the constructor's championship from 1958 to 2020, capturing championship standings from when it was introduced.",
+  "table_columns": [
+    {
+      "name": "index",
+      "type": "int",
+      "description": "Unique index for each entry."
+    },
+    {
+      "name": "year",
+      "type": "int",
+      "description": "The year of the championship."
+    },
+    {
+      "name": "position",
+      "type": "int",
+      "description": "The finishing position of the constructor in the championship."
+    },
+    {
+      "name": "team",
+      "type": "text",
+      "description": "The name of the constructor/team."
+    },
+    {
+      "name": "points",
+      "type": "float",
+      "description": "Points earned in the championship."
+    }
+  ],
+  "table_rules": [
+    "When comparing teams across years, account for team name changes (e.g., Brawn GP became Mercedes).",
+    "Points systems have changed over the years, so direct points comparisons across eras may not be meaningful.",
+    "Constructor's Championship only started in 1958, so no data exists before that year."
+  ]
+}

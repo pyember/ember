@@ -1,0 +1,46 @@
+{
+  "table_name": "race_wins",
+  "table_description": "Documents race win data from 1950-2020, detailing venue, winner, team, and race duration.",
+  "table_columns": [
+    {
+      "name": "index",
+      "type": "int",
+      "description": "Unique index for each entry."
+    },
+    {
+      "name": "date",
+      "type": "text",
+      "description": "Date of the race in 'DD Mon YYYY' format."
+    },
+    {
+      "name": "venue",
+      "type": "text",
+      "description": "Location/track of the race."
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "description": "Name of the race winner."
+    },
+    {
+      "name": "team",
+      "type": "text",
+      "description": "The team of the winner."
+    },
+    {
+      "name": "laps",
+      "type": "int",
+      "description": "Number of laps in the race."
+    },
+    {
+      "name": "time",
+      "type": "text",
+      "description": "Total race duration."
+    }
+  ],
+  "table_rules": [
+    "Date is stored as text in the format 'DD Mon YYYY', use TO_DATE function for date operations.",
+    "When joining with other tables, extract the year from the date using EXTRACT(YEAR FROM TO_DATE(date, 'DD Mon YYYY')).",
+    "Time is the total race duration and is stored as text, typically in the format 'H:MM:SS.mmm'."
+  ]
+}
