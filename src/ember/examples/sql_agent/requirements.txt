@@ -1,0 +1,7 @@
+openai
+streamlit
+pandas
+sqlalchemy
+requests
+nest_asyncio
+tabulate 

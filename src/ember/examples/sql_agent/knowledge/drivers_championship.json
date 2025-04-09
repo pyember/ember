@@ -1,0 +1,46 @@
+{
+  "table_name": "drivers_championship",
+  "table_description": "Contains data for driver's championship standings from 1950-2020, detailing driver positions, teams, and points.",
+  "table_columns": [
+    {
+      "name": "index",
+      "type": "int",
+      "description": "Unique index for each entry."
+    },
+    {
+      "name": "year",
+      "type": "int",
+      "description": "The year of the championship."
+    },
+    {
+      "name": "position",
+      "type": "int",
+      "description": "The finishing position of the driver in the championship."
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "description": "The name of the driver."
+    },
+    {
+      "name": "team",
+      "type": "text",
+      "description": "The team the driver raced for."
+    },
+    {
+      "name": "points",
+      "type": "float",
+      "description": "Points earned in the championship."
+    },
+    {
+      "name": "wins",
+      "type": "int",
+      "description": "Number of race wins in the season."
+    }
+  ],
+  "table_rules": [
+    "Points systems have changed over the years, so direct points comparisons across eras may not be meaningful.",
+    "Driver names should be used consistently (e.g., 'Lewis Hamilton' not 'Hamilton, Lewis').",
+    "When analyzing driver careers, join with race_results or race_wins tables for detailed race information."
+  ]
+}
