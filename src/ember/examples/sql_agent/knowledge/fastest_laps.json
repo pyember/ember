@@ -1,0 +1,51 @@
+{
+  "table_name": "fastest_laps",
+  "table_description": "Contains data for the fastest laps recorded in races from 1950-2020, including driver and team details.",
+  "table_columns": [
+    {
+      "name": "index",
+      "type": "int",
+      "description": "Unique index for each entry."
+    },
+    {
+      "name": "year",
+      "type": "int",
+      "description": "The year of the race."
+    },
+    {
+      "name": "venue",
+      "type": "text",
+      "description": "Location/track of the race."
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "description": "Name of the driver who set the fastest lap."
+    },
+    {
+      "name": "team",
+      "type": "text",
+      "description": "The team of the driver."
+    },
+    {
+      "name": "time",
+      "type": "text",
+      "description": "The fastest lap time, in the format 'M:SS.mmm'."
+    },
+    {
+      "name": "lap",
+      "type": "int",
+      "description": "The lap number on which the fastest lap was set."
+    },
+    {
+      "name": "speed",
+      "type": "float",
+      "description": "The average speed during the fastest lap in km/h."
+    }
+  ],
+  "table_rules": [
+    "Lap times are stored as text in the format 'M:SS.mmm', use appropriate string functions for comparison.",
+    "Track configurations have changed over time, so direct lap time comparisons for the same venue across years may not be valid.",
+    "Speed is measured in km/h and should be treated as a float for calculations."
+  ]
+}
