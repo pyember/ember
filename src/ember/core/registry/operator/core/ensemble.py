@@ -60,9 +60,12 @@ class EnsembleOperatorOutputs(EmberModel):
                  in the ensemble. Each element corresponds to the output
                  from one model instance, preserving the original order of
                  the LMModules provided to the operator.
+        query: The original query that was sent to all models in the ensemble.
+              This is included for convenience in downstream processing.
     """
 
     responses: List[str]
+    query: str
 
 
 class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]):
@@ -115,4 +118,4 @@ class EnsembleOperator(Operator[EnsembleOperatorInputs, EnsembleOperatorOutputs]
         """
         rendered_prompt: str = self.specification.render_prompt(inputs=inputs)
         responses: List[str] = [lm(prompt=rendered_prompt) for lm in self.lm_modules]
-        return {"responses": responses}
+        return {"responses": responses, "query": inputs.query}
