@@ -41,6 +41,12 @@ from ember.core.registry.model.model_module.lm import LMModule, LMModuleConfig
 from ember.core.registry.operator.base.operator_base import Operator
 
 # Import the concrete operator implementations
+from ember.core.registry.operator.core.enhancer import (
+    PromptEnhancerOperator,
+    PromptEnhancerOperatorInputs,
+    PromptEnhancerOperatorOutputs,
+    PromptEnhancerSpecification,
+)
 from ember.core.registry.operator.core.ensemble import (
     EnsembleOperator,
     EnsembleOperatorInputs,
@@ -474,10 +480,10 @@ class PromptEnhancer(
 
     Example:
         enhancer = PromptEnhancer(model_name="anthropic:claude-3-opus")
-        result = enhancer(inputs=PromptEnhancerOperatorInputs(
+        result = enhancer(inputs=PromptEnhancerInputs(
             query="Climate change solutions"
         ))
-        enhanced_query = result.enhanced_query  # More detailed query about climate change solutions
+        enhanced_query = result.query  # More detailed query about climate change solutions
     """
 
     specification: Specification = PromptEnhancerSpecification()
