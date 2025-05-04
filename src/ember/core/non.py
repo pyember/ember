@@ -65,6 +65,8 @@ from ember.core.registry.operator.core.verifier import (
 )
 from ember.core.registry.specification.specification import Specification
 from ember.core.types.ember_model import EmberModel
+from ember.core.registry.operator.core.map import MapEnsembleOperator, MapEnsembleOperatorInputs, MapEnsembleOperatorOutputs, SummarizationMapEnsemblerSpecification
+from ember.core.registry.operator.core.enhancer import PromptEnhancerOperator, PromptEnhancerOperatorInputs, PromptEnhancerOperatorOutputs, PromptEnhancerSpecification
 
 # Define type variables for use in generic operators
 InputT = TypeVar("InputT")
@@ -456,6 +458,120 @@ class VariedEnsemble(Operator[VariedEnsembleInputs, VariedEnsembleOutputs]):
             response_text = self.call_lm(prompt=prompt, lm=lm).strip()
             responses.append(response_text)
         return VariedEnsembleOutputs(responses=responses)
+
+
+# ------------------------------------------------------------------------------
+# 6) PromptEnhancer Operator Wrapper
+# ------------------------------------------------------------------------------
+
+class PromptEnhancer(
+    Operator[PromptEnhancerOperatorInputs, PromptEnhancerOperatorOutputs]
+):
+    """Wrapper around PromptEnhancerOperator that enhances a given query.
+
+    This operator takes a sparse query and expands it into a more detailed and
+    comprehensive query by reasoning about the user's likely intent.
+
+    Example:
+        enhancer = PromptEnhancer(model_name="anthropic:claude-3-opus")
+        result = enhancer(inputs=PromptEnhancerOperatorInputs(
+            query="Climate change solutions"
+        ))
+        enhanced_query = result.enhanced_query  # More detailed query about climate change solutions
+    """
+
+    specification: Specification = PromptEnhancerSpecification()
+    model_name: str
+    temperature: float
+    max_tokens: Optional[int]
+    _enhancer_op: Optional[PromptEnhancerOperator] = None
+
+    def __init__(
+        self,
+        *,
+        model_name: str = "gpt-4o-mini",
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+    ) -> None:
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+        lm_module = LMModule(
+            config=LMModuleConfig(
+                model_name=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+        )
+        self._enhancer_op = PromptEnhancerOperator(lm_module=lm_module)
+
+    def forward(
+        self, *, inputs: PromptEnhancerOperatorInputs
+    ) -> PromptEnhancerOperatorOutputs:
+        """Delegates execution to the underlying PromptEnhancerOperator."""
+        if self._enhancer_op is None:
+            raise ValueError("PromptEnhancerOperator not initialized")
+        return self._enhancer_op(inputs=inputs)
+
+
+# ------------------------------------------------------------------------------
+# 7) Summarization Operator Wrapper
+# ------------------------------------------------------------------------------
+
+class Summarization(
+    Operator[MapEnsembleOperatorInputs, MapEnsembleOperatorOutputs]
+):
+    """Wrapper around MapEnsembleOperator to perform summarization.
+
+    This operator takes a list of texts and returns their concise summaries.
+
+    Example:
+        summarizer = Summarization(model_name="openai:gpt-4o", temperature=0.5)
+        result = summarizer(
+            inputs=MapEnsembleOperatorInputs(inputs=["A long article to summarize."])
+        )
+        summaries = result.outputs  # List of summaries
+    """
+
+    specification: Specification = SummarizationMapEnsemblerSpecification()
+    model_name: str
+    temperature: float
+    max_tokens: Optional[int]
+    _summarizer_op: Optional[MapEnsembleOperator] = None
+
+    def __init__(
+        self,
+        *,
+        model_name: str = "gpt-4o-mini",
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+    ) -> None:
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+        lm_module = LMModule(
+            config=LMModuleConfig(
+                model_name=self.model_name,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+            )
+        )
+        # instantiate the core MapEnsembleOperator
+        self._summarizer_op = MapEnsembleOperator(lm_module=lm_module)
+        # override its specification to the summarization template
+        self._summarizer_op.specification = self.specification
+
+    def forward(
+        self, *, inputs: MapEnsembleOperatorInputs
+    ) -> MapEnsembleOperatorOutputs:
+        """Delegates execution to the underlying MapEnsembleOperator."""
+        if self._summarizer_op is None:
+            raise ValueError("MapEnsembleOperator not initialized")
+        return self._summarizer_op(inputs=inputs)
+
+
 
 
 class Sequential(Operator[InputT, OutputT]):

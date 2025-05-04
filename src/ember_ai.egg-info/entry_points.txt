@@ -1,0 +1,6 @@
+[ember.dataset_preppers]
+commonsense_qa = ember.core.utils.data.datasets_registry.commonsense_qa:CommonsenseQAPrepper
+halueval = ember.core.utils.data.datasets_registry.halueval:HaluEvalPrepper
+mmlu = ember.core.utils.data.datasets_registry.mmlu:MMLUPrepper
+short_answer = ember.core.utils.data.datasets_registry.short_answer:ShortAnswerPrepper
+truthful_qa = ember.core.utils.data.datasets_registry.truthful_qa:TruthfulQAPrepper
