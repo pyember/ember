@@ -151,9 +151,7 @@ class ModelComponent(Component):
                             model_id, module_path, model_config
                         )
                     except Exception as e:
-                        self._logger.error(
-                            f"Error registering model '{model_id}': {e}"
-                        )
+                        self._logger.error(f"Error registering model '{model_id}': {e}")
 
     def _register_model_from_module(
         self, model_id: str, module_path: str, config: Dict[str, Any]

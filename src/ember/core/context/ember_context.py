@@ -170,7 +170,7 @@ class EmberContext:
 
         # Metrics integration (lazily initialized)
         self._metrics_integration = None
-        
+
         # Data context (lazily initialized)
         self._data_context = None
 

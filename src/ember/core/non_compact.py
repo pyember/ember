@@ -45,6 +45,7 @@ from ember.core.non import (
     Sequential,
     UniformEnsemble,
     Verifier,
+    PromptEnhancer,
 )
 
 # Type aliases
@@ -157,6 +158,11 @@ class OpRegistry:
 
         # Most Common (aggregation)
         registry.register("MC", lambda _, __, ___: MostCommon())
+
+        # Prompt Enhancemer
+        registry.register(
+            "PE", lambda c, m, t: PromptEnhancer(model_name=m, temperature=t)
+        )
 
         return registry
 

@@ -43,10 +43,10 @@ class JudgeSynthesisSpecification(Specification):
         "{responses}\n"
         "Now, we want to synthesize a single best, final answer to:\n"
         "{query}\n"
-        "Explain your reasoning concisely, then provide the single best final answer.\n"
+        "Explain your reasoning, then provide the single best final answer that encompasses all of the most relevant information.\n"
         "Format:\n"
         "Reasoning: <your reasoning for synthesizing this answer in this way>\n"
-        "Final Answer: <the single best answer>\n"
+        "Final Answer: <the single best answer of similar length of the previous answers>\n"
     )
     structured_output: Optional[Type[EmberModel]] = JudgeSynthesisOutputs
     input_model: Type[EmberModel] = JudgeSynthesisInputs

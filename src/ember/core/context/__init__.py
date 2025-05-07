@@ -34,7 +34,10 @@ Typical usage:
 from .component import Component
 from .config import ConfigComponent
 from .data import DataComponent
-from .ember_context import EmberContext, current_context  # Import for backward compatibility
+from .ember_context import (
+    EmberContext,
+    current_context,
+)  # Import for backward compatibility
 from .management import (
     scoped_registry,
     seed_registry,

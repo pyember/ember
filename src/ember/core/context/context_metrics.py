@@ -149,7 +149,7 @@ class EmberContextMetricsIntegration:
         request durations, response sizes, or batch processing times.
 
         Args:
-            name: Metric name (should follow naming convention like 
+            name: Metric name (should follow naming convention like
                 "request_duration_seconds").
             value: Measurement to record.
             tags: Optional dimensional tags for metric segmentation.
