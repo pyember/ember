@@ -26,11 +26,11 @@ class MapEnsembleOperatorInputs(EmberModel):
     configurability.
 
     Attributes:
-        inputs: The list of strings to be sent to the same language models in the ensemble.
+        items: The list of strings to be sent to the same language models in the ensemble.
                 The individual pieces of text will be transformed based on the operator's
                 specification template. 
     """
-    inputs: List[str]
+    items: List[str]
 
 class MapEnsembleOperatorOutputs(EmberModel):
     """
@@ -50,13 +50,15 @@ class SummarizationMapEnsemblerSpecification(Specification):
     """Specification for SummarizationMapEnsembler defining the summarization map ensembler."""
     prompt_template: str = (
         "You are a summarization expert tasked with creating concise yet comprehensive summaries.\n"
-        "Given the following text: {text}\n"
+        "Given the following text: {input}\n"
         "Please provide a clear and coherent summary that captures the key points while maintaining readability.\n"
         "Your summary should be structured as follows:\n"
         "Summary: <Your concise summary of the main points>\n"
     )
     input_model: Type[EmberModel] = MapEnsembleOperatorInputs
     structured_output: Type[EmberModel] = MapEnsembleOperatorOutputs
+    # Injecting our variables in the prompt via iteration
+    check_all_placeholders: bool = False
 
 
 class MapEnsembleOperator(Operator[MapEnsembleOperatorInputs, MapEnsembleOperatorOutputs]):
@@ -90,7 +92,7 @@ class MapEnsembleOperator(Operator[MapEnsembleOperatorInputs, MapEnsembleOperato
         """
         self.lm_module = lm_module
 
-    def forward(self, *, map: MapEnsembleOperatorInputs) -> MapEnsembleOperatorOutputs:
+    def forward(self, *, inputs: MapEnsembleOperatorInputs) -> MapEnsembleOperatorOutputs:
         """
         Executes the mapping operation across all input strings.
 
@@ -107,6 +109,6 @@ class MapEnsembleOperator(Operator[MapEnsembleOperatorInputs, MapEnsembleOperato
                     inputs={"input": input_text}
                 )
             ) 
-            for input_text in map.inputs
+            for input_text in inputs.items
         ]
         return MapEnsembleOperatorOutputs(outputs=outputs)
