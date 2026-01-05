@@ -307,8 +307,8 @@ def review_code(code: str) -> dict:
     Code:
     {code}
     """
-    
-review = models("claude-4-sonnet", prompt)
+
+    review = models("claude-4-sonnet", prompt)
     
     # Extract structured feedback
     return {
@@ -364,8 +364,8 @@ def consensus_answer(question: str) -> str:
     """Get consensus from multiple models"""
     # Query different models
     gpt4_answer = models("gpt-4", question)
-    claude_answer = models("claude-4-sonnet", question) 
-gemini_answer = models("gemini-1.5-pro-latest", question)
+    claude_answer = models("claude-4-sonnet", question)
+    gemini_answer = models("gemini-1.5-pro-latest", question)
     
     # Synthesize consensus
     synthesis_prompt = f"""
