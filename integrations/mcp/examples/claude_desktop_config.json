@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "ember": {
+      "command": "python",
+      "args": [
+        "-m",
+        "ember.integrations.mcp.fastmcp_server"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "EMBER_LOG_LEVEL": "INFO"
+      }
+    },
+    "ember-advanced": {
+      "command": "python",
+      "args": [
+        "-m",
+        "ember.integrations.mcp.server"
+      ],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}",
+        "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+        "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
+        "EMBER_LOG_LEVEL": "DEBUG"
+      }
+    }
+  }
+}

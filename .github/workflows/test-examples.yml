@@ -1,0 +1,90 @@
+name: Test Examples
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+      - 'tests/examples/**'
+      - 'src/ember/**'
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'tests/examples/**'
+      - 'src/ember/**'
+  schedule:
+    # Run daily to catch any issues with examples
+    - cron: '0 0 * * *'
+
+jobs:
+  test-examples:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+      fail-fast: false
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up uv with Python ${{ matrix.python-version }}
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install project and example deps
+      run: |
+        uv sync --locked --all-extras
+        uv pip install -r examples/requirements.txt
+        uv pip install pytest pytest-timeout pytest-xdist
+    
+    - name: Run example tests (replay)
+      run: |
+        uv run pytest tests/examples/ -v --timeout=300
+    
+    - name: Validate golden outputs
+      run: |
+        uv run python tests/examples/validate_golden.py
+    
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.python-version }}
+        path: |
+          pytest-report.xml
+          .coverage
+    
+    - name: Comment PR with results
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const pytest_report = 'pytest-report.xml';
+          
+          if (fs.existsSync(pytest_report)) {
+            // Parse and format test results
+            const report = fs.readFileSync(pytest_report, 'utf8');
+            // Add comment formatting logic here
+          }
+
+  lint-examples:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        python-version: '3.12'
+    
+    - name: Run ruff
+      run: |
+        uvx ruff check examples/
+    
+    - name: Run mypy
+      run: |
+        uvx mypy examples/ --ignore-missing-imports || true

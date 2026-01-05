@@ -1,0 +1,25 @@
+# Minimal dependencies for running Ember examples
+# Core Ember is assumed to be already installed
+
+# For notebook examples
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# For visualization in examples
+matplotlib>=3.5.0
+seaborn>=0.12.0
+
+# For data processing examples
+pandas>=1.5.0
+numpy>=1.23.0
+
+# For testing examples
+pytest>=7.0.0
+pytest-timeout>=2.1.0
+pytest-xdist>=3.0.0
+
+# For integration examples (optional)
+# Uncomment as needed:
+# fastapi>=0.100.0
+# gradio>=4.0.0
+# streamlit>=1.25.0

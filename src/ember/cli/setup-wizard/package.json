@@ -1,0 +1,53 @@
+{
+  "name": "@ember-ai/setup",
+  "version": "1.0.0",
+  "description": "Delightful setup wizard for Ember",
+  "type": "module",
+  "bin": {
+    "ember-setup": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.tsx",
+    "prepare": "npm run build",
+    "publish": "npm run build && npm publish"
+  },
+  "dependencies": {
+    "clipboardy": "^4.0.0",
+    "execa": "^8.0.1",
+    "ink": "^4.4.1",
+    "ink-big-text": "^2.0.0",
+    "ink-gradient": "^3.0.0",
+    "ink-link": "^3.0.0",
+    "ink-select-input": "^5.0.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^5.0.1",
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.4",
+    "@types/react": "^18.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18.16.0"
+  },
+  "keywords": [
+    "ember",
+    "ai",
+    "setup",
+    "wizard",
+    "cli"
+  ],
+  "author": "Ember AI",
+  "license": "MIT"
+}

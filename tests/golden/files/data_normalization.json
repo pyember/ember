@@ -1,0 +1,47 @@
+[
+  {
+    "answer": "A1",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": "Q1"
+  },
+  {
+    "answer": "A2",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": "Q2"
+  },
+  {
+    "answer": "A3",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": "Q3"
+  },
+  {
+    "answer": "A4",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": "Q4"
+  },
+  {
+    "answer": "A5",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": "Q5"
+  },
+  {
+    "answer": "",
+    "has_choices": false,
+    "metadata_keys": [
+      "fields",
+      "unrelated"
+    ],
+    "question": ""
+  },
+  {
+    "answer": "",
+    "has_choices": false,
+    "metadata_keys": [],
+    "question": ""
+  }
+]

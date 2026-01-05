@@ -1,0 +1,235 @@
+{
+  "name": "text_with_tool_call",
+  "request": {
+    "model": "claude-4-sonnet-20250514",
+    "instructions": "You are a concise assistant.",
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "What's the weather in SF?"
+          }
+        ]
+      }
+    ],
+    "tools": [
+      {
+        "type": "function",
+        "function": {
+          "name": "get_weather",
+          "description": "Returns weather by city.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "city": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "city"
+            ]
+          }
+        }
+      }
+    ],
+    "tool_choice": "required",
+    "parallel_tool_calls": false,
+    "max_output_tokens": 256,
+    "reasoning": {
+      "effort": "medium"
+    }
+  },
+  "anthropic_stream": [
+    {
+      "type": "message_start",
+      "message": {
+        "id": "msg_1",
+        "model": "claude-4-sonnet-20250514"
+      }
+    },
+    {
+      "type": "content_block_start",
+      "index": 0,
+      "content_block": {
+        "type": "tool_use",
+        "id": "toolu_1",
+        "name": "get_weather"
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+        "partial_json": "{\"city\":\"San "
+      },
+      "content_block": {
+        "type": "tool_use",
+        "id": "toolu_1",
+        "name": "get_weather"
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+        "partial_json": "Francisco\"}"
+      },
+      "content_block": {
+        "type": "tool_use",
+        "id": "toolu_1",
+        "name": "get_weather"
+      }
+    },
+    {
+      "type": "content_block_stop",
+      "index": 0
+    },
+    {
+      "type": "message_stop",
+      "stop_reason": "tool_use",
+      "usage": {
+        "input_tokens": 42,
+        "output_tokens": 3
+      }
+    }
+  ],
+  "expected_events": [
+    {
+      "type": "response.created"
+    },
+    {
+      "type": "response.tool_call.created",
+      "call_id": "toolu_1",
+      "name": "get_weather",
+      "tool_type": "function"
+    },
+    {
+      "type": "response.tool_call.delta",
+      "call_id": "toolu_1",
+      "arguments_delta": "{\"city\":\"San "
+    },
+    {
+      "type": "response.tool_call.delta",
+      "call_id": "toolu_1",
+      "arguments_delta": "Francisco\"}"
+    },
+    {
+      "type": "response.tool_call.completed",
+      "call_id": "toolu_1"
+    },
+    {
+      "type": "response.required_action",
+      "required_action": {
+        "type": "submit_tool_outputs",
+        "submit_tool_outputs": {
+          "tool_calls": [
+            {
+              "id": "toolu_1",
+              "name": "get_weather",
+              "type": "function",
+              "arguments": {
+                "city": "San Francisco"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "submit_tool_outputs": {
+    "request": {
+      "tool_outputs": [
+        {
+          "tool_call_id": "toolu_1",
+          "output": "{\"temperature_f\": 67}"
+        }
+      ]
+    },
+    "anthropic_stream": [
+      {
+        "type": "message_start",
+        "message": {
+          "id": "msg_2",
+          "model": "claude-4-sonnet-20250514"
+        }
+      },
+      {
+        "type": "content_block_delta",
+        "index": 0,
+        "delta": {
+          "text": "It is 67F and sunny in San Francisco."
+        },
+        "content_block": {
+          "type": "text"
+        }
+      },
+      {
+        "type": "message_delta",
+        "usage": {
+          "input_tokens": 10,
+          "output_tokens": 12
+        }
+      },
+      {
+        "type": "message_stop",
+        "stop_reason": "end_turn"
+      }
+    ],
+    "expected_events": [
+      {
+        "type": "response.created"
+      },
+      {
+        "type": "response.output_text.delta",
+        "delta": "It is 67F and sunny in San Francisco."
+      },
+      {
+        "type": "response.delta",
+        "usage_delta": {
+          "prompt_tokens": 10,
+          "completion_tokens": 12,
+          "total_tokens": 22,
+          "input_tokens": 10,
+          "output_tokens": 12
+        }
+      },
+      {
+        "type": "response.completed",
+        "usage": {
+          "prompt_tokens": 10,
+          "completion_tokens": 12,
+          "total_tokens": 22,
+          "input_tokens": 10,
+          "output_tokens": 12
+        },
+        "response": {
+          "id": "resp_fixture",
+          "model": "claude-4-sonnet-20250514",
+          "status": "completed",
+          "output": [
+            {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "output_text",
+                  "text": "It is 67F and sunny in San Francisco."
+                }
+              ],
+              "status": "completed"
+            }
+          ],
+          "output_text": "It is 67F and sunny in San Francisco.",
+          "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 12,
+            "total_tokens": 22,
+            "input_tokens": 10,
+            "output_tokens": 12
+          }
+        }
+      }
+    ]
+  }
+}

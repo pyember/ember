@@ -1,0 +1,552 @@
+# Ember Model Pricing Configuration
+# All prices in USD per 1 million tokens (not per 1000!)
+# Last updated: 2025-10-04
+# 
+# Sources:
+# - OpenAI: https://openai.com/api/pricing/
+# - Anthropic: https://docs.anthropic.com/en/docs/about-claude/models/overview#model-pricing
+# - Google: https://ai.google.dev/gemini-api/docs/pricing
+
+version: "1.1"
+updated_at: "2025-11-26T00:00:00Z"
+
+providers:
+  openai:
+    source: "https://openai.com/api/pricing/"
+    models:
+      # GPT-4 Original
+      # NOTE: Pricing discrepancy - Ayush has $2/$8, OpenAI docs show $30/$60
+      # TODO: Verify current pricing
+      gpt-4:
+        input: 30.0    # $30 per 1M tokens
+        output: 60.0   # $60 per 1M tokens
+        context: 8192
+      
+      # GPT-4 variants (from Ayush's costs - need verification)
+      gpt-4.1:
+        input: 2.0     # $2 per 1M tokens
+        output: 8.0    # $8 per 1M tokens
+        context: 128000
+      
+      gpt-4.1-mini:
+        input: 0.4     # $0.40 per 1M tokens
+        output: 1.6    # $1.60 per 1M tokens
+        context: 128000
+      
+      gpt-4.1-nano:
+        input: 0.1     # $0.10 per 1M tokens
+        output: 0.4    # $0.40 per 1M tokens
+        context: 128000
+      
+      gpt-4.5-preview:
+        input: 75.0    # $75 per 1M tokens (very expensive)
+        output: 150.0  # $150 per 1M tokens
+        context: 128000
+      
+      # GPT-4 Turbo
+      gpt-4-turbo:
+        input: 10.0    # $10 per 1M tokens
+        output: 30.0   # $30 per 1M tokens
+        context: 128000
+      
+      # GPT-4o (Latest optimized)
+      gpt-4o:
+        input: 3.0     # $3 per 1M tokens (recent reduction)
+        output: 10.0   # $10 per 1M tokens (recent reduction)
+        context: 128000
+      
+      # GPT-4o mini
+      gpt-4o-mini:
+        input: 0.15    # $0.15 per 1M tokens
+        output: 0.6    # $0.60 per 1M tokens
+        context: 128000
+      gpt-4o-mini-2024-07-18:
+        input: 0.15    # (versioned alias)
+        output: 0.6
+        context: 128000
+      
+      # GPT-3.5 Turbo (estimated based on being "most economical")
+      gpt-3.5-turbo:
+        input: 0.5     # $0.50 per 1M tokens
+        output: 1.5    # $1.50 per 1M tokens
+        context: 16385
+      
+      gpt-3.5-turbo-16k:
+        input: 3.0     # $3 per 1M tokens
+        output: 4.0    # $4 per 1M tokens
+        context: 16385
+      
+      # O-series reasoning models
+      o1:
+        input: 15.0    # $15 per 1M tokens
+        output: 60.0   # $60 per 1M tokens
+        context: 128000
+      
+      o1-pro:
+        input: 150.0   # $150 per 1M tokens (extremely expensive)
+        output: 600.0  # $600 per 1M tokens
+        context: 128000
+      
+      o1-mini:
+        input: 1.1     # $1.10 per 1M tokens
+        output: 4.4    # $4.40 per 1M tokens
+        context: 128000
+      
+      o3:
+        input: 2.0     # $2 per 1M tokens
+        output: 8.0    # $8 per 1M tokens
+        context: 128000
+      
+      o3-pro:
+        input: 20.0    # $20 per 1M tokens
+        output: 80.0   # $80 per 1M tokens
+        context: 128000
+      
+      o3-mini:
+        input: 1.1     # $1.10 per 1M tokens
+        output: 4.4    # $4.40 per 1M tokens
+        context: 128000
+      
+      o3-deep-research:
+        input: 10.0    # $10 per 1M tokens
+        output: 40.0   # $40 per 1M tokens
+        context: 128000
+      
+      o4-mini:
+        input: 1.1     # $1.10 per 1M tokens
+        output: 4.4    # $4.40 per 1M tokens
+        context: 128000
+      
+      o4-mini-deep-research:
+        input: 2.0     # $2 per 1M tokens
+        output: 8.0    # $8 per 1M tokens
+        context: 128000
+      
+      # GPT-5 family (official OpenAI IDs)
+      gpt-5:
+        input: 1.25   # $1.25 per 1M tokens
+        output: 10.0  # $10 per 1M tokens
+        context: 400000
+      gpt-5-mini:
+        input: 0.25   # $0.25 per 1M tokens
+        output: 2.0   # $2.00 per 1M tokens
+        context: 400000
+      gpt-5-nano:
+        input: 0.05   # $0.05 per 1M tokens
+        output: 0.4   # $0.40 per 1M tokens
+        context: 400000
+      gpt-5-nano-2025-08-07:
+        input: 0.05   # $0.05 per 1M tokens (versioned alias)
+        output: 0.4
+        context: 400000
+      gpt-5-chat-latest:
+        input: 1.25   # $1.25 per 1M tokens (alias of gpt-5)
+        output: 10.0  # $10 per 1M tokens
+        context: 400000
+      gpt-5-codex:
+        input: 1.25   # $1.25 per 1M tokens (Codex tuned alias)
+        output: 10.0  # $10 per 1M tokens
+        context: 400000
+
+      # GPT-5.1 family (latest iteration)
+      gpt-5.1:
+        input: 1.25   # $1.25 per 1M tokens
+        output: 10.0  # $10 per 1M tokens
+        context: 272000
+      gpt-5.1-2025-11-13:
+        input: 1.25   # $1.25 per 1M tokens (versioned alias)
+        output: 10.0
+        context: 272000
+      gpt-5.1-codex:
+        input: 1.25   # $1.25 per 1M tokens (same as gpt-5.1)
+        output: 10.0  # $10 per 1M tokens
+        context: 272000
+      gpt-5.1-codex-max:
+        input: 1.25   # $1.25 per 1M tokens
+        output: 10.0  # $10 per 1M tokens
+        context: 400000
+      gpt-5.1-codex-mini:
+        input: 0.25   # $0.25 per 1M tokens
+        output: 2.0   # $2 per 1M tokens
+        context: 272000
+
+      # OpenAI Embedding Models
+      # Source: https://openai.com/api/pricing/
+      text-embedding-3-large:
+        input: 0.13   # $0.13 per 1M tokens
+        output: 0.0   # Embeddings have no output tokens
+        context: 8191
+      openai/text-embedding-3-large:
+        input: 0.13   # (provider-prefixed alias)
+        output: 0.0
+        context: 8191
+      text-embedding-3-small:
+        input: 0.02   # $0.02 per 1M tokens
+        output: 0.0
+        context: 8191
+      openai/text-embedding-3-small:
+        input: 0.02   # (provider-prefixed alias)
+        output: 0.0
+        context: 8191
+      text-embedding-ada-002:
+        input: 0.1    # $0.10 per 1M tokens
+        output: 0.0
+        context: 8191
+
+      # GPT-5.2 family (December 2025 release)
+      gpt-5.2:
+        input: 1.75   # $1.75 per 1M tokens
+        output: 14.0  # $14 per 1M tokens
+        context: 400000
+      gpt-5.2-2025-12-11:
+        input: 1.75   # Versioned alias
+        output: 14.0
+        context: 400000
+      gpt-5.2-chat-latest:
+        input: 1.75   # Chat alias
+        output: 14.0
+        context: 400000
+      gpt-5.2-pro:
+        input: 21.0   # $21 per 1M tokens
+        output: 168.0 # $168 per 1M tokens
+        context: 400000
+      gpt-5.2-pro-2025-12-11:
+        input: 21.0   # Versioned pro alias
+        output: 168.0
+        context: 400000
+
+  anthropic:
+    source: "https://docs.anthropic.com/en/docs/about-claude/models/overview"
+    models:
+      # Claude Opus 4.5 (November 2025 release)
+      claude-opus-4-5-20251101:
+        input: 5.0     # $5 per 1M tokens (66% reduction from 4.1)
+        output: 25.0   # $25 per 1M tokens
+        context: 200000
+
+      claude-opus-4.5:
+        input: 5.0     # $5 per 1M tokens (alias)
+        output: 25.0   # $25 per 1M tokens
+        context: 200000
+
+      # Claude Opus 4.1 (official versioned ID)
+      claude-opus-4-1-20250805:
+        input: 15.0    # $15 per 1M tokens
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      # Claude Opus 4.1 (alias)
+      claude-opus-4-1:
+        input: 15.0    # $15 per 1M tokens
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      # Claude Opus 4 (official versioned ID)
+      claude-opus-4-20250514:
+        input: 15.0    # $15 per 1M tokens
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      # Claude Opus 4 (alias)
+      claude-opus-4:
+        input: 15.0    # $15 per 1M tokens
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      # Claude 4 Sonnet (official versioned ID)
+      claude-4-sonnet-20250514:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+        # NOTE: Beta 1M context available via header; long-context premium pricing may apply.
+
+      # Claude 4 Sonnet (marketing alias with 1M-token beta context)
+      claude-4-sonnet:
+        input: 3.0     # $3 per 1M tokens (≤200K tokens)
+        output: 15.0   # $15 per 1M tokens (≤200K tokens)
+        context: 1000000
+        # NOTE: Requests over 200K tokens bill at $6 input / $22.50 output per 1M tokens.
+
+      # Claude 4.5 Sonnet aliases
+      claude-4.5-sonnet:
+        input: 3.0
+        output: 15.0
+        context: 200000
+
+      claude-4-5-sonnet:
+        input: 3.0
+        output: 15.0
+        context: 200000
+
+      # Claude Sonnet 4.5 (official versioned ID)
+      claude-sonnet-4-5-20250929:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      # Claude Sonnet 4 (legacy alias)
+      claude-sonnet-4:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      # Claude Sonnet 3.7 family
+      claude-sonnet-3.7:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      claude-3-7-sonnet-20250219:
+        input: 3.0     # $3 per 1M tokens (versioned API ID)
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      claude-3-7-sonnet-latest:
+        input: 3.0     # $3 per 1M tokens (latest alias)
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      # Claude Sonnet 3.5 family
+      claude-3-5-sonnet-20241022:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      claude-3-5-sonnet-latest:
+        input: 3.0     # $3 per 1M tokens (latest alias)
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      claude-3.5-sonnet-latest:
+        input: 3.0     # $3 per 1M tokens (marketing alias)
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      # Claude Sonnet 3 family
+      claude-3-sonnet:
+        input: 3.0     # $3 per 1M tokens
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      claude-3-sonnet-20240229:
+        input: 3.0     # $3 per 1M tokens (versioned API ID)
+        output: 15.0   # $15 per 1M tokens
+        context: 200000
+
+      # Claude Haiku 4.5 family (October 2025)
+      claude-haiku-4-5-20251001:
+        input: 1.0     # $1 per 1M tokens
+        output: 5.0    # $5 per 1M tokens
+        context: 200000
+
+      claude-haiku-4.5:
+        input: 1.0     # $1 per 1M tokens (alias)
+        output: 5.0    # $5 per 1M tokens
+        context: 200000
+
+      claude-4-5-haiku:
+        input: 1.0     # $1 per 1M tokens (alias)
+        output: 5.0    # $5 per 1M tokens
+        context: 200000
+
+      # Claude Haiku 3.5 family (legacy)
+      claude-haiku-3.5:
+        input: 0.8     # $0.80 per 1M tokens
+        output: 4.0    # $4 per 1M tokens
+        context: 200000
+
+      claude-3-5-haiku-20241022:
+        input: 0.8     # $0.80 per 1M tokens
+        output: 4.0    # $4 per 1M tokens
+        context: 200000
+
+      claude-3-5-haiku-latest:
+        input: 0.8     # $0.80 per 1M tokens (latest alias)
+        output: 4.0    # $4 per 1M tokens
+        context: 200000
+
+      claude-3.5-haiku-latest:
+        input: 0.8     # $0.80 per 1M tokens (marketing alias)
+        output: 4.0    # $4 per 1M tokens
+        context: 200000
+
+      # Claude Opus 3 family
+      claude-3-opus:
+        input: 15.0    # $15 per 1M tokens
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      claude-3-opus-20240229:
+        input: 15.0    # $15 per 1M tokens (versioned API ID)
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      claude-3-opus-latest:
+        input: 15.0    # $15 per 1M tokens (latest alias)
+        output: 75.0   # $75 per 1M tokens
+        context: 200000
+
+      # Claude Haiku 3 family
+      claude-3-haiku:
+        input: 0.25    # $0.25 per 1M tokens
+        output: 1.25   # $1.25 per 1M tokens
+        context: 200000
+
+      claude-3-haiku-20240307:
+        input: 0.25    # $0.25 per 1M tokens (versioned API ID)
+        output: 1.25   # $1.25 per 1M tokens
+        context: 200000
+
+      # Claude 2.x (legacy)
+      claude-2.1:
+        input: 8.0     # $8 per 1M tokens
+        output: 24.0   # $24 per 1M tokens
+        context: 200000
+
+      claude-instant-1.2:
+        input: 0.8     # $0.80 per 1M tokens
+        output: 2.4    # $2.40 per 1M tokens
+        context: 100000
+        
+  google:
+    source: "https://ai.google.dev/gemini-api/docs/pricing"
+    models:
+      # Gemini 3 Pro Preview (November 2025)
+      gemini-3-pro-preview:
+        input: 2.0     # $2 per 1M tokens (≤200K context)
+        output: 12.0   # $12 per 1M tokens
+        context: 1000000  # 1M tokens; >200K context is $4/$18
+
+      gemini-3-pro:
+        input: 2.0     # $2 per 1M tokens
+        output: 12.0   # $12 per 1M tokens
+        context: 1000000
+
+      # Gemini 3 Flash Preview (November 2025)
+      gemini-3-flash-preview:
+        input: 0.5     # $0.5 per 1M tokens
+        output: 3.0    # $3 per 1M tokens
+        context: 1000000
+
+      gemini-3-flash:
+        input: 0.5     # $0.5 per 1M tokens
+        output: 3.0    # $3 per 1M tokens
+        context: 1000000
+
+      models/gemini-3-flash-preview:
+        input: 0.5
+        output: 3.0
+        context: 1000000
+
+      # Google API returns model IDs with "models/" prefix
+      models/gemini-3-pro-preview:
+        input: 2.0
+        output: 12.0
+        context: 1000000
+
+      # Gemini 2.5 Pro (using lower end of range for paid tier)
+      gemini-2.5-pro:
+        input: 1.25    # $1.25 per 1M tokens (≤200K prompt tokens)
+        output: 10.0   # $10 per 1M tokens (includes thinking tokens)
+        context: 1000000  # 1M tokens; >200K tier is 2.50/15.00 per 1M
+      
+      # Gemini 2.5 Flash
+      gemini-2.5-flash:
+        input: 0.3     # $0.30 per 1M tokens (text/image/video)
+        output: 2.5    # $2.50 per 1M tokens
+        context: 1000000  # 1M tokens
+      
+      # Gemini 2.5 Flash-Lite
+      gemini-2.5-flash-lite:
+        input: 0.1     # $0.10 per 1M tokens (text/image/video)
+        output: 0.4    # $0.40 per 1M tokens
+        context: 1048576  # 1,048,576 tokens per API docs
+      models/gemini-2.5-flash-lite:
+        input: 0.1     # (prefixed alias)
+        output: 0.4
+        context: 1048576
+      
+      # Gemini 1.5 Pro (using lower end of range)
+      gemini-1.5-pro:
+        input: 1.25    # $1.25 per 1M tokens (lower end)
+        output: 5.0    # $5 per 1M tokens (lower end)
+        context: 2000000  # 2M tokens
+      gemini-1.5-pro-latest:
+        input: 1.25
+        output: 5.0
+        context: 2000000
+      
+      # Gemini 1.5 Flash (using lower end of range)
+      gemini-1.5-flash:
+        input: 0.075   # $0.075 per 1M tokens (lower end)
+        output: 0.3    # $0.30 per 1M tokens (lower end)
+        context: 1000000  # 1M tokens
+      gemini-1.5-flash-latest:
+        input: 0.075
+        output: 0.3
+        context: 1000000
+      
+      # Legacy names for compatibility
+      gemini-pro:
+        input: 0.5     # $0.50 per 1M tokens
+        output: 1.5    # $1.50 per 1M tokens
+        context: 32768
+      
+      gemini-pro-vision:
+        input: 0.5     # $0.50 per 1M tokens
+        output: 1.5    # $1.50 per 1M tokens
+        context: 32768
+
+      # Gemini Embedding Models
+      # Source: https://ai.google.dev/gemini-api/docs/pricing
+      gemini-embedding-001:
+        input: 0.15    # $0.15 per 1M tokens
+        output: 0.0    # Embeddings have no output tokens
+        context: 2048
+      models/gemini-embedding-001:
+        input: 0.15    # (prefixed alias for API responses)
+        output: 0.0
+        context: 2048
+      google/gemini-embedding-001:
+        input: 0.15    # (provider-prefixed alias)
+        output: 0.0
+        context: 2048
+
+  dashscope:
+    source: "https://www.alibabacloud.com/help/en/model-studio/models"
+    models:
+      # Qwen Plus snapshot (thinking enabled via extra_body.enable_thinking=true)
+      qwen-plus-2025-07-28:
+        input: 0.4     # $0.40 per 1M tokens (0–256K tier; 256K–1M = 1.20)
+        output: 4.0    # $4.00 per 1M tokens (thinking mode; non-thinking lower)
+        context: 1000000
+      # Qwen Plus baseline (non-thinking)
+      qwen-plus:
+        input: 0.4
+        output: 1.2
+        context: 131072
+
+  meta:
+    source: "Via various providers (Placeholder pricing for now, based on FCP inference rates with SGLang workers)"
+    models:
+      llama-2-70b:
+        input: 0.7     # $0.70 per 1M tokens
+        output: 0.9    # $0.90 per 1M tokens
+        context: 4096
+      
+      llama-2-13b:
+        input: 0.3     # $0.30 per 1M tokens
+        output: 0.4    # $0.40 per 1M tokens
+        context: 4096
+      
+      llama-2-7b:
+        input: 0.2     # $0.20 per 1M tokens
+        output: 0.2    # $0.20 per 1M tokens
+        context: 4096
+
+# Notes:
+# - Prices are per million tokens, not per thousand
+# - Google Gemini has free tiers for some models (not reflected here)
+# - Some providers offer batch processing discounts (50% off)
+# - Cached inputs can reduce costs by 50%
+# - Prices subject to change - check provider pages for latest

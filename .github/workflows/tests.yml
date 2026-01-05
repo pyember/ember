@@ -1,0 +1,59 @@
+name: Python tests
+
+# cancel any prior runs for this workflow and this PR (or branch)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: '3.12'
+      - name: Run pre-commit (ruff/black/mypy)
+        run: uvx pre-commit run -a
+
+  test:
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    strategy:
+      matrix:
+        python-version:
+          # TODO: 3.9, 3.10: 'ember.api.models' is not a package
+          - "3.11"
+          - "3.12"
+          - "3.13"
+        os:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+          # - ubuntu-24.04-arm # TODO: not enabled for private repos at the moment
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv and set the python version
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true          
+          python-version: ${{ matrix.python-version }}
+      - name: Install the project
+        run: uv sync --locked --all-extras --dev
+      - name: Configure setup-wizard
+        run: cd src/ember/cli/setup-wizard/ && npm ci
+      - name: Run all tests
+        run: uv run pytest -n auto

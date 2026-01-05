@@ -1,0 +1,44 @@
+name: Update Model Pricing
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  update-pricing:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        python-version: '3.12'
+    
+    - name: Install project
+      run: |
+        uv sync --locked --all-extras
+    
+    - name: Update pricing data
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        uv run python -m ember.models.pricing_updater --dry-run
+    
+    - name: Create Pull Request
+      if: github.event_name == 'workflow_dispatch'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        commit-message: 'chore: update model pricing data'
+        title: 'Update Model Pricing Data'
+        body: |
+          This PR updates the model pricing data from official sources.
+          
+          The update was performed automatically using the pricing updater.
+          Please review the changes before merging.
+        branch: update-pricing-${{ github.run_number }}
+        delete-branch: true

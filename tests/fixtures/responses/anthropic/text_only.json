@@ -1,0 +1,107 @@
+{
+  "name": "text_only",
+  "request": {
+    "model": "claude-3-5-sonnet-20241022",
+    "instructions": "Reply briefly.",
+    "input": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "input_text",
+            "text": "Say hello."
+          }
+        ]
+      }
+    ],
+    "max_output_tokens": 128
+  },
+  "anthropic_stream": [
+    {
+      "type": "message_start",
+      "message": {
+        "id": "msg_text_1",
+        "model": "claude-3-5-sonnet-20241022"
+      }
+    },
+    {
+      "type": "content_block_delta",
+      "index": 0,
+      "delta": {
+        "text": "Hello!"
+      },
+      "content_block": {
+        "type": "text"
+      }
+    },
+    {
+      "type": "message_delta",
+      "usage": {
+        "input_tokens": 8,
+        "output_tokens": 2
+      }
+    },
+    {
+      "type": "message_stop",
+      "stop_reason": "end_turn",
+      "usage": {
+        "input_tokens": 8,
+        "output_tokens": 2
+      }
+    }
+  ],
+  "expected_events": [
+    {
+      "type": "response.created"
+    },
+    {
+      "type": "response.output_text.delta",
+      "delta": "Hello!"
+    },
+    {
+      "type": "response.delta",
+      "usage_delta": {
+        "prompt_tokens": 8,
+        "completion_tokens": 2,
+        "total_tokens": 10,
+        "input_tokens": 8,
+        "output_tokens": 2
+      }
+    },
+    {
+      "type": "response.completed",
+      "usage": {
+        "prompt_tokens": 8,
+        "completion_tokens": 2,
+        "total_tokens": 10,
+        "input_tokens": 8,
+        "output_tokens": 2
+      },
+      "response": {
+        "id": "resp_fixture",
+        "model": "claude-3-5-sonnet-20241022",
+        "status": "completed",
+        "output": [
+          {
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Hello!"
+              }
+            ],
+            "status": "completed"
+          }
+        ],
+        "output_text": "Hello!",
+        "usage": {
+          "prompt_tokens": 8,
+          "completion_tokens": 2,
+          "total_tokens": 10,
+          "input_tokens": 8,
+          "output_tokens": 2
+        }
+      }
+    }
+  ]
+}

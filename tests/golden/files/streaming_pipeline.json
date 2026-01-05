@@ -1,0 +1,23 @@
+[
+  {
+    "category": "odd",
+    "id": 3,
+    "label": "odd_3",
+    "squared": 900,
+    "value": 30
+  },
+  {
+    "category": "even",
+    "id": 4,
+    "label": "even_4",
+    "squared": 1600,
+    "value": 40
+  },
+  {
+    "category": "odd",
+    "id": 5,
+    "label": "odd_5",
+    "squared": 2500,
+    "value": 50
+  }
+]

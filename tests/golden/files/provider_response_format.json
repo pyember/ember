@@ -1,0 +1,20 @@
+[
+  {
+    "model": "test-model",
+    "prompt": "test prompt",
+    "response": "This is a test response",
+    "tokens": 8
+  },
+  {
+    "model": "test-model",
+    "prompt": "math problem",
+    "response": "2 + 2 = 4",
+    "tokens": 8
+  },
+  {
+    "model": "test-model",
+    "prompt": "unknown",
+    "response": "Response to: unknown",
+    "tokens": 4
+  }
+]

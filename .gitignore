@@ -1,0 +1,254 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# AI assistant tooling
+.claude/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Environments
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+.tmp*/
+.tmp_*
+tmp/
+.tmp*/
+.tmp_*/
+
+# Bench & experiment outputs
+benchmark_outputs/
+local_bench_outputs/
+local_bench_logs/
+runs/
+
+# Model checkpoints and run logs
+model_path/
+wandb/
+**/model_path/
+**/wandb/
+
+# GraphRouter scratch
+embergraphrouter/.venv/
+embergraphrouter/cache/
+embergraphrouter/model/
+embergraphrouter/model_path/
+embergraphrouter/embergraphrouter.egg-info/
+
+# Scratch dirs created during agent runs
+@tmp/
+tmp_ctx_test*/
+tmp_home/
+
+# Package manager transcripts
+=*
+
+# Local planning notes
+docs/internal/
+
+# Distribution / packaging
+.Python
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+coverage.xml
+*.cover
+.hypothesis/
+nosetests.xml
+
+# Translations
+*.mo
+*.pot
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# Cython debug symbols
+cython_debug/
+
+# Deprecated code moved during cleanup
+.deprecated/
+
+# Documentation backup
+.docs_backup/
+
+# Backup and temporary files
+.backup/
+*.backup
+*_backup.py
+*_refactored.py
+diagnostic_*.json
+test_diagnostics.log
+test_*.md
+*.orig
+
+# Ruff
+.ruff_cache/
+
+# # Ember gateway and Takumi (excluded from VCS)
+# # Code paths intentionally not tracked in ember-v2
+# src/ember/gateway/
+# src/ember/models/providers/takumi.py
+# src/ember/models/providers/takumi/
+
+# tox
+.tox/
+
+# Coverage reports
+.coverage.*
+coverage/
+
+# Credentials (just in case)
+credentials.json
+*.pem
+*.key
+*.crt
+
+# Local development
+.local/
+local_tests/
+
+# Generated files
+*.generated.py
+
+# Poetry
+poetry.lock
+
+# PDM
+.pdm.toml
+.pdm-python
+__pypackages__/
+# Javascript
+node_modules/
+
+# Setup-wizard local artifacts
+src/ember/cli/setup-wizard/hello_ember*.py
+
+# Large dataset snapshots
+embergraphrouter/data/router_data.csv
+
+# Large router data files (CSV datasets)
+embergraphrouter/data/*.csv
+embergraphrouter/data/*.csv.gz
+embergraphrouter/data/.router_cache/
+embergraphrouter/data/.router_cache_backup_*/
+
+# GraphRouter datasets and checkpoints (download separately)
+embergraphrouter/data/**
+!embergraphrouter/data/README.md
+embergraphrouter/configs/*.pkl
+embergraphrouter/configs/config_local.yaml
+embergraphrouter_full.tar.gz
+embergraphrouter/model_path_eval/
+embergraphrouter/model_path_baseline/
+embergraphrouter/remote_backup_*/
+
+# Model checkpoints (weights)
+*.pt
+*.pth
+model_weights/
+
+# Archives
+*.tar.gz
+
+# Additional venvs and caches
+.venv311/
+.uv-cache/
+
+# Calibration outputs
+calibration/
+calibration_derived/
+calibration_ensemble/
+
+# Run outputs
+runs/
+snapshots/
+
+# Third-party clones
+third_party/
+
+# Misc large/generated files
+.cache/
+.flowignore
+
+# Debug and scratch scripts
+debug_*.py
+inspect_*.py
+verify_*.py
+reproduce_*.py
+
+# Analysis outputs and temp files
+response.json
+*_results.json
+task.yaml
