@@ -1,0 +1,18 @@
+{
+  "id": "msg_01234",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "Here's the answer to your question..."
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "stop_details": null,
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 50
+  }
+}

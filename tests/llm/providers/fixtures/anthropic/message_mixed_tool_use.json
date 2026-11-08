@@ -1,0 +1,17 @@
+{
+  "stop_reason": "tool_use",
+  "content": [
+    {
+      "type": "server_tool_use",
+      "id": "srvtoolu_01HxbWnMRmbWyMfUtJKC45rA",
+      "name": "web_search",
+      "input": { "query": "example article" }
+    },
+    {
+      "type": "tool_use",
+      "id": "toolu_01PjgRJLbXrXEMZwDNYLnBqk",
+      "name": "run_command",
+      "input": { "command": "uname -a" }
+    }
+  ]
+}
