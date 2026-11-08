@@ -3,7 +3,9 @@
 One `Transport` owns one long-lived ``httpx.Client`` for one provider
 configuration. Every request streams, so its timeouts are liveness bounds:
 how long to wait for a connection and how long to wait for the next byte.
-Nothing caps how long a generation may take. The transport never retries; it
+Nothing caps how long a generation may take. A model may stay silent for many
+minutes while it reasons, so the idle bound is long; TCP keepalive on every
+connection is what notices a peer that died in the meantime. The transport never retries; it
 turns every HTTP or network failure into a `ModelError` whose message is
 built from the status, the provider's short error code and an ember-written
 reason, never from the upstream body.
@@ -14,6 +16,8 @@ import dataclasses
 import email.utils
 import json
 import math
+import socket
+import sys
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 
@@ -23,7 +27,7 @@ from ember.errors import ErrorKind, ModelError
 from ember.llm.providers.sse import SseEvent, parse
 from ember.llm.providers.wire import Body, Failure
 
-__all__ = ["Endpoint", "EventStream", "Transport"]
+__all__ = ["Endpoint", "EventStream", "Transport", "keepalive_socket_options"]
 
 _REASONS: Mapping[ErrorKind, str] = {
     ErrorKind.AUTH: "the provider rejected the credentials",
@@ -49,6 +53,12 @@ _NETWORK_FAILURES = (
     httpx.ProxyError,
     httpx.DecodingError,
 )
+
+# TCP keepalive: first probe after 60 s of silence, then every 15 s, and the
+# connection is declared dead after 4 unanswered probes (about two minutes).
+_KEEPALIVE_IDLE_S = 60
+_KEEPALIVE_INTERVAL_S = 15
+_KEEPALIVE_PROBES = 4
 
 Classifier = Callable[[int, object], Failure]
 """Maps an HTTP error's status and JSON body (or ``None``) to a `Failure`."""
@@ -103,9 +113,17 @@ class Transport:
                 direction. Not a cap on total generation time.
             max_connections: Connections kept per provider; the client's
                 limiter keeps requests in flight at or below this.
-            transport: Replaces the network, for tests.
+            transport: Replaces the network, for tests. Without it, connections
+                use TCP keepalive (`keepalive_socket_options`).
         """
         self._endpoint = endpoint
+        limits = httpx.Limits(
+            max_connections=max_connections, max_keepalive_connections=max_connections
+        )
+        if transport is None:
+            transport = httpx.HTTPTransport(
+                limits=limits, socket_options=keepalive_socket_options()
+            )
         self._client = httpx.Client(
             base_url=endpoint.base_url,
             headers=dict(endpoint.headers),
@@ -115,9 +133,7 @@ class Transport:
                 write=idle_timeout_s,
                 pool=connect_timeout_s,
             ),
-            limits=httpx.Limits(
-                max_connections=max_connections, max_keepalive_connections=max_connections
-            ),
+            limits=limits,
             transport=transport,
         )
 
@@ -159,7 +175,8 @@ class Transport:
             if not response.headers.get("content-type", "").startswith("text/event-stream"):
                 raise self._error(
                     Failure(ErrorKind.MALFORMED),
-                    "the provider did not return an event stream",
+                    "the provider did not return an event stream; ember streams every "
+                    "call, so the server must support streaming responses",
                     model,
                     response,
                     request_id,
@@ -253,6 +270,27 @@ class Transport:
             request_id=request_id,
             before_first_byte=before_first_byte,
         )
+
+
+def keepalive_socket_options() -> list[tuple[int, int, int]]:
+    """Returns the socket options that turn on TCP keepalive.
+
+    Linux and macOS also get the probe timing; other platforms keep their
+    system timing, which only ``SO_KEEPALIVE`` is portable enough to set.
+    """
+    options = [(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)]
+    if sys.platform == "linux":
+        idle = socket.TCP_KEEPIDLE
+    elif sys.platform == "darwin":
+        idle = socket.TCP_KEEPALIVE
+    else:
+        return options
+    return [
+        *options,
+        (socket.IPPROTO_TCP, idle, _KEEPALIVE_IDLE_S),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPINTVL, _KEEPALIVE_INTERVAL_S),
+        (socket.IPPROTO_TCP, socket.TCP_KEEPCNT, _KEEPALIVE_PROBES),
+    ]
 
 
 def _json_or_none(content: bytes) -> object:

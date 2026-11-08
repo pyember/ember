@@ -14,8 +14,10 @@ state is the part as received, keeping the last signature the stream sent
 for it.
 
 Function-call ids. Gemini may return a ``functionCall`` without an ``id``.
-ember then names the call ``ember-gemini-<digest>``, unique to its response
-and position, and sends neither that call nor its ``functionResponse`` with
+ember then names the call ``ember-gemini-<digest>``, a digest of the response
+id, the conversation turn (the request's message count), the call's position
+and the call itself, so identical calls in different turns get different ids
+even when the response carries no id. It sends neither that call nor its ``functionResponse`` with
 an id: Gemini pairs an id-less call and response by name and order. A
 ``functionResponse`` names its function, which encoding looks up from the
 earlier call with the same id.
@@ -273,7 +275,7 @@ def _calling_config(choice: ToolChoice) -> JsonValue:
 
 
 def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+    spec: ModelSpec, request: Request, events: Iterable[SseEvent], request_id: str | None
 ) -> Iterator[StreamItem]:
     """Decodes a streamed response.
 
@@ -285,7 +287,7 @@ def decode_events(
             a chunk with a finish reason.
     """
     del request_id
-    stream = _ChunkStream(spec.ref.provider)
+    stream = _ChunkStream(spec.ref.provider, turn=len(request.messages))
     for event in events:
         yield from stream.chunk(parse_event_data(event, "stream chunk"))
     yield from stream.finish()
@@ -294,8 +296,9 @@ def decode_events(
 class _ChunkStream:
     """State for one stream: open block, finish reason, last usage and id."""
 
-    def __init__(self, provider: str) -> None:
+    def __init__(self, provider: str, *, turn: int) -> None:
         self.acc = StreamAccumulator("gemini", provider)
+        self.turn = turn
         self.block = 0
         self.open_kind = ""
         self.calls = 0
@@ -371,9 +374,10 @@ class _ChunkStream:
         return ToolCallPart(id=string(call_id, "functionCall.id"), name=name, arguments=arguments)
 
     def synthetic_id(self, name: str, arguments: Mapping[str, JsonValue]) -> str:
-        """Names an id-less call uniquely to this response and position."""
-        seed = json.dumps([self.response_id, self.calls, name, arguments], sort_keys=True)
-        return _SYNTHETIC_ID_PREFIX + hashlib.sha256(seed.encode()).hexdigest()[:16]
+        """Names an id-less call uniquely to this turn, response and position."""
+        seed = [self.response_id, self.turn, self.calls, name, arguments]
+        seed_json = json.dumps(seed, sort_keys=True)
+        return _SYNTHETIC_ID_PREFIX + hashlib.sha256(seed_json.encode()).hexdigest()[:16]
 
     def open_block(self, kind: str, *, fresh: bool = False) -> int:
         """Returns the key for ``kind``, continuing the open block when it matches."""

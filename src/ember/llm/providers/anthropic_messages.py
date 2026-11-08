@@ -369,7 +369,7 @@ class _MessageStream:
 
 
 def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+    spec: ModelSpec, request: Request, events: Iterable[SseEvent], request_id: str | None
 ) -> Iterator[StreamItem]:
     """Decodes a streamed message.
 

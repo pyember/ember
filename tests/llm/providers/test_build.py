@@ -237,7 +237,7 @@ def test_send_reads_the_stream_and_its_failures_delivered_nothing(kit, recorder)
 
 
 def test_unexpected_codec_exceptions_are_malformed(kit) -> None:
-    def explode(spec, events, request_id):
+    def explode(spec, request, events, request_id):
         yield TextDelta("partial")
         raise KeyError("thinking")
 
@@ -336,3 +336,16 @@ def test_importing_providers_loads_no_vendor_sdk(tmp_path) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_an_exception_the_consumer_throws_in_is_not_relabelled(kit, recorder) -> None:
+    provider, _ = _provider(
+        kit,
+        recorder,
+        kit.settings("openai", "openai", key=KEY),
+        lambda request: kit.sse_response(kit.text("openai/chat_stream_text.sse")),
+    )
+    items = provider.stream(kit.spec("openai_chat"), Request.from_prompt("hi"))
+    assert next(items) == TextDelta("Hello")
+    with pytest.raises(ValueError, match="consumer"):
+        items.throw(ValueError("consumer gave up"))

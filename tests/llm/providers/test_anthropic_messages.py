@@ -45,6 +45,7 @@ SPEC = ModelSpec(
     api="anthropic_messages",
     max_output_tokens=64000,
 )
+ASK = Request.from_prompt("hi")
 
 
 def _encode(kit, request: Request, *, catalog_max: int | None = 64000) -> dict:
@@ -58,7 +59,7 @@ def _encode(kit, request: Request, *, catalog_max: int | None = 64000) -> dict:
 
 
 def _decode(events: list[SseEvent], request_id: str | None = None) -> list:
-    return list(anthropic_messages.decode_events(SPEC, events, request_id))
+    return list(anthropic_messages.decode_events(SPEC, ASK, events, request_id))
 
 
 def _final(events: list[SseEvent]) -> Decoded:
@@ -412,7 +413,7 @@ def test_documented_error_event_raises_overloaded_and_is_never_text(kit) -> None
     )
     received = []
     with pytest.raises(WireError) as caught:
-        for item in anthropic_messages.decode_events(SPEC, events, None):
+        for item in anthropic_messages.decode_events(SPEC, ASK, events, None):
             received.append(item)
     assert received == [TextDelta("Hello")]
     assert caught.value.kind is ErrorKind.OVERLOADED

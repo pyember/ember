@@ -2,6 +2,8 @@
 
 import contextlib
 import email.utils
+import socket
+import sys
 import time
 from collections.abc import Callable, Iterator
 
@@ -10,7 +12,7 @@ import pytest
 
 from ember.errors import ErrorKind, ModelError
 from ember.llm.providers import openai_platform
-from ember.llm.providers.http import Endpoint, EventStream, Transport
+from ember.llm.providers.http import Endpoint, EventStream, Transport, keepalive_socket_options
 
 Handler = Callable[[httpx.Request], httpx.Response]
 
@@ -234,3 +236,33 @@ def test_stream_error_status_is_classified_with_its_code() -> None:
     error = caught.value
     assert (error.kind, error.retry_after_s) == (ErrorKind.RATE_LIMITED, 4.0)
     assert "rate_limit_error" in str(error) and "org 42" not in str(error)
+
+
+def test_a_non_streaming_server_is_told_to_stream() -> None:
+    body = _Body([b'{"choices": []}'])
+    with pytest.raises(ModelError, match="must support streaming"):
+        with _open(_streamed(body, "application/json")):
+            pass
+
+
+def test_keepalive_options_probe_a_silent_connection() -> None:
+    options = keepalive_socket_options()
+    assert options[0] == (socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    if sys.platform in ("linux", "darwin"):
+        assert [value for _, _, value in options[1:]] == [60, 15, 4]
+        assert {level for level, _, _ in options[1:]} == {socket.IPPROTO_TCP}
+
+
+def test_every_real_connection_uses_keepalive(monkeypatch) -> None:
+    seen: list[dict] = []
+    real = httpx.HTTPTransport
+
+    def recording(**kwargs):
+        seen.append(kwargs)
+        return real(**kwargs)
+
+    monkeypatch.setattr(httpx, "HTTPTransport", recording)
+    endpoint = Endpoint("acme", "https://api.example.test/v1", {}, ())
+    Transport(endpoint, connect_timeout_s=1, idle_timeout_s=1, max_connections=3).close()
+    assert seen[0]["socket_options"] == keepalive_socket_options()
+    assert seen[0]["limits"].max_connections == 3
