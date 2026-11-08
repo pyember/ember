@@ -45,26 +45,53 @@ def test_outside_a_scope_wait_blocks_on_a_future_another_thread_completes() -> N
     assert runtime.wait(future) == "late"
 
 
-def test_outside_a_scope_a_stream_is_sent_before_dispatch_stream_returns() -> None:
+def test_outside_a_scope_a_stream_is_opened_on_the_callers_thread_before_returning() -> None:
     log: list[str] = []
 
     def source() -> Iterator[int]:
-        log.append("sent")
+        log.append(f"opened on {threading.current_thread().name}")
         yield from range(3)
+        log.append("read to the end")
 
     stream = runtime.dispatch_stream(source, label="s")
-    assert log == ["sent"]
+    assert log == [f"opened on {threading.current_thread().name}"]
     assert list(stream) == [0, 1, 2]
+    assert log[-1] == "read to the end"
 
 
-def test_outside_a_scope_a_stream_failure_nobody_pulls_is_never_raised() -> None:
+def test_outside_a_scope_a_failure_before_the_first_item_raises_at_the_call_site() -> None:
     def source() -> Iterator[int]:
-        raise ProviderDown("never pulled")
+        raise ProviderDown("refused")
         yield 0
 
-    runtime.dispatch_stream(source, label="s")
-    with pytest.raises(ProviderDown, match="pulled"):
-        list(runtime.dispatch_stream(source, label="s"))
+    with pytest.raises(ProviderDown, match="refused"):
+        runtime.dispatch_stream(source, label="s")
+
+
+def test_outside_a_scope_a_later_failure_is_raised_only_when_pulled() -> None:
+    def source() -> Iterator[int]:
+        yield 0
+        raise ProviderDown("later")
+
+    unread = runtime.dispatch_stream(source, label="s")
+    stream = runtime.dispatch_stream(source, label="s")
+    assert next(stream) == 0
+    with pytest.raises(ProviderDown, match="later"):
+        next(stream)
+    del unread
+
+
+def test_outside_a_scope_closing_an_unread_stream_closes_its_source() -> None:
+    log: list[str] = []
+
+    def source() -> Iterator[int]:
+        try:
+            yield from range(3)
+        finally:
+            log.append("source closed")
+
+    runtime.dispatch_stream(source, label="s").close()  # type: ignore[attr-defined]
+    assert log == ["source closed"]
 
 
 def test_inside_a_scope_tasks_run_on_named_worker_threads_in_the_dispatching_context() -> None:

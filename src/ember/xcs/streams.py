@@ -59,8 +59,6 @@ class Channel(Generic[T]):
         self._read_to_end = False
         self._closed = False
         self._waiter: Future[None] | None = None
-        self.started: Future[None] = Future()
-        """Completes when the first item arrives or the stream ends."""
 
     def put(self, item: T) -> bool:
         """Adds ``item``. Returns False once the channel is closed."""
@@ -108,5 +106,3 @@ class Channel(Generic[T]):
     def _wake(self, waiter: "Future[None] | None") -> None:
         if waiter is not None:
             waiter.set_result(None)
-        if not self.started.done():
-            self.started.set_result(None)
