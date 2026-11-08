@@ -107,8 +107,8 @@ def parse(spec: str) -> tuple[Stage, ...]:
 
     Example:
         >>> from ember.non import parse
-        >>> [stage.column for stage in parse("3E@openai/gpt-5(temperature=0.7), 1J@openai/gpt-5")]
-        [0, 34]
+        >>> [stage.column for stage in parse("3E@openai/gpt-5.5, 1J@anthropic/claude-opus-5-5")]
+        [0, 19]
 
     Raises:
         NonSyntaxError: ``spec`` is not a valid graph.

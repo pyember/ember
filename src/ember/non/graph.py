@@ -144,9 +144,9 @@ def build_graph(spec: str) -> NonGraph:
 
     Example:
         >>> from ember import build_graph
-        >>> graph = build_graph("3E@openai/gpt-5(temperature=0.7), 1J@anthropic/claude-sonnet-4-5")
+        >>> graph = build_graph("3E@openai/gpt-5.5, 1J@anthropic/claude-opus-5-5")
         >>> [stage.column for stage in graph.stages()]
-        [0, 34]
+        [0, 19]
 
     Raises:
         NonSyntaxError: ``spec`` is not a valid graph.

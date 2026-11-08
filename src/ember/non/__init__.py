@@ -2,7 +2,7 @@
 
 Example:
     >>> from ember.non import build_graph
-    >>> graph = build_graph("5E@openai/gpt-5(temperature=0.7), 1M")
+    >>> graph = build_graph("5E@openai/gpt-5.5(reasoning_effort=low), 1M")
     >>> [type(stage).__name__ for stage in graph.stages()]
     ['ModelStage', 'VoteStage']
 """

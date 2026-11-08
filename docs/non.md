@@ -7,18 +7,18 @@ returns an operator that runs it. Every example on this page runs in CI against 
 from ember import build_graph
 
 # Five samples, then a judge that reads all five and writes the answer.
-graph = build_graph("5E@openai/gpt-5(temperature=0.7), 1J@anthropic/claude-sonnet-4-5")
+graph = build_graph("5E@openai/gpt-5.5(reasoning_effort=low), 1J@anthropic/claude-opus-5-5")
 answer = graph("What is the most effective way to cut household energy use?")
 print(answer.text)
 
 # Seven samples and a majority vote.
-voted = build_graph("7E@openai/gpt-5(temperature=0.7), 1M")
+voted = build_graph("7E@gemini/gemini-3.1-pro-preview(temperature=0.7), 1M")
 print(voted("Is 1009 prime? Answer yes or no.").text)
 
 # Samples from two models, a verifier that keeps the answers it passes, then a judge.
 checked = build_graph(
-    "3E@openai/gpt-5, 3E@anthropic/claude-sonnet-4-5, 1V@openai/gpt-5, "
-    "1J@anthropic/claude-sonnet-4-5"
+    "3E@openai/gpt-5.5, 3E@anthropic/claude-sonnet-5-5, 1V@openai/gpt-5.5, "
+    "1J@anthropic/claude-opus-5-5"
 )
 print(checked("Why is the sky blue? Two sentences.").text)
 ```
@@ -51,9 +51,13 @@ E, J and V stages take parameters in parentheses:
 | `system` | word or `"quoted string"` | System instructions. Escapes are `\"` and `\\`. |
 | `quorum` | whole number | E and J: calls that must succeed (default all). V: answers that must pass (default 1). |
 
+Each model's catalog entry lists the settings it accepts, and any other setting raises `ValueError`
+before anything is sent. Many current models take `reasoning_effort` and `max_output_tokens` but
+not `temperature`.
+
 ```python
 tolerant = build_graph(
-    '5E@openai/gpt-5(temperature=0.9, quorum=3, system="Answer in one word."), 1M'
+    '5E@openai/gpt-5.5(max_output_tokens=200, quorum=3, system="Answer in one word."), 1M'
 )
 print(tolerant("Largest planet?").text)
 ```
@@ -84,7 +88,7 @@ A mistake raises `NonSyntaxError`, a `ValueError` that names the column:
 ```python
 from ember.errors import NonSyntaxError
 
-for spec in ("0E@openai/gpt-5, 1M", "3E@openai/gpt-5(temperature=hot), 1M", "3E@gpt-5, 1M"):
+for spec in ("0E@openai/gpt-5.5, 1M", "3E@openai/gpt-5.5(seed=1.5), 1M", "3E@gpt-5.5, 1M"):
     try:
         build_graph(spec)
     except NonSyntaxError as error:

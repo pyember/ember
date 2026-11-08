@@ -32,7 +32,7 @@ class ModelCall(Operator[Prompt, Completion]):
 
     Example:
         >>> from ember.operators import ModelCall
-        >>> ask = ModelCall("openai/gpt-5", template="Answer in one word: {input}")
+        >>> ask = ModelCall("openai/gpt-5.5", template="Answer in one word: {input}")
         >>> ask.template
         'Answer in one word: {input}'
 

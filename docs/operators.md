@@ -68,14 +68,14 @@ string whose only field is `{input}`:
 from ember.llm import Message
 from ember.operators import ModelCall
 
-summarize = ModelCall("openai/gpt-5", template="Summarize in one sentence:\n{input}")
+summarize = ModelCall("openai/gpt-5.5", template="Summarize in one sentence:\n{input}")
 result = summarize("Ember composes model calls into larger systems.")
 print(result.text, result.usage.output)
 
-chat = ModelCall("anthropic/claude-sonnet-4-5", system="Answer briefly.")
+chat = ModelCall("anthropic/claude-opus-5-5", system="Answer briefly.")
 print(chat([Message.user("Hi"), Message.assistant("Hello."), Message.user("Name a prime.")]).text)
 
-refine = summarize >> ModelCall("openai/gpt-5", template="Make this shorter:\n{input}")
+refine = summarize >> ModelCall("openai/gpt-5.5", template="Make this shorter:\n{input}")
 print(refine("Ember composes model calls into larger systems.").text)
 
 try:
@@ -101,9 +101,9 @@ from ember.operators import Ensemble, Failed, Succeeded
 
 panel = Ensemble(
     (
-        ModelCall("openai/gpt-5"),
-        ModelCall("anthropic/claude-sonnet-4-5"),
-        ModelCall("gemini/gemini-2.5-pro"),
+        ModelCall("openai/gpt-5.5"),
+        ModelCall("anthropic/claude-opus-5-5"),
+        ModelCall("gemini/gemini-3.1-pro-preview"),
     ),
     quorum=2,
 )
@@ -141,13 +141,13 @@ from ember.operators import (
 
 candidates = Candidates("Capital of France?", ("Paris", " paris", "Lyon"))
 
-print(Judge(ModelCall("anthropic/claude-sonnet-4-5"))(candidates).text)
+print(Judge(ModelCall("anthropic/claude-opus-5-5"))(candidates).text)
 
 vote = MajorityVote(normalize=fold_answer, tie=TiePolicy.RAISE)(candidates)
 assert (vote.answer, vote.votes) == ("Paris", 2)
 assert vote.tally == (("paris", 2), ("lyon", 1))
 
-for check in Verifier(ModelCall("openai/gpt-5"))(candidates):
+for check in Verifier(ModelCall("openai/gpt-5.5"))(candidates):
     if isinstance(check, Succeeded):
         print(check.value.answer, check.value.verdict)
 ```
