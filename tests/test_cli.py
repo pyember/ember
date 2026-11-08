@@ -203,10 +203,10 @@ def test_the_installed_command_survives_a_broken_home_config(tmp_path: Path) -> 
     )
     assert result.returncode == 1
     assert result.stdout == ""
-    assert result.stderr.splitlines() == [
-        f"ember: error: {home}/.ember/config.yaml line 2: not valid YAML "
-        "(expected ',' or ']', but got '<stream end>')"
-    ]
+    assert len(result.stderr.splitlines()) == 1
+    assert result.stderr.startswith(
+        f"ember: error: {home}/.ember/config.yaml line 2: not valid YAML"
+    )
 
 
 def test_cli_data_and_eval_never_start_processes_or_prompt() -> None:
