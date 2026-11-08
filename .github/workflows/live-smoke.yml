@@ -1,0 +1,41 @@
+name: live-smoke
+
+# Calls each provider's real API with the keys stored as repository secrets.
+# Started by hand only; it never runs on pushes, pull requests or forks.
+on:
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: "Comma-separated: openai, openai_chat, anthropic, gemini"
+        required: true
+        default: "openai,openai_chat,anthropic,gemini"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  UV_VERSION: "0.13.7"
+
+jobs:
+  smoke:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # Starting guess: about 20 short calls per provider.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - run: uv sync --locked
+      - name: Call each provider
+        env:
+          PROVIDERS: ${{ inputs.providers }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: uv run python tests/live/smoke.py --providers "$PROVIDERS"

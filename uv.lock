@@ -228,7 +228,7 @@ wheels = [
 
 [[package]]
 name = "ember-ai"
-version = "0.2.0.dev0"
+version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "greenlet" },
