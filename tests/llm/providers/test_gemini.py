@@ -410,3 +410,39 @@ def test_identical_id_less_calls_in_different_turns_get_different_ids(kit) -> No
     second = list(gemini.decode_events(SPEC, later, kit.sse(chunk), None))[-1]
     assert _id_less_call(first) == _id_less_call(again)
     assert _id_less_call(first) != _id_less_call(second)
+
+
+def test_documented_invalid_key_is_an_auth_failure(kit) -> None:
+    failure = gemini.classify(400, kit.json("gemini/error_api_key_invalid.json"))
+    assert (failure.kind, failure.label) == (ErrorKind.AUTH, "API_KEY_INVALID")
+
+
+def test_invalid_key_in_a_stream_error_frame_is_an_auth_failure(kit) -> None:
+    events = kit.sse(kit.json("gemini/error_api_key_invalid.json"))
+    with pytest.raises(WireError) as caught:
+        list(gemini.decode_events(SPEC, ASK, events, None))
+    assert caught.value.kind is ErrorKind.AUTH
+    assert "API_KEY_INVALID" in caught.value.reason
+    assert "not valid" not in caught.value.reason
+
+
+def test_missing_credentials_are_an_auth_failure(kit) -> None:
+    body = kit.json("gemini/error_api_key_invalid.json")
+    body["error"].update(code=403, status="PERMISSION_DENIED")
+    body["error"]["details"][0]["reason"] = "CREDENTIALS_MISSING"
+    assert gemini.classify(403, body).kind is ErrorKind.AUTH
+
+
+@pytest.mark.parametrize(
+    ("reason", "domain", "status", "kind"),
+    [
+        ("RATE_LIMIT_EXCEEDED", "googleapis.com", 429, ErrorKind.RATE_LIMITED),
+        ("API_KEY_SERVICE_BLOCKED", "googleapis.com", 403, ErrorKind.PERMISSION),
+        ("API_KEY_INVALID", "example.com", 400, ErrorKind.BAD_REQUEST),
+    ],
+)
+def test_other_reasons_and_domains_keep_the_status_kind(kit, reason, domain, status, kind) -> None:
+    body = kit.json("gemini/error_api_key_invalid.json")
+    body["error"]["code"] = status
+    body["error"]["details"][0].update(reason=reason, domain=domain)
+    assert gemini.classify(status, body).kind is kind
