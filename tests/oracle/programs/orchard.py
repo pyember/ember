@@ -442,6 +442,16 @@ def strict_all(model: Model, xs: list[str]) -> list[str]:
     return xcs.map(lambda x: model(x).text, xs)
 
 
+def fail_then_continue(model: Model, x: str) -> list[str]:
+    """A failing call followed by more work: the failure must raise at one place."""
+    note("before")
+    first = model(f"fail:{x}")
+    note("after the failing call")
+    second = model(f"next {x}")
+    note("after the next call")
+    return [first.text, second.text]
+
+
 def _counter() -> Callable[[], int]:
     count = 0
 

@@ -1,12 +1,15 @@
 """A stand-in model that reaches the xcs scheduler exactly as the client does.
 
 `FakeModel` builds its `Request` at the call site, hands the network work to
-`ember.xcs.runtime.dispatch`, and returns the resulting `Completion`. The
-network work sleeps for a fixed latency and answers deterministically, so a
-plain run and a jitted run of the same program can be compared exactly.
+`ember.xcs.runtime.dispatch`, and returns the resulting `Completion`. Like the
+client, it waits at the call site, raising a failure there, unless
+`runtime.deferred()` says the call is inside jit or map. The network work
+sleeps for a fixed latency and answers deterministically, so a plain run and a
+jitted run of the same program can be compared exactly.
 """
 
 import collections
+import concurrent.futures
 import threading
 import time
 from collections.abc import Callable
@@ -29,12 +32,21 @@ class FakeModel:
 
     A prompt starting with ``fail:`` fails with ``ModelError(RATE_LIMITED)``.
     The answer function runs on whichever thread serves the request, so it
-    sees that thread's context.
+    sees that thread's context. With ``arrives_before_return``, each call
+    blocks until its request has finished before returning, so a failure has
+    always arrived by the time the program gets the `Completion`.
     """
 
-    def __init__(self, latency_s: float, answer: Callable[[str], str] = echo) -> None:
+    def __init__(
+        self,
+        latency_s: float,
+        answer: Callable[[str], str] = echo,
+        *,
+        arrives_before_return: bool = False,
+    ) -> None:
         self.latency_s = latency_s
         self._answer = answer
+        self._arrives_before_return = arrives_before_return
         self._lock = threading.Lock()
         self._clock = 0
         self._reached = 0
@@ -46,6 +58,10 @@ class FakeModel:
             self._reached += 1
         reached_at = self._tick()
         future = runtime.dispatch(lambda: self._serve(request, reached_at), label=str(REF))
+        if self._arrives_before_return:
+            concurrent.futures.wait([future])
+        if not runtime.deferred():
+            runtime.wait(future)
         return Completion(future, REF)
 
     def requests(self) -> collections.Counter[str]:

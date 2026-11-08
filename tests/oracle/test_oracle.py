@@ -53,6 +53,9 @@ class Case:
         order: How side effects are compared.
         answer: How the fake answers, on the thread that serves the request.
         error: The error type both runs must raise, if any.
+        raises_late: A call fails outside `xcs.map`. The plain run raises at
+            the call site and the jit run at the first read, so the jit run
+            may also make the calls, and the side effects, in between.
     """
 
     name: str
@@ -61,6 +64,7 @@ class Case:
     order: Literal["program", "per_item"] = "program"
     answer: Callable[[str], str] = fakemodel.echo
     error: type[Exception] | None = None
+    raises_late: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -174,7 +178,7 @@ CASES = [
     Case("fanout_from_global", drive_fanout),
     Case("session_object", drive_session),
     Case("pair", call(orchard.pair, "a", "b"), independent=2),
-    Case("pair_failure", call(orchard.pair, "fail:a", "b"), error=ModelError),
+    Case("pair_failure", call(orchard.pair, "fail:a", "b"), error=ModelError, raises_late=True),
     Case(
         "nested_fanout",
         call(orchard.nested_fanout, ["q0", "q1"]),
@@ -197,9 +201,11 @@ CASES = [
 ]
 
 
-def execute(case: Case, transform: Transform, latency_s: float) -> Run:
+def execute(
+    case: Case, transform: Transform, latency_s: float, *, arrives_before_return: bool = False
+) -> Run:
     orchard.reset()
-    model = fakemodel.FakeModel(latency_s, case.answer)
+    model = fakemodel.FakeModel(latency_s, case.answer, arrives_before_return=arrives_before_return)
     started = time.perf_counter()
     try:
         outcome: object = case.drive(transform, model)
@@ -240,14 +246,21 @@ def divergences(case: Case, expected: Run, actual: Run) -> list[str]:
             found.append(f"outcome {actual.outcome!r} != {expected.outcome!r}")
     elif actual.outcome != expected.outcome:
         found.append(f"outcome {actual.outcome!r} != {expected.outcome!r}")
-    if actual.requests != expected.requests:
+    if case.raises_late:
+        if not expected.requests <= actual.requests:
+            found.append(f"requests {dict(actual.requests)} miss {dict(expected.requests)}")
+    elif actual.requests != expected.requests:
         found.append(f"requests {dict(actual.requests)} != {dict(expected.requests)}")
     for run in (expected, actual):
         if sum(run.requests.values()) != run.reached:
             found.append(f"{run.reached} call sites but {sum(run.requests.values())} requests")
         if run.early:
             found.append(f"sent before the program reached them: {run.early}")
-    if actual.effects != expected.effects:
+    if case.raises_late and isinstance(expected.effects, list):
+        assert isinstance(actual.effects, list)
+        if actual.effects[: len(expected.effects)] != expected.effects:
+            found.append(f"side effects {actual.effects!r} do not extend {expected.effects!r}")
+    elif actual.effects != expected.effects:
         found.append(f"side effects {actual.effects!r} != {expected.effects!r}")
     return found
 
@@ -338,3 +351,24 @@ def test_oracle_rejects_v01_behaviours(mutant: Transform, must_catch: set[str]) 
             if divergences(case, plain_run, mutant_run):
                 caught.add(case.name)
     assert caught == must_catch
+
+
+FAIL_THEN_CONTINUE = Case(
+    "fail_then_continue", call(orchard.fail_then_continue, "x"), error=ModelError, raises_late=True
+)
+
+
+@pytest.mark.parametrize("transform", [plain, xcs.jit], ids=["plain", "jit"])
+def test_failure_raises_at_the_same_place_however_fast_it_arrives(transform: Transform) -> None:
+    instant = execute(FAIL_THEN_CONTINUE, transform, 0.0, arrives_before_return=True)
+    delayed = execute(FAIL_THEN_CONTINUE, transform, 0.05)
+    same_place = dataclasses.replace(FAIL_THEN_CONTINUE, raises_late=False)
+    assert divergences(same_place, instant, delayed) == []
+
+
+def test_failure_raises_at_the_call_outside_jit_and_at_the_read_inside() -> None:
+    plain_run = execute(FAIL_THEN_CONTINUE, plain, 0.0, arrives_before_return=True)
+    jit_run = execute(FAIL_THEN_CONTINUE, xcs.jit, 0.0, arrives_before_return=True)
+    assert plain_run.effects == [("before",)]
+    assert jit_run.effects == [("before",), ("after the failing call",), ("after the next call",)]
+    assert divergences(FAIL_THEN_CONTINUE, plain_run, jit_run) == []
