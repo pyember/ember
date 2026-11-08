@@ -1,5 +1,6 @@
 """The client pipeline: checks before sending, retries, pricing, reports and placement."""
 
+import contextvars
 import gc
 import os
 import subprocess
@@ -629,32 +630,20 @@ def test_a_stream_is_sent_at_its_call_site_even_if_never_read(
 ) -> None:
     events = client.stream("gpt-5.5", "hi")
     assert len(fake.requests) == 1
-    assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=1, waiting=0)
     del events
     gc.collect()
-    assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
+    _wait_for(lambda: client.limiter_state("openai") == LimiterState(64, 0, 0))
     assert len(fake.requests) == 1
 
 
-def test_outside_jit_a_failure_before_the_first_event_raises_at_the_call_site() -> None:
-    fake = FakeProvider([Fail(ErrorKind.AUTH)])
-    with Client(provider_factory=fake.factory) as client:
-        with pytest.raises(ModelError) as caught:
-            client.stream("gpt-5.5", "hi")
-        assert caught.value.kind is ErrorKind.AUTH
-        assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
-
-
-def test_when_deferred_a_failure_before_the_first_event_raises_on_first_read(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(runtime, "deferred", lambda: True)
+def test_a_failure_before_the_first_event_raises_at_the_first_read() -> None:
     fake = FakeProvider([Fail(ErrorKind.AUTH)])
     with Client(provider_factory=fake.factory) as client:
         events = client.stream("gpt-5.5", "hi")
         with pytest.raises(ModelError) as caught:
             next(events)
         assert caught.value.kind is ErrorKind.AUTH
+        _wait_for(lambda: client.limiter_state("openai") == LimiterState(64, 0, 0))
 
 
 @pytest.mark.parametrize(
@@ -680,53 +669,32 @@ def test_a_dispatch_that_cannot_start_returns_the_permit(
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
 
 
-# A call that only its own caller could unblock.
+# A call made while the same provider's stream is open.
 
 
-@pytest.mark.parametrize("surface", SURFACES)
-def test_a_call_that_would_wait_on_its_own_open_stream_raises_before_sending(
-    surface: Surface, client: Client, fake: FakeProvider
+def test_a_call_made_while_reading_a_stream_completes_at_a_limit_of_one(
+    client: Client,
 ) -> None:
-    with context.override(max_in_flight_per_provider=1):
-        events = client.stream("gpt-5.5", "first")
-        assert next(events) == TextDelta("ok")
-        with pytest.raises(ModelError) as caught:
-            surface(client, "gpt-5.5")
-        assert caught.value.kind is ErrorKind.BAD_REQUEST
-        assert "would wait forever" in str(caught.value)
-        assert len(fake.requests) == 1
-        events.close()  # type: ignore[attr-defined]
-        assert client.limiter_state("openai") == LimiterState(limit=1, in_flight=0, waiting=0)
+    # Workers drain every stream, so an open stream never holds its slot
+    # hostage to its reader: a call made on the reading thread runs once the
+    # stream finishes. The scenario runs on a daemon thread so that a runtime
+    # without that guarantee fails this test instead of hanging the suite.
+    outcome: list[object] = []
 
-
-def test_another_threads_open_stream_makes_a_call_wait_not_fail(
-    client: Client, fake: FakeProvider
-) -> None:
-    opened, finish = threading.Event(), threading.Event()
-    texts: list[str] = []
-
-    def hold_a_stream() -> None:
+    def read_and_call() -> None:
         with context.override(max_in_flight_per_provider=1):
             events = client.stream("gpt-5.5", "first")
-            next(events)
-            opened.set()
-            assert finish.wait(timeout=10)
-            list(events)
+            first = next(events)
+            nested = client.complete("gpt-5.5", "second").text
+            outcome.extend([first, nested, type(list(events)[-1])])
 
-    def call() -> None:
-        with context.override(max_in_flight_per_provider=1):
-            texts.append(client.complete("gpt-5.5", "second").text)
-
-    holder = threading.Thread(target=hold_a_stream)
-    holder.start()
-    assert opened.wait(timeout=10)
-    caller = threading.Thread(target=call)
-    caller.start()
-    _wait_for(lambda: client.limiter_state("openai") == LimiterState(1, 1, 1))
-    finish.set()
-    holder.join(timeout=10)
-    caller.join(timeout=10)
-    assert texts == ["ok"]
+    worker = threading.Thread(
+        target=contextvars.copy_context().run, args=(read_and_call,), daemon=True
+    )
+    worker.start()
+    worker.join(timeout=10)
+    assert not worker.is_alive(), "the nested call never got a slot"
+    assert outcome == [TextDelta("ok"), "ok", Done]
 
 
 # Lifetime.

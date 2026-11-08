@@ -44,7 +44,7 @@ from ember.llm import observe, providers
 from ember.llm.attempt import Call, extensions_keep_list_price
 from ember.llm.catalog import Catalog
 from ember.llm.completion import Completion
-from ember.llm.limiter import HeldByCaller, Limiter, LimiterState, Permit
+from ember.llm.limiter import Limiter, LimiterState, Permit
 from ember.llm.pool import ProviderFactory, ProviderPool
 from ember.llm.ref import ModelRef
 from ember.llm.request import JsonValue, Message, Request, Sampling, ToolChoice, ToolSpec
@@ -345,7 +345,7 @@ class Client:
 
     def send(self, model: ModelName, request: Request) -> Completion:
         """Sends a prepared request; see the module docstring for the steps."""
-        call = self._prepare(model, request, streaming=False)
+        call = self._prepare(model, request)
         try:
             future = runtime.dispatch(call.run, label=str(call.spec.ref))
         except BaseException:
@@ -358,7 +358,7 @@ class Client:
 
     def send_stream(self, model: ModelName, request: Request) -> Iterator[Event]:
         """Streams a prepared request; checks raise here, before anything is sent."""
-        call = self._prepare(model, request, streaming=True)
+        call = self._prepare(model, request)
         try:
             return runtime.dispatch_stream(call.open_events, label=str(call.spec.ref))
         except BaseException:
@@ -384,7 +384,7 @@ class Client:
     ) -> None:
         self.close()
 
-    def _prepare(self, model: ModelName, request: Request, *, streaming: bool) -> Call:
+    def _prepare(self, model: ModelName, request: Request) -> Call:
         ctx = context.current()
         spec = self._resolve(model, ctx)
         check_settings(spec, request.sampling)
@@ -393,7 +393,7 @@ class Client:
         _check_price(spec, list_price, ctx)
         lease = self._pool.lease(settings, ctx)
         try:
-            permit = self._wait_for_permit(spec, ctx.max_in_flight_per_provider, streaming)
+            permit = self._wait_for_permit(spec.ref.provider, ctx.max_in_flight_per_provider)
         except BaseException:
             lease.release()
             raise
@@ -418,27 +418,8 @@ class Client:
         table = self._catalog if self._catalog is not None else catalog_module.default()
         return table.resolve(model, providers=ctx.providers)
 
-    def _wait_for_permit(self, spec: ModelSpec, cap: int, streaming: bool) -> Permit:
-        # Outside xcs a stream advances only as it is read, and it belongs to
-        # the thread that opened it, wherever it is later read: only that
-        # thread can be relied on to free its slot.
-        provider = spec.ref.provider
-        try:
-            pending = self._limiter.acquire(
-                provider,
-                cap=cap,
-                caller=threading.get_ident(),
-                caller_holds=streaming and not runtime.deferred(),
-            )
-        except HeldByCaller:
-            raise ModelError(
-                ErrorKind.BAD_REQUEST,
-                provider=provider,
-                model=spec.ref.name,
-                reason=f"this call would wait forever: every in-flight slot for {provider} is "
-                "held by this caller (an open stream); finish reading it first or raise "
-                "max_in_flight_per_provider",
-            ) from None
+    def _wait_for_permit(self, provider: str, cap: int) -> Permit:
+        pending = self._limiter.acquire(provider, cap=cap)
         try:
             return runtime.wait(pending)
         except BaseException:

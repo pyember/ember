@@ -13,10 +13,6 @@ by additive increase, multiplicative decrease:
   (in flight >= limit) and the limit is below the reporting caller's cap. A
   success never lowers the limit, and serial traffic never raises it.
 
-A caller that would wait while it holds every in-flight slot itself (an open
-stream it has not finished reading, outside ``@xcs.jit``) would wait forever;
-`acquire` raises `HeldByCaller` instead.
-
 `acquire` returns a future that completes with a `Permit` once the provider
 has room. Callers waiting for room sit in an `ember.xcs.runtime.WaitQueue`,
 so the scheduler decides who gets each freed slot. The client reads the
@@ -34,19 +30,6 @@ from ember.xcs import runtime
 __all__ = ["Limiter", "LimiterState", "Permit"]
 
 _BACKOFF_KINDS = frozenset({ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED})
-
-
-class HeldByCaller(Exception):
-    """The caller would wait for a slot that only the caller itself can free.
-
-    An internal signal from `Limiter.acquire` to the client, raised under the
-    limiter's lock so the check is atomic. It never escapes the client, which
-    raises ``ModelError(BAD_REQUEST)`` in its place.
-    """
-
-    def __init__(self, provider: str) -> None:
-        self.provider = provider
-        super().__init__(f"every in-flight slot for {provider} is held by this caller")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -68,7 +51,6 @@ class LimiterState:
 class _Waiter:
     future: "Future[Permit]"
     cap: int
-    holder: object | None
 
 
 @dataclasses.dataclass(slots=True)
@@ -82,7 +64,6 @@ class _Provider:
         waiters: Callers waiting for room, in the scheduler's order.
         next: The waiter that won the last freed slot but whose own, lower
             cap still holds it back. It keeps its turn.
-        held_by: Permits held for a caller that alone can release them.
     """
 
     limit: int
@@ -90,22 +71,9 @@ class _Provider:
     epoch: int = 0
     waiters: runtime.WaitQueue[_Waiter] = dataclasses.field(default_factory=runtime.WaitQueue)
     next: _Waiter | None = None
-    held_by: dict[object, int] = dataclasses.field(default_factory=dict)
 
     def waiting(self) -> int:
         return len(self.waiters) + (self.next is not None)
-
-    def hold(self, holder: object | None) -> None:
-        self.in_flight += 1
-        if holder is not None:
-            self.held_by[holder] = self.held_by.get(holder, 0) + 1
-
-    def drop(self, holder: object | None) -> None:
-        self.in_flight -= 1
-        if holder is not None:
-            remaining = self.held_by.pop(holder) - 1
-            if remaining:
-                self.held_by[holder] = remaining
 
 
 class Permit:
@@ -115,16 +83,13 @@ class Permit:
     `release`, exactly once.
     """
 
-    __slots__ = ("_cap", "_epoch", "_holder", "_limiter", "_provider", "_released")
+    __slots__ = ("_cap", "_epoch", "_limiter", "_provider", "_released")
 
-    def __init__(
-        self, limiter: "Limiter", provider: str, cap: int, epoch: int, holder: object | None
-    ) -> None:
+    def __init__(self, limiter: "Limiter", provider: str, cap: int, epoch: int) -> None:
         self._limiter = limiter
         self._provider = provider
         self._cap = cap
         self._epoch = epoch
-        self._holder = holder
         self._released = False
 
     @property
@@ -156,23 +121,12 @@ class Limiter:
         self._lock = threading.Lock()
         self._providers: dict[str, _Provider] = {}
 
-    def acquire(
-        self,
-        provider: str,
-        *,
-        cap: int,
-        caller: object | None = None,
-        caller_holds: bool = False,
-    ) -> "Future[Permit]":
+    def acquire(self, provider: str, *, cap: int) -> "Future[Permit]":
         """Asks for a permit to send one request to ``provider``.
 
         Args:
             provider: Provider name.
             cap: The most requests this caller allows in flight to the provider.
-            caller: Identifies the caller (the client passes its thread), to
-                detect a wait that only the caller could end.
-            caller_holds: Whether only ``caller`` can release the permit, as
-                with a stream it reads itself.
 
         Returns:
             A future that completes with the permit once there is room. Cancel
@@ -180,24 +134,20 @@ class Limiter:
 
         Raises:
             ValueError: ``cap`` is less than one.
-            HeldByCaller: The caller would wait, and holds every slot in flight.
         """
         if cap < 1:
             raise ValueError(f"cap must be at least 1, got {cap}")
         future: Future[Permit] = Future()
-        holder = caller if caller_holds else None
         with self._lock:
             state = self._providers.setdefault(provider, _Provider(limit=cap))
             if state.epoch == 0 and cap > state.limit:
                 state.limit = cap
             if state.waiting() == 0 and state.in_flight < min(state.limit, cap):
-                state.hold(holder)
-                granted = [(future, Permit(self, provider, cap, state.epoch, holder))]
-            elif caller is not None and 0 < state.in_flight == state.held_by.get(caller, 0):
-                raise HeldByCaller(provider)
+                state.in_flight += 1
+                granted = [(future, Permit(self, provider, cap, state.epoch))]
             else:
                 # Pushed on the caller's greenlet, so the scheduler sees who waits.
-                state.waiters.push(_Waiter(future, cap, holder))
+                state.waiters.push(_Waiter(future, cap))
                 granted = self._admit(provider, state)
         _deliver(granted)
         return future
@@ -222,9 +172,8 @@ class Limiter:
                 break
             if not waiter.future.set_running_or_notify_cancel():
                 continue
-            state.hold(waiter.holder)
-            permit = Permit(self, provider, waiter.cap, state.epoch, waiter.holder)
-            granted.append((waiter.future, permit))
+            state.in_flight += 1
+            granted.append((waiter.future, Permit(self, provider, waiter.cap, state.epoch)))
         return granted
 
     def _record(self, permit: Permit, failure: ErrorKind | None) -> None:
@@ -246,7 +195,7 @@ class Limiter:
             _check_held(permit)
             permit._released = True
             state = self._providers[permit.provider]
-            state.drop(permit._holder)
+            state.in_flight -= 1
             granted = self._admit(permit.provider, state)
         _deliver(granted)
 

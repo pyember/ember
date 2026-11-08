@@ -8,7 +8,7 @@ from concurrent.futures import Future
 import pytest
 
 from ember.errors import ErrorKind
-from ember.llm.limiter import HeldByCaller, Limiter, LimiterState, Permit
+from ember.llm.limiter import Limiter, LimiterState, Permit
 
 
 def _grant(limiter: Limiter, provider: str = "openai", cap: int = 8) -> Permit:
@@ -239,21 +239,3 @@ def test_after_a_backoff_growth_stops_at_the_reporting_callers_cap() -> None:
     held[1].record(None)  # saturated, but the limit has reached cap 3
     assert limiter.state("openai") == LimiterState(limit=3, in_flight=3, waiting=0)
     third.release()
-
-
-def test_a_caller_holding_every_slot_cannot_wait_for_one() -> None:
-    limiter = Limiter()
-    mine = limiter.acquire("openai", cap=1, caller="me", caller_holds=True).result()
-    with pytest.raises(HeldByCaller, match="openai"):
-        limiter.acquire("openai", cap=1, caller="me")
-    assert limiter.state("openai") == LimiterState(limit=1, in_flight=1, waiting=0)
-    waiting = limiter.acquire("openai", cap=1, caller="someone else")
-    assert not waiting.done()
-    mine.release()
-    assert waiting.done()
-
-
-def test_a_slot_held_by_a_task_is_not_held_by_its_caller() -> None:
-    limiter = Limiter()
-    limiter.acquire("openai", cap=1, caller="me").result()  # a dispatched task frees it
-    assert not limiter.acquire("openai", cap=1, caller="me").done()
