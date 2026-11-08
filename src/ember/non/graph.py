@@ -21,6 +21,7 @@ import dataclasses
 import functools
 from collections.abc import Callable
 
+from ember import xcs
 from ember.errors import QuorumError
 from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
@@ -32,7 +33,6 @@ from ember.operators.candidates import Candidates
 from ember.operators.ensemble import Ensemble, Failed, Outcome, Succeeded
 from ember.operators.judge import Judge
 from ember.operators.model_call import ModelCall
-from ember.operators.upstream import xcs_map
 from ember.operators.verifier import Check, Verdict, Verifier
 from ember.operators.vote import MajorityVote, TiePolicy, Vote, fold_answer
 
@@ -130,7 +130,7 @@ class NonGraph(Operator[str, Answer]):
             raise TypeError(f"a NON graph takes a question string, got {type(input)}")
         stages = self.stages()
         generation = [s for s in stages if isinstance(s, ModelStage) and s.role is Role.ENSEMBLE]
-        records: list[StageRecord] = list(xcs_map(functools.partial(_generate, input), generation))
+        records: list[StageRecord] = list(xcs.map(functools.partial(_generate, input), generation))
         answers = tuple(answer for record in records for answer in record.answers)
         for stage in stages[len(generation) :]:
             record = _refine(stage, Candidates(input, answers))

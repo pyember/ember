@@ -5,10 +5,10 @@ Members run concurrently through `ember.xcs.map`. A member that returns a
 ensemble returns. A member whose model call failed for an operational reason
 (rate limits, overload, server errors, transport failures, cancellation), or
 whose own quorum failed, is recorded as `Failed` and the others carry on. Any
-other exception, including authentication, permission, not-found,
-bad-request and price errors and every bug in user code, propagates
-unchanged: those fail every member alike, and a quorum met despite them would
-hide an outage.
+other exception, including authentication, permission, quota, not-found,
+bad-request, malformed-response and price errors and every bug in user code,
+propagates unchanged: those fail every member alike, and a quorum met despite
+them would hide an outage.
 """
 
 import dataclasses
@@ -16,10 +16,10 @@ import functools
 from collections.abc import Callable, Sequence
 from typing import Generic, TypeAlias, TypeVar
 
+from ember import xcs
 from ember.errors import ErrorKind, ModelError, QuorumError
 from ember.llm.completion import Completion
 from ember.operators.base import In, Operator, Out
-from ember.operators.upstream import xcs_map
 
 __all__ = [
     "MEMBER_FAILURE_KINDS",
@@ -114,7 +114,7 @@ def run_members(calls: Sequence[Callable[[], T]]) -> tuple[Outcome[T], ...]:
         Exception: The first, by position, of the calls' non-operational
             errors, unchanged.
     """
-    return tuple(xcs_map(_attempt, enumerate(calls)))
+    return tuple(xcs.map(_attempt, enumerate(calls)))
 
 
 def require_quorum(outcomes: Sequence[Outcome[T]], quorum: int) -> None:

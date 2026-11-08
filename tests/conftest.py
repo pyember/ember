@@ -67,6 +67,7 @@ def result_of(text: str, model: ModelRef) -> Result:
     """A finished result carrying ``text``."""
     return Result(
         text=text,
+        message=Message.assistant(text),
         reasoning="",
         tool_calls=(),
         finish_reason=FinishReason.STOP,

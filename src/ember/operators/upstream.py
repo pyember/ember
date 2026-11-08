@@ -1,21 +1,17 @@
-"""Stand-ins for `ember.models` and `ember.xcs.map` until those lanes merge.
+"""A stand-in for `ember.models` until the models lane merges.
 
-This module is deleted when the operators lane rebases onto them; nothing
-else in the package changes except the two imports that point here.
+This module is deleted when the operators lane rebases onto it; nothing else
+in the package changes except the import that points here.
 """
 
-from collections.abc import Callable, Iterable, Sequence
-from typing import TypeVar
+from collections.abc import Sequence
 
 from ember.errors import ConfigError
 from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
 from ember.llm.request import Message
 
-__all__ = ["models", "xcs_map"]
-
-T = TypeVar("T")
-R = TypeVar("R")
+__all__ = ["models"]
 
 
 def models(
@@ -33,8 +29,3 @@ def models(
     """The documented `ember.models` call, restricted to what operators pass."""
     del prompt, system, temperature, top_p, max_output_tokens, stop, seed, reasoning_effort
     raise ConfigError(f"ember.models is not on this branch yet; cannot call {model}")
-
-
-def xcs_map(fn: Callable[[T], R], items: Iterable[T]) -> list[R]:
-    """The documented `ember.xcs.map`, run sequentially."""
-    return [fn(item) for item in items]

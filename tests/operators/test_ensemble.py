@@ -54,8 +54,10 @@ def test_operational_failures_become_outcomes(kind: ErrorKind) -> None:
     [
         ErrorKind.AUTH,
         ErrorKind.PERMISSION,
+        ErrorKind.QUOTA,
         ErrorKind.NOT_FOUND,
         ErrorKind.BAD_REQUEST,
+        ErrorKind.MALFORMED,
         ErrorKind.UNPRICED,
     ],
 )
@@ -70,8 +72,10 @@ def test_the_failure_partition_covers_every_error_kind() -> None:
     fatal = {
         ErrorKind.AUTH,
         ErrorKind.PERMISSION,
+        ErrorKind.QUOTA,
         ErrorKind.NOT_FOUND,
         ErrorKind.BAD_REQUEST,
+        ErrorKind.MALFORMED,
         ErrorKind.UNPRICED,
     }
     assert MEMBER_FAILURE_KINDS | fatal == set(ErrorKind)
