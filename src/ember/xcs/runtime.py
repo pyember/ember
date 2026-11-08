@@ -1,12 +1,14 @@
 """The boundary between model calls and the xcs scheduler.
 
-`ember.llm` uses exactly three functions from this module:
+`ember.llm` uses exactly four functions from this module:
 
 - `wait(future)` to read any result, including a rate-limit permit. Inside
   `@xcs.jit` and `xcs.map` it lets other greenlets run while this one waits.
 - `dispatch(task)` to run one request that already holds its permit.
 - `dispatch_stream(source)` to run one streaming request that already holds
   its permit, reading its items as they arrive.
+- `deferred()` to decide where a failed call raises: at the call site when
+  it returns False, at the first read of its result when it returns True.
 
 Tasks given to `dispatch` and `dispatch_stream` are leaf network I/O: they
 never call back into ember and never wait on other ember work, so worker
@@ -20,7 +22,7 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import Future
 from typing import TypeVar
 
-__all__ = ["dispatch", "dispatch_stream", "wait"]
+__all__ = ["deferred", "dispatch", "dispatch_stream", "wait"]
 
 T = TypeVar("T")
 
@@ -56,6 +58,17 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
     """
     del label
     return source()
+
+
+def deferred() -> bool:
+    """Whether model calls made here return before they finish.
+
+    True inside `@xcs.jit` and `xcs.map`: a call returns a pending result at
+    once and a failure raises when that result is first read. False
+    everywhere else: a call waits and raises at the call site, like any
+    synchronous function. The answer depends only on scope, never on timing.
+    """
+    return False
 
 
 def wait(future: "Future[T]") -> T:
