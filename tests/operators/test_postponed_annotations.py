@@ -1,8 +1,8 @@
 """Operators defined under PEP 563 with `TYPE_CHECKING`-only types.
 
 v0.1 resolved string annotations against the wrong module, so `@op` and
-`Operator` raised on the first call here (and eb1's copy silently skipped
-validation). v0.2 never reads annotations, so they cannot matter.
+`Operator` raised on the first call here (and a downstream copy silently
+skipped validation). v0.2 never reads annotations, so they cannot matter.
 """
 
 from __future__ import annotations
