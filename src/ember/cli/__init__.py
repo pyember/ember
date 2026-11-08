@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from typing import NoReturn
 
 import ember
-from ember.cli import configure
+from ember.cli import configure, models
 from ember.errors import ConfigError, ModelError
 
 __all__ = ["main"]
@@ -103,6 +103,12 @@ def _parser() -> _Parser:
     unset.add_argument("provider")
     unset.add_argument("field", nargs="?", help="any field name, including a misspelt one")
     unset.set_defaults(handler=configure.unset)
+    commands.add_parser("models", help="list the model catalog").set_defaults(
+        handler=models.list_models
+    )
+    check = commands.add_parser("check", help="send one short request and report the result")
+    check.add_argument("model", help="a catalog model or alias, or provider/name")
+    check.set_defaults(handler=models.check)
     parser.commands = tuple(commands.choices)
     configure_parser.commands = tuple(actions.choices)
     return parser

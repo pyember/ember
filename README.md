@@ -180,6 +180,7 @@ ember configure set-key openai      # prompts for the key; keys are never comman
 ember configure set local kind openai_compatible
 ember configure set local base_url http://localhost:11434/v1
 ember configure show                # keys are masked
+ember check gpt-5.5                 # one short request: finish reason, latency, request id, cost
 ```
 
 Runtime overrides apply to a block and are never written to disk:
@@ -198,6 +199,8 @@ ember configure show                          # print the config file, keys mask
 ember configure set-key PROVIDER              # save a key typed at a hidden prompt
 ember configure set PROVIDER FIELD VALUE      # FIELD is kind, base_url or api_key_env
 ember configure unset PROVIDER [FIELD]        # remove a field (even a misspelt one) or a provider
+ember models                                  # list the model catalog with limits and prices
+ember check MODEL                             # send one short request and report the result
 ```
 
 ## Design Principles

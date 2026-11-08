@@ -13,6 +13,9 @@ import pytest
 import ember.cli
 from ember import context
 from ember.cli import main
+from ember.errors import ErrorKind
+from ember.llm import Client, using
+from ember.llm.fake import Fail, FakeProvider
 
 KEY = "sk-secret-abcdefgh1234"
 SPAWNS = re.compile(r"input|system|popen|fork|forkpty|exec[lv]p?e?|spawn[lv]p?e?|posix_spawnp?")
@@ -321,6 +324,9 @@ COMMANDS = (
     ("configure", "set", "local", "api_key_env", "LOCAL_API_KEY"),
     ("configure", "unset", "local", "base_url"),
     ("configure", "unset", "local"),
+    ("models",),
+    ("check", "gpt-5.5"),
+    ("check", "local/llama-3"),
 )
 
 
@@ -350,13 +356,15 @@ def test_output_never_echoes_a_key_given_in_any_argument_slot(
         "providers:\n  local:\n    kind: openai_compatible\n    base_url: http://h/v1\n"
     )
     type_key(monkeypatch, "sk-typed-at-the-prompt-0000")
+    fake = FakeProvider(default=Fail(ErrorKind.NOT_FOUND, status=404))
     crash = ""
-    try:
-        main(list(argv))
-    except SystemExit:
-        pass
-    except Exception as exc:  # Recorded, then asserted absent below.
-        crash = "".join(traceback.format_exception(exc))
+    with Client(provider_factory=fake.factory) as client, using(client):
+        try:
+            main(list(argv))
+        except SystemExit:
+            pass
+        except Exception as exc:  # Recorded, then asserted absent below.
+            crash = "".join(traceback.format_exception(exc))
     out, err = capsys.readouterr()
     assert KEY not in out + err + crash
     assert crash == ""

@@ -2,21 +2,49 @@
 
 import json
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 from types import MappingProxyType
 
 import pytest
 
-from ember import data
+import ember
+from ember import context, data
 from ember import eval as ember_eval
 from ember.data import Example
 from ember.errors import ErrorKind, ModelError
 from ember.eval import Completed, Failed, NumericAnswer, Scored
-from ember.llm import FinishReason, Message, ModelRef, Money, Result, Usage
+from ember.llm import (
+    Client,
+    FinishReason,
+    Message,
+    ModelRef,
+    Money,
+    Request,
+    Result,
+    TextPart,
+    Usage,
+    catalog,
+    using,
+)
+from ember.llm.fake import Fail, FakeProvider, Reply
 from ember.llm.observe import Attempt, Observer, active_observers
 
 MODEL = ModelRef("fake", "m1")
+
+
+@pytest.fixture(autouse=True)
+def isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Keeps every test, including real-client ones, away from the user's config and keys."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("EMBER_CONFIG", str(tmp_path / "config.yaml"))
+    for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    context.reload()
+    yield
+    context.reload()
+
+
 ITEMS = [Example(question=f"{n} + {n}?", answer=str(2 * n)) for n in range(3)]
 
 
@@ -423,3 +451,55 @@ def test_text_after_the_end_record_is_rejected(tmp_path: Path) -> None:
     path.write_text(path.read_text() + '{"schema": 1, "type": "it')
     with pytest.raises(ValueError, match="unterminated text after the end record"):
         ember_eval.read_run(path)
+
+
+def test_a_run_through_the_real_client_records_its_retries_and_prices(tmp_path: Path) -> None:
+    usage = Usage(input=10, output=2)
+    answers: dict[str, list[Reply | Fail]] = {
+        "0 + 0?": [Reply("0", usage=usage, request_id="req-a")],
+        "1 + 1?": [
+            Fail(ErrorKind.OVERLOADED, status=529),
+            Reply("2", usage=usage, request_id="req-b"),
+        ],
+        "2 + 2?": [Fail(ErrorKind.AUTH, status=401)],
+    }
+
+    def respond(model: ModelRef, request: Request) -> Reply | Fail:
+        (part,) = request.messages[-1].parts
+        assert isinstance(part, TextPart)
+        return answers[part.text].pop(0)
+
+    fake = FakeProvider(respond=respond)
+    with Client(provider_factory=fake.factory, sleep=lambda s: None) as client, using(client):
+        records = ember_eval.run(
+            lambda example: ember.models("gpt-5.5", example.question).text,
+            ITEMS,
+            scorer=NumericAnswer(),
+            records=tmp_path / "run.jsonl",
+        )
+
+    assert records == ember_eval.read_run(tmp_path / "run.jsonl")
+    spec = catalog.default().get("openai/gpt-5.5")
+    assert spec is not None and spec.rates is not None
+    price = spec.rates.cost(usage)
+    assert price is not None
+    first, retried, failed = (item.attempts for item in records.items)
+    assert [(a.request_id, a.outcome) for a in first] == [
+        ("req-a", Completed(FinishReason.STOP, usage, price))
+    ]
+    assert [(a.number, a.will_retry, a.request_id) for a in retried] == [
+        (1, True, None),
+        (2, False, "req-b"),
+    ]
+    assert isinstance(retried[0].outcome, Failed)
+    assert (retried[0].outcome.kind, retried[0].outcome.status) == (ErrorKind.OVERLOADED, 529)
+    assert len({a.call_id for a in retried}) == 1
+    assert [(a.number, a.will_retry) for a in failed] == [(1, False)]
+    models_sent = {a.model for item in records.items for a in item.attempts}
+    assert models_sent == {ModelRef("openai", "gpt-5.5")}
+    summary = records.summary
+    assert (summary.scored, summary.failed) == (2, 1)
+    assert dict(summary.failures) == {"ModelError:auth": 1}
+    assert (summary.calls, summary.attempts, summary.retries) == (3, 4, 1)
+    assert (summary.failed_attempts, summary.failed_calls) == (2, 1)
+    assert (summary.unpriced_calls, summary.cost) == (0, price + price)
