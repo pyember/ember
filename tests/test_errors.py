@@ -13,6 +13,8 @@ from ember.errors import ErrorKind, ModelError, NonSyntaxError
         (ErrorKind.BAD_REQUEST, False),
         (ErrorKind.NOT_FOUND, False),
         (ErrorKind.UNPRICED, False),
+        (ErrorKind.QUOTA, False),
+        (ErrorKind.MALFORMED, False),
     ],
 )
 def test_retryable_follows_kind(kind: ErrorKind, retryable: bool) -> None:
