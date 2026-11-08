@@ -102,7 +102,7 @@ def test_a_permit_releases_exactly_once() -> None:
     assert limiter.state("openai") == LimiterState(limit=8, in_flight=0, waiting=0)
 
 
-def test_waiters_get_freed_slots_in_arrival_order() -> None:
+def test_without_a_scheduler_waiters_get_freed_slots_in_arrival_order() -> None:
     limiter = Limiter()
     first = _grant(limiter, cap=1)
     second: Future[Permit] = limiter.acquire("openai", cap=1)

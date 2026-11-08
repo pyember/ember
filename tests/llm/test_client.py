@@ -16,8 +16,11 @@ from ember.llm.attempt import retry_delay
 from ember.llm.fake import FakeProvider, Reply
 from ember.llm.limiter import LimiterState
 from ember.llm.observe import Attempt, observing
+from ember.llm.provider import StreamItem
 from ember.llm.ref import ModelRef
+from ember.llm.request import Request
 from ember.llm.result import Done, Event, Money, Result, TextDelta, Usage, UsageEvent
+from ember.llm.spec import ModelSpec
 from ember.xcs import runtime
 
 
@@ -373,6 +376,28 @@ def test_a_stream_retries_only_before_its_first_item(sleeps: list[float]) -> Non
         assert (len(fake.requests), sleeps) == (2, [0.5])
         # Both attempts were overloaded, the second sent after the first halving.
         assert client.limiter_state("openai") == LimiterState(limit=16, in_flight=0, waiting=0)
+
+
+class MislabelledStream(FakeProvider):
+    """Fails mid-stream with an error that wrongly claims nothing was received."""
+
+    streams = 0
+
+    def stream(self, spec: ModelSpec, request: Request) -> Iterator[StreamItem]:
+        self.streams += 1
+        yield TextDelta("partial ")
+        raise ModelError(ErrorKind.OVERLOADED, provider="openai", model="m", reason="busy")
+
+
+def test_the_client_never_retries_a_stream_that_delivered_output(sleeps: list[float]) -> None:
+    fake = MislabelledStream()
+    with Client(provider_factory=fake.factory, sleep=sleeps.append) as client:
+        received: list[Event] = []
+        with pytest.raises(ModelError):
+            for event in client.stream("gpt-5.5", "hi"):
+                received.append(event)
+    assert received == [TextDelta("partial ")]
+    assert (fake.streams, sleeps) == (1, [])
 
 
 def test_an_abandoned_stream_is_reported_cancelled_and_frees_its_permit() -> None:
