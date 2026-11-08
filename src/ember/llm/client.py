@@ -44,7 +44,7 @@ from ember.llm import observe, providers
 from ember.llm.attempt import Call
 from ember.llm.catalog import Catalog
 from ember.llm.completion import Completion
-from ember.llm.limiter import Limiter, Permit
+from ember.llm.limiter import Limiter, LimiterState, Permit
 from ember.llm.pool import ProviderFactory, ProviderPool
 from ember.llm.ref import ModelRef
 from ember.llm.request import JsonValue, Message, Request, Sampling, ToolChoice, ToolSpec
@@ -356,6 +356,10 @@ class Client:
         """Streams a prepared request; checks raise here, before anything is sent."""
         call = self._prepare(model, request)
         return runtime.dispatch_stream(call.open_events, label=str(call.spec.ref))
+
+    def limiter_state(self, provider: str) -> LimiterState | None:
+        """Returns ``provider``'s current limit and load, or ``None`` before its first call."""
+        return self._limiter.state(provider)
 
     def close(self) -> None:
         """Closes every provider this client built. Later calls raise RuntimeError."""

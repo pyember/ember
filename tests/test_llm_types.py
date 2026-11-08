@@ -5,7 +5,7 @@ import pytest
 
 from ember.llm import Message, ModelRef, Request, Sampling, TextPart, ToolCallPart, ToolSpec, Usage
 from ember.llm.result import Money
-from ember.llm.spec import LongContextRates, Rates
+from ember.llm.spec import LongContextRates, ModelSpec, Rates
 
 
 def test_model_ref_keeps_everything_after_the_first_slash() -> None:
@@ -86,3 +86,31 @@ def test_money_formats_exactly_with_at_least_cents() -> None:
     assert str(Money(1_500_000_000)) == "$1.50"
     assert str(Money(450)) == "$0.00000045"
     assert str(Money(0)) == "$0.00"
+
+
+def test_a_missing_cache_price_leaves_only_calls_that_use_the_cache_unpriced() -> None:
+    rates = _rates(cache_read=None, cache_write=None)
+    assert not rates.fully_priced
+    assert rates.cost(Usage(input=3, output=1)) == Money(450 + 600)
+    assert rates.cost(Usage(input=3, cache_read=1)) is None
+    assert rates.cost(Usage(input=3, cache_write=1)) is None
+    assert _rates().fully_priced
+
+
+def test_long_context_rates_without_a_cache_price_are_not_fully_priced() -> None:
+    long = LongContextRates(above_prompt_tokens=10, rates=_rates(cache_write=None))
+    assert not _rates(long_context=long).fully_priced
+
+
+def test_model_spec_offers_reasoning_effort_exactly_when_it_lists_efforts() -> None:
+    ref = ModelRef("openai", "m")
+    common = {"ref": ref, "wire_id": "m", "api": "openai_responses", "known": False}
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        ModelSpec(**common, accepts=frozenset({"reasoning_effort"}))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="reasoning_effort"):
+        ModelSpec(**common, accepts=frozenset(), reasoning_efforts=frozenset({"low"}))  # type: ignore[arg-type]
+
+
+def test_a_catalog_model_must_say_where_its_values_came_from() -> None:
+    with pytest.raises(ValueError, match="sources and as_of"):
+        ModelSpec(ref=ModelRef("openai", "m"), wire_id="m", api="openai_responses")
