@@ -80,7 +80,7 @@ class Strand:
         self.frame.record(call)
         return call
 
-    def next_key_remaining_s(self) -> float:
+    def next_call_remaining_s(self) -> float:
         """The current plan's prediction for the next call this greenlet dispatches."""
         return self.frame.planned_remaining_s((self.path, self.dispatched))
 

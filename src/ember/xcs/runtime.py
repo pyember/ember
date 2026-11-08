@@ -23,8 +23,9 @@ threads cannot deadlock on each other. Each runs in a copy of the context
 that was active where it was dispatched.
 """
 
-import collections
 import contextvars
+import heapq
+import itertools
 import time
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import Future
@@ -116,16 +117,33 @@ def wait(future: "Future[T]") -> T:
 class WaitQueue(Generic[T]):
     """Acquirers waiting for a shared capacity, such as a provider's permits.
 
-    The scheduler decides who gets each freed slot. For now, slots go in
-    arrival order. Not thread-safe: the owner calls it under its own lock.
+    Slots go to jit calls in the order their acquirers arrived, as in a FIFO
+    queue, so no call can starve another. Within one jit call, each slot goes
+    to the waiting acquirer whose next request has the longest predicted
+    remaining path, from the function's previous run (see `Jitted.graph`);
+    without a prediction, in arrival order. Outside jit and map, every
+    acquirer is its own call, so the queue is plain FIFO.
+
+    Not thread-safe: the owner calls it under its own lock.
     """
 
     def __init__(self) -> None:
-        self._items: collections.deque[T] = collections.deque()
+        self._serial = itertools.count()
+        self._arrivals: list[tuple[int, object]] = []
+        self._by_scope: dict[object, list[tuple[float, int, T]]] = {}
 
     def push(self, item: T) -> None:
-        """Adds ``item``, for the request the caller sends next."""
-        self._items.append(item)
+        """Adds ``item``, for the request the running greenlet sends next."""
+        serial = next(self._serial)
+        strand = strands.current()
+        if strand is None:
+            scope: object = object()
+            priority = 0.0
+        else:
+            scope = strand.frame.outermost()
+            priority = strand.next_call_remaining_s()
+        heapq.heappush(self._arrivals, (serial, scope))
+        heapq.heappush(self._by_scope.setdefault(scope, []), (-priority, serial, item))
 
     def pop(self) -> T:
         """Removes and returns the item that gets the freed slot.
@@ -133,12 +151,17 @@ class WaitQueue(Generic[T]):
         Raises:
             IndexError: The queue is empty.
         """
-        if not self._items:
+        if not self._arrivals:
             raise IndexError("pop from an empty WaitQueue")
-        return self._items.popleft()
+        _, scope = heapq.heappop(self._arrivals)
+        waiting = self._by_scope[scope]
+        _, _, item = heapq.heappop(waiting)
+        if not waiting:
+            del self._by_scope[scope]
+        return item
 
     def __len__(self) -> int:
-        return len(self._items)
+        return len(self._arrivals)
 
 
 def _run_now(task: Callable[[], T]) -> "Future[T]":
