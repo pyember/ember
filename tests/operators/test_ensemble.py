@@ -2,12 +2,16 @@
 
 import dataclasses
 from collections.abc import Callable
+from concurrent.futures import Future
 from typing import Any
 
 import pytest
 
 from ember import op
 from ember.errors import ErrorKind, ModelError, QuorumError
+from ember.llm.completion import Completion
+from ember.llm.ref import ModelRef
+from ember.llm.result import Result
 from ember.operators import Ensemble, Failed, ModelCall, Operator, Succeeded
 from ember.operators.ensemble import MEMBER_FAILURE_KINDS
 
@@ -124,3 +128,35 @@ def test_model_call_members_send_one_request_each(fake_models: Callable[..., Any
     texts = [o.value.text for o in outcomes if isinstance(o, Succeeded)]
     assert texts == ["openai/gpt-5:q", "anthropic/claude-sonnet-4-5:q"]
     assert len(fake.calls) == 2
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class FailsWhenRead(Operator[str, Completion]):
+    """Returns a pending Completion whose call failed, as members do inside jit."""
+
+    error: ModelError
+
+    def forward(self, input: str) -> Completion:
+        future: Future[Result] = Future()
+        future.set_exception(self.error)
+        return Completion(future, ModelRef("fake", "m"))
+
+
+def test_a_pending_failure_is_the_members_outcome_not_a_later_surprise() -> None:
+    error = _error(ErrorKind.OVERLOADED)
+    outcomes = Ensemble((echo, FailsWhenRead(error)), quorum=1)("a")
+    assert outcomes == (Succeeded(0, "a"), Failed(1, error))
+
+
+def test_a_pending_fatal_failure_propagates_from_the_ensemble() -> None:
+    error = _error(ErrorKind.AUTH)
+    with pytest.raises(ModelError) as raised:
+        Ensemble((echo, FailsWhenRead(error)), quorum=1)("a")
+    assert raised.value is error
+
+
+def test_succeeded_model_calls_hold_finished_completions(fake_models: Callable[..., Any]) -> None:
+    fake_models(lambda model, prompt: "done")
+    [outcome] = Ensemble((ModelCall("openai/gpt-5"),), quorum=1)("q")
+    assert isinstance(outcome, Succeeded) and isinstance(outcome.value, Completion)
+    assert outcome.value.done() and outcome.value.text == "done"

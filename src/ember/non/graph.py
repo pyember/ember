@@ -22,8 +22,8 @@ import functools
 from collections.abc import Callable
 
 from ember.errors import QuorumError
+from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
-from ember.llm.result import Result
 from ember.llm.spec import ModelSpec
 from ember.non.grammar import ModelStage, Role, Stage, VoteStage, parse
 from ember.non.plan import Plan, plan
@@ -44,7 +44,7 @@ class Sampled:
     """What an E or J stage produced: one outcome per call, in member order."""
 
     stage: ModelStage
-    outcomes: tuple[Outcome[Result], ...]
+    outcomes: tuple[Outcome[Completion], ...]
 
     @property
     def answers(self) -> tuple[str, ...]:

@@ -75,7 +75,7 @@ class Verifier(Operator[Candidates, tuple[Outcome[Check], ...]]):
         return f"{self.instructions}\n\nQuestion:\n{question}\n\nAnswer:\n{answer}"
 
     def _check(self, question: str, answer: str) -> Check:
-        result = self.call(self.prompt(question, answer))
+        result = self.call(self.prompt(question, answer)).result()
         return Check(answer=answer, verdict=read_verdict(result.text), result=result)
 
 

@@ -5,23 +5,30 @@ import string
 from collections.abc import Sequence
 from typing import TypeAlias, TypeGuard
 
+from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
 from ember.llm.request import Message, Sampling
-from ember.llm.result import Result
 from ember.operators.base import Operator
 from ember.operators.upstream import models
 
 __all__ = ["ModelCall", "Prompt"]
 
-Prompt: TypeAlias = str | Sequence[Message]
+Prompt: TypeAlias = str | Sequence[Message] | Completion
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class ModelCall(Operator[Prompt, Result]):
-    """Sends its input to a model and returns the finished `Result`.
+class ModelCall(Operator[Prompt, Completion]):
+    """Sends its input to a model and returns the call's `Completion`.
 
-    The input is a prompt string or a sequence of `Message`; anything else
-    raises `TypeError` instead of being converted to text.
+    Outside `@xcs.jit` and `xcs.map` the call has finished when `ModelCall`
+    returns, and a failure raises here. Inside them the `Completion` is
+    pending: the request is already sent, and reading any field waits for it
+    and raises its failure. So ``a = summarize(doc); b = translate(doc)`` sends
+    both requests before either is read.
+
+    The input is a prompt string, a sequence of `Message`, or the `Completion`
+    of an earlier call, whose text is the prompt (reading it waits for that
+    call). Anything else raises `TypeError` instead of being converted to text.
 
     Example:
         >>> from ember.operators import ModelCall
@@ -32,8 +39,9 @@ class ModelCall(Operator[Prompt, Result]):
     Attributes:
         model: ``provider/name`` or a catalog alias. There is no default.
         template: A `str.format` template whose only field is ``{input}``.
-            When set, the input must be a string and the prompt is the template
-            with the input substituted; when ``None`` the input is sent as is.
+            When set, the input must be text (a string or a `Completion`) and
+            the prompt is the template with the text substituted; when
+            ``None`` the input is sent as is.
         system: System instructions.
         sampling: Generation settings.
     """
@@ -49,9 +57,9 @@ class ModelCall(Operator[Prompt, Result]):
         if self.template is not None:
             _require_input_template(self.template)
 
-    def forward(self, input: Prompt) -> Result:
+    def forward(self, input: Prompt) -> Completion:
         sampling = self.sampling
-        completion = models(
+        return models(
             self.model,
             self.prompt(input),
             system=self.system,
@@ -62,22 +70,24 @@ class ModelCall(Operator[Prompt, Result]):
             seed=sampling.seed,
             reasoning_effort=sampling.reasoning_effort,
         )
-        return completion.result()
 
     def prompt(self, input: Prompt) -> str | tuple[Message, ...]:
         """Returns what `forward` sends for ``input``.
 
         Raises:
-            TypeError: ``input`` is neither a string nor a sequence of
-                `Message`, or it is messages and the call has a template.
+            TypeError: ``input`` is not a string, a sequence of `Message` or a
+                `Completion`, or it is messages and the call has a template.
         """
-        if isinstance(input, str):
-            return input if self.template is None else self.template.format(input=input)
-        if _is_messages(input):
+        text = input.text if isinstance(input, Completion) else input
+        if isinstance(text, str):
+            return text if self.template is None else self.template.format(input=text)
+        if _is_messages(text):
             if self.template is not None:
-                raise TypeError("a ModelCall with a template takes a string")
-            return tuple(input)
-        raise TypeError(f"ModelCall takes a string or a sequence of Message, got {type(input)}")
+                raise TypeError("a ModelCall with a template takes text")
+            return tuple(text)
+        raise TypeError(
+            f"ModelCall takes a string, a sequence of Message or a Completion, got {type(input)}"
+        )
 
 
 def _is_messages(value: object) -> TypeGuard[Sequence[Message]]:

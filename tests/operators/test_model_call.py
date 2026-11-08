@@ -2,12 +2,16 @@
 
 import dataclasses
 from collections.abc import Callable
+from concurrent.futures import Future
 from typing import Any
 
 import pytest
 
+from ember.errors import ErrorKind, ModelError
+from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
 from ember.llm.request import Message, Sampling
+from ember.llm.result import Result
 from ember.operators import ModelCall
 
 
@@ -54,14 +58,14 @@ def test_anything_but_text_or_messages_raises_before_sending(
     fake_models: Callable[..., Any], value: object
 ) -> None:
     fake = fake_models(lambda model, prompt: "should not be called")
-    with pytest.raises(TypeError, match="string or a sequence of Message"):
+    with pytest.raises(TypeError, match="a string, a sequence of Message or a Completion"):
         ModelCall("openai/gpt-5")(value)  # type: ignore[arg-type]
     assert fake.calls == []
 
 
 def test_a_template_needs_text_input(fake_models: Callable[..., Any]) -> None:
     fake_models(lambda model, prompt: "ok")
-    with pytest.raises(TypeError, match="with a template takes a string"):
+    with pytest.raises(TypeError, match="with a template takes text"):
         ModelCall("openai/gpt-5", template="{input}")([Message.user("hi")])
 
 
@@ -94,3 +98,42 @@ def test_replace_changes_settings_and_revalidates() -> None:
     assert hotter.sampling.temperature == 1.0 and call.sampling.temperature is None
     with pytest.raises(ValueError):
         dataclasses.replace(call, template="{oops}")
+
+
+def _pending(outcome: "Result | ModelError") -> Completion:
+    """A Completion as a deferred call leaves it: its future already settled."""
+    future: Future[Result] = Future()
+    if isinstance(outcome, ModelError):
+        future.set_exception(outcome)
+    else:
+        future.set_result(outcome)
+    return Completion(future, ModelRef("fake", "earlier"))
+
+
+def test_a_completion_input_is_read_as_its_text(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: "ok")
+    earlier = ModelCall("openai/gpt-5")("draft")
+    ModelCall("openai/gpt-5", template="Improve: {input}")(earlier)
+    ModelCall("openai/gpt-5")(earlier)
+    assert [call.prompt for call in fake.calls] == ["draft", "Improve: ok", "ok"]
+
+
+def test_rshift_feeds_one_calls_text_to_the_next(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: f"[{prompt}]")
+    pipeline = ModelCall("a/first") >> ModelCall("b/second", template="again {input}")
+    assert pipeline("x").text == "[again [x]]"
+    assert [(call.model, call.prompt) for call in fake.calls] == [
+        ("a/first", "x"),
+        ("b/second", "again [x]"),
+    ]
+
+
+def test_a_failed_input_completion_raises_its_error_before_sending(
+    fake_models: Callable[..., Any],
+) -> None:
+    fake = fake_models(lambda model, prompt: "should not be called")
+    error = ModelError(ErrorKind.SERVER, provider="fake", model="earlier", reason="injected")
+    with pytest.raises(ModelError) as raised:
+        ModelCall("openai/gpt-5")(_pending(error))
+    assert raised.value is error
+    assert fake.calls == []

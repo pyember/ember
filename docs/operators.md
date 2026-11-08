@@ -58,10 +58,11 @@ assert pipeline("  two   words ") == 2
 
 ## Calling a model
 
-`ModelCall` sends its input to a model and returns the finished `Result`, with the text, token
-usage, cost and request id. The model has no default. The input is a string or a list of
-`Message`; anything else raises `TypeError` instead of being sent as its Python repr. A template,
-if given, is a `str.format` string whose only field is `{input}`:
+`ModelCall` sends its input to a model and returns the call's `Completion`, with the text, token
+usage, cost and request id. The model has no default. The input is a string, a list of `Message`,
+or the `Completion` of an earlier call, whose text becomes the prompt; anything else raises
+`TypeError` instead of being sent as its Python repr. A template, if given, is a `str.format`
+string whose only field is `{input}`:
 
 ```python
 from ember.llm import Message
@@ -74,13 +75,19 @@ print(result.text, result.usage.output)
 chat = ModelCall("anthropic/claude-sonnet-4-5", system="Answer briefly.")
 print(chat([Message.user("Hi"), Message.assistant("Hello."), Message.user("Name a prime.")]).text)
 
+refine = summarize >> ModelCall("openai/gpt-5", template="Make this shorter:\n{input}")
+print(refine("Ember composes model calls into larger systems.").text)
+
 try:
     summarize({"question": "not a prompt"})
 except TypeError as error:
     print(error)
 ```
 
-A `ModelCall` returns only after its call finishes, so its errors raise where it is called.
+Outside `@xcs.jit` and `xcs.map`, the call has finished when `ModelCall` returns and a failure
+raises there. Inside them the `Completion` is pending: the request is already sent, and reading any
+field waits for it and raises its failure. Two `ModelCall`s that do not read each other's output
+therefore have both requests sent before either is read.
 
 ## Ensembles
 
@@ -117,8 +124,8 @@ despite it would hide the outage. An ensemble cannot be empty, and its members m
 
 These three take `Candidates(question, answers)`.
 
-`Judge` sends one prompt holding the question and every answer, numbered, and returns the model's
-`Result`. `MajorityVote` returns the answer most candidates agree on; you choose how answers are
+`Judge` sends one prompt holding the question and every answer, numbered, and returns the call's
+`Completion`. `MajorityVote` returns the answer most candidates agree on; you choose how answers are
 compared and what happens on a tie, and neither has a default. `Verifier` checks each answer with
 its own call, concurrently, and reads the verdict from the last line of the reply:
 
@@ -191,5 +198,3 @@ until a class declares a model.
   operator API in v0.2.
 - An ensemble waits for every member. Returning early once the quorum has succeeded needs
   cancellation from the xcs scheduler, which v0.2 does not have.
-- Inside `@xcs.jit`, operators that run one after another wait for each other because each returns
-  a finished value. Members of an `Ensemble` and items of `xcs.map` overlap.

@@ -1,12 +1,14 @@
 """`Ensemble`: run several operators on one input and keep every outcome.
 
-Members run concurrently through `ember.xcs.map`. A member whose model call
-failed for an operational reason (rate limits, overload, server errors,
-transport failures, cancellation), or whose own quorum failed, is recorded as
-`Failed` and the others carry on. Any other exception, including
-authentication, permission, not-found, bad-request and price errors and every
-bug in user code, propagates unchanged: those fail every member alike, and a
-quorum met despite them would hide an outage.
+Members run concurrently through `ember.xcs.map`. A member that returns a
+`Completion` is waited for in its own turn, so its outcome is final when the
+ensemble returns. A member whose model call failed for an operational reason
+(rate limits, overload, server errors, transport failures, cancellation), or
+whose own quorum failed, is recorded as `Failed` and the others carry on. Any
+other exception, including authentication, permission, not-found,
+bad-request and price errors and every bug in user code, propagates
+unchanged: those fail every member alike, and a quorum met despite them would
+hide an outage.
 """
 
 import dataclasses
@@ -15,6 +17,7 @@ from collections.abc import Callable, Sequence
 from typing import Generic, TypeAlias, TypeVar
 
 from ember.errors import ErrorKind, ModelError, QuorumError
+from ember.llm.completion import Completion
 from ember.operators.base import In, Operator, Out
 from ember.operators.upstream import xcs_map
 
@@ -127,7 +130,10 @@ def require_quorum(outcomes: Sequence[Outcome[T]], quorum: int) -> None:
 def _attempt(item: tuple[int, Callable[[], T]]) -> Outcome[T]:
     index, call = item
     try:
-        return Succeeded(index, call())
+        value = call()
+        if isinstance(value, Completion):
+            value.result()  # A pending call's failure is this member's, so classify it here.
+        return Succeeded(index, value)
     except ModelError as error:
         if error.kind not in MEMBER_FAILURE_KINDS:
             raise

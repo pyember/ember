@@ -2,7 +2,7 @@
 
 import dataclasses
 
-from ember.llm.result import Result
+from ember.llm.completion import Completion
 from ember.operators.base import Operator
 from ember.operators.candidates import Candidates
 from ember.operators.model_call import ModelCall
@@ -17,8 +17,11 @@ JUDGE_INSTRUCTIONS = (
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class Judge(Operator[Candidates, Result]):
+class Judge(Operator[Candidates, Completion]):
     """Synthesizes one answer from the question and all of its candidates.
+
+    Returns the judging call's `Completion`, which is pending inside
+    `@xcs.jit` until it is read.
 
     Attributes:
         call: The model call that judges; it receives the rendered prompt.
@@ -29,7 +32,7 @@ class Judge(Operator[Candidates, Result]):
     call: ModelCall
     instructions: str = JUDGE_INSTRUCTIONS
 
-    def forward(self, input: Candidates) -> Result:
+    def forward(self, input: Candidates) -> Completion:
         return self.call(self.prompt(input))
 
     def prompt(self, candidates: Candidates) -> str:
