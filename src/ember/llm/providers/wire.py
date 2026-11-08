@@ -39,6 +39,7 @@ __all__ = [
     "AssistantPart",
     "Body",
     "Codec",
+    "Failure",
     "StreamAccumulator",
     "WireError",
     "array",
@@ -67,7 +68,7 @@ _IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
 _STATUS_KINDS: Mapping[int, ErrorKind] = {
     400: ErrorKind.BAD_REQUEST,
     401: ErrorKind.AUTH,
-    402: ErrorKind.PERMISSION,
+    402: ErrorKind.QUOTA,
     403: ErrorKind.PERMISSION,
     404: ErrorKind.NOT_FOUND,
     408: ErrorKind.SERVER,
@@ -94,14 +95,14 @@ class WireError(Exception):
     Attributes:
         kind: The error kind the provider reports it as.
         reason: Short explanation written by ember; never upstream text.
-        status: HTTP status the provider attached to an error frame, if any.
+        retry_after_s: Seconds the provider asked the caller to wait, if it said.
     """
 
-    def __init__(self, kind: ErrorKind, reason: str, *, status: int | None = None) -> None:
+    def __init__(self, kind: ErrorKind, reason: str, *, retry_after_s: float | None = None) -> None:
         super().__init__(reason)
         self.kind = kind
         self.reason = reason
-        self.status = status
+        self.retry_after_s = retry_after_s
 
     def to_model_error(
         self, *, provider: str, model: str, request_id: str | None, before_first_byte: bool
@@ -112,15 +113,38 @@ class WireError(Exception):
             provider=provider,
             model=model,
             reason=self.reason,
-            status=self.status,
             request_id=request_id,
+            retry_after_s=self.retry_after_s,
             before_first_byte=before_first_byte,
         )
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class Failure:
+    """How a provider described a failure, from an HTTP error or a stream frame.
+
+    Attributes:
+        kind: The error kind it maps to.
+        label: The provider's short error code, if it sent an identifier.
+        retry_after_s: A wait the provider named in the body, if any.
+    """
+
+    kind: ErrorKind
+    label: str | None = None
+    retry_after_s: float | None = None
+
+    def describe(self, reason: str) -> str:
+        """Returns ``reason`` with the provider's code appended, when there is one."""
+        return f"{reason}; provider error {self.label}" if self.label else reason
+
+    def wire_error(self, reason: str) -> WireError:
+        """Returns the codec error that reports this failure."""
+        return WireError(self.kind, self.describe(reason), retry_after_s=self.retry_after_s)
+
+
 def malformed(what: str) -> WireError:
     """Returns the error for a response that does not match its documented shape."""
-    return WireError(ErrorKind.SERVER, f"malformed response: {what}")
+    return WireError(ErrorKind.MALFORMED, f"malformed response: {what}")
 
 
 def stream_cut(terminal: str) -> WireError:
@@ -223,20 +247,22 @@ def _merge(
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Codec:
-    """One wire format: request encoding and response decoding.
+    """One wire protocol: the streaming request body and its stream.
+
+    Every call streams, so the idle bound is a liveness bound even when the
+    caller waits for the whole result.
 
     Attributes:
-        encode: Builds the JSON body for ``(spec, request, stream)``.
-        decode: Turns ``(spec, body, request_id)`` for a complete JSON response
-            into `Decoded`; ``spec`` names the provider its reasoning parts
-            belong to.
-        decode_events: Turns ``(spec, events, request_id)`` for a stream into
-            items ending in exactly one `Decoded`.
+        encode: Builds the JSON body that asks for a stream, for ``(spec, request)``.
+        decode_events: Turns ``(spec, events, request_id)`` into items ending
+            in exactly one `Decoded`; ``spec`` names the provider that
+            reasoning parts belong to.
+        classify: Maps an HTTP error's ``(status, body)`` to a `Failure`.
     """
 
-    encode: Callable[[ModelSpec, Request, bool], Body]
-    decode: Callable[[ModelSpec, object, str | None], Decoded]
+    encode: Callable[[ModelSpec, Request], Body]
     decode_events: Callable[[ModelSpec, Iterable[SseEvent], str | None], Iterator[StreamItem]]
+    classify: Callable[[int, object], Failure]
 
 
 AssistantPart: TypeAlias = TextPart | ToolCallPart | ReasoningPart
@@ -400,6 +426,8 @@ def complete_arguments(
 ) -> Mapping[str, JsonValue] | None:
     """Parses a tool call's arguments, allowing only truncation to cut them.
 
+    An empty argument string is a call that takes no arguments, ``{}``.
+
     Returns:
         The arguments, or ``None`` when generation hit the length limit inside
         this call; the call is then incomplete, and `FinishReason.LENGTH` on
@@ -409,7 +437,11 @@ def complete_arguments(
         WireError: The arguments are not a JSON object and the output was
             not truncated.
     """
+    truncated = finish_reason is FinishReason.LENGTH
+    if not raw.strip():
+        # A call with no arguments may stream none at all.
+        return None if truncated else {}
     arguments = parse_arguments(raw)
-    if arguments is None and finish_reason is not FinishReason.LENGTH:
+    if arguments is None and not truncated:
         raise malformed(f"tool call {index} arguments are not a JSON object")
     return arguments

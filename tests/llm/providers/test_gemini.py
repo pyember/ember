@@ -1,4 +1,10 @@
-"""Gemini: generationConfig, function calls and signatures, finish reasons, streams."""
+"""Gemini: generationConfig, function calls and signatures, finish reasons, streams.
+
+Every call streams. A ``GenerateContentResponse`` is also one stream chunk,
+so the response fixtures are decoded as single-chunk streams.
+"""
+
+import copy
 
 import pytest
 
@@ -25,11 +31,17 @@ WEATHER = ToolSpec("get_weather", "Weather for a city.", {"type": "object"})
 SPEC = ModelSpec(
     ref=ModelRef("gemini", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
 )
+FILES_URI = "https://generativelanguage.googleapis.com/v1beta/files/abc-123"
 
 
-def _encode(kit, request: Request) -> dict:
-    spec = kit.spec("gemini", provider="gemini", wire_id="gemini-3.8-flash")
-    return gemini.encode(spec, request, False)
+def _encode(kit, request: Request, spec: ModelSpec = SPEC) -> dict:
+    return gemini.encode(spec, request)
+
+
+def _final(kit, *chunks: dict) -> Decoded:
+    final = list(gemini.decode_events(SPEC, kit.sse(*chunks), "ignored-header-id"))[-1]
+    assert isinstance(final, Decoded)
+    return final
 
 
 def test_generation_config_uses_documented_names(kit) -> None:
@@ -101,39 +113,50 @@ def test_tools_and_tool_choice(kit, choice, config) -> None:
     assert body["toolConfig"] == {"functionCallingConfig": config}
 
 
-def test_images_are_inline_data_or_file_data(kit) -> None:
+def test_images_are_inline_data_or_files_api_uris(kit) -> None:
     message = Message(
         "user",
-        (
-            ImagePart("image/png", data=b"\x89PNG"),
-            ImagePart("image/jpeg", url="https://example.test/files/abc"),
-        ),
+        (ImagePart("image/png", data=b"\x89PNG"), ImagePart("image/jpeg", url=FILES_URI)),
     )
     assert _encode(kit, Request((message,)))["contents"][0]["parts"] == [
         {"inlineData": {"mimeType": "image/png", "data": "iVBORw=="}},
-        {"fileData": {"mimeType": "image/jpeg", "fileUri": "https://example.test/files/abc"}},
+        {"fileData": {"mimeType": "image/jpeg", "fileUri": FILES_URI}},
     ]
 
 
-def test_function_call_round_trip_returns_signatures_on_their_parts(kit) -> None:
-    response = kit.json("gemini/function_call.json")
-    decoded = gemini.decode(SPEC, response, None)
-    assert decoded.message is not None
-    request = Request(
+def test_other_image_urls_are_rejected(kit) -> None:
+    message = Message("user", (ImagePart("image/png", url="https://example.test/a.png"),))
+    with pytest.raises(ValueError, match="Files API"):
+        _encode(kit, Request((message,)))
+
+
+def _id_less_call(first: Decoded) -> str:
+    call_id = first.tool_calls[1].id
+    assert call_id.startswith("ember-gemini-")
+    return call_id
+
+
+def _loop_request(first: Decoded) -> Request:
+    return Request(
         (
             Message.user("Weather and time in Paris?"),
-            decoded.message,
+            first.message,
             Message(
                 "tool",
                 (
                     ToolResultPart("fc-7", "18C"),
-                    ToolResultPart("call_1", "clock unavailable", is_error=True),
+                    ToolResultPart(_id_less_call(first), "clock unavailable", is_error=True),
                 ),
             ),
         ),
         tools=(WEATHER,),
     )
-    contents = _encode(kit, request)["contents"]
+
+
+def test_two_turn_tool_loop_returns_signatures_on_their_parts(kit) -> None:
+    response = kit.json("gemini/function_call.json")
+    first = _final(kit, response)
+    contents = _encode(kit, _loop_request(first))["contents"]
     assert contents[1] == {
         "role": "model",
         "parts": [
@@ -142,7 +165,7 @@ def test_function_call_round_trip_returns_signatures_on_their_parts(kit) -> None
                 "functionCall": {"id": "fc-7", "name": "get_weather", "args": {"city": "Paris"}},
                 "thoughtSignature": "CiQBVKhc7call",
             },
-            {"functionCall": {"id": "call_1", "name": "get_time", "args": {"zone": "CET"}}},
+            {"functionCall": {"name": "get_time", "args": {"zone": "CET"}}},
         ],
     }
     assert contents[2] == {
@@ -155,13 +178,30 @@ def test_function_call_round_trip_returns_signatures_on_their_parts(kit) -> None
                     "response": {"output": "18C"},
                 }
             },
-            {
-                "functionResponse": {
-                    "id": "call_1",
-                    "name": "get_time",
-                    "response": {"error": "clock unavailable"},
-                }
-            },
+            {"functionResponse": {"name": "get_time", "response": {"error": "clock unavailable"}}},
+        ],
+    }
+
+
+def test_id_less_calls_get_ids_unique_across_turns(kit) -> None:
+    turn_one = kit.json("gemini/function_call.json")
+    turn_two = copy.deepcopy(turn_one)
+    turn_two["responseId"] = "resp-gem-later"
+    first, second = _final(kit, turn_one), _final(kit, turn_two)
+    assert _id_less_call(first) != _id_less_call(second)
+    assert _id_less_call(first) == _id_less_call(_final(kit, turn_one))
+
+
+def test_signatures_and_thoughts_from_another_provider_are_not_sent(kit) -> None:
+    first = _final(kit, kit.json("gemini/function_call.json"))
+    vertex = ModelSpec(
+        ref=ModelRef("vertex", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
+    )
+    assert _encode(kit, _loop_request(first), vertex)["contents"][1] == {
+        "role": "model",
+        "parts": [
+            {"functionCall": {"id": "fc-7", "name": "get_weather", "args": {"city": "Paris"}}},
+            {"functionCall": {"name": "get_time", "args": {"zone": "CET"}}},
         ],
     }
 
@@ -196,7 +236,7 @@ def test_tool_result_for_an_unknown_call_is_rejected(kit) -> None:
 
 
 def test_text_response_usage_and_request_id(kit) -> None:
-    decoded = gemini.decode(SPEC, kit.json("gemini/text.json"), "ignored-header-id")
+    decoded = _final(kit, kit.json("gemini/text.json"))
     assert decoded.text == "AI learns patterns from data."
     assert decoded.finish_reason is FinishReason.STOP
     assert decoded.request_id == "resp-gem-1"
@@ -207,25 +247,38 @@ def test_text_response_usage_and_request_id(kit) -> None:
             ReasoningPart(
                 "", api="gemini", provider="gemini", state={"thoughtSignature": "CiQBVKhc7text"}
             ),
-            TextPart("AI learns patterns "),
-            TextPart("from data."),
+            # A stream splits one text part across chunks, so adjacent text
+            # fragments join; the signature stays before the text it came on.
+            TextPart("AI learns patterns from data."),
         ),
     )
 
 
-def test_function_calls_finish_as_tool_calls_and_get_ids(kit) -> None:
-    decoded = gemini.decode(SPEC, kit.json("gemini/function_call.json"), None)
+def test_function_calls_finish_as_tool_calls(kit) -> None:
+    decoded = _final(kit, kit.json("gemini/function_call.json"))
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
-    assert [(c.id, c.name) for c in decoded.tool_calls] == [
-        ("fc-7", "get_weather"),
-        ("call_1", "get_time"),
-    ]
+    assert [c.name for c in decoded.tool_calls] == ["get_weather", "get_time"]
+    assert decoded.tool_calls[0].id == "fc-7"
     assert decoded.reasoning == "Checking the weather."
     assert decoded.usage == Usage(input=55, output=30, reasoning=10)
 
 
+def test_an_empty_thought_part_keeps_its_signature(kit) -> None:
+    chunk = kit.json("gemini/text.json")
+    parts = chunk["candidates"][0]["content"]["parts"]
+    parts.insert(0, {"text": "", "thought": True, "thoughtSignature": "sig-thought"})
+    parts.insert(1, {"text": "", "thought": True})
+    decoded = _final(kit, chunk)
+    assert decoded.message.parts[0] == ReasoningPart(
+        "",
+        api="gemini",
+        provider="gemini",
+        state={"text": "", "thought": True, "thoughtSignature": "sig-thought"},
+    )
+
+
 def test_blocked_prompt_is_content_filtering(kit) -> None:
-    decoded = gemini.decode(SPEC, kit.json("gemini/prompt_blocked.json"), None)
+    decoded = _final(kit, kit.json("gemini/prompt_blocked.json"))
     assert decoded.finish_reason is FinishReason.CONTENT_FILTER
     assert decoded.message == Message("assistant", (TextPart(""),))
     assert decoded.usage == Usage(input=8)
@@ -245,7 +298,7 @@ def test_blocked_prompt_is_content_filtering(kit) -> None:
 def test_finish_reasons_are_never_reported_as_stop(kit, reason, finish) -> None:
     body = kit.json("gemini/text.json")
     body["candidates"][0]["finishReason"] = reason
-    assert gemini.decode(SPEC, body, None).finish_reason is finish
+    assert _final(kit, body).finish_reason is finish
 
 
 @pytest.mark.parametrize(
@@ -254,25 +307,33 @@ def test_finish_reasons_are_never_reported_as_stop(kit, reason, finish) -> None:
         ("MALFORMED_FUNCTION_CALL", ErrorKind.SERVER),
         ("MISSING_THOUGHT_SIGNATURE", ErrorKind.BAD_REQUEST),
         ("OTHER", ErrorKind.SERVER),
+        ("SOMETHING_NEW", ErrorKind.MALFORMED),
     ],
 )
-def test_failed_generations_raise(kit, reason, kind) -> None:
+def test_failed_or_unknown_finishes_raise(kit, reason, kind) -> None:
     body = kit.json("gemini/text.json")
     body["candidates"][0]["finishReason"] = reason
     with pytest.raises(WireError) as caught:
-        gemini.decode(SPEC, body, None)
+        _final(kit, body)
     assert caught.value.kind is kind
 
 
 def test_missing_usage_is_unmeasured(kit) -> None:
     body = kit.json("gemini/text.json")
     del body["usageMetadata"]
-    assert gemini.decode(SPEC, body, None).usage == Usage(measured=False)
+    assert _final(kit, body).usage == Usage(measured=False)
 
 
-def test_error_body_label(kit) -> None:
-    assert (
-        gemini.error_label(kit.json("gemini/error_resource_exhausted.json")) == "RESOURCE_EXHAUSTED"
+def test_http_errors_carry_status_name_and_retry_delay(kit) -> None:
+    body = kit.json("gemini/error_resource_exhausted.json")
+    body["error"]["details"] = [
+        {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "27s"}
+    ]
+    failure = gemini.classify(429, body)
+    assert (failure.kind, failure.label, failure.retry_after_s) == (
+        ErrorKind.RATE_LIMITED,
+        "RESOURCE_EXHAUSTED",
+        27.0,
     )
 
 
@@ -305,17 +366,13 @@ def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
     )
 
 
-def test_streamed_function_call(kit) -> None:
-    chunk = kit.json("gemini/function_call.json")
-    items = list(gemini.decode_events(SPEC, kit.sse(chunk), None))
+def test_streamed_function_call_deltas(kit) -> None:
+    items = list(gemini.decode_events(SPEC, kit.sse(kit.json("gemini/function_call.json")), None))
     calls = [item for item in items if isinstance(item, ToolCallDelta)]
-    assert [(c.index, c.id, c.name, c.arguments_json) for c in calls] == [
-        (0, "fc-7", "get_weather", '{"city":"Paris"}'),
-        (1, "call_1", "get_time", '{"zone":"CET"}'),
+    assert [(c.index, c.name, c.arguments_json) for c in calls] == [
+        (0, "get_weather", '{"city":"Paris"}'),
+        (1, "get_time", '{"zone":"CET"}'),
     ]
-    done = items[-1]
-    assert isinstance(done, Decoded) and done.finish_reason is FinishReason.TOOL_CALLS
-    assert done.message == gemini.decode(SPEC, chunk, None).message
 
 
 def test_stream_without_a_finish_reason_is_cut(kit) -> None:
@@ -336,25 +393,3 @@ def test_error_chunk_raises_with_its_status(kit) -> None:
     assert received == [TextDelta("AI learns")]
     assert caught.value.kind is ErrorKind.RATE_LIMITED
     assert "quota" not in caught.value.reason
-
-
-def test_signatures_and_thoughts_from_another_provider_are_not_sent(kit) -> None:
-    first = gemini.decode(SPEC, kit.json("gemini/function_call.json"), None)
-    vertex = ModelSpec(
-        ref=ModelRef("vertex", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
-    )
-    request = Request(
-        (
-            Message.user("Weather and time in Paris?"),
-            first.message,
-            Message("tool", (ToolResultPart("fc-7", "18C"), ToolResultPart("call_1", "12:00"))),
-        ),
-        tools=(WEATHER,),
-    )
-    assert gemini.encode(vertex, request, False)["contents"][1] == {
-        "role": "model",
-        "parts": [
-            {"functionCall": {"id": "fc-7", "name": "get_weather", "args": {"city": "Paris"}}},
-            {"functionCall": {"id": "call_1", "name": "get_time", "args": {"zone": "CET"}}},
-        ],
-    }

@@ -1,5 +1,6 @@
 """The transport classifies every failure and never leaks upstream text."""
 
+import contextlib
 import email.utils
 import time
 from collections.abc import Callable, Iterator
@@ -8,8 +9,8 @@ import httpx
 import pytest
 
 from ember.errors import ErrorKind, ModelError
-from ember.llm.providers import openai_chat
-from ember.llm.providers.http import Endpoint, Transport
+from ember.llm.providers import openai_platform
+from ember.llm.providers.http import Endpoint, EventStream, Transport
 
 Handler = Callable[[httpx.Request], httpx.Response]
 
@@ -20,7 +21,6 @@ def _transport(handler: Handler) -> Transport:
         base_url="https://api.example.test/v1",
         headers={"authorization": "Bearer test-key"},
         request_id_headers=("x-request-id", "apim-request-id"),
-        error_label=openai_chat.error_label,
     )
     return Transport(
         endpoint,
@@ -31,9 +31,18 @@ def _transport(handler: Handler) -> Transport:
     )
 
 
+def _open(
+    handler: Handler, body: dict | None = None
+) -> contextlib.AbstractContextManager[EventStream]:
+    return _transport(handler).stream(
+        "chat/completions", body or {}, model="m", classify=openai_platform.classify
+    )
+
+
 def _failure(response: httpx.Response) -> ModelError:
     with pytest.raises(ModelError) as caught:
-        _transport(lambda request: response).post("chat/completions", {}, model="m")
+        with _open(lambda request: response):
+            pass
     return caught.value
 
 
@@ -42,7 +51,7 @@ def _failure(response: httpx.Response) -> ModelError:
     [
         (400, ErrorKind.BAD_REQUEST, False),
         (401, ErrorKind.AUTH, False),
-        (402, ErrorKind.PERMISSION, False),
+        (402, ErrorKind.QUOTA, False),
         (403, ErrorKind.PERMISSION, False),
         (404, ErrorKind.NOT_FOUND, False),
         (408, ErrorKind.SERVER, True),
@@ -83,6 +92,14 @@ def test_free_text_in_code_fields_is_not_copied() -> None:
     assert "10.0.0.7" not in str(error)
 
 
+def test_quota_codes_are_quota_not_rate_limits() -> None:
+    body = {"error": {"type": "insufficient_quota", "code": "credit_balance_exhausted"}}
+    error = _failure(httpx.Response(429, json=body))
+    assert (error.kind, error.retryable) == (ErrorKind.QUOTA, False)
+    body = {"error": {"code": "project_spend_limit_exceeded", "message": "project p-9"}}
+    assert _failure(httpx.Response(429, json=body)).kind is ErrorKind.QUOTA
+
+
 def test_azure_request_id_header_is_read_when_it_is_the_only_one() -> None:
     error = _failure(httpx.Response(401, json={}, headers={"apim-request-id": "az-1"}))
     assert error.request_id == "az-1"
@@ -108,10 +125,12 @@ def test_timeouts_are_connect_and_idle_bounds_only() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request.extensions["timeout"])
-        return httpx.Response(200, json={})
+        return httpx.Response(200, headers={"content-type": "text/event-stream"}, content=b"")
 
-    _transport(handler).post("chat/completions", {}, model="m")
-    # read and write are per-byte (idle) bounds; httpx has no total deadline.
+    with _open(handler) as opened:
+        list(opened.events)
+    # read and write are per-byte (idle) bounds; httpx has no total deadline,
+    # and every request streams, so the idle bound never caps a generation.
     assert seen == [{"connect": 3.0, "read": 7.0, "write": 7.0, "pool": 3.0}]
 
 
@@ -120,7 +139,8 @@ def test_connection_failure_is_a_retryable_transport_error_without_os_text() -> 
         raise httpx.ConnectError("[Errno 61] Connection refused to 10.1.2.3")
 
     with pytest.raises(ModelError) as caught:
-        _transport(handler).post("chat/completions", {}, model="m")
+        with _open(handler):
+            pass
     error = caught.value
     assert (error.kind, error.before_first_byte, error.retryable) == (
         ErrorKind.TRANSPORT,
@@ -128,11 +148,6 @@ def test_connection_failure_is_a_retryable_transport_error_without_os_text() -> 
         True,
     )
     assert "10.1.2.3" not in str(error)
-
-
-def test_non_json_success_body_is_a_server_error() -> None:
-    error = _failure(httpx.Response(200, content=b"<html>gateway</html>"))
-    assert error.kind is ErrorKind.SERVER and "gateway" not in str(error)
 
 
 def test_unserializable_body_raises_before_sending() -> None:
@@ -143,7 +158,8 @@ def test_unserializable_body_raises_before_sending() -> None:
         return httpx.Response(200, json={})
 
     with pytest.raises(ValueError):
-        _transport(handler).post("x", {"temperature": float("nan")}, model="m")
+        with _open(handler, {"temperature": float("nan")}):
+            pass
     assert sent == []
 
 
@@ -162,40 +178,49 @@ class _Body(httpx.SyncByteStream):
         self.closed = True
 
 
-def _stream_response(body: _Body, content_type: str = "text/event-stream") -> Handler:
-    return lambda request: httpx.Response(200, headers={"content-type": content_type}, stream=body)
+def _streamed(body: _Body, content_type: str = "text/event-stream") -> Handler:
+    headers = {"content-type": content_type, "x-request-id": "req_mid"}
+    return lambda request: httpx.Response(200, headers=headers, stream=body)
 
 
-def test_read_failure_mid_stream_is_transport_after_the_first_byte() -> None:
+def test_read_failure_mid_stream_keeps_the_request_id() -> None:
     body = _Body([b'data: {"a":1}\n\n'], fail=True)
     seen = []
     with pytest.raises(ModelError) as caught:
-        with _transport(_stream_response(body)).stream("x", {}, model="m") as opened:
+        with _open(_streamed(body)) as opened:
             for event in opened.events:
                 seen.append(event.data)
     assert seen == ['{"a":1}']
     error = caught.value
-    assert (error.kind, error.before_first_byte, error.retryable) == (
+    assert (error.kind, error.before_first_byte, error.request_id) == (
         ErrorKind.TRANSPORT,
         False,
-        False,
+        "req_mid",
     )
+    assert "10.9.9.9" not in str(error)
 
 
 def test_abandoned_stream_closes_the_response() -> None:
     body = _Body([b"data: 1\n\n", b"data: 2\n\n"])
-    with _transport(_stream_response(body)).stream("x", {}, model="m") as opened:
+    with _open(_streamed(body)) as opened:
         next(opened.events)
     assert body.closed
 
 
-def test_stream_must_be_an_event_stream() -> None:
+def test_a_success_that_is_not_an_event_stream_is_malformed() -> None:
     body = _Body([b'{"choices": []}'])
     with pytest.raises(ModelError) as caught:
-        with _transport(_stream_response(body, "application/json")).stream("x", {}, model="m"):
+        with _open(_streamed(body, "application/json")):
             pass
-    assert caught.value.kind is ErrorKind.SERVER
+    assert (caught.value.kind, caught.value.retryable) == (ErrorKind.MALFORMED, False)
     assert body.closed
+
+
+def test_invalid_utf8_in_the_stream_is_malformed() -> None:
+    with pytest.raises(ModelError) as caught:
+        with _open(_streamed(_Body([b"data: \xff\n\n"]))) as opened:
+            list(opened.events)
+    assert (caught.value.kind, caught.value.request_id) == (ErrorKind.MALFORMED, "req_mid")
 
 
 def test_stream_error_status_is_classified_with_its_code() -> None:
@@ -204,7 +229,7 @@ def test_stream_error_status_is_classified_with_its_code() -> None:
         return httpx.Response(429, json=body, headers={"retry-after": "4"})
 
     with pytest.raises(ModelError) as caught:
-        with _transport(handler).stream("x", {}, model="m"):
+        with _open(handler):
             pass
     error = caught.value
     assert (error.kind, error.retry_after_s) == (ErrorKind.RATE_LIMITED, 4.0)

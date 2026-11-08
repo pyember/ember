@@ -1,4 +1,11 @@
-"""Chat Completions: request fields, finish reasons, usage, tools and streams."""
+"""Chat Completions: request fields, finish reasons, usage, tools and streams.
+
+Every call streams, so responses are decoded from chunk streams: the
+documented ones in the fixtures, or chunks built from them with the one
+documented field a test is about changed.
+"""
+
+import json
 
 import pytest
 
@@ -26,8 +33,24 @@ WEATHER = ToolSpec("get_weather", "Weather for a city.", {"type": "object"})
 SPEC = ModelSpec(ref=ModelRef("openai", "gpt-6-astra"), wire_id="gpt-6-astra", api="openai_chat")
 
 
-def _encode(kit, request: Request, stream: bool = False) -> dict:
-    return openai_chat.encode(kit.spec("openai_chat", wire_id="gpt-6-astra"), request, stream)
+def _encode(kit, request: Request) -> dict:
+    return openai_chat.encode(SPEC, request)
+
+
+def _chunks(kit) -> list[dict]:
+    """The documented text stream's chunks, without the [DONE] line."""
+    return [json.loads(e.data) for e in kit.events("openai/chat_stream_text.sse")[:-1]]
+
+
+def _decode(kit, chunks: list[dict], done: bool = True) -> list:
+    payloads = [*chunks, "[DONE]"] if done else chunks
+    return list(openai_chat.decode_events(SPEC, kit.sse(*payloads), "req"))
+
+
+def _final(kit, chunks: list[dict]) -> Decoded:
+    final = _decode(kit, chunks)[-1]
+    assert isinstance(final, Decoded)
+    return final
 
 
 def test_sampling_uses_documented_field_names(kit) -> None:
@@ -52,6 +75,8 @@ def test_sampling_uses_documented_field_names(kit) -> None:
         "stop": ["END"],
         "seed": 7,
         "reasoning_effort": "high",
+        "stream": True,
+        "stream_options": {"include_usage": True},
     }
     assert "max_tokens" not in body
 
@@ -62,7 +87,7 @@ def test_unknown_reasoning_effort_is_rejected_before_sending(kit) -> None:
 
 
 def test_streaming_asks_for_usage(kit) -> None:
-    body = _encode(kit, Request.from_prompt("hi"), stream=True)
+    body = _encode(kit, Request.from_prompt("hi"))
     assert body["stream"] is True and body["stream_options"] == {"include_usage": True}
 
 
@@ -171,7 +196,7 @@ def test_extensions_merge_recursively_and_collisions_raise(kit) -> None:
         sampling=Sampling(max_output_tokens=5),
         extensions={"service_tier": "flex", "stream_options": {"include_obfuscation": False}},
     )
-    body = _encode(kit, extended, stream=True)
+    body = _encode(kit, extended)
     assert body["service_tier"] == "flex"
     assert body["stream_options"] == {"include_usage": True, "include_obfuscation": False}
     for collision in ({"max_completion_tokens": 9}, {"stream_options": {"include_usage": False}}):
@@ -179,25 +204,21 @@ def test_extensions_merge_recursively_and_collisions_raise(kit) -> None:
             (Message.user("hi"),), sampling=Sampling(max_output_tokens=5), extensions=collision
         )
         with pytest.raises(ValueError, match="collides"):
-            _encode(kit, request, stream=True)
+            _encode(kit, request)
 
 
-def test_documented_text_response(kit) -> None:
-    decoded = openai_chat.decode(SPEC, kit.json("openai/chat_text.json"), "req_1")
-    assert decoded.text == "Hello! How can I assist you today?"
-    assert decoded.finish_reason is FinishReason.STOP
-    assert decoded.usage == Usage(input=19, output=10)
-    assert decoded.request_id == "req_1"
-    assert decoded.message == Message("assistant", (TextPart(decoded.text),))
-
-
-def test_documented_tool_call_response(kit) -> None:
-    decoded = openai_chat.decode(SPEC, kit.json("openai/chat_tool_call.json"), None)
-    assert decoded.finish_reason is FinishReason.TOOL_CALLS
-    assert [(c.id, c.name, c.arguments) for c in decoded.tool_calls] == [
-        ("call_abc123", "get_current_weather", {"location": "Boston, MA"})
-    ]
-    assert decoded.text == ""
+def test_documented_stream_without_usage_is_unmeasured(kit) -> None:
+    items = list(openai_chat.decode_events(SPEC, kit.events("openai/chat_stream_text.sse"), "r"))
+    assert items[:-1] == [TextDelta("Hello")]
+    done = items[-1]
+    assert isinstance(done, Decoded)
+    assert (done.text, done.finish_reason, done.usage, done.request_id) == (
+        "Hello",
+        FinishReason.STOP,
+        Usage(measured=False),
+        "r",
+    )
+    assert done.message == Message("assistant", (TextPart("Hello"),))
 
 
 @pytest.mark.parametrize(
@@ -209,74 +230,56 @@ def test_documented_tool_call_response(kit) -> None:
     ],
 )
 def test_finish_reasons_are_never_reported_as_stop(kit, finish, expected) -> None:
-    body = kit.json("openai/chat_text.json")
-    body["choices"][0]["finish_reason"] = finish
-    assert openai_chat.decode(SPEC, body, None).finish_reason is expected
+    chunks = _chunks(kit)
+    chunks[-1]["choices"][0]["finish_reason"] = finish
+    assert _final(kit, chunks).finish_reason is expected
 
 
 def test_refusal_is_a_refusal_with_its_message_as_text(kit) -> None:
-    body = kit.json("openai/chat_text.json")
-    body["choices"][0]["message"].update(content=None, refusal="I can't help with that.")
-    decoded = openai_chat.decode(SPEC, body, None)
-    assert decoded.finish_reason is FinishReason.REFUSAL
-    assert decoded.text == "I can't help with that."
+    chunks = _chunks(kit)
+    chunks[1]["choices"][0]["delta"] = {"refusal": "I can't help with that."}
+    final = _final(kit, chunks)
+    assert final.finish_reason is FinishReason.REFUSAL
+    assert final.text == "I can't help with that."
 
 
-def test_unknown_finish_reason_raises(kit) -> None:
-    body = kit.json("openai/chat_text.json")
-    body["choices"][0]["finish_reason"] = "abort"
+def test_unknown_finish_reason_is_malformed(kit) -> None:
+    chunks = _chunks(kit)
+    chunks[-1]["choices"][0]["finish_reason"] = "abort"
     with pytest.raises(WireError, match="abort") as caught:
-        openai_chat.decode(SPEC, body, None)
-    assert caught.value.kind is ErrorKind.SERVER
+        _decode(kit, chunks)
+    assert caught.value.kind is ErrorKind.MALFORMED
 
 
-def test_usage_splits_cached_cache_written_and_reasoning_tokens(kit) -> None:
-    body = kit.json("openai/chat_text.json")
-    body["usage"] = {
+def test_usage_chunk_splits_cached_cache_written_and_reasoning_tokens(kit) -> None:
+    usage = {
         "prompt_tokens": 1000,
         "completion_tokens": 300,
         "total_tokens": 1300,
         "prompt_tokens_details": {"cached_tokens": 800, "cache_write_tokens": 150},
         "completion_tokens_details": {"reasoning_tokens": 250},
     }
-    assert openai_chat.decode(SPEC, body, None).usage == Usage(
-        input=50, cache_read=800, cache_write=150, output=300, reasoning=250
-    )
+    chunks = [*_chunks(kit), {"id": "chatcmpl-123", "choices": [], "usage": usage}]
+    items = _decode(kit, chunks)
+    expected = Usage(input=50, cache_read=800, cache_write=150, output=300, reasoning=250)
+    assert items[-2] == UsageEvent(expected)
+    assert items[-1].usage == expected
 
 
-def test_missing_usage_is_unmeasured_not_zero(kit) -> None:
-    body = kit.json("openai/chat_text.json")
-    del body["usage"]
-    assert openai_chat.decode(SPEC, body, None).usage == Usage(measured=False)
-
-
-def test_truncated_tool_call_is_dropped_only_when_length_cut_it(kit) -> None:
-    body = kit.json("openai/chat_tool_call.json")
-    body["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = '{"loc'
-    body["choices"][0]["finish_reason"] = "length"
-    decoded = openai_chat.decode(SPEC, body, None)
-    assert decoded.finish_reason is FinishReason.LENGTH and decoded.tool_calls == ()
-    body["choices"][0]["finish_reason"] = "tool_calls"
-    with pytest.raises(WireError, match="arguments"):
-        openai_chat.decode(SPEC, body, None)
-
-
-def test_documented_stream_without_usage(kit) -> None:
-    items = list(openai_chat.decode_events(SPEC, kit.events("openai/chat_stream_text.sse"), "r"))
-    assert items[:-1] == [TextDelta("Hello")]
-    done = items[-1]
-    assert isinstance(done, Decoded)
-    assert (done.text, done.finish_reason, done.usage) == (
-        "Hello",
-        FinishReason.STOP,
-        Usage(measured=False),
-    )
+def test_null_usage_details_are_zero(kit) -> None:
+    usage = {
+        "prompt_tokens": 9,
+        "completion_tokens": 2,
+        "prompt_tokens_details": None,
+        "completion_tokens_details": None,
+    }
+    chunks = [*_chunks(kit), {"id": "chatcmpl-123", "choices": [], "usage": usage}]
+    assert _final(kit, chunks).usage == Usage(input=9, output=2)
 
 
 def test_streamed_tool_calls_assemble_by_index_and_report_usage(kit) -> None:
-    items = list(
-        openai_chat.decode_events(SPEC, kit.events("openai/chat_stream_tool_calls.sse"), None)
-    )
+    events = kit.events("openai/chat_stream_tool_calls.sse")
+    items = list(openai_chat.decode_events(SPEC, events, None))
     deltas = [item for item in items if isinstance(item, ToolCallDelta)]
     assert [(d.index, d.id, d.name) for d in deltas[:2]] == [
         (0, "call_weather", "get_weather"),
@@ -294,51 +297,86 @@ def test_streamed_tool_calls_assemble_by_index_and_report_usage(kit) -> None:
     assert sum(isinstance(item, Decoded) for item in items) == 1
 
 
+def _one_call(arguments: str, finish: str) -> list[dict]:
+    call = {"index": 0, "id": "call_now", "type": "function"}
+    call["function"] = {"name": "now", "arguments": arguments}
+    return [
+        {"id": "c", "choices": [{"index": 0, "delta": {"tool_calls": [call]}}]},
+        {"id": "c", "choices": [{"index": 0, "delta": {}, "finish_reason": finish}]},
+    ]
+
+
+def test_a_call_with_empty_arguments_takes_no_arguments(kit) -> None:
+    final = _final(kit, _one_call("", "tool_calls"))
+    assert [(c.name, c.arguments) for c in final.tool_calls] == [("now", {})]
+
+
+def test_truncated_tool_call_is_dropped_only_when_length_cut_it(kit) -> None:
+    final = _final(kit, _one_call('{"loc', "length"))
+    assert final.finish_reason is FinishReason.LENGTH and final.tool_calls == ()
+    with pytest.raises(WireError, match="arguments") as caught:
+        _decode(kit, _one_call('{"loc', "tool_calls"))
+    assert caught.value.kind is ErrorKind.MALFORMED
+
+
 def test_stream_cut_before_done_is_a_transport_error(kit) -> None:
-    events = kit.events("openai/chat_stream_text.sse")[:-1]
     with pytest.raises(WireError) as caught:
-        list(openai_chat.decode_events(SPEC, events, None))
+        _decode(kit, _chunks(kit), done=False)
     assert caught.value.kind is ErrorKind.TRANSPORT
 
 
-def test_error_frame_in_stream_raises_and_is_never_text(kit) -> None:
-    events = kit.events("openai/chat_stream_text.sse")[:2] + kit.sse(
-        {"error": {"message": "upstream shard us-east-7 died", "type": "server_error"}}
-    )
+@pytest.mark.parametrize(
+    ("error", "kind"),
+    [
+        ({"message": "upstream shard us-east-7 died", "type": "server_error"}, ErrorKind.SERVER),
+        ({"message": "out of credit", "code": "insufficient_quota"}, ErrorKind.QUOTA),
+    ],
+)
+def test_error_frame_in_stream_raises_and_is_never_text(kit, error, kind) -> None:
     received = []
     with pytest.raises(WireError) as caught:
+        events = kit.sse(*_chunks(kit)[:2], {"error": error})
         for item in openai_chat.decode_events(SPEC, events, None):
             received.append(item)
     assert received == [TextDelta("Hello")]
-    assert "server_error" in caught.value.reason and "shard" not in caught.value.reason
+    assert caught.value.kind is kind
+    assert "shard" not in caught.value.reason and "credit" not in caught.value.reason
 
 
 def test_two_turn_tool_loop_replays_only_result_message(kit) -> None:
-    first = openai_chat.decode(SPEC, kit.json("openai/chat_tool_call.json"), None)
+    events = kit.events("openai/chat_stream_tool_calls.sse")
+    first = list(openai_chat.decode_events(SPEC, events, None))[-1]
+    assert isinstance(first, Decoded)
     foreign = ReasoningPart("r", api="openai_responses", provider="openai", state={"id": "rs"})
     turn = Message("assistant", (foreign, *first.message.parts))
     request = Request(
         (
-            Message.user("What is the weather like in Boston today?"),
+            Message.user("Weather in Boston, and the time in New York?"),
             turn,
-            Message("tool", (ToolResultPart("call_abc123", '{"temp_f": 72}'),)),
+            Message(
+                "tool",
+                (ToolResultPart("call_weather", "72F"), ToolResultPart("call_time", "09:00")),
+            ),
         ),
         tools=(WEATHER,),
     )
-    assert openai_chat.encode(SPEC, request, False)["messages"] == [
-        {"role": "user", "content": "What is the weather like in Boston today?"},
+    assert openai_chat.encode(SPEC, request)["messages"] == [
+        {"role": "user", "content": "Weather in Boston, and the time in New York?"},
         {
             "role": "assistant",
             "tool_calls": [
                 {
-                    "id": "call_abc123",
+                    "id": "call_weather",
                     "type": "function",
-                    "function": {
-                        "name": "get_current_weather",
-                        "arguments": '{"location":"Boston, MA"}',
-                    },
-                }
+                    "function": {"name": "get_weather", "arguments": '{"city":"Boston"}'},
+                },
+                {
+                    "id": "call_time",
+                    "type": "function",
+                    "function": {"name": "get_time", "arguments": '{"zone":"EST"}'},
+                },
             ],
         },
-        {"role": "tool", "tool_call_id": "call_abc123", "content": '{"temp_f": 72}'},
+        {"role": "tool", "tool_call_id": "call_weather", "content": "72F"},
+        {"role": "tool", "tool_call_id": "call_time", "content": "09:00"},
     ]

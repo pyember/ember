@@ -1,9 +1,8 @@
-"""Gemini ``generateContent``: the request body and the response, both ways.
+"""Gemini ``streamGenerateContent``: the request body and its chunks.
 
-This module is the only code that reads or writes Gemini shapes. A streamed
-response (``streamGenerateContent?alt=sse``) is a series of
-``GenerateContentResponse`` chunks, the last of which carries the finish
-reason.
+This module is the only code that reads or writes Gemini shapes. Every call
+uses ``streamGenerateContent?alt=sse``, whose events are
+``GenerateContentResponse`` chunks; the last one carries the finish reason.
 
 Reasoning state. Gemini attaches an opaque ``thoughtSignature`` to response
 parts and rejects function-call history whose signatures are missing
@@ -11,33 +10,40 @@ parts and rejects function-call history whose signatures are missing
 `ReasoningPart` with state ``{"thoughtSignature": ...}`` placed directly before
 the part it was attached to, and encoding attaches it to that part again.
 Thought summaries (``thought: true`` parts) become `ReasoningPart`s whose
-state is the part as received.
+state is the part as received, keeping the last signature the stream sent
+for it.
 
-Function-call ids. Gemini may return a ``functionCall`` without an ``id``;
-ember then names it ``call_<n>``, its position among the response's calls,
-and sends that id back on the call and on its ``functionResponse``. A
-``functionResponse`` must also name its function, which encoding looks up
-from the earlier call with the same id.
+Function-call ids. Gemini may return a ``functionCall`` without an ``id``.
+ember then names the call ``ember-gemini-<digest>``, unique to its response
+and position, and sends neither that call nor its ``functionResponse`` with
+an id: Gemini pairs an id-less call and response by name and order. A
+``functionResponse`` names its function, which encoding looks up from the
+earlier call with the same id.
+
+Images. Gemini takes a ``fileUri`` from its Files API; an image URL that is
+not one is rejected rather than sent unverified.
 
 Wire reference, read 2026-11-07 (the reference gives schemas, not example
 payloads):
 https://ai.google.dev/api/generate-content
-https://ai.google.dev/api/generate-content/generate-content
 https://ai.google.dev/api/generate-content/stream-generate-content
 https://ai.google.dev/gemini-api/docs/troubleshooting
+https://google.aip.dev/193 and google/rpc/error_details.proto (``RetryInfo``)
 """
 
 import base64
+import hashlib
 import json
+import re
 from collections.abc import Iterable, Iterator, Mapping
 
 from ember.errors import ErrorKind
-from ember.llm.provider import Decoded, StreamItem
+from ember.llm.provider import StreamItem
 from ember.llm.providers.sse import SseEvent
 from ember.llm.providers.wire import (
-    AssistantPart,
     Body,
     Codec,
+    Failure,
     StreamAccumulator,
     WireError,
     array,
@@ -71,7 +77,7 @@ from ember.llm.request import (
 from ember.llm.result import FinishReason, Usage, UsageEvent
 from ember.llm.spec import ModelSpec
 
-__all__ = ["CODEC", "decode", "decode_events", "encode", "error_label"]
+__all__ = ["CODEC", "classify", "decode_events", "encode"]
 
 #: ``reasoning_effort`` to ``thinkingConfig.thinkingLevel``. Gemini 3 and later
 #: take levels; earlier models reject them and are configured by extension.
@@ -112,16 +118,20 @@ _FAILED_FINISHES: Mapping[str, ErrorKind] = {
 }
 
 _SIGNATURE = "thoughtSignature"
+_SYNTHETIC_ID_PREFIX = "ember-gemini-"
+_FILES_URI = re.compile(r"https://generativelanguage\.googleapis\.com/[^?#]*/files/[^/?#]+")
+_RETRY_INFO = "type.googleapis.com/google.rpc.RetryInfo"
+_DURATION = re.compile(r"(\d+(?:\.\d+)?)s")
 
 
-def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
+def encode(spec: ModelSpec, request: Request) -> Body:
     """Builds the request body; the model and streaming are in the URL.
 
     Raises:
-        ValueError: A tool result answers no earlier call, the effort has no
-            thinking level, or an extension collides with a field ember sets.
+        ValueError: A tool result answers no earlier call, an image URL is
+            not a Files API URI, the effort has no thinking level, or an
+            extension collides with a field ember sets.
     """
-    del stream
     body: Body = {"contents": _contents(spec, request.messages)}
     if request.system is not None:
         body["systemInstruction"] = {"parts": [{"text": request.system}]}
@@ -183,6 +193,11 @@ def _user_part(part: Part) -> JsonValue:
         return {"text": part.text}
     assert isinstance(part, ImagePart)  # User turns hold only text and images.
     if part.url is not None:
+        if not _FILES_URI.fullmatch(part.url):
+            raise ValueError(
+                "Gemini takes image URLs only from its Files API "
+                "(https://generativelanguage.googleapis.com/.../files/...); pass the bytes"
+            )
         return {"fileData": {"mimeType": part.media_type, "fileUri": part.url}}
     assert part.data is not None  # ImagePart holds exactly one of url and data.
     data = base64.b64encode(part.data).decode("ascii")
@@ -207,7 +222,7 @@ def _model_parts(spec: ModelSpec, parts: tuple[Part, ...]) -> list[JsonValue]:
             wire = {"text": part.text}
         else:
             assert isinstance(part, ToolCallPart)  # Model turns hold no other part.
-            wire = {"functionCall": {"id": part.id, "name": part.name, "args": part.arguments}}
+            wire = {"functionCall": _function_call_wire(part)}
         if signature is not None:
             wire[_SIGNATURE] = signature
             signature = None
@@ -215,6 +230,13 @@ def _model_parts(spec: ModelSpec, parts: tuple[Part, ...]) -> list[JsonValue]:
     if signature is not None:
         encoded.append({"text": "", _SIGNATURE: signature})
     return encoded
+
+
+def _function_call_wire(part: ToolCallPart) -> JsonValue:
+    call: dict[str, JsonValue] = {"name": part.name, "args": part.arguments}
+    if not part.id.startswith(_SYNTHETIC_ID_PREFIX):
+        call = {"id": part.id, **call}
+    return call
 
 
 def _function_response(part: Part, call_names: Mapping[str, str]) -> JsonValue:
@@ -226,7 +248,10 @@ def _function_response(part: Part, call_names: Mapping[str, str]) -> JsonValue:
             "Gemini needs the called function's name"
         )
     payload = {"error": part.content} if part.is_error else {"output": part.content}
-    return {"functionResponse": {"id": part.call_id, "name": name, "response": payload}}
+    response: dict[str, JsonValue] = {"name": name, "response": payload}
+    if not part.call_id.startswith(_SYNTHETIC_ID_PREFIX):
+        response = {"id": part.call_id, **response}
+    return {"functionResponse": response}
 
 
 def _declaration(tool: ToolSpec) -> JsonValue:
@@ -247,34 +272,126 @@ def _calling_config(choice: ToolChoice) -> JsonValue:
     return {"mode": "ANY", "allowedFunctionNames": [choice]}
 
 
-def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
-    """Decodes a complete response.
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
+    """Decodes a streamed response.
 
-    Gemini documents no request-id header; the body's ``responseId`` is the
+    Gemini documents no request-id header; the chunks' ``responseId`` is the
     request id, so ``request_id`` from the transport is not used.
 
     Raises:
-        WireError: The response reports a failure or is malformed.
+        WireError: The stream reports an error, is malformed, or ends before
+            a chunk with a finish reason.
     """
     del request_id
-    response = json_object(body, "response")
-    if "error" in response:
-        raise stream_error(response["error"])
-    response_id = _response_id(response)
-    blocked = _blocked_prompt(response)
-    if blocked:
-        return assemble([], FinishReason.CONTENT_FILTER, _usage_of(response), response_id)
-    candidate = _only_candidate(response)
-    raw_parts = _candidate_parts(candidate)
-    calls = sum(1 for raw in raw_parts if "functionCall" in raw)
-    finish = _finish(candidate.get("finishReason"), calls > 0)
-    parts: list[AssistantPart] = []
-    ordinal = 0
-    for raw in raw_parts:
-        parts.extend(_parts_of(raw, ordinal, spec.ref.provider))
+    stream = _ChunkStream(spec.ref.provider)
+    for event in events:
+        yield from stream.chunk(parse_event_data(event, "stream chunk"))
+    yield from stream.finish()
+
+
+class _ChunkStream:
+    """State for one stream: open block, finish reason, last usage and id."""
+
+    def __init__(self, provider: str) -> None:
+        self.acc = StreamAccumulator("gemini", provider)
+        self.block = 0
+        self.open_kind = ""
+        self.calls = 0
+        self.thought_signatures: dict[int, str] = {}
+        self.finish_raw: object = None
+        self.blocked = False
+        self.usage = Usage(measured=False)
+        self.response_id: str | None = None
+
+    def chunk(self, chunk: Mapping[str, object]) -> Iterator[StreamItem]:
+        if "error" in chunk:
+            raise _failure(None, chunk).wire_error("the provider reported an error")
+        self.response_id = self.response_id or _response_id(chunk)
+        if chunk.get("usageMetadata") is not None:
+            self.usage = _usage_of(chunk)
+        if _blocked_prompt(chunk):
+            self.blocked = True
+            return
+        if chunk.get("candidates") is None:
+            return
+        candidate = _only_candidate(chunk)
+        for raw in _candidate_parts(candidate):
+            yield from self.part(raw)
+        if candidate.get("finishReason") is not None:
+            self.finish_raw = candidate["finishReason"]
+
+    def part(self, raw: Mapping[str, object]) -> Iterator[StreamItem]:
+        signature = raw.get(_SIGNATURE)
+        if raw.get("thought") is True:
+            yield from self.thought(raw, signature)
+            return
+        if signature is not None:
+            sig = {_SIGNATURE: string(signature, "thoughtSignature")}
+            self.acc.reasoning_state(self.open_block("signature", fresh=True), sig)
+            self.open_kind = ""
         if "functionCall" in raw:
-            ordinal += 1
-    return assemble(parts, finish, _usage_of(response), response_id)
+            call = self.function_call(raw["functionCall"])
+            yield self.acc.tool_call(
+                self.open_block("call", fresh=True),
+                id=call.id,
+                name=call.name,
+                arguments=json.dumps(call.arguments, ensure_ascii=False, separators=(",", ":")),
+            )
+        elif "text" in raw:
+            text = string(raw["text"], "part.text")
+            if text:
+                yield self.acc.text(self.open_block("text"), text)
+
+    def thought(self, raw: Mapping[str, object], signature: object) -> Iterator[StreamItem]:
+        """Adds a thought part to the open thought block; a later chunk of the
+        same thought may omit the signature, so the last one sent is kept."""
+        key = self.open_block("thought")
+        text = string(raw.get("text", ""), "thought text")
+        delta = self.acc.reasoning(key, text)
+        if text:
+            yield delta
+        if signature is not None:
+            self.thought_signatures[key] = string(signature, "thoughtSignature")
+        state: dict[str, JsonValue] = {"text": self.acc.block_text(key), "thought": True}
+        if key in self.thought_signatures:
+            state[_SIGNATURE] = self.thought_signatures[key]
+        self.acc.reasoning_state(key, state)
+
+    def function_call(self, value: object) -> ToolCallPart:
+        call = json_object(value, "functionCall")
+        name = string(call.get("name"), "functionCall.name")
+        args = call.get("args")
+        arguments = {} if args is None else as_json(json_object(args, "functionCall.args"))
+        call_id = call.get("id")
+        if call_id is None:
+            call_id = self.synthetic_id(name, arguments)
+        self.calls += 1
+        return ToolCallPart(id=string(call_id, "functionCall.id"), name=name, arguments=arguments)
+
+    def synthetic_id(self, name: str, arguments: Mapping[str, JsonValue]) -> str:
+        """Names an id-less call uniquely to this response and position."""
+        seed = json.dumps([self.response_id, self.calls, name, arguments], sort_keys=True)
+        return _SYNTHETIC_ID_PREFIX + hashlib.sha256(seed.encode()).hexdigest()[:16]
+
+    def open_block(self, kind: str, *, fresh: bool = False) -> int:
+        """Returns the key for ``kind``, continuing the open block when it matches."""
+        if fresh or kind != self.open_kind:
+            self.block += 1
+            self.open_kind = kind
+        return self.block
+
+    def finish(self) -> Iterator[StreamItem]:
+        if self.blocked:
+            finish = FinishReason.CONTENT_FILTER
+        elif self.finish_raw is None:
+            raise stream_cut("a chunk with a finishReason")
+        else:
+            finish = _finish(self.finish_raw, self.calls > 0)
+        if self.usage.measured:
+            yield UsageEvent(self.usage)
+        yield assemble(self.acc.parts(finish), finish, self.usage, self.response_id)
 
 
 def _response_id(response: Mapping[str, object]) -> str | None:
@@ -305,35 +422,6 @@ def _candidate_parts(candidate: Mapping[str, object]) -> list[Mapping[str, objec
     if raw is None:
         return []
     return [json_object(part, "content.parts[]") for part in array(raw, "content.parts")]
-
-
-def _parts_of(raw: Mapping[str, object], ordinal: int, provider: str) -> Iterator[AssistantPart]:
-    """Maps one response part; code-execution and media parts carry no part."""
-    if raw.get("thought") is True:
-        text = string(raw.get("text", ""), "thought text")
-        yield ReasoningPart(text=text, api="gemini", provider=provider, state=as_json(raw))
-        return
-    signature = raw.get(_SIGNATURE)
-    if signature is not None:
-        state = {_SIGNATURE: string(signature, "thoughtSignature")}
-        yield ReasoningPart(text="", api="gemini", provider=provider, state=state)
-    if "functionCall" in raw:
-        yield _function_call(raw["functionCall"], ordinal)
-    elif "text" in raw:
-        text = string(raw["text"], "part.text")
-        if text:
-            yield TextPart(text)
-
-
-def _function_call(value: object, ordinal: int) -> ToolCallPart:
-    call = json_object(value, "functionCall")
-    call_id = call.get("id")
-    args = call.get("args")
-    return ToolCallPart(
-        id=f"call_{ordinal}" if call_id is None else string(call_id, "functionCall.id"),
-        name=string(call.get("name"), "functionCall.name"),
-        arguments={} if args is None else as_json(json_object(args, "functionCall.args")),
-    )
 
 
 def _finish(raw: object, called_tools: bool) -> FinishReason:
@@ -375,118 +463,35 @@ def _usage_of(response: Mapping[str, object]) -> Usage:
     )
 
 
-def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
-) -> Iterator[StreamItem]:
-    """Decodes a streamed response.
-
-    Raises:
-        WireError: The stream reports an error, is malformed, or ends before
-            a chunk with a finish reason.
-    """
-    del request_id
-    stream = _ChunkStream(spec.ref.provider)
-    for event in events:
-        yield from stream.chunk(parse_event_data(event, "stream chunk"))
-    yield from stream.finish()
+def classify(status: int, body: object) -> Failure:
+    """Classifies an HTTP error response with Google's error body."""
+    return _failure(status, body)
 
 
-class _ChunkStream:
-    """State for one stream: open block, finish reason, last usage and id."""
-
-    def __init__(self, provider: str) -> None:
-        self.acc = StreamAccumulator("gemini", provider)
-        self.block = 0
-        self.open_kind = ""
-        self.calls = 0
-        self.finish_raw: object = None
-        self.blocked = False
-        self.usage = Usage(measured=False)
-        self.response_id: str | None = None
-
-    def chunk(self, chunk: Mapping[str, object]) -> Iterator[StreamItem]:
-        if "error" in chunk:
-            raise stream_error(chunk["error"])
-        self.response_id = self.response_id or _response_id(chunk)
-        if chunk.get("usageMetadata") is not None:
-            self.usage = _usage_of(chunk)
-        if _blocked_prompt(chunk):
-            self.blocked = True
-            return
-        candidates = chunk.get("candidates")
-        if candidates is None:
-            return
-        candidate = _only_candidate(chunk)
-        for raw in _candidate_parts(candidate):
-            yield from self.part(raw)
-        if candidate.get("finishReason") is not None:
-            self.finish_raw = candidate["finishReason"]
-
-    def part(self, raw: Mapping[str, object]) -> Iterator[StreamItem]:
-        signature = raw.get(_SIGNATURE)
-        if raw.get("thought") is True:
-            text = string(raw.get("text", ""), "thought text")
-            key = self.open_block("thought")
-            if text:
-                yield self.acc.reasoning(key, text)
-            state: dict[str, JsonValue] = {"text": self.acc.block_text(key), "thought": True}
-            if signature is not None:
-                state[_SIGNATURE] = string(signature, "thoughtSignature")
-            self.acc.reasoning_state(key, state)
-            return
-        if signature is not None:
-            sig = {_SIGNATURE: string(signature, "thoughtSignature")}
-            self.acc.reasoning_state(self.open_block("signature", fresh=True), sig)
-            self.open_kind = ""
-        if "functionCall" in raw:
-            call = _function_call(raw["functionCall"], self.calls)
-            self.calls += 1
-            yield self.acc.tool_call(
-                self.open_block("call", fresh=True),
-                id=call.id,
-                name=call.name,
-                arguments=json.dumps(call.arguments, ensure_ascii=False, separators=(",", ":")),
-            )
-        elif "text" in raw:
-            text = string(raw["text"], "part.text")
-            if text:
-                yield self.acc.text(self.open_block("text"), text)
-
-    def open_block(self, kind: str, *, fresh: bool = False) -> int:
-        """Returns the key for ``kind``, continuing the open block when it matches."""
-        if fresh or kind != self.open_kind:
-            self.block += 1
-            self.open_kind = kind
-        return self.block
-
-    def finish(self) -> Iterator[StreamItem]:
-        if self.blocked:
-            finish = FinishReason.CONTENT_FILTER
-        elif self.finish_raw is None:
-            raise stream_cut("a chunk with a finishReason")
-        else:
-            finish = _finish(self.finish_raw, self.calls > 0)
-        if self.usage.measured:
-            yield UsageEvent(self.usage)
-        yield assemble(self.acc.parts(finish), finish, self.usage, self.response_id)
+def _failure(status: int | None, body: object) -> Failure:
+    """Reads a Google ``error`` object: its code, status name and retry delay."""
+    error = body.get("error") if isinstance(body, dict) else None
+    if not isinstance(error, dict):
+        return Failure(ErrorKind.SERVER if status is None else kind_for_status(status))
+    code = error.get("code")
+    if isinstance(code, int) and not isinstance(code, bool):
+        kind = kind_for_status(code)
+    else:
+        kind = ErrorKind.SERVER if status is None else kind_for_status(status)
+    return Failure(kind, identifier(error.get("status")), _retry_delay_s(error.get("details")))
 
 
-def stream_error(value: object) -> WireError:
-    """Returns the error for a Google ``error`` object sent with status 200."""
-    fields = json_object(value, "error")
-    code = fields.get("code")
-    kind = kind_for_status(code) if isinstance(code, int) else ErrorKind.SERVER
-    label = identifier(fields.get("status"))
-    reason = "the provider reported an error"
-    return WireError(kind, f"{reason}; provider error {label}" if label else reason)
-
-
-def error_label(body: object) -> str | None:
-    """Returns the ``error.status`` of a Google error body, if short."""
-    if not isinstance(body, dict):
+def _retry_delay_s(details: object) -> float | None:
+    """Reads ``RetryInfo.retryDelay`` (a JSON Duration such as ``"30s"``), if sent."""
+    if not isinstance(details, list):
         return None
-    error = body.get("error")
-    return identifier(error.get("status")) if isinstance(error, dict) else None
+    for detail in details:
+        if isinstance(detail, dict) and detail.get("@type") == _RETRY_INFO:
+            delay = detail.get("retryDelay")
+            match = _DURATION.fullmatch(delay) if isinstance(delay, str) else None
+            if match:
+                return float(match.group(1))
+    return None
 
 
-CODEC = Codec(encode=encode, decode=decode, decode_events=decode_events)
+CODEC = Codec(encode=encode, decode_events=decode_events, classify=classify)

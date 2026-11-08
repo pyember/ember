@@ -1,13 +1,18 @@
-"""OpenAI Responses: the request body and the response, both ways.
+"""OpenAI Responses: the streaming request body and its events.
 
 This module is the only code that reads or writes Responses shapes. The
 ``openai`` provider uses it for models whose catalog entry says
 ``api = "openai_responses"``.
 
 A streamed response ends with ``response.completed``, ``response.incomplete``
-or ``response.failed``, each carrying the whole response object, so the
-stream is decoded into deltas for the caller and the final `Decoded` comes
-from the same walker that decodes a non-streamed response.
+or ``response.failed``, each carrying the whole response object; the deltas
+before it go to the caller and the final `Decoded` is decoded from that
+object.
+
+For a reasoning model (one whose catalog entry lists reasoning efforts) the
+request asks for ``reasoning.encrypted_content``, so the reasoning items in
+`Result.message` can be replayed without relying on the provider storing
+the response, including with ``store: false``.
 
 Wire reference, read 2026-11-07:
 https://developers.openai.com/api/reference/resources/responses/methods/create
@@ -18,7 +23,8 @@ from collections.abc import Iterable, Iterator, Mapping
 
 from ember.errors import ErrorKind
 from ember.llm.provider import Decoded, StreamItem
-from ember.llm.providers.openai_chat import arguments_json, image_url
+from ember.llm.providers import openai_platform
+from ember.llm.providers.openai_platform import EFFORTS, SCHEMA_NAME, UsageFields
 from ember.llm.providers.sse import SseEvent
 from ember.llm.providers.wire import (
     AssistantPart,
@@ -58,15 +64,13 @@ from ember.llm.result import (
     ReasoningDelta,
     TextDelta,
     ToolCallDelta,
-    Usage,
     UsageEvent,
 )
 from ember.llm.spec import ModelSpec
 
-__all__ = ["CODEC", "decode", "decode_events", "encode"]
+__all__ = ["CODEC", "decode_events", "encode"]
 
-_EFFORTS = frozenset({"none", "minimal", "low", "medium", "high", "xhigh", "max"})
-_SCHEMA_NAME = "output"
+_USAGE = UsageFields(prompt="input_tokens", output="output_tokens")
 
 _INCOMPLETE_REASONS: Mapping[str, FinishReason] = {
     "max_output_tokens": FinishReason.LENGTH,
@@ -80,11 +84,6 @@ _INCOMPLETE_REASONS: Mapping[str, FinishReason] = {
 _POLICY_CODES = frozenset(
     {"bio_policy", "misalignment_policy_violation", "image_content_policy_violation"}
 )
-_RETRYABLE_FAILURES: Mapping[str, ErrorKind] = {
-    "server_error": ErrorKind.SERVER,
-    "vector_store_timeout": ErrorKind.SERVER,
-    "rate_limit_exceeded": ErrorKind.RATE_LIMITED,
-}
 
 _TEXT_DELTAS = frozenset({"response.output_text.delta", "response.refusal.delta"})
 _REASONING_DELTAS = frozenset(
@@ -93,8 +92,8 @@ _REASONING_DELTAS = frozenset(
 _TERMINAL_EVENTS = frozenset({"response.completed", "response.incomplete", "response.failed"})
 
 
-def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
-    """Builds the request body.
+def encode(spec: ModelSpec, request: Request) -> Body:
+    """Builds the streaming request body.
 
     Raises:
         ValueError: The request sets something Responses does not have
@@ -112,13 +111,14 @@ def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
         body["text"] = {
             "format": {
                 "type": "json_schema",
-                "name": _SCHEMA_NAME,
+                "name": SCHEMA_NAME,
                 "schema": request.output_schema,
                 "strict": True,
             }
         }
-    if stream:
-        body["stream"] = True
+    if spec.reasoning_efforts:
+        body["include"] = ["reasoning.encrypted_content"]
+    body["stream"] = True
     return merge_extensions(body, request.extensions)
 
 
@@ -135,9 +135,9 @@ def _sampling(sampling: Sampling) -> Body:
     if sampling.max_output_tokens is not None:
         fields["max_output_tokens"] = sampling.max_output_tokens
     if sampling.reasoning_effort is not None:
-        if sampling.reasoning_effort not in _EFFORTS:
+        if sampling.reasoning_effort not in EFFORTS:
             raise ValueError(
-                f"Responses reasoning.effort must be one of {sorted(_EFFORTS)}, "
+                f"Responses reasoning.effort must be one of {sorted(EFFORTS)}, "
                 f"got {sampling.reasoning_effort!r}"
             )
         fields["reasoning"] = {"effort": sampling.reasoning_effort}
@@ -164,15 +164,16 @@ def _user_content(parts: tuple[Part, ...]) -> JsonValue:
         if isinstance(part, TextPart):
             content.append({"type": "input_text", "text": part.text})
         elif isinstance(part, ImagePart):
-            content.append({"type": "input_image", "image_url": image_url(part), "detail": "auto"})
+            url = openai_platform.image_url(part)
+            content.append({"type": "input_image", "image_url": url, "detail": "auto"})
     return content
 
 
 def _assistant_items(spec: ModelSpec, parts: tuple[Part, ...]) -> Iterator[JsonValue]:
     """Encodes an assistant turn as input items, in order.
 
-    Reasoning from this wire protocol is replayed as the item it came from;
-    reasoning from other protocols cannot be read here and is left out.
+    Reasoning is replayed as the item it came from when it came from this
+    provider and protocol; any other reasoning is left out.
     """
     for part in parts:
         if isinstance(part, TextPart):
@@ -182,7 +183,7 @@ def _assistant_items(spec: ModelSpec, parts: tuple[Part, ...]) -> Iterator[JsonV
                 "type": "function_call",
                 "call_id": part.id,
                 "name": part.name,
-                "arguments": arguments_json(part.arguments),
+                "arguments": openai_platform.arguments_json(part.arguments),
             }
         elif isinstance(part, ReasoningPart) and replays(part, spec):
             yield part.state
@@ -216,25 +217,84 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
     return {"type": "function", "name": choice}
 
 
-def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
-    """Decodes a complete response object.
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
+    """Decodes a streamed response.
 
     Raises:
-        WireError: The response failed, was cancelled, or is malformed.
+        WireError: The stream reports an error, the response failed, or the
+            stream ends before a terminal event.
     """
-    return _decode_response(json_object(body, "response"), request_id, spec.ref.provider)
+    call_indexes: dict[int, int] = {}
+    for event in events:
+        data = parse_event_data(event, "stream event")
+        kind = _event_type(data)
+        if kind in _TEXT_DELTAS:
+            yield TextDelta(string(data.get("delta"), f"{kind}.delta"))
+        elif kind in _REASONING_DELTAS:
+            yield ReasoningDelta(string(data.get("delta"), f"{kind}.delta"))
+        elif kind == "response.output_item.added":
+            yield from _call_started(data, call_indexes)
+        elif kind == "response.function_call_arguments.delta":
+            yield _call_arguments(data, call_indexes)
+        elif kind == "error":
+            failure = openai_platform.error_failure({"code": data.get("code")}, None)
+            raise failure.wire_error("the provider reported an error in the stream")
+        elif kind in _TERMINAL_EVENTS:
+            response = json_object(data.get("response"), f"{kind}.response")
+            decoded = _decode_response(response, request_id, spec.ref.provider)
+            if decoded.usage.measured:
+                yield UsageEvent(decoded.usage)
+            yield decoded
+            return
+    raise stream_cut("response.completed")
+
+
+def _event_type(data: Mapping[str, object]) -> str:
+    kind = data.get("type")
+    if not isinstance(kind, str):
+        raise malformed("a stream event has no type")
+    return kind
+
+
+def _call_started(data: Mapping[str, object], indexes: dict[int, int]) -> Iterator[StreamItem]:
+    item = json_object(data.get("item"), "output_item.added.item")
+    if item.get("type") != "function_call":
+        return
+    output_index = count(data.get("output_index"), "output_item.added.output_index")
+    indexes[output_index] = len(indexes)
+    arguments = item.get("arguments")
+    yield ToolCallDelta(
+        index=indexes[output_index],
+        id=string(item.get("call_id"), "function_call.call_id"),
+        name=string(item.get("name"), "function_call.name"),
+        arguments_json="" if arguments is None else string(arguments, "function_call.arguments"),
+    )
+
+
+def _call_arguments(data: Mapping[str, object], indexes: dict[int, int]) -> ToolCallDelta:
+    output_index = count(data.get("output_index"), "function_call_arguments.output_index")
+    if output_index not in indexes:
+        raise malformed("function call arguments arrived before the call")
+    return ToolCallDelta(
+        index=indexes[output_index],
+        id=None,
+        name=None,
+        arguments_json=string(data.get("delta"), "function_call_arguments.delta"),
+    )
 
 
 def _decode_response(
     response: Mapping[str, object], request_id: str | None, provider: str
 ) -> Decoded:
-    output = array(response.get("output"), "output")
-    items = [json_object(item, "output[]") for item in output]
+    items = [json_object(item, "output[]") for item in array(response.get("output"), "output")]
     finish = _finish(response, items)
     parts: list[AssistantPart] = []
     for index, item in enumerate(items):
         parts.extend(_item_parts(item, index, finish, provider))
-    return assemble(parts, finish, usage(response.get("usage")), request_id)
+    usage = openai_platform.usage(response.get("usage"), _USAGE)
+    return assemble(parts, finish, usage, request_id)
 
 
 def _finish(response: Mapping[str, object], items: list[Mapping[str, object]]) -> FinishReason:
@@ -269,12 +329,12 @@ def _failure(error: object) -> FinishReason:
     """Maps a failed response: a policy block is content filtering, the rest raise."""
     fields = json_object(error, "error")
     code = fields.get("code")
-    if code in _POLICY_CODES:
+    if isinstance(code, str) and code in _POLICY_CODES:
         return FinishReason.CONTENT_FILTER
-    label = identifier(code)
-    kind = _RETRYABLE_FAILURES.get(label or "", ErrorKind.BAD_REQUEST)
-    reason = "the provider reported the response failed"
-    raise WireError(kind, f"{reason}; provider error {label}" if label else reason)
+    # The failure codes the reference lists, past those the shared table
+    # maps, describe the request (invalid images, prompts, residency).
+    failure = openai_platform.error_failure(fields, None, unexplained=ErrorKind.BAD_REQUEST)
+    raise failure.wire_error("the provider reported the response failed")
 
 
 def _item_parts(
@@ -326,94 +386,4 @@ def _function_call(
     )
 
 
-def usage(value: object) -> Usage:
-    """Maps ``usage``; ``input_tokens`` includes cached and cache-written tokens."""
-    if value is None:
-        return Usage(measured=False)
-    fields = json_object(value, "usage")
-    prompt = count(fields.get("input_tokens"), "usage.input_tokens")
-    output = count(fields.get("output_tokens"), "usage.output_tokens")
-    input_details = json_object(fields.get("input_tokens_details", {}), "input_tokens_details")
-    output_details = json_object(fields.get("output_tokens_details", {}), "output_tokens_details")
-    cache_read = count(input_details.get("cached_tokens", 0), "usage.cached_tokens")
-    cache_write = count(input_details.get("cache_write_tokens", 0), "usage.cache_write_tokens")
-    reasoning = count(output_details.get("reasoning_tokens", 0), "usage.reasoning_tokens")
-    if cache_read + cache_write > prompt or reasoning > output:
-        raise malformed("usage details exceed their totals")
-    return Usage(
-        input=prompt - cache_read - cache_write,
-        cache_read=cache_read,
-        cache_write=cache_write,
-        output=output,
-        reasoning=reasoning,
-    )
-
-
-def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
-) -> Iterator[StreamItem]:
-    """Decodes a streamed response.
-
-    Raises:
-        WireError: The stream reports an error, the response failed, or the
-            stream ends before a terminal event.
-    """
-    call_indexes: dict[int, int] = {}
-    for event in events:
-        data = parse_event_data(event, "stream event")
-        kind = data.get("type")
-        if kind in _TEXT_DELTAS:
-            yield TextDelta(string(data.get("delta"), f"{kind}.delta"))
-        elif kind in _REASONING_DELTAS:
-            yield ReasoningDelta(string(data.get("delta"), f"{kind}.delta"))
-        elif kind == "response.output_item.added":
-            yield from _call_started(data, call_indexes)
-        elif kind == "response.function_call_arguments.delta":
-            yield _call_arguments(data, call_indexes)
-        elif kind == "error":
-            raise _stream_error(data)
-        elif kind in _TERMINAL_EVENTS:
-            response = json_object(data.get("response"), "terminal event response")
-            decoded = _decode_response(response, request_id, spec.ref.provider)
-            if decoded.usage.measured:
-                yield UsageEvent(decoded.usage)
-            yield decoded
-            return
-    raise stream_cut("response.completed")
-
-
-def _call_started(data: Mapping[str, object], indexes: dict[int, int]) -> Iterator[StreamItem]:
-    item = json_object(data.get("item"), "output_item.added.item")
-    if item.get("type") != "function_call":
-        return
-    output_index = count(data.get("output_index"), "output_item.added.output_index")
-    indexes[output_index] = len(indexes)
-    arguments = item.get("arguments")
-    yield ToolCallDelta(
-        index=indexes[output_index],
-        id=string(item.get("call_id"), "function_call.call_id"),
-        name=string(item.get("name"), "function_call.name"),
-        arguments_json="" if arguments is None else string(arguments, "function_call.arguments"),
-    )
-
-
-def _call_arguments(data: Mapping[str, object], indexes: dict[int, int]) -> ToolCallDelta:
-    output_index = count(data.get("output_index"), "function_call_arguments.output_index")
-    if output_index not in indexes:
-        raise malformed("function call arguments arrived before the call")
-    return ToolCallDelta(
-        index=indexes[output_index],
-        id=None,
-        name=None,
-        arguments_json=string(data.get("delta"), "function_call_arguments.delta"),
-    )
-
-
-def _stream_error(data: Mapping[str, object]) -> WireError:
-    label = identifier(data.get("code"))
-    kind = _RETRYABLE_FAILURES.get(label or "", ErrorKind.SERVER)
-    reason = "the provider reported an error in the stream"
-    return WireError(kind, f"{reason}; provider error {label}" if label else reason)
-
-
-CODEC = Codec(encode=encode, decode=decode, decode_events=decode_events)
+CODEC = Codec(encode=encode, decode_events=decode_events, classify=openai_platform.classify)

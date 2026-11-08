@@ -1,7 +1,8 @@
 """Provider implementations, one codec module per wire protocol.
 
 `build` is the only entry point the client uses. Each provider kind is an
-`HttpProvider` with its own endpoint, authentication and routing:
+`HttpProvider` with its own endpoint, authentication and routing, and every
+call streams:
 
 - ``openai``: Chat Completions or Responses, chosen by the model's catalog
   ``api``.
@@ -11,7 +12,7 @@
   the key as a bearer token and needs no ``api-version``.
 - ``anthropic``: Messages, at API version
   `anthropic_messages.API_VERSION`.
-- ``gemini``: ``generateContent`` and ``streamGenerateContent``.
+- ``gemini``: ``streamGenerateContent``.
 """
 
 from collections.abc import Callable, Mapping
@@ -69,11 +70,9 @@ def _openai(settings: ProviderSettings) -> tuple[Endpoint, Router]:
         base_url=_base_url(settings, _OPENAI_URL),
         headers={"authorization": f"Bearer {key}"},
         request_id_headers=("x-request-id",),
-        error_label=openai_chat.error_label,
     )
 
-    def route(spec: ModelSpec, stream: bool) -> Route:
-        del stream
+    def route(spec: ModelSpec) -> Route:
         if spec.api == "openai_chat":
             return Route("chat/completions", openai_chat.CODEC)
         if spec.api == "openai_responses":
@@ -92,11 +91,9 @@ def _openai_compatible(settings: ProviderSettings) -> tuple[Endpoint, Router]:
         base_url=_base_url(settings, settings.base_url),
         headers={} if key is None else {"authorization": f"Bearer {key.reveal()}"},
         request_id_headers=("x-request-id", "apim-request-id"),
-        error_label=openai_chat.error_label,
     )
 
-    def route(spec: ModelSpec, stream: bool) -> Route:
-        del stream
+    def route(spec: ModelSpec) -> Route:
         if spec.api != "openai_chat":
             raise _unspoken(settings, spec)
         return Route("chat/completions", openai_chat.CODEC)
@@ -113,11 +110,9 @@ def _anthropic(settings: ProviderSettings) -> tuple[Endpoint, Router]:
             "anthropic-version": anthropic_messages.API_VERSION,
         },
         request_id_headers=("request-id",),
-        error_label=anthropic_messages.error_label,
     )
 
-    def route(spec: ModelSpec, stream: bool) -> Route:
-        del stream
+    def route(spec: ModelSpec) -> Route:
         if spec.api != "anthropic_messages":
             raise _unspoken(settings, spec)
         return Route("messages", anthropic_messages.CODEC)
@@ -131,16 +126,13 @@ def _gemini(settings: ProviderSettings) -> tuple[Endpoint, Router]:
         base_url=_base_url(settings, _GEMINI_URL),
         headers={"x-goog-api-key": _required_key(settings)},
         request_id_headers=(),
-        error_label=gemini.error_label,
     )
 
-    def route(spec: ModelSpec, stream: bool) -> Route:
+    def route(spec: ModelSpec) -> Route:
         if spec.api != "gemini":
             raise _unspoken(settings, spec)
         model = f"models/{quote(spec.wire_id, safe='')}"
-        if stream:
-            return Route(f"{model}:streamGenerateContent", gemini.CODEC, {"alt": "sse"})
-        return Route(f"{model}:generateContent", gemini.CODEC)
+        return Route(f"{model}:streamGenerateContent", gemini.CODEC, {"alt": "sse"})
 
     return endpoint, route
 

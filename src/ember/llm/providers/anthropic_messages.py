@@ -24,23 +24,24 @@ https://docs.claude.com/en/api/versioning
 """
 
 import base64
+import json
 from collections.abc import Iterable, Iterator, Mapping
 
 from ember.errors import ErrorKind
-from ember.llm.provider import Decoded, StreamItem
+from ember.llm.provider import StreamItem
 from ember.llm.providers.sse import SseEvent
 from ember.llm.providers.wire import (
-    AssistantPart,
     Body,
     Codec,
+    Failure,
     StreamAccumulator,
     WireError,
-    array,
     as_json,
     assemble,
     count,
     identifier,
     json_object,
+    kind_for_status,
     malformed,
     merge_extensions,
     parse_event_data,
@@ -65,7 +66,7 @@ from ember.llm.request import (
 from ember.llm.result import FinishReason, Usage, UsageEvent
 from ember.llm.spec import ModelSpec
 
-__all__ = ["API_VERSION", "CODEC", "decode", "decode_events", "encode", "error_label"]
+__all__ = ["API_VERSION", "CODEC", "classify", "decode_events", "encode"]
 
 API_VERSION = "2026-10-21"
 """The ``anthropic-version`` this codec speaks."""
@@ -89,7 +90,7 @@ _ERROR_KINDS: Mapping[str, ErrorKind] = {
     "request_too_large": ErrorKind.BAD_REQUEST,
     "authentication_error": ErrorKind.AUTH,
     "permission_error": ErrorKind.PERMISSION,
-    "billing_error": ErrorKind.PERMISSION,
+    "billing_error": ErrorKind.QUOTA,
     "not_found_error": ErrorKind.NOT_FOUND,
     "rate_limit_error": ErrorKind.RATE_LIMITED,
     "overloaded_error": ErrorKind.OVERLOADED,
@@ -100,8 +101,8 @@ _ERROR_KINDS: Mapping[str, ErrorKind] = {
 _REASONING_BLOCKS = frozenset({"thinking", "redacted_thinking"})
 
 
-def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
-    """Builds the request body.
+def encode(spec: ModelSpec, request: Request) -> Body:
+    """Builds the streaming request body.
 
     Raises:
         ValueError: The request sets something this API version does not
@@ -123,8 +124,7 @@ def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
     if request.tools:
         body["tools"] = [_tool(tool) for tool in request.tools]
         body["tool_choice"] = _tool_choice(request.tool_choice)
-    if stream:
-        body["stream"] = True
+    body["stream"] = True
     return merge_extensions(body, request.extensions)
 
 
@@ -240,45 +240,6 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
     return {"type": "tool", "name": choice}
 
 
-def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
-    """Decodes a complete message.
-
-    Raises:
-        WireError: The response is malformed or reports an unknown stop reason.
-    """
-    message = json_object(body, "message")
-    finish = _finish(message.get("stop_reason"))
-    parts: list[AssistantPart] = []
-    for index, raw in enumerate(array(message.get("content"), "content")):
-        part = _content_part(json_object(raw, f"content[{index}]"), index, spec.ref.provider)
-        if part is not None:
-            parts.append(part)
-    return assemble(parts, finish, usage(message.get("usage")), request_id)
-
-
-def _content_part(block: Mapping[str, object], index: int, provider: str) -> AssistantPart | None:
-    """Maps one content block; server-tool blocks carry no part."""
-    kind = block.get("type")
-    if kind == "text":
-        return TextPart(string(block.get("text"), f"content[{index}].text"))
-    if kind == "thinking":
-        text = string(block.get("thinking"), f"content[{index}].thinking")
-        return ReasoningPart(
-            text=text, api="anthropic_messages", provider=provider, state=as_json(block)
-        )
-    if kind == "redacted_thinking":
-        return ReasoningPart(
-            text="", api="anthropic_messages", provider=provider, state=as_json(block)
-        )
-    if kind == "tool_use":
-        return ToolCallPart(
-            id=string(block.get("id"), f"content[{index}].id"),
-            name=string(block.get("name"), f"content[{index}].name"),
-            arguments=as_json(json_object(block.get("input"), f"content[{index}].input")),
-        )
-    return None
-
-
 def _finish(raw: object) -> FinishReason:
     if not isinstance(raw, str) or raw not in _STOP_REASONS:
         raise malformed(f"unknown stop_reason {identifier(raw) or 'missing'}")
@@ -321,6 +282,7 @@ class _MessageStream:
         self.acc = StreamAccumulator("anthropic_messages", provider)
         self.kinds: dict[int, str] = {}
         self.signatures: dict[int, str] = {}
+        self.tool_inputs: dict[int, Mapping[str, JsonValue]] = {}
         self.usage_fields: dict[str, object] = {}
         self.stop_reason: object = None
 
@@ -348,6 +310,9 @@ class _MessageStream:
         elif kind == "redacted_thinking":
             self.acc.reasoning_state(index, as_json(block))
         elif kind == "tool_use":
+            # The start block's input stands when no partial JSON follows, as
+            # for a tool that takes no arguments.
+            self.tool_inputs[index] = as_json(json_object(block.get("input", {}), "input"))
             yield self.acc.tool_call(
                 index,
                 id=string(block.get("id"), "tool_use.id"),
@@ -359,7 +324,9 @@ class _MessageStream:
         index = count(data.get("index"), "content_block_delta.index")
         delta = json_object(data.get("delta"), "content_block_delta.delta")
         kind = delta.get("type")
-        block_kind = self.kinds.get(index)
+        if index not in self.kinds:
+            raise malformed(f"content block {index} received a delta before its start")
+        block_kind = self.kinds[index]
         if kind == "text_delta" and block_kind == "text":
             yield self.acc.text(index, string(delta.get("text"), "text_delta.text"))
         elif kind == "thinking_delta" and block_kind == "thinking":
@@ -372,8 +339,11 @@ class _MessageStream:
             partial = string(delta.get("partial_json"), "input_json_delta.partial_json")
             yield self.acc.tool_call(index, id=None, name=None, arguments=partial)
 
-    def stop_block(self, data: Mapping[str, object]) -> None:
+    def stop_block(self, data: Mapping[str, object]) -> Iterator[StreamItem]:
         index = count(data.get("index"), "content_block_stop.index")
+        if self.kinds.get(index) == "tool_use" and not self.acc.block_text(index).strip():
+            arguments = json.dumps(self.tool_inputs[index], separators=(",", ":"))
+            yield self.acc.tool_call(index, id=None, name=None, arguments=arguments)
         if self.kinds.get(index) == "thinking":
             block: dict[str, JsonValue] = {
                 "type": "thinking",
@@ -421,7 +391,7 @@ def decode_events(
         elif kind == "content_block_delta":
             yield from state.delta(data)
         elif kind == "content_block_stop":
-            state.stop_block(data)
+            yield from state.stop_block(data)
         elif kind == "message_delta":
             state.message_delta(data)
         elif kind == "message_stop":
@@ -433,18 +403,21 @@ def decode_events(
 
 
 def _stream_error(data: Mapping[str, object]) -> WireError:
-    label = error_label(data)
-    kind = _ERROR_KINDS.get(label or "", ErrorKind.SERVER)
-    reason = "the provider reported an error in the stream"
-    return WireError(kind, f"{reason}; provider error {label}" if label else reason)
+    failure = _failure(None, data)
+    return failure.wire_error("the provider reported an error in the stream")
 
 
-def error_label(body: object) -> str | None:
-    """Returns the ``error.type`` of an Anthropic error body, if short."""
-    if not isinstance(body, dict):
-        return None
-    error = body.get("error")
-    return identifier(error.get("type")) if isinstance(error, dict) else None
+def classify(status: int, body: object) -> Failure:
+    """Classifies an HTTP error response by its ``error.type``, else its status."""
+    return _failure(status, body)
 
 
-CODEC = Codec(encode=encode, decode=decode, decode_events=decode_events)
+def _failure(status: int | None, body: object) -> Failure:
+    error = body.get("error") if isinstance(body, dict) else None
+    label = identifier(error.get("type")) if isinstance(error, dict) else None
+    if label is not None and label in _ERROR_KINDS:
+        return Failure(_ERROR_KINDS[label], label)
+    return Failure(ErrorKind.SERVER if status is None else kind_for_status(status), label)
+
+
+CODEC = Codec(encode=encode, decode_events=decode_events, classify=classify)

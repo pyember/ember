@@ -1,5 +1,6 @@
 """build(): each provider kind's URL, authentication, routing and failure contract."""
 
+import json
 import subprocess
 import sys
 import textwrap
@@ -9,7 +10,10 @@ import pytest
 
 from ember.errors import ConfigError, ErrorKind, ModelError
 from ember.llm.provider import Decoded
-from ember.llm.providers import build
+from ember.llm.providers import build, gemini
+from ember.llm.providers.http import Endpoint, Transport
+from ember.llm.providers.http_provider import HttpProvider, Route
+from ember.llm.providers.wire import Codec
 from ember.llm.request import Request, Sampling
 from ember.llm.result import FinishReason, TextDelta
 
@@ -21,13 +25,19 @@ def _provider(kit, recorder, settings, respond):
     return build(settings, kit.context(), transport=record.transport), record
 
 
+def _completed(kit, name: str) -> str:
+    """An event stream whose only event completes the response in ``name``."""
+    event = {"type": "response.completed", "response": kit.json(name)}
+    return f"event: response.completed\ndata: {json.dumps(event)}\n\n"
+
+
 def test_openai_chat_url_auth_and_request_id(kit, recorder) -> None:
     provider, record = _provider(
         kit,
         recorder,
         kit.settings("openai", "openai", key=KEY),
-        lambda request: kit.json_response(
-            kit.json("openai/chat_text.json"), **{"x-request-id": "req_a"}
+        lambda request: kit.sse_response(
+            kit.text("openai/chat_stream_text.sse"), **{"x-request-id": "req_a"}
         ),
     )
     decoded = provider.send(
@@ -45,7 +55,7 @@ def test_openai_routes_responses_models_by_catalog_api(kit, recorder) -> None:
         kit,
         recorder,
         kit.settings("openai", "openai", key=KEY),
-        lambda request: kit.json_response(kit.json("openai/responses_reasoning.json")),
+        lambda request: kit.sse_response(_completed(kit, "openai/responses_reasoning.json")),
     )
     provider.send(kit.spec("openai_responses"), Request.from_prompt("hi"))
     assert record.requests[0].url.path == "/v1/responses"
@@ -59,8 +69,8 @@ def test_azure_v1_through_openai_compatible(kit, recorder) -> None:
         kit,
         recorder,
         settings,
-        lambda request: kit.json_response(
-            kit.json("openai/chat_text.json"), **{"apim-request-id": "apim-1"}
+        lambda request: kit.sse_response(
+            kit.text("openai/chat_stream_text.sse"), **{"apim-request-id": "apim-1"}
         ),
     )
     spec = kit.spec("openai_chat", provider="azure", wire_id="my-gpt-deployment")
@@ -82,7 +92,7 @@ def test_openai_compatible_key_is_optional_and_base_url_is_required(kit, recorde
         kit,
         recorder,
         settings,
-        lambda request: kit.json_response(kit.json("openai/chat_text.json")),
+        lambda request: kit.sse_response(kit.text("openai/chat_stream_text.sse")),
     )
     provider.send(kit.spec("openai_chat", provider="local"), Request.from_prompt("hi"))
     assert "authorization" not in record.requests[0].headers
@@ -95,8 +105,8 @@ def test_anthropic_headers_and_path(kit, recorder) -> None:
         kit,
         recorder,
         kit.settings("anthropic", "anthropic", key=KEY),
-        lambda request: kit.json_response(
-            kit.json("anthropic/message_end_turn.json"), **{"request-id": "req_ant"}
+        lambda request: kit.sse_response(
+            kit.text("anthropic/stream_text.sse"), **{"request-id": "req_ant"}
         ),
     )
     spec = kit.spec("anthropic_messages", provider="anthropic", max_output_tokens=1024)
@@ -114,31 +124,17 @@ def test_gemini_key_is_a_header_never_in_the_url(kit, recorder) -> None:
         kit,
         recorder,
         kit.settings("gemini", "gemini", key=KEY),
-        lambda request: kit.json_response(kit.json("gemini/text.json")),
+        lambda request: kit.sse_response(kit.text("gemini/stream_text.sse")),
     )
     spec = kit.spec("gemini", provider="gemini", wire_id="gemini-3.8-flash")
     provider.send(spec, Request.from_prompt("hi"))
     request = record.requests[0]
     assert str(request.url) == (
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent"
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-3.8-flash:streamGenerateContent?alt=sse"
     )
     assert request.headers["x-goog-api-key"] == KEY
     assert KEY not in str(request.url)
-
-
-def test_gemini_stream_uses_sse_endpoint(kit, recorder) -> None:
-    provider, record = _provider(
-        kit,
-        recorder,
-        kit.settings("gemini", "gemini", key=KEY),
-        lambda request: kit.sse_response(kit.text("gemini/stream_text.sse")),
-    )
-    spec = kit.spec("gemini", provider="gemini", wire_id="gemini-3.8-flash")
-    items = list(provider.stream(spec, Request.from_prompt("hi")))
-    url = record.requests[0].url
-    assert url.path == "/v1beta/models/gemini-3.8-flash:streamGenerateContent"
-    assert url.params["alt"] == "sse"
-    assert isinstance(items[-1], Decoded) and items[-1].text == "AI learns patterns from data."
 
 
 def test_missing_key_names_the_variable(kit, monkeypatch) -> None:
@@ -172,7 +168,7 @@ def test_invalid_requests_fail_before_any_byte_is_sent(kit, recorder) -> None:
         kit,
         recorder,
         kit.settings("anthropic", "anthropic", key=KEY),
-        lambda request: kit.json_response({}),
+        lambda request: kit.sse_response(""),
     )
     spec = kit.spec("anthropic_messages", provider="anthropic", max_output_tokens=1024)
     with pytest.raises(ValueError):
@@ -196,23 +192,72 @@ def test_providers_never_retry(kit, recorder) -> None:
 
 
 def test_codec_failures_become_model_errors_with_identity(kit, recorder) -> None:
-    body = kit.json("openai/chat_text.json")
-    body["choices"][0]["finish_reason"] = "abort"
+    text = kit.text("openai/chat_stream_text.sse").replace(
+        '"finish_reason":"stop"', '"finish_reason":"abort"'
+    )
     provider, _ = _provider(
         kit,
         recorder,
         kit.settings("openai", "openai", key=KEY),
-        lambda request: kit.json_response(body, **{"x-request-id": "req_bad"}),
+        lambda request: kit.sse_response(text, **{"x-request-id": "req_bad"}),
     )
     with pytest.raises(ModelError) as caught:
         provider.send(kit.spec("openai_chat", wire_id="gpt-6-astra"), Request.from_prompt("hi"))
     error = caught.value
-    assert (error.kind, error.provider, error.model, error.request_id) == (
-        ErrorKind.SERVER,
+    assert (error.kind, error.provider, error.model, error.request_id, error.retryable) == (
+        ErrorKind.MALFORMED,
         "openai",
         "gpt-6-astra",
         "req_bad",
+        False,
     )
+
+
+def test_send_reads_the_stream_and_its_failures_delivered_nothing(kit, recorder) -> None:
+    events = kit.text("anthropic/stream_text.sse").split("\n\n")
+    text = "\n\n".join(events[:5]) + "\n\n" + kit.text("anthropic/stream_error_overloaded.sse")
+    provider, record = _provider(
+        kit,
+        recorder,
+        kit.settings("anthropic", "anthropic", key=KEY),
+        lambda request: kit.sse_response(text),
+    )
+    spec = kit.spec("anthropic_messages", provider="anthropic", max_output_tokens=1024)
+    with pytest.raises(ModelError) as caught:
+        provider.send(spec, Request.from_prompt("hi"))
+    assert record.last_body["stream"] is True
+    assert record.requests[0].headers["accept"] == "text/event-stream"
+    # Two text deltas were read, but send() returns nothing before the end,
+    # so the caller received nothing and the failure may be retried.
+    assert (caught.value.kind, caught.value.before_first_byte, caught.value.retryable) == (
+        ErrorKind.OVERLOADED,
+        True,
+        True,
+    )
+
+
+def test_unexpected_codec_exceptions_are_malformed(kit) -> None:
+    def explode(spec, events, request_id):
+        yield TextDelta("partial")
+        raise KeyError("thinking")
+
+    codec = Codec(encode=lambda spec, request: {}, decode_events=explode, classify=gemini.classify)
+    endpoint = Endpoint("acme", "https://api.example.test/v1", {}, ())
+    transport = Transport(
+        endpoint,
+        connect_timeout_s=1.0,
+        idle_timeout_s=1.0,
+        max_connections=1,
+        transport=httpx.MockTransport(lambda request: kit.sse_response("data: {}\n\n")),
+    )
+    provider = HttpProvider("acme", transport, lambda spec: Route("x", codec))
+    received = []
+    with pytest.raises(ModelError) as caught:
+        for item in provider.stream(kit.spec("gemini", provider="acme"), Request.from_prompt("hi")):
+            received.append(item)
+    assert received == [TextDelta("partial")]
+    assert (caught.value.kind, caught.value.before_first_byte) == (ErrorKind.MALFORMED, False)
+    assert isinstance(caught.value.__cause__, KeyError)
 
 
 @pytest.mark.parametrize(("events_before_error", "delivered"), [(3, False), (4, True)])

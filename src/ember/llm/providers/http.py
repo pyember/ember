@@ -1,12 +1,12 @@
 """The HTTP transport every provider uses.
 
 One `Transport` owns one long-lived ``httpx.Client`` for one provider
-configuration. Its timeouts are liveness bounds only: how long to wait for a
-connection and how long to wait for the next byte. Nothing caps how long a
-generation may take. The transport never retries; it turns every HTTP or
-network failure into a `ModelError` whose message is built from the status,
-the provider's short error code and an ember-written reason, never from the
-upstream body.
+configuration. Every request streams, so its timeouts are liveness bounds:
+how long to wait for a connection and how long to wait for the next byte.
+Nothing caps how long a generation may take. The transport never retries; it
+turns every HTTP or network failure into a `ModelError` whose message is
+built from the status, the provider's short error code and an ember-written
+reason, never from the upstream body.
 """
 
 import contextlib
@@ -21,18 +21,22 @@ import httpx
 
 from ember.errors import ErrorKind, ModelError
 from ember.llm.providers.sse import SseEvent, parse
-from ember.llm.providers.wire import Body, kind_for_status
+from ember.llm.providers.wire import Body, Failure
 
-__all__ = ["Endpoint", "EventStream", "JsonResponse", "Transport"]
+__all__ = ["Endpoint", "EventStream", "Transport"]
 
 _REASONS: Mapping[ErrorKind, str] = {
     ErrorKind.AUTH: "the provider rejected the credentials",
     ErrorKind.PERMISSION: "the credentials are not allowed to make this request",
+    ErrorKind.QUOTA: "the account's credit, spend limit or usage quota is exhausted",
     ErrorKind.NOT_FOUND: "the provider does not know this model or endpoint",
     ErrorKind.BAD_REQUEST: "the provider rejected the request as invalid",
     ErrorKind.RATE_LIMITED: "the provider rate-limited the request",
     ErrorKind.OVERLOADED: "the provider is overloaded",
     ErrorKind.SERVER: "the provider failed to serve the request",
+    ErrorKind.MALFORMED: "the provider's error response could not be read",
+    ErrorKind.TRANSPORT: "the provider rejected the connection",
+    ErrorKind.CANCELLED: "the provider cancelled the request",
 }
 
 # The httpx failures that mean the network or the peer failed. Anything else
@@ -46,6 +50,9 @@ _NETWORK_FAILURES = (
     httpx.DecodingError,
 )
 
+Classifier = Callable[[int, object], Failure]
+"""Maps an HTTP error's status and JSON body (or ``None``) to a `Failure`."""
+
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class Endpoint:
@@ -58,23 +65,12 @@ class Endpoint:
             They are given to the HTTP client and never appear in errors.
         request_id_headers: Response headers that carry the provider's
             request id, in the order they are consulted.
-        error_label: Extracts the provider's short error type or code from
-            an error response body.
     """
 
     provider: str
     base_url: str
     headers: Mapping[str, str]
     request_id_headers: tuple[str, ...]
-    error_label: Callable[[object], str | None]
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class JsonResponse:
-    """A successful non-streaming response."""
-
-    body: object
-    request_id: str | None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -86,7 +82,7 @@ class EventStream:
 
 
 class Transport:
-    """Sends JSON requests to one provider over one owned HTTP client."""
+    """Streams JSON requests to one provider over one owned HTTP client."""
 
     def __init__(
         self,
@@ -125,61 +121,52 @@ class Transport:
             transport=transport,
         )
 
-    def post(
-        self, path: str, body: Body, *, model: str, params: Mapping[str, str] | None = None
-    ) -> JsonResponse:
-        """Sends ``body`` and returns the decoded JSON response.
-
-        Raises:
-            ModelError: The request failed, or the response is not JSON.
-        """
-        request = self._build(path, body, params, accept="application/json")
-        try:
-            response = self._client.send(request)
-        except _NETWORK_FAILURES as error:
-            raise self._network_error(error, model, before_first_byte=True) from None
-        request_id = self._request_id(response)
-        if not response.is_success:
-            raise self._status_error(response, model, request_id)
-        try:
-            body_value: object = json.loads(response.content)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            raise self._error(
-                ErrorKind.SERVER, model, "the response body is not JSON", response, request_id
-            ) from None
-        return JsonResponse(body=body_value, request_id=request_id)
-
     @contextlib.contextmanager
     def stream(
-        self, path: str, body: Body, *, model: str, params: Mapping[str, str] | None = None
+        self,
+        path: str,
+        body: Body,
+        *,
+        model: str,
+        classify: Classifier,
+        params: Mapping[str, str] | None = None,
     ) -> Generator[EventStream, None, None]:
         """Sends ``body`` and yields the response's events as they arrive.
 
         Leaving the block closes the response and frees its connection, so a
         consumer that stops reading early does not leak it.
 
+        Args:
+            path: Path relative to the base URL.
+            body: The JSON request body.
+            model: Model name for errors.
+            classify: The wire protocol's reading of an HTTP error body.
+            params: Query parameters.
+
         Raises:
-            ModelError: The request failed before or during the stream.
+            ModelError: The request failed, or the response is not an event
+                stream.
         """
-        request = self._build(path, body, params, accept="text/event-stream")
+        request = self._build(path, body, params)
         try:
             response = self._client.send(request, stream=True)
         except _NETWORK_FAILURES as error:
-            raise self._network_error(error, model, before_first_byte=True) from None
+            raise self._network_error(error, model, None, before_first_byte=True) from None
         try:
             request_id = self._request_id(response)
             if not response.is_success:
-                self._read_quietly(response, model)
-                raise self._status_error(response, model, request_id)
+                raise self._status_error(response, model, request_id, classify)
             if not response.headers.get("content-type", "").startswith("text/event-stream"):
                 raise self._error(
-                    ErrorKind.SERVER,
-                    model,
+                    Failure(ErrorKind.MALFORMED),
                     "the provider did not return an event stream",
+                    model,
                     response,
                     request_id,
                 )
-            yield EventStream(events=self._events(response, model), request_id=request_id)
+            yield EventStream(
+                events=self._events(response, model, request_id), request_id=request_id
+            )
         finally:
             response.close()
 
@@ -187,39 +174,32 @@ class Transport:
         """Closes the HTTP client and its connections."""
         self._client.close()
 
-    def _build(
-        self, path: str, body: Body, params: Mapping[str, str] | None, *, accept: str
-    ) -> httpx.Request:
+    def _build(self, path: str, body: Body, params: Mapping[str, str] | None) -> httpx.Request:
         content = json.dumps(body, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
         return self._client.build_request(
             "POST",
             path,
             params=dict(params) if params else None,
             content=content.encode("utf-8"),
-            headers={"content-type": "application/json", "accept": accept},
+            headers={"content-type": "application/json", "accept": "text/event-stream"},
         )
 
-    def _events(self, response: httpx.Response, model: str) -> Iterator[SseEvent]:
+    def _events(
+        self, response: httpx.Response, model: str, request_id: str | None
+    ) -> Iterator[SseEvent]:
         try:
             yield from parse(response.iter_bytes())
         except _NETWORK_FAILURES as error:
-            raise self._network_error(error, model, before_first_byte=False) from None
+            raise self._network_error(error, model, request_id, before_first_byte=False) from None
         except UnicodeDecodeError:
             raise ModelError(
-                ErrorKind.SERVER,
+                ErrorKind.MALFORMED,
                 provider=self._endpoint.provider,
                 model=model,
                 reason="the event stream is not valid UTF-8",
-                request_id=self._request_id(response),
+                request_id=request_id,
                 before_first_byte=False,
             ) from None
-
-    def _read_quietly(self, response: httpx.Response, model: str) -> None:
-        """Reads an error response's body so its error code can be labelled."""
-        try:
-            response.read()
-        except _NETWORK_FAILURES as error:
-            raise self._network_error(error, model, before_first_byte=False) from None
 
     def _request_id(self, response: httpx.Response) -> str | None:
         for header in self._endpoint.request_id_headers:
@@ -229,35 +209,40 @@ class Transport:
         return None
 
     def _status_error(
-        self, response: httpx.Response, model: str, request_id: str | None
+        self,
+        response: httpx.Response,
+        model: str,
+        request_id: str | None,
+        classify: Classifier,
     ) -> ModelError:
-        kind = kind_for_status(response.status_code)
-        reason = _REASONS[kind]
-        label = self._endpoint.error_label(_json_or_none(response.content))
-        if label is not None:
-            reason = f"{reason}; provider error {label}"
-        return self._error(kind, model, reason, response, request_id)
+        try:
+            response.read()
+        except _NETWORK_FAILURES as error:
+            return self._network_error(error, model, request_id, before_first_byte=True)
+        failure = classify(response.status_code, _json_or_none(response.content))
+        return self._error(failure, _REASONS[failure.kind], model, response, request_id)
 
     def _error(
         self,
-        kind: ErrorKind,
-        model: str,
+        failure: Failure,
         reason: str,
+        model: str,
         response: httpx.Response,
         request_id: str | None,
     ) -> ModelError:
+        retry_after_s = _retry_after_s(response.headers.get("retry-after"))
         return ModelError(
-            kind,
+            failure.kind,
             provider=self._endpoint.provider,
             model=model,
-            reason=reason,
+            reason=failure.describe(reason),
             status=response.status_code,
             request_id=request_id,
-            retry_after_s=_retry_after_s(response.headers.get("retry-after")),
+            retry_after_s=failure.retry_after_s if retry_after_s is None else retry_after_s,
         )
 
     def _network_error(
-        self, error: Exception, model: str, *, before_first_byte: bool
+        self, error: Exception, model: str, request_id: str | None, *, before_first_byte: bool
     ) -> ModelError:
         when = "before the response started" if before_first_byte else "while reading the response"
         return ModelError(
@@ -265,6 +250,7 @@ class Transport:
             provider=self._endpoint.provider,
             model=model,
             reason=f"{type(error).__name__} {when}",
+            request_id=request_id,
             before_first_byte=before_first_byte,
         )
 

@@ -1,5 +1,7 @@
 """Responses: request fields, terminal statuses, reasoning replay and streams."""
 
+import dataclasses
+
 import pytest
 
 from ember.errors import ErrorKind
@@ -34,9 +36,16 @@ SPEC = ModelSpec(
 )
 
 
-def _encode(kit, request: Request, stream: bool = False) -> dict:
-    spec = kit.spec("openai_responses", wire_id="gpt-6-astra")
-    return openai_responses.encode(spec, request, stream)
+def _encode(kit, request: Request) -> dict:
+    return openai_responses.encode(SPEC, request)
+
+
+def _final(kit, response: dict, kind: str = "response.completed", request_id: str | None = None):
+    """Decodes ``response`` as the terminal event of a stream."""
+    events = kit.sse({"type": kind, "response": response})
+    final = list(openai_responses.decode_events(SPEC, events, request_id))[-1]
+    assert isinstance(final, Decoded)
+    return final
 
 
 def test_fields_follow_the_responses_reference(kit) -> None:
@@ -50,7 +59,7 @@ def test_fields_follow_the_responses_reference(kit) -> None:
         tools=(WEATHER,),
         tool_choice=ToolName("get_current_weather"),
     )
-    assert _encode(kit, request, stream=True) == {
+    assert _encode(kit, request) == {
         "model": "gpt-6-astra",
         "input": [{"role": "user", "content": "hi"}],
         "instructions": "be brief",
@@ -124,7 +133,7 @@ def test_history_becomes_input_items_and_replays_only_this_apis_reasoning(kit) -
 
 
 def test_documented_function_call_response(kit) -> None:
-    decoded = openai_responses.decode(SPEC, kit.json("openai/responses_function_call.json"), "req")
+    decoded = _final(kit, kit.json("openai/responses_function_call.json"), request_id="req")
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
     assert decoded.message == Message(
         "assistant",
@@ -140,7 +149,7 @@ def test_documented_function_call_response(kit) -> None:
 
 
 def test_documented_reasoning_response_splits_reasoning_tokens(kit) -> None:
-    decoded = openai_responses.decode(SPEC, kit.json("openai/responses_reasoning.json"), None)
+    decoded = _final(kit, kit.json("openai/responses_reasoning.json"))
     assert decoded.text == "The classic tongue twister..."
     assert decoded.finish_reason is FinishReason.STOP
     assert decoded.usage == Usage(input=81, output=1035, reasoning=832)
@@ -155,7 +164,7 @@ def test_reasoning_items_become_replayable_parts(kit) -> None:
         "encrypted_content": "gAAAAB",
     }
     body["output"].insert(0, item)
-    decoded = openai_responses.decode(SPEC, body, None)
+    decoded = _final(kit, body)
     assert decoded.reasoning == "Thinking about wood."
     assert decoded.message is not None
     assert decoded.message.parts[0] == ReasoningPart(
@@ -174,13 +183,13 @@ def test_reasoning_items_become_replayable_parts(kit) -> None:
 def test_incomplete_responses_are_never_a_clean_stop(kit, reason, finish) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="incomplete", incomplete_details={"reason": reason})
-    assert openai_responses.decode(SPEC, body, None).finish_reason is finish
+    assert _final(kit, body).finish_reason is finish
 
 
 def test_refusal_content_is_a_refusal(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body["output"][0]["content"] = [{"type": "refusal", "refusal": "I can't help."}]
-    decoded = openai_responses.decode(SPEC, body, None)
+    decoded = _final(kit, body)
     assert (decoded.finish_reason, decoded.text) == (FinishReason.REFUSAL, "I can't help.")
 
 
@@ -196,7 +205,7 @@ def test_failed_responses_raise_with_the_code_but_not_the_message(kit, code, kin
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="failed", error={"code": code, "message": "raw upstream detail"})
     with pytest.raises(WireError) as caught:
-        openai_responses.decode(SPEC, body, None)
+        _final(kit, body)
     assert caught.value.kind is kind
     assert code in caught.value.reason and "raw upstream" not in caught.value.reason
 
@@ -204,14 +213,14 @@ def test_failed_responses_raise_with_the_code_but_not_the_message(kit, code, kin
 def test_policy_failure_is_content_filtering(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="failed", error={"code": "bio_policy", "message": "blocked"})
-    assert openai_responses.decode(SPEC, body, None).finish_reason is FinishReason.CONTENT_FILTER
+    assert _final(kit, body).finish_reason is FinishReason.CONTENT_FILTER
 
 
 def test_cancelled_response_raises_cancelled(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body["status"] = "cancelled"
     with pytest.raises(WireError) as caught:
-        openai_responses.decode(SPEC, body, None)
+        _final(kit, body)
     assert caught.value.kind is ErrorKind.CANCELLED
 
 
@@ -302,7 +311,7 @@ def test_two_turn_tool_loop_replays_the_reasoning_item_verbatim(kit) -> None:
     events = kit.events("openai/responses_stream_function_call.sse")
     first = list(openai_responses.decode_events(SPEC, events, None))[-1]
     assert isinstance(first, Decoded)
-    assert openai_responses.encode(SPEC, _loop_request(first), False)["input"] == [
+    assert openai_responses.encode(SPEC, _loop_request(first))["input"] == [
         {"role": "user", "content": "What is the weather like in Boston today?"},
         {
             "id": "rs_1",
@@ -331,9 +340,59 @@ def test_reasoning_from_another_provider_is_not_sent(kit) -> None:
     gateway = ModelSpec(
         ref=ModelRef("gateway", "gpt-6-astra"), wire_id="gpt-6-astra", api="openai_responses"
     )
-    items = openai_responses.encode(gateway, _loop_request(first), False)["input"]
+    items = openai_responses.encode(gateway, _loop_request(first))["input"]
     assert [item.get("type", "message") for item in items] == [
         "message",
         "function_call",
         "function_call_output",
     ]
+
+
+REASONER = ModelSpec(
+    ref=ModelRef("openai", "gpt-6-astra"),
+    wire_id="gpt-6-astra",
+    api="openai_responses",
+    reasoning_efforts=frozenset({"low", "high"}),
+)
+
+
+def test_reasoning_models_ask_for_encrypted_reasoning(kit) -> None:
+    assert openai_responses.encode(REASONER, Request.from_prompt("hi"))["include"] == [
+        "reasoning.encrypted_content"
+    ]
+    assert "include" not in _encode(kit, Request.from_prompt("hi"))
+
+
+def test_two_turn_replay_with_store_false_carries_the_encrypted_item(kit) -> None:
+    events = kit.events("openai/responses_stream_function_call.sse")
+    first = list(openai_responses.decode_events(REASONER, events, None))[-1]
+    assert isinstance(first, Decoded)
+    request = dataclasses.replace(_loop_request(first), extensions={"store": False})
+    body = openai_responses.encode(REASONER, request)
+    assert body["store"] is False
+    assert body["include"] == ["reasoning.encrypted_content"]
+    assert body["input"][1]["encrypted_content"] == "gAAAAopaque"
+
+
+def test_event_without_a_string_type_is_malformed(kit) -> None:
+    with pytest.raises(WireError) as caught:
+        list(openai_responses.decode_events(SPEC, kit.sse({"type": {"x": 1}}), None))
+    assert caught.value.kind is ErrorKind.MALFORMED
+
+
+def test_quota_codes_in_failures_and_error_events(kit) -> None:
+    body = kit.json("openai/responses_reasoning.json")
+    body.update(status="failed", error={"code": "insufficient_quota", "message": "no credit"})
+    with pytest.raises(WireError) as caught:
+        _final(kit, body, kind="response.failed")
+    assert caught.value.kind is ErrorKind.QUOTA
+    event = {"type": "error", "code": "organization_usage_limit_exceeded", "message": "x"}
+    with pytest.raises(WireError) as caught:
+        list(openai_responses.decode_events(SPEC, kit.sse(event), None))
+    assert caught.value.kind is ErrorKind.QUOTA
+
+
+def test_null_usage_details_are_zero(kit) -> None:
+    body = kit.json("openai/responses_reasoning.json")
+    body["usage"].update(input_tokens_details=None, output_tokens_details=None)
+    assert _final(kit, body).usage == Usage(input=81, output=1035)
