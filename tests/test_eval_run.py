@@ -13,7 +13,7 @@ from ember import eval as ember_eval
 from ember.data import Example
 from ember.errors import ErrorKind, ModelError
 from ember.eval import Completed, Failed, NumericAnswer, Scored
-from ember.llm import FinishReason, ModelRef, Money, Result, Usage
+from ember.llm import FinishReason, Message, ModelRef, Money, Result, Usage
 from ember.llm.observe import Attempt, Observer, active_observers
 
 MODEL = ModelRef("fake", "m1")
@@ -32,6 +32,7 @@ def reply(text: str, *, cost: int | None = 450, measured: bool = True) -> Result
         model=MODEL,
         request_id=f"req-{text}",
         latency_s=0.01,
+        message=Message.assistant(text),
     )
 
 

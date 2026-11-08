@@ -1,0 +1,25 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {"text": "Checking the weather.", "thought": true, "thoughtSignature": "CiQBVKhc7thought"},
+          {"functionCall": {"id": "fc-7", "name": "get_weather", "args": {"city": "Paris"}}, "thoughtSignature": "CiQBVKhc7call"},
+          {"functionCall": {"name": "get_time", "args": {"zone": "CET"}}}
+        ]
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 50,
+    "candidatesTokenCount": 20,
+    "toolUsePromptTokenCount": 5,
+    "thoughtsTokenCount": 10,
+    "totalTokenCount": 85
+  },
+  "modelVersion": "gemini-3.8-flash",
+  "responseId": "resp-gem-2"
+}

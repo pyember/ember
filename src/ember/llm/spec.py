@@ -11,11 +11,11 @@ import decimal
 from typing import Literal
 
 from ember.llm.ref import ModelRef
+from ember.llm.request import WireApi
 from ember.llm.result import Money, Usage
 
 __all__ = ["LongContextRates", "ModelSpec", "Rates", "WireApi"]
 
-WireApi = Literal["openai_chat", "openai_responses", "anthropic_messages", "gemini"]
 SamplingField = Literal[
     "temperature", "top_p", "max_output_tokens", "stop", "seed", "reasoning_effort"
 ]

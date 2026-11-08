@@ -1,0 +1,24 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "role": "model",
+        "parts": [
+          {"text": "AI learns patterns ", "thoughtSignature": "CiQBVKhc7text"},
+          {"text": "from data."}
+        ]
+      },
+      "finishReason": "STOP",
+      "index": 0
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 120,
+    "cachedContentTokenCount": 100,
+    "candidatesTokenCount": 12,
+    "thoughtsTokenCount": 30,
+    "totalTokenCount": 162
+  },
+  "modelVersion": "gemini-3.8-flash",
+  "responseId": "resp-gem-1"
+}
