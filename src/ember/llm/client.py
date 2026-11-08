@@ -396,10 +396,11 @@ class Client:
         """Raises what a call to ``model`` with ``sampling`` would raise before sending.
 
         Resolves the model, checks its settings and the price policy, and
-        obtains the provider from this client's pool, exactly as a call does,
-        so a missing key or base URL raises here too. It waits for no
-        capacity and sends nothing; a provider it builds stays pooled for the
-        next call.
+        obtains the provider from this client's pool with this client's
+        factory, exactly as a call does, so a missing key or base URL raises
+        here too. It builds, and keeps pooled, the provider the next call
+        would build; it opens no connection, takes no capacity permit and
+        sends nothing.
 
         Returns:
             The resolved spec.
