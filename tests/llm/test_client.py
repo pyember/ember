@@ -567,13 +567,37 @@ def test_reading_to_done_and_stopping_is_not_a_cancellation(client: Client) -> N
     assert [type(a.outcome) for a in recorder.attempts] == [Result]
 
 
-def test_a_stream_never_read_still_frees_its_permit(client: Client, fake: FakeProvider) -> None:
+def test_a_stream_is_sent_at_its_call_site_even_if_never_read(
+    client: Client, fake: FakeProvider
+) -> None:
     events = client.stream("gpt-5.5", "hi")
+    assert len(fake.requests) == 1
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=1, waiting=0)
     del events
     gc.collect()
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
-    assert fake.requests == ()
+    assert len(fake.requests) == 1
+
+
+def test_outside_jit_a_failure_before_the_first_event_raises_at_the_call_site() -> None:
+    fake = FakeProvider([Fail(ErrorKind.AUTH)])
+    with Client(provider_factory=fake.factory) as client:
+        with pytest.raises(ModelError) as caught:
+            client.stream("gpt-5.5", "hi")
+        assert caught.value.kind is ErrorKind.AUTH
+        assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
+
+
+def test_when_deferred_a_failure_before_the_first_event_raises_on_first_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runtime, "deferred", lambda: True)
+    fake = FakeProvider([Fail(ErrorKind.AUTH)])
+    with Client(provider_factory=fake.factory) as client:
+        events = client.stream("gpt-5.5", "hi")
+        with pytest.raises(ModelError) as caught:
+            next(events)
+        assert caught.value.kind is ErrorKind.AUTH
 
 
 @pytest.mark.parametrize(
