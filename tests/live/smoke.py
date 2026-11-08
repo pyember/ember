@@ -42,6 +42,10 @@ TARGETS = {
     "gemini": Target("gemini", "gemini/gemini-3.1-flash-lite", "GEMINI_API_KEY", "low", True),
 }
 
+# Generous, because these models may reason before answering; a lower cap can
+# end a reply at LENGTH, which would look like a finish-reason bug.
+OUTPUT_CAP = 2000
+
 ADD = ToolSpec(
     "add",
     "Adds two integers and returns the sum.",
@@ -63,7 +67,8 @@ def require(condition: bool, message: str) -> None:
 
 
 def check_plain(target: Target) -> str:
-    answer = ember.models(target.model, "Reply with the single word: ok", max_output_tokens=200)
+    prompt = "Reply with the single word: ok"
+    answer = ember.models(target.model, prompt, max_output_tokens=OUTPUT_CAP)
     result = answer.result()
     require(result.finish_reason is FinishReason.STOP, f"finish {result.finish_reason}")
     require(bool(result.text.strip()), "empty text")
@@ -77,7 +82,8 @@ def check_plain(target: Target) -> str:
 def check_stream(target: Target) -> str:
     pieces: list[str] = []
     done: Done | None = None
-    for event in ember.models.stream(target.model, "Count from 1 to 5.", max_output_tokens=200):
+    events = ember.models.stream(target.model, "Count from 1 to 5.", max_output_tokens=OUTPUT_CAP)
+    for event in events:
         if isinstance(event, TextDelta):
             pieces.append(event.text)
         elif isinstance(event, Done):
@@ -98,7 +104,7 @@ def check_tool_loop(target: Target) -> str:
         tools=[ADD],
         tool_choice="add",
         reasoning_effort=target.reasoning_effort,
-        max_output_tokens=1000,
+        max_output_tokens=OUTPUT_CAP,
     ).result()
     require(len(first.tool_calls) == 1, f"tool calls {first.tool_calls}")
     call = first.tool_calls[0]
@@ -109,7 +115,7 @@ def check_tool_loop(target: Target) -> str:
         history,
         tools=[ADD],
         reasoning_effort=target.reasoning_effort,
-        max_output_tokens=1000,
+        max_output_tokens=OUTPUT_CAP,
     ).result()
     require(second.finish_reason is FinishReason.STOP, f"finish {second.finish_reason}")
     require("5" in second.text, f"answer {second.text!r}")
@@ -119,8 +125,8 @@ def check_tool_loop(target: Target) -> str:
 def check_overlap(target: Target) -> str:
     @xcs.jit
     def two(model: str) -> tuple[str, str]:
-        a = ember.models(model, "Name a prime number.", max_output_tokens=200)
-        b = ember.models(model, "Name a planet.", max_output_tokens=200)
+        a = ember.models(model, "Name a prime number.", max_output_tokens=OUTPUT_CAP)
+        b = ember.models(model, "Name a planet.", max_output_tokens=OUTPUT_CAP)
         return a.text, b.text
 
     texts = two(target.model)
