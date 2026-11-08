@@ -63,6 +63,13 @@ python_version = "3.11"
 strict = true
 files = ["src"]
 
+# `datasets` ships no type information, and CI type-checks without the `data`
+# extra installed; ember.data validates every row it reads at runtime instead.
+[[tool.mypy.overrides]]
+module = ["datasets", "datasets.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib --strict-markers"
