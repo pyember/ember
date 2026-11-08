@@ -46,7 +46,14 @@ from ember.context import Context, ProviderSettings
 from ember.errors import ErrorKind, ModelError
 from ember.llm.provider import Decoded, Provider, StreamItem
 from ember.llm.ref import ModelRef
-from ember.llm.request import Request
+from ember.llm.request import (
+    Message,
+    Part,
+    ReasoningPart,
+    Request,
+    TextPart,
+    ToolCallPart,
+)
 from ember.llm.result import (
     FinishReason,
     Money,
@@ -200,7 +207,7 @@ class FakeProvider:
 
     def send(self, spec: ModelSpec, request: Request) -> Decoded:
         """Returns the chosen reply, or raises the chosen failure."""
-        return _decoded(self._answer(spec, request, streamed=False))
+        return _decoded(spec, self._answer(spec, request, streamed=False))
 
     def stream(self, spec: ModelSpec, request: Request) -> Iterator[StreamItem]:
         """Streams the chosen reply piece by piece, ending with `Decoded`."""
@@ -215,7 +222,7 @@ class FakeProvider:
             yield ToolCallDelta(index, call.id, call.name, json.dumps(call.arguments))
         if reply.usage.measured:
             yield UsageEvent(reply.usage)
-        yield _decoded(reply)
+        yield _decoded(spec, reply)
 
     def close(self) -> None:
         """Counts the close; the fake holds no connections."""
@@ -241,7 +248,7 @@ class FakeProvider:
         return answer
 
 
-def _decoded(reply: Reply) -> Decoded:
+def _decoded(spec: ModelSpec, reply: Reply) -> Decoded:
     return Decoded(
         text=reply.text,
         reasoning=reply.reasoning,
@@ -249,8 +256,21 @@ def _decoded(reply: Reply) -> Decoded:
         finish_reason=reply.finish_reason,
         usage=reply.usage,
         request_id=reply.request_id,
+        message=_assistant_turn(spec, reply),
         cost=reply.cost,
     )
+
+
+def _assistant_turn(spec: ModelSpec, reply: Reply) -> Message:
+    """The reply as the assistant message a provider would return: reasoning,
+    text, then tool calls, or one empty text part when there is nothing."""
+    parts: list[Part] = []
+    if reply.reasoning:
+        parts.append(ReasoningPart(reply.reasoning, spec.api, spec.ref.provider, {}))
+    if reply.text:
+        parts.append(TextPart(reply.text))
+    parts.extend(ToolCallPart(call.id, call.name, call.arguments) for call in reply.tool_calls)
+    return Message("assistant", tuple(parts) or (TextPart(""),))
 
 
 def _error(spec: ModelSpec, fail: Fail, *, before_first_byte: bool) -> ModelError:

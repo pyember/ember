@@ -113,12 +113,3 @@ def test_a_model_states_one_kind_of_input_limit() -> None:
             context_window=10,
             max_input_tokens=10,
         )
-
-
-def test_model_spec_offers_reasoning_effort_exactly_when_it_lists_efforts() -> None:
-    ref = ModelRef("openai", "m")
-    common = {"ref": ref, "wire_id": "m", "api": "openai_responses", "known": False}
-    with pytest.raises(ValueError, match="reasoning_effort"):
-        ModelSpec(**common, accepts=frozenset({"reasoning_effort"}))  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="reasoning_effort"):
-        ModelSpec(**common, accepts=frozenset(), reasoning_efforts=frozenset({"low"}))  # type: ignore[arg-type]

@@ -187,7 +187,7 @@ def _spec(entry: Mapping[str, object]) -> ModelSpec:
         context_window=table.optional_count("context_window"),
         max_input_tokens=table.optional_count("max_input_tokens"),
         max_output_tokens=table.optional_count("max_output_tokens"),
-        accepts=_sampling_fields(ref, table.texts("accepts")),
+        accepts=_accepted(ref, table.texts("accepts"), table.texts("reasoning_efforts")),
         reasoning_efforts=frozenset(table.texts("reasoning_efforts")),
         rates=None if rates is None else _rates(rates, f"{ref} rates"),
         sources=tuple(table.texts("sources")),
@@ -197,11 +197,15 @@ def _spec(entry: Mapping[str, object]) -> ModelSpec:
     return spec
 
 
-def _sampling_fields(ref: ModelRef, names: list[str]) -> frozenset[SamplingField]:
+def _accepted(ref: ModelRef, names: list[str], efforts: list[str]) -> frozenset[SamplingField]:
     fields = frozenset(field for field in SAMPLING_FIELDS if field in names)
     unknown = set(names) - fields
     if unknown:
         raise CatalogError(f"{ref}: accepts names unknown settings {sorted(unknown)}")
+    if ("reasoning_effort" in fields) != bool(efforts):
+        raise CatalogError(
+            f"{ref}: accepts must include reasoning_effort exactly when reasoning_efforts is set"
+        )
     return fields
 
 

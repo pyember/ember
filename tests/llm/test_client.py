@@ -2,10 +2,13 @@
 
 import gc
 import os
+import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
+from pathlib import Path
 
 import pytest
 
@@ -20,8 +23,14 @@ from ember.llm.limiter import LimiterState
 from ember.llm.observe import Attempt, observing
 from ember.llm.provider import StreamItem
 from ember.llm.ref import ModelRef
-from ember.llm.request import Request
-from ember.llm.result import Done, Event, Money, Result, TextDelta, Usage, UsageEvent
+from ember.llm.request import (
+    ReasoningPart,
+    Request,
+    TextPart,
+    ToolCallPart,
+    ToolResultPart,
+)
+from ember.llm.result import Done, Event, Money, Result, TextDelta, ToolCall, Usage, UsageEvent
 from ember.llm.spec import ModelSpec
 from ember.xcs import runtime
 
@@ -71,6 +80,35 @@ def test_result_reports_the_canonical_model_and_sends_the_pinned_snapshot() -> N
         "req_1",
     )
     assert [seen.wire_id for seen in fake.requests] == ["gpt-5.5-2026-04-23"]
+
+
+def test_the_assistant_turn_continues_a_tool_loop() -> None:
+    call = ToolCall("call_1", "lookup", {"city": "Paris"})
+    fake = FakeProvider(
+        [Reply(text="", reasoning="Need weather.", tool_calls=(call,)), Reply("Sunny.")]
+    )
+    with Client(provider_factory=fake.factory) as client:
+        first = client.complete("gpt-5.5", "Weather in Paris?")
+        assert first.message == Message(
+            "assistant",
+            (
+                ReasoningPart("Need weather.", "openai_responses", "openai", {}),
+                ToolCallPart("call_1", "lookup", {"city": "Paris"}),
+            ),
+        )
+        history = [
+            Message.user("Weather in Paris?"),
+            first.message,
+            Message("tool", (ToolResultPart("call_1", "sunny"),)),
+        ]
+        assert client.complete("gpt-5.5", history).text == "Sunny."
+    assert fake.requests[1].request.messages == tuple(history)
+
+
+def test_an_empty_answer_is_one_empty_text_part() -> None:
+    fake = FakeProvider(default=Reply(""))
+    with Client(provider_factory=fake.factory) as client:
+        assert client.complete("gpt-5.5", "hi").message == Message("assistant", (TextPart(""),))
 
 
 def test_cost_prices_every_token_kind_exactly() -> None:
@@ -704,19 +742,39 @@ def test_close_closes_providers_and_refuses_new_calls(fake: FakeProvider) -> Non
         client.complete("gpt-5.5", "hi")
 
 
-@pytest.mark.skipif(not hasattr(os, "fork"), reason="the platform has no fork")
-def test_a_forked_child_builds_its_own_providers(client: Client, fake: FakeProvider) -> None:
+_FORK_SCRIPT = """
+import os, sys
+from ember.llm import Client
+from ember.llm.fake import FakeProvider
+
+fake = FakeProvider()
+client = Client(provider_factory=fake.factory)
+client.complete("gpt-5.5", "hi")
+pid = os.fork()
+if pid == 0:
     client.complete("gpt-5.5", "hi")
-    pid = os.fork()
-    if pid == 0:
-        try:
-            client.complete("gpt-5.5", "hi")
-            healthy = len(fake.built) == 2 and fake.closes == 0
-        finally:
-            os._exit(0 if healthy else 1)
-    _, status = os.waitpid(pid, 0)
-    assert os.waitstatus_to_exitcode(status) == 0
-    assert len(fake.built) == 1
+    os._exit(0 if len(fake.built) == 2 and fake.closes == 0 else 1)
+_, status = os.waitpid(pid, 0)
+sys.exit(os.waitstatus_to_exitcode(status) or len(fake.built) - 1)
+"""
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="the platform has no fork")
+def test_a_forked_child_builds_its_own_providers(tmp_path: Path) -> None:
+    # A fresh interpreter, so no other test's threads are inherited; the
+    # warning filter fails the run if ember itself had started a thread.
+    result = subprocess.run(
+        [sys.executable, "-W", "error::DeprecationWarning", "-c", _FORK_SCRIPT],
+        env={
+            "HOME": str(tmp_path),
+            "EMBER_CONFIG": str(tmp_path / "none.yaml"),
+            "PATH": "/usr/bin:/bin",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_hot_path_overhead_with_a_zero_latency_provider(

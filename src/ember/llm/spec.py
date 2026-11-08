@@ -120,8 +120,9 @@ class ModelSpec:
         max_output_tokens: Maximum generated tokens, if known.
         accepts: Sampling settings the model accepts; anything else set on a
             request is rejected before sending.
-        reasoning_efforts: Allowed values for `Sampling.reasoning_effort`.
-            Non-empty exactly when `accepts` contains ``"reasoning_effort"``.
+        reasoning_efforts: Allowed values for `Sampling.reasoning_effort`. The
+            catalog loader requires them non-empty exactly when `accepts`
+            contains ``"reasoning_effort"``.
         rates: Prices, or ``None`` when unknown.
         known: False for a model resolved without a catalog entry. Nothing is
             known about such a model's limits or settings, so none are checked
@@ -148,10 +149,5 @@ class ModelSpec:
     as_of: datetime.date | None = None
 
     def __post_init__(self) -> None:
-        if ("reasoning_effort" in self.accepts) != bool(self.reasoning_efforts):
-            raise ValueError(
-                f"{self.ref}: accepts must include reasoning_effort exactly when "
-                "reasoning_efforts is non-empty"
-            )
         if self.context_window is not None and self.max_input_tokens is not None:
             raise ValueError(f"{self.ref}: give context_window or max_input_tokens, not both")

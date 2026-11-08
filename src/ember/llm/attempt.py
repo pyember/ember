@@ -258,6 +258,7 @@ class Call:
             model=self.spec.ref,
             request_id=decoded.request_id,
             latency_s=time.monotonic() - started,
+            message=decoded.message,
         )
 
     def _report(

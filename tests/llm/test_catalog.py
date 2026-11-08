@@ -138,6 +138,11 @@ def test_two_models_claiming_one_name_fail_at_load() -> None:
         (('aliases = ["m"]', 'aliases = ["openai/m"]'), "bare names"),
         (('accepts = ["max_output_tokens"]', 'accepts = ["temprature"]'), "unknown settings"),
         (('api = "openai_responses"', 'api = "responses"'), "api must be one of"),
+        (("reasoning_efforts = []", 'reasoning_efforts = ["low"]'), "accepts must include"),
+        (
+            ('accepts = ["max_output_tokens"]', 'accepts = ["reasoning_effort"]'),
+            "accepts must include",
+        ),
         (
             ('sources = ["https://developers.openai.com/api/docs/models/m1"]\n', ""),
             "missing 'sources'",
