@@ -10,17 +10,19 @@ additive increase, multiplicative decrease:
 - A success adds one to the limit, up to the cap, but only while the provider
   is saturated (in flight >= limit). Serial traffic never raises the limit.
 
-`acquire` returns a future that completes with a `Permit` as soon as the
-provider has room, in first-come order. The client reads it through
-`ember.xcs.runtime.wait`, so a call waiting for room lets other work run.
+`acquire` returns a future that completes with a `Permit` once the provider
+has room. Callers waiting for room sit in an `ember.xcs.runtime.WaitQueue`,
+so the scheduler decides who gets each freed slot. The client reads the
+future through `ember.xcs.runtime.wait`, so a call waiting for room lets other
+work run.
 """
 
-import collections
 import dataclasses
 import threading
 from concurrent.futures import Future
 
 from ember.errors import ErrorKind
+from ember.xcs import runtime
 
 __all__ = ["Limiter", "LimiterState", "Permit"]
 
@@ -42,16 +44,33 @@ class LimiterState:
     waiting: int
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _Waiter:
+    future: "Future[Permit]"
+    cap: int
+
+
 @dataclasses.dataclass(slots=True)
 class _Provider:
-    """Mutable state for one provider, guarded by the limiter's lock."""
+    """Mutable state for one provider, guarded by the limiter's lock.
+
+    Attributes:
+        limit: Requests allowed in flight.
+        in_flight: Permits held.
+        epoch: Counts halvings; a permit's outcome halves only in its epoch.
+        waiters: Callers waiting for room, in the scheduler's order.
+        next: The waiter that won the last freed slot but whose own, lower
+            cap still holds it back. It keeps its turn.
+    """
 
     limit: int
     in_flight: int = 0
     epoch: int = 0
-    waiters: collections.deque[tuple["Future[Permit]", int]] = dataclasses.field(
-        default_factory=collections.deque
-    )
+    waiters: runtime.WaitQueue[_Waiter] = dataclasses.field(default_factory=runtime.WaitQueue)
+    next: _Waiter | None = None
+
+    def waiting(self) -> int:
+        return len(self.waiters) + (self.next is not None)
 
 
 class Permit:
@@ -118,7 +137,7 @@ class Limiter:
         future: Future[Permit] = Future()
         with self._lock:
             state = self._providers.setdefault(provider, _Provider(limit=cap))
-            state.waiters.append((future, cap))
+            state.waiters.push(_Waiter(future, cap))
             granted = self._admit(provider, state)
         _deliver(granted)
         return future
@@ -129,19 +148,22 @@ class Limiter:
             state = self._providers.get(provider)
             if state is None:
                 return None
-            return LimiterState(state.limit, state.in_flight, len(state.waiters))
+            return LimiterState(state.limit, state.in_flight, state.waiting())
 
     def _admit(self, provider: str, state: _Provider) -> list[tuple["Future[Permit]", Permit]]:
         granted = []
-        while state.waiters:
-            future, cap = state.waiters[0]
-            if state.in_flight >= min(state.limit, cap):
+        while state.in_flight < state.limit and (state.next is not None or state.waiters):
+            waiter = state.next if state.next is not None else state.waiters.pop()
+            state.next = None
+            if waiter.future.cancelled():
+                continue
+            if state.in_flight >= waiter.cap:
+                state.next = waiter
                 break
-            state.waiters.popleft()
-            if not future.set_running_or_notify_cancel():
+            if not waiter.future.set_running_or_notify_cancel():
                 continue
             state.in_flight += 1
-            granted.append((future, Permit(self, provider, cap, state.epoch)))
+            granted.append((waiter.future, Permit(self, provider, waiter.cap, state.epoch)))
         return granted
 
     def _record(self, permit: Permit, failure: ErrorKind | None) -> None:
