@@ -8,7 +8,7 @@ from concurrent.futures import Future
 import pytest
 
 from ember.errors import ErrorKind
-from ember.llm.limiter import Limiter, LimiterState, Permit
+from ember.llm.limiter import HeldByCaller, Limiter, LimiterState, Permit
 
 
 def _grant(limiter: Limiter, provider: str = "openai", cap: int = 8) -> Permit:
@@ -205,3 +205,55 @@ def test_a_cancelled_head_does_not_hold_back_a_newcomer() -> None:
     held.release()
     assert limiter.acquire("openai", cap=1).done()
     assert limiter.state("openai") == LimiterState(limit=1, in_flight=1, waiting=0)
+
+
+def test_a_success_never_lowers_the_limit() -> None:
+    limiter = Limiter()
+    narrow = _grant(limiter, cap=2)
+    wide = _hold(limiter, 7, cap=8)  # a higher cap raises the limit to 8
+    assert limiter.state("openai") == LimiterState(limit=8, in_flight=8, waiting=0)
+    narrow.record(None)
+    wide[0].record(None)
+    assert limiter.state("openai") == LimiterState(limit=8, in_flight=8, waiting=0)
+
+
+def test_a_higher_cap_raises_the_limit_only_before_the_first_backoff() -> None:
+    limiter = Limiter()
+    _grant(limiter, cap=2).release()
+    probe = _grant(limiter, cap=8)
+    assert limiter.state("openai") == LimiterState(limit=8, in_flight=1, waiting=0)
+    probe.record(ErrorKind.RATE_LIMITED)
+    probe.release()
+    _grant(limiter, cap=16).release()
+    assert limiter.state("openai") == LimiterState(limit=4, in_flight=0, waiting=0)
+
+
+def test_after_a_backoff_growth_stops_at_the_reporting_callers_cap() -> None:
+    limiter = Limiter()
+    first = _grant(limiter, cap=4)
+    first.record(ErrorKind.OVERLOADED)  # limit 2
+    first.release()
+    held = _hold(limiter, 2, cap=3)
+    held[0].record(None)  # saturated and below cap 3: grows to 3
+    third = _grant(limiter, cap=3)
+    held[1].record(None)  # saturated, but the limit has reached cap 3
+    assert limiter.state("openai") == LimiterState(limit=3, in_flight=3, waiting=0)
+    third.release()
+
+
+def test_a_caller_holding_every_slot_cannot_wait_for_one() -> None:
+    limiter = Limiter()
+    mine = limiter.acquire("openai", cap=1, caller="me", caller_holds=True).result()
+    with pytest.raises(HeldByCaller, match="openai"):
+        limiter.acquire("openai", cap=1, caller="me")
+    assert limiter.state("openai") == LimiterState(limit=1, in_flight=1, waiting=0)
+    waiting = limiter.acquire("openai", cap=1, caller="someone else")
+    assert not waiting.done()
+    mine.release()
+    assert waiting.done()
+
+
+def test_a_slot_held_by_a_task_is_not_held_by_its_caller() -> None:
+    limiter = Limiter()
+    limiter.acquire("openai", cap=1, caller="me").result()  # a dispatched task frees it
+    assert not limiter.acquire("openai", cap=1, caller="me").done()

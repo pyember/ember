@@ -201,3 +201,19 @@ def test_without_providers_only_catalog_models_resolve() -> None:
         catalog.default().resolve("openai/gpt-5")
     assert caught.value.kind is ErrorKind.NOT_FOUND
     assert "configured providers: none" in str(caught.value)
+
+
+def test_each_token_limit_is_the_kind_its_page_states() -> None:
+    table = catalog.default()
+    # Gemini pages state an "Input token limit", except Gemini 4 Argon's, which
+    # states a "Context window (unified input and output token limit)".
+    limits = {
+        name: (table.resolve(name).context_window, table.resolve(name).max_input_tokens)
+        for name in ("gemini-3.1-pro-preview", "gemini-4-argon", "claude-opus-5-5", "gpt-5.5")
+    }
+    assert limits == {
+        "gemini-3.1-pro-preview": (None, 1_048_576),
+        "gemini-4-argon": (1_048_576, None),
+        "claude-opus-5-5": (1_000_000, None),
+        "gpt-5.5": (1_050_000, None),
+    }

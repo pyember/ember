@@ -18,9 +18,19 @@ from ember.llm.attempt import retry_delay
 from ember.llm.fake import Fail, FakeProvider, Reply
 from ember.llm.limiter import LimiterState
 from ember.llm.observe import Attempt, observing
+from ember.llm.provider import StreamItem
 from ember.llm.ref import ModelRef
+from ember.llm.request import Request
 from ember.llm.result import Done, Event, Money, Result, TextDelta, Usage, UsageEvent
+from ember.llm.spec import ModelSpec
 from ember.xcs import runtime
+
+
+def _wait_for(condition: Callable[[], bool]) -> None:
+    deadline = time.monotonic() + 10
+    while not condition():
+        assert time.monotonic() < deadline, "condition not reached"
+        time.sleep(0.001)
 
 
 class Recorder:
@@ -125,20 +135,51 @@ def test_invalid_calls_raise_before_anything_is_built_or_sent(
 
 
 @pytest.mark.parametrize("surface", SURFACES)
-@pytest.mark.parametrize("model", ["openai/gpt-5", "gemini-4-argon", "gemini-3.1-pro-preview"])
-def test_require_price_refuses_models_without_a_full_price_before_sending(
-    surface: Surface, model: str, client: Client, fake: FakeProvider
+@pytest.mark.parametrize(
+    ("model", "options"),
+    [
+        ("openai/gpt-5", {}),
+        ("gemini-4-argon", {}),
+        ("gpt-5.5", {"extensions": {"service_tier": "priority"}}),
+    ],
+    ids=["uncatalogued", "no-rates", "price-changing-extension"],
+)
+def test_require_price_refuses_calls_whose_price_is_unknown_before_sending(
+    surface: Surface, model: str, options: dict[str, object], client: Client, fake: FakeProvider
 ) -> None:
     with context.override(require_price=True), pytest.raises(ModelError) as caught:
-        surface(client, model)
+        surface(client, model, **options)
     assert caught.value.kind is ErrorKind.UNPRICED
     assert (fake.requests, fake.built) == ((), ())
 
 
-def test_require_price_sends_fully_priced_models(client: Client, fake: FakeProvider) -> None:
+@pytest.mark.parametrize(
+    "model", ["claude-opus-5-5", "gemini-3.1-pro-preview", "gpt-5.4-pro", "gpt-5.5-pro"]
+)
+def test_require_price_sends_models_priced_for_every_token_they_report(
+    model: str, client: Client, fake: FakeProvider
+) -> None:
     with context.override(require_price=True):
-        client.complete("claude-opus-5-5", "hi")
+        client.complete(model, "hi", extensions={"metadata": {"run": "r1"}})
     assert len(fake.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("extensions", "cost"),
+    [
+        ({}, Money(79_000)),
+        ({"metadata": {"run": "r1"}}, Money(79_000)),
+        ({"service_tier": "flex"}, None),
+    ],
+    ids=["none", "price-neutral", "price-changing"],
+)
+def test_only_price_neutral_extensions_keep_a_computed_cost(
+    extensions: dict[str, object], cost: Money | None
+) -> None:
+    fake = FakeProvider(default=Reply(usage=Usage(input=3, cache_read=8, output=2)))
+    with Client(provider_factory=fake.factory) as client:
+        result = client.complete("gpt-5.5", "hi", extensions=extensions)  # type: ignore[arg-type]
+        assert result.cost == cost
 
 
 def test_accepted_settings_are_sent(client: Client, fake: FakeProvider) -> None:
@@ -417,6 +458,26 @@ def test_a_stream_reports_its_attempts_before_done() -> None:
                     assert len(recorder.attempts) == 2
 
 
+class Broken:
+    def __init__(self) -> None:
+        self.error = ValueError("observer bug")
+
+    def on_attempt(self, attempt: Attempt) -> None:
+        raise self.error
+
+
+def test_an_observer_that_raises_keeps_the_result_and_the_other_observers(
+    client: Client,
+) -> None:
+    broken, recorder = Broken(), Recorder()
+    with pytest.raises(ExceptionGroup) as caught:
+        with observing(broken), observing(recorder):
+            completion = client.complete("gpt-5.5", "hi")
+            assert completion.text == "ok"
+            assert len(recorder.attempts) == 1
+    assert caught.value.exceptions == (broken.error,)
+
+
 # Streams.
 
 
@@ -444,6 +505,42 @@ def test_a_stream_retries_before_its_first_item_but_not_after(sleeps: list[float
         assert (len(fake.requests), sleeps) == (2, [0.5])
         # Both attempts were overloaded, the second sent after the first halving.
         assert client.limiter_state("openai") == LimiterState(limit=16, in_flight=0, waiting=0)
+
+
+class MislabelledStream(FakeProvider):
+    """Fails mid-stream with an error that wrongly claims nothing was received."""
+
+    streams = 0
+
+    def stream(self, spec: ModelSpec, request: Request) -> Iterator[StreamItem]:
+        self.streams += 1
+        yield TextDelta("partial ")
+        raise ModelError(ErrorKind.SERVER, provider="openai", model="m", reason="cut")
+
+
+def test_the_client_never_replays_a_stream_that_delivered_output(sleeps: list[float]) -> None:
+    fake = MislabelledStream()
+    with Client(provider_factory=fake.factory, sleep=sleeps.append) as client:
+        received: list[Event] = []
+        with pytest.raises(ModelError):
+            for event in client.stream("gpt-5.5", "hi"):
+                received.append(event)
+    assert received == [TextDelta("partial ")]
+    assert (fake.streams, sleeps) == (1, [])
+
+
+def test_a_stream_dropped_mid_loop_is_reported_cancelled_and_frees_its_permit() -> None:
+    recorder = Recorder()
+    fake = FakeProvider(default=Reply("one two three"))
+    with Client(provider_factory=fake.factory) as client, observing(recorder):
+        for _ in client.stream("gpt-5.5", "hi"):
+            break
+        gc.collect()
+        assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
+    assert len(fake.requests) == 1
+    [attempt] = recorder.attempts
+    assert isinstance(attempt.outcome, ModelError)
+    assert attempt.outcome.kind is ErrorKind.CANCELLED
 
 
 def test_an_abandoned_stream_is_reported_cancelled_and_frees_its_permit() -> None:
@@ -500,6 +597,55 @@ def test_a_dispatch_that_cannot_start_returns_the_permit(
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
     list(surface(client, "gpt-5.5"))
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
+
+
+# A call that only its own caller could unblock.
+
+
+@pytest.mark.parametrize("surface", SURFACES)
+def test_a_call_that_would_wait_on_its_own_open_stream_raises_before_sending(
+    surface: Surface, client: Client, fake: FakeProvider
+) -> None:
+    with context.override(max_in_flight_per_provider=1):
+        events = client.stream("gpt-5.5", "first")
+        assert next(events) == TextDelta("ok")
+        with pytest.raises(ModelError) as caught:
+            surface(client, "gpt-5.5")
+        assert caught.value.kind is ErrorKind.BAD_REQUEST
+        assert "would wait forever" in str(caught.value)
+        assert len(fake.requests) == 1
+        events.close()  # type: ignore[attr-defined]
+        assert client.limiter_state("openai") == LimiterState(limit=1, in_flight=0, waiting=0)
+
+
+def test_another_threads_open_stream_makes_a_call_wait_not_fail(
+    client: Client, fake: FakeProvider
+) -> None:
+    opened, finish = threading.Event(), threading.Event()
+    texts: list[str] = []
+
+    def hold_a_stream() -> None:
+        with context.override(max_in_flight_per_provider=1):
+            events = client.stream("gpt-5.5", "first")
+            next(events)
+            opened.set()
+            assert finish.wait(timeout=10)
+            list(events)
+
+    def call() -> None:
+        with context.override(max_in_flight_per_provider=1):
+            texts.append(client.complete("gpt-5.5", "second").text)
+
+    holder = threading.Thread(target=hold_a_stream)
+    holder.start()
+    assert opened.wait(timeout=10)
+    caller = threading.Thread(target=call)
+    caller.start()
+    _wait_for(lambda: client.limiter_state("openai") == LimiterState(1, 1, 1))
+    finish.set()
+    holder.join(timeout=10)
+    caller.join(timeout=10)
+    assert texts == ["ok"]
 
 
 # Lifetime.

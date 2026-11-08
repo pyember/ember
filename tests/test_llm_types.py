@@ -90,16 +90,29 @@ def test_money_formats_exactly_with_at_least_cents() -> None:
 
 def test_a_missing_cache_price_leaves_only_calls_that_use_the_cache_unpriced() -> None:
     rates = _rates(cache_read=None, cache_write=None)
-    assert not rates.fully_priced
     assert rates.cost(Usage(input=3, output=1)) == Money(450 + 600)
     assert rates.cost(Usage(input=3, cache_read=1)) is None
     assert rates.cost(Usage(input=3, cache_write=1)) is None
-    assert _rates().fully_priced
 
 
-def test_long_context_rates_without_a_cache_price_are_not_fully_priced() -> None:
-    long = LongContextRates(above_prompt_tokens=10, rates=_rates(cache_write=None))
-    assert not _rates(long_context=long).fully_priced
+def test_the_callers_decimal_context_cannot_change_a_price() -> None:
+    # 123,456,789 tokens at $0.15 per million is $18.51851835 exactly.
+    usage = Usage(input=123_456_789)
+    with decimal.localcontext() as ctx:
+        ctx.prec = 3
+        ctx.rounding = decimal.ROUND_DOWN
+        assert _rates().cost(usage) == Money(18_518_518_350)
+
+
+def test_a_model_states_one_kind_of_input_limit() -> None:
+    with pytest.raises(ValueError, match="not both"):
+        ModelSpec(
+            ref=ModelRef("gemini", "m"),
+            wire_id="m",
+            api="gemini",
+            context_window=10,
+            max_input_tokens=10,
+        )
 
 
 def test_model_spec_offers_reasoning_effort_exactly_when_it_lists_efforts() -> None:

@@ -24,6 +24,9 @@ SAMPLING_FIELDS: frozenset[SamplingField] = frozenset(
 )
 
 _PER_MILLION = decimal.Decimal(1_000_000)
+# Prices are computed in this context, whatever the caller's decimal context
+# is: 50 digits hold any realistic token count times any rate exactly.
+_EXACT = decimal.Context(prec=50, rounding=decimal.ROUND_HALF_EVEN)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -47,9 +50,11 @@ class Rates:
     Attributes:
         input: Uncached prompt tokens.
         cache_read: Prompt tokens served from cache, or ``None`` when the
-            provider publishes no such price for the model.
+            provider publishes no such price for the model, which then reports
+            no such tokens (for example a model without prompt caching).
         cache_write: Prompt tokens written to cache, or ``None`` when the
-            provider publishes no such price for the model.
+            provider publishes no such price for the model, which then reports
+            no such tokens.
         output: Generated tokens, reasoning included.
         source_url: The provider page the prices were read from.
         as_of: The date they were read.
@@ -64,14 +69,11 @@ class Rates:
     as_of: datetime.date
     long_context: LongContextRates | None = None
 
-    @property
-    def fully_priced(self) -> bool:
-        """Whether every kind of token has a published price, at every prompt size."""
-        own = self.cache_read is not None and self.cache_write is not None
-        return own and (self.long_context is None or self.long_context.rates.fully_priced)
-
     def cost(self, usage: Usage) -> Money | None:
         """Prices ``usage`` exactly, rounding once to the nano-dollar.
+
+        The arithmetic runs in a fixed decimal context, so the caller's decimal
+        precision and rounding settings cannot change the result.
 
         Returns:
             The cost, or ``None`` when ``usage`` includes cache reads or writes
@@ -85,12 +87,14 @@ class Rates:
         rates = self
         if self.long_context and usage.prompt_tokens > self.long_context.above_prompt_tokens:
             rates = self.long_context.rates
-        cache_read = _priced(usage.cache_read, rates.cache_read)
-        cache_write = _priced(usage.cache_write, rates.cache_write)
-        if cache_read is None or cache_write is None:
-            return None
-        total = usage.input * rates.input + cache_read + cache_write + usage.output * rates.output
-        return Money.from_dollars(total / _PER_MILLION)
+        with decimal.localcontext(_EXACT):
+            cache_read = _priced(usage.cache_read, rates.cache_read)
+            cache_write = _priced(usage.cache_write, rates.cache_write)
+            if cache_read is None or cache_write is None:
+                return None
+            total = usage.input * rates.input + cache_read + cache_write
+            total += usage.output * rates.output
+            return Money.from_dollars(total / _PER_MILLION)
 
 
 def _priced(tokens: int, rate: decimal.Decimal | None) -> decimal.Decimal | None:
@@ -109,7 +113,10 @@ class ModelSpec:
         wire_id: The model id sent to the provider's API.
         api: The wire protocol used to call it.
         aliases: Other names that resolve to this model.
-        context_window: Maximum prompt plus output tokens, if known.
+        context_window: Maximum prompt plus output tokens, where the provider
+            states such a combined limit.
+        max_input_tokens: Maximum prompt tokens, where the provider states an
+            input limit instead. A model has at most one of the two.
         max_output_tokens: Maximum generated tokens, if known.
         accepts: Sampling settings the model accepts; anything else set on a
             request is rejected before sending.
@@ -129,6 +136,7 @@ class ModelSpec:
     api: WireApi
     aliases: tuple[str, ...] = ()
     context_window: int | None = None
+    max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     accepts: frozenset[SamplingField] = frozenset(
         {"temperature", "top_p", "max_output_tokens", "stop", "seed"}
@@ -145,3 +153,5 @@ class ModelSpec:
                 f"{self.ref}: accepts must include reasoning_effort exactly when "
                 "reasoning_efforts is non-empty"
             )
+        if self.context_window is not None and self.max_input_tokens is not None:
+            raise ValueError(f"{self.ref}: give context_window or max_input_tokens, not both")

@@ -41,10 +41,10 @@ from ember.context import Context
 from ember.errors import ConfigError, ErrorKind, ModelError
 from ember.llm import catalog as catalog_module
 from ember.llm import observe, providers
-from ember.llm.attempt import Call
+from ember.llm.attempt import Call, list_price_applies
 from ember.llm.catalog import Catalog
 from ember.llm.completion import Completion
-from ember.llm.limiter import Limiter, LimiterState, Permit
+from ember.llm.limiter import HeldByCaller, Limiter, LimiterState, Permit
 from ember.llm.pool import ProviderFactory, ProviderPool
 from ember.llm.ref import ModelRef
 from ember.llm.request import JsonValue, Message, Request, Sampling, ToolChoice, ToolSpec
@@ -345,7 +345,7 @@ class Client:
 
     def send(self, model: ModelName, request: Request) -> Completion:
         """Sends a prepared request; see the module docstring for the steps."""
-        call = self._prepare(model, request)
+        call = self._prepare(model, request, streaming=False)
         try:
             future = runtime.dispatch(call.run, label=str(call.spec.ref))
         except BaseException:
@@ -358,7 +358,7 @@ class Client:
 
     def send_stream(self, model: ModelName, request: Request) -> Iterator[Event]:
         """Streams a prepared request; checks raise here, before anything is sent."""
-        call = self._prepare(model, request)
+        call = self._prepare(model, request, streaming=True)
         try:
             return runtime.dispatch_stream(call.open_events, label=str(call.spec.ref))
         except BaseException:
@@ -384,14 +384,14 @@ class Client:
     ) -> None:
         self.close()
 
-    def _prepare(self, model: ModelName, request: Request) -> Call:
+    def _prepare(self, model: ModelName, request: Request, *, streaming: bool) -> Call:
         ctx = context.current()
         spec = self._resolve(model, ctx)
         check_settings(spec, request.sampling)
-        _check_price(spec, ctx)
+        _check_price(spec, request, ctx)
         lease = self._pool.lease(ctx.provider(spec.ref.provider), ctx)
         try:
-            permit = self._wait_for_permit(spec.ref.provider, ctx.max_in_flight_per_provider)
+            permit = self._wait_for_permit(spec, ctx.max_in_flight_per_provider, streaming)
         except BaseException:
             lease.release()
             raise
@@ -402,7 +402,7 @@ class Client:
             lease=lease,
             permit=permit,
             retry=ctx.retry,
-            observers=observe.active_observers(),
+            reporter=observe.reporter(),
             sleep=self._sleep,
             jitter=self._jitter,
         )
@@ -415,8 +415,26 @@ class Client:
         table = self._catalog if self._catalog is not None else catalog_module.default()
         return table.resolve(model, providers=ctx.providers)
 
-    def _wait_for_permit(self, provider: str, cap: int) -> Permit:
-        pending = self._limiter.acquire(provider, cap=cap)
+    def _wait_for_permit(self, spec: ModelSpec, cap: int, streaming: bool) -> Permit:
+        # Outside xcs a stream advances only as its thread reads it, so only
+        # that thread can free its slot, whatever greenlet it is running.
+        provider = spec.ref.provider
+        try:
+            pending = self._limiter.acquire(
+                provider,
+                cap=cap,
+                caller=threading.get_ident(),
+                caller_holds=streaming and not runtime.deferred(),
+            )
+        except HeldByCaller:
+            raise ModelError(
+                ErrorKind.BAD_REQUEST,
+                provider=provider,
+                model=spec.ref.name,
+                reason=f"this call would wait forever: every in-flight slot for {provider} is "
+                "held by this caller (an open stream); finish reading it first or raise "
+                "max_in_flight_per_provider",
+            ) from None
         try:
             return runtime.wait(pending)
         except BaseException:
@@ -432,14 +450,18 @@ class Client:
         self._limiter = Limiter()
 
 
-def _check_price(spec: ModelSpec, ctx: Context) -> None:
-    if ctx.require_price and (spec.rates is None or not spec.rates.fully_priced):
-        raise ModelError(
-            ErrorKind.UNPRICED,
-            provider=spec.ref.provider,
-            model=spec.ref.name,
-            reason="the model has no full published price and require_price is set",
-        )
+def _check_price(spec: ModelSpec, request: Request, ctx: Context) -> None:
+    if not ctx.require_price:
+        return
+    if spec.rates is None:
+        reason = "the model has no published price and require_price is set"
+    elif not list_price_applies(request):
+        reason = "an extension may change the price and require_price is set"
+    else:
+        return
+    raise ModelError(
+        ErrorKind.UNPRICED, provider=spec.ref.provider, model=spec.ref.name, reason=reason
+    )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

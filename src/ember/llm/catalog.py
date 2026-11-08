@@ -185,6 +185,7 @@ def _spec(entry: Mapping[str, object]) -> ModelSpec:
         api=cast(WireApi, api),
         aliases=aliases,
         context_window=table.optional_count("context_window"),
+        max_input_tokens=table.optional_count("max_input_tokens"),
         max_output_tokens=table.optional_count("max_output_tokens"),
         accepts=_sampling_fields(ref, table.texts("accepts")),
         reasoning_efforts=frozenset(table.texts("reasoning_efforts")),

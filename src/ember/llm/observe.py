@@ -3,8 +3,15 @@
 Code that needs a record of each request, such as an evaluation run, installs
 an `Observer` for a block with `observing()`. The client reports every
 attempt, including retries, to every observer active at the call site.
-Observers run on whichever thread finished the attempt and must return quickly
-and never raise.
+Observers run on whichever thread finished the attempt and should return
+quickly.
+
+An observer that raises cannot cost the caller a result it paid for, or hide
+the attempt from other observers: every observer still receives the attempt,
+the call's outcome is delivered as usual, and the observer's exceptions are
+raised together, as an `ExceptionGroup`, when its `observing()` block exits.
+An attempt reported after that block has exited raises the observer's
+exception at once.
 
 Every attempt of a call is reported before the call's outcome can be read:
 before its `Completion` holds a result or an error, and before a stream yields
@@ -26,6 +33,7 @@ Example:
 import contextlib
 import contextvars
 import dataclasses
+import threading
 from collections.abc import Generator
 from typing import Protocol
 
@@ -33,7 +41,7 @@ from ember.errors import ModelError
 from ember.llm.ref import ModelRef
 from ember.llm.result import Result
 
-__all__ = ["Attempt", "Observer", "active_observers", "observing"]
+__all__ = ["Attempt", "Observer", "Reporter", "active_observers", "observing", "reporter"]
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -65,21 +73,73 @@ class Observer(Protocol):
         ...
 
 
-_OBSERVERS: contextvars.ContextVar[tuple[Observer, ...]] = contextvars.ContextVar(
+class _Sink:
+    """One `observing()` block: its observer and the exceptions it raised."""
+
+    def __init__(self, observer: Observer) -> None:
+        self.observer = observer
+        self._lock = threading.Lock()
+        self._errors: list[Exception] = []
+        self._open = True
+
+    def deliver(self, attempt: Attempt) -> None:
+        try:
+            self.observer.on_attempt(attempt)
+        except Exception as error:  # Held for the block's exit; see the module docstring.
+            with self._lock:
+                if self._open:
+                    self._errors.append(error)
+                    return
+            raise
+
+    def close(self) -> list[Exception]:
+        with self._lock:
+            self._open = False
+            errors, self._errors = self._errors, []
+        return errors
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class Reporter:
+    """Delivers attempts to the observers that were active where it was made."""
+
+    sinks: tuple[_Sink, ...]
+
+    def report(self, attempt: Attempt) -> None:
+        """Gives ``attempt`` to every observer, outermost first."""
+        for sink in self.sinks:
+            sink.deliver(attempt)
+
+
+_SINKS: contextvars.ContextVar[tuple[_Sink, ...]] = contextvars.ContextVar(
     "ember_observers", default=()
 )
 
 
 def active_observers() -> tuple[Observer, ...]:
     """Returns the observers active in the current context, outermost first."""
-    return _OBSERVERS.get()
+    return tuple(sink.observer for sink in _SINKS.get())
+
+
+def reporter() -> Reporter:
+    """Returns a reporter for the observers active here, to use from any thread."""
+    return Reporter(_SINKS.get())
 
 
 @contextlib.contextmanager
 def observing(observer: Observer) -> Generator[Observer, None, None]:
-    """Reports every attempt made inside the block to ``observer``."""
-    token = _OBSERVERS.set((*_OBSERVERS.get(), observer))
+    """Reports every attempt made inside the block to ``observer``.
+
+    Raises:
+        ExceptionGroup: ``observer`` raised while receiving attempts; every
+            exception it raised is in the group.
+    """
+    sink = _Sink(observer)
+    token = _SINKS.set((*_SINKS.get(), sink))
     try:
         yield observer
     finally:
-        _OBSERVERS.reset(token)
+        _SINKS.reset(token)
+        errors = sink.close()
+        if errors:
+            raise ExceptionGroup(f"observer {observer!r} raised while observing", errors)

@@ -10,8 +10,9 @@ the only code in ember that retries:
 - after a jittered exponential delay, clamped to `RetryPolicy.max_delay_s`
   after the jitter, and never sooner than the provider's ``retry_after_s``;
 - never when the provider asks for a longer wait than ``max_delay_s``;
-- never once a stream has delivered its first item, which `ModelError`
-  marks by ``before_first_byte=False`` and so ``retryable=False``.
+- never once a stream has delivered its first item: providers mark such
+  errors ``before_first_byte=False``, and the client refuses the retry itself
+  whatever the error says, since a retry would deliver that output twice.
 
 Every attempt, retries included, is reported to the observers that were
 active where the call was made, and to the provider's limiter.
@@ -25,14 +26,14 @@ from collections.abc import Callable, Generator, Iterator
 from ember.context import RetryPolicy
 from ember.errors import ErrorKind, ModelError
 from ember.llm.limiter import Permit
-from ember.llm.observe import Attempt, Observer
+from ember.llm.observe import Attempt, Reporter
 from ember.llm.pool import Lease
 from ember.llm.provider import Decoded
 from ember.llm.request import Request
 from ember.llm.result import Done, Event, Money, Result
 from ember.llm.spec import ModelSpec
 
-__all__ = ["Call", "cost_of", "retry_delay"]
+__all__ = ["PRICE_NEUTRAL_EXTENSIONS", "Call", "cost_of", "list_price_applies", "retry_delay"]
 
 # Bounds 2**n so a very large attempt count cannot overflow a float.
 _MAX_DOUBLINGS = 62
@@ -66,11 +67,39 @@ def retry_delay(
     return max(delay, error.retry_after_s)
 
 
-def cost_of(spec: ModelSpec, decoded: Decoded) -> Money | None:
-    """The call's cost: the provider's own figure if it sent one, else the catalog's."""
+#: Extension keys that never change what a provider charges per token: request
+#: labels, routing and storage hints, and extra output fields. Any other key may
+#: select a different price (a service tier, priority or fast mode, a cache
+#: retention period, data residency), so a request carrying one is unpriced.
+PRICE_NEUTRAL_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        "metadata",
+        "user",
+        "safety_identifier",
+        "prompt_cache_key",
+        "parallel_tool_calls",
+        "store",
+        "include",
+    }
+)
+
+
+def list_price_applies(request: Request) -> bool:
+    """Whether the catalog's rates price ``request``: no extension changes the price."""
+    return request.extensions.keys() <= PRICE_NEUTRAL_EXTENSIONS
+
+
+def cost_of(spec: ModelSpec, request: Request, decoded: Decoded) -> Money | None:
+    """The call's exact cost, or ``None`` when it cannot be known exactly.
+
+    The provider's own figure wins. Otherwise the catalog's rates price the
+    usage, unless the model has no rates, the usage was not measured, an
+    extension may have changed the price, or the usage includes a kind of
+    token the model has no rate for.
+    """
     if decoded.cost is not None:
         return decoded.cost
-    if spec.rates is None or not decoded.usage.measured:
+    if spec.rates is None or not decoded.usage.measured or not list_price_applies(request):
         return None
     return spec.rates.cost(decoded.usage)
 
@@ -86,7 +115,8 @@ class Call:
         lease: The provider to send it with.
         permit: The rate-limit slot it holds until it finishes.
         retry: The retry policy of the context the call was made in.
-        observers: The observers active where the call was made.
+        reporter: Delivers attempts to the observers active where the call
+            was made.
         sleep: Waits between attempts.
         jitter: Returns a uniform random number in [0, 1).
     """
@@ -97,9 +127,10 @@ class Call:
     lease: Lease
     permit: Permit
     retry: RetryPolicy
-    observers: tuple[Observer, ...]
+    reporter: Reporter
     sleep: Callable[[float], None]
     jitter: Callable[[], float]
+    started: bool = dataclasses.field(default=False, init=False, repr=False)
     finished: bool = dataclasses.field(default=False, init=False, repr=False)
 
     def run(self) -> Result:
@@ -110,9 +141,16 @@ class Call:
             self.finish()
 
     def open_events(self) -> Iterator[Event]:
-        """Returns the call's stream; its resources are freed even if it is never read."""
+        """Returns the call's stream; its resources are freed even if it is never read.
+
+        A started stream frees them when it ends or is closed, after reporting
+        any unfinished attempt as cancelled. One dropped before it started has
+        no generator frame to do that, so its finalizer frees them instead.
+        CPython runs that finalizer before closing a dropped generator, which
+        is why it must leave started streams alone.
+        """
         events = self._events()
-        weakref.finalize(events, self.finish)
+        weakref.finalize(events, self._finish_if_never_started)
         return events
 
     def finish(self) -> None:
@@ -124,6 +162,10 @@ class Call:
             self.permit.release()
         finally:
             self.lease.release()
+
+    def _finish_if_never_started(self) -> None:
+        if not self.started:
+            self.finish()
 
     def _send_until_done(self) -> Result:
         number = 0
@@ -144,6 +186,7 @@ class Call:
             return result
 
     def _events(self) -> Iterator[Event]:
+        self.started = True
         try:
             number = 0
             completed = False
@@ -160,14 +203,16 @@ class Call:
         the call should try again.
         """
         final: Decoded | None = None
+        delivered = False
         try:
             for item in self.lease.provider.stream(self.spec, self.request):
                 if isinstance(item, Decoded):
                     final = item
                     break
+                delivered = True
                 yield item
         except ModelError as error:
-            delay = retry_delay(self.retry, number, error, self.jitter())
+            delay = None if delivered else retry_delay(self.retry, number, error, self.jitter())
             self._report(number, started, error, will_retry=delay is not None)
             if delay is None:
                 raise
@@ -194,7 +239,7 @@ class Call:
             tool_calls=decoded.tool_calls,
             finish_reason=decoded.finish_reason,
             usage=decoded.usage,
-            cost=cost_of(self.spec, decoded),
+            cost=cost_of(self.spec, self.request, decoded),
             model=self.spec.ref,
             request_id=decoded.request_id,
             latency_s=time.monotonic() - started,
@@ -212,8 +257,7 @@ class Call:
             outcome=outcome,
             will_retry=will_retry,
         )
-        for observer in self.observers:
-            observer.on_attempt(attempt)
+        self.reporter.report(attempt)
 
     def _cancelled(self) -> ModelError:
         return self._error(ErrorKind.CANCELLED, "the caller stopped reading the stream")

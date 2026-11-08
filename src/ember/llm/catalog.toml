@@ -14,10 +14,14 @@
 #   accepts            settings the model accepts, from: temperature, top_p,
 #                      max_output_tokens, stop, seed, reasoning_effort.
 #   reasoning_efforts  allowed reasoning_effort values, in the provider's spelling.
+#   context_window     prompt plus output tokens, where the page states that.
+#   max_input_tokens   prompt tokens, where the page states an input limit.
 #   rates              US dollars per million tokens, as exact decimal strings.
 #                      A missing cache_read or cache_write means the provider
-#                      publishes no such price for the model. A missing rates
-#                      table means the price is not a fixed per-token rate.
+#                      publishes no such price for the model, which reports no
+#                      such tokens (no prompt caching, or no cache writes). A
+#                      missing rates table means the price is not a fixed
+#                      per-token rate.
 #   rates.long_context rates that apply when a prompt (uncached input plus cache
 #                      reads and writes) has more than above_prompt_tokens tokens.
 #
@@ -29,11 +33,13 @@
 #   projects. Responses has no stop or seed parameter. cache_write is the 30m
 #   write price where the page prints one; for GPT-5.5 and earlier, OpenAI's
 #   prompt caching guide states "No additional cache-write charge", so
-#   cache_write equals the input price. GPT-5.5 Pro "does not offer a cached
-#   input discount", so its cache_read equals its input price.
+#   cache_write equals the input price. The Pro models print no cached-input
+#   price, so they have no cache_read.
 # - Gemini: Google now calls generateContent "a legacy API" and recommends the
 #   Interactions API; ember ships the generateContent codec. No page states a
-#   cache write price, so cache_write is absent. gemini-4-argon,
+#   cache write price, and Gemini reports no cache-write tokens, so cache_write
+#   is absent. Model pages state an input token limit, except Gemini 4 Argon's,
+#   which states a unified input and output context window. gemini-4-argon,
 #   gemini-3.8-flash and gemini-3.6-flash have introductory prices that change
 #   on a fixed date, so they have no rates.
 
@@ -700,7 +706,6 @@ as_of = 2026-11-07
 
 [model.rates]
 input = "30.00"
-cache_read = "30.00"
 cache_write = "30.00"
 output = "180.00"
 source_url = "https://developers.openai.com/api/docs/pricing.md"
@@ -709,7 +714,6 @@ as_of = 2026-11-07
 [model.rates.long_context]
 above_prompt_tokens = 272000
 input = "60.00"
-cache_read = "60.00"
 cache_write = "60.00"
 output = "270.00"
 
@@ -876,7 +880,7 @@ id = "gemini/gemini-3.8-flash"
 wire_id = "gemini-3.8-flash"
 api = "gemini"
 aliases = ["gemini-3.8-flash"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["low", "medium", "high"]
@@ -894,7 +898,7 @@ id = "gemini/gemini-3.6-flash"
 wire_id = "gemini-3.6-flash"
 api = "gemini"
 aliases = ["gemini-3.6-flash"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["minimal", "low", "medium", "high"]
@@ -913,7 +917,7 @@ id = "gemini/gemini-3.5-flash-lite"
 wire_id = "gemini-3.5-flash-lite"
 api = "gemini"
 aliases = ["gemini-3.5-flash-lite"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["minimal", "low", "medium", "high"]
@@ -939,7 +943,7 @@ id = "gemini/gemini-3.1-flash-lite"
 wire_id = "gemini-3.1-flash-lite"
 api = "gemini"
 aliases = ["gemini-3.1-flash-lite"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["temperature", "top_p", "max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["minimal", "low", "medium", "high"]
@@ -964,7 +968,7 @@ id = "gemini/gemini-3.1-pro-preview"
 wire_id = "gemini-3.1-pro-preview"
 api = "gemini"
 aliases = ["gemini-3.1-pro-preview"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["temperature", "top_p", "max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["low", "medium", "high"]
@@ -995,7 +999,7 @@ id = "gemini/gemini-3-flash-preview"
 wire_id = "gemini-3-flash-preview"
 api = "gemini"
 aliases = ["gemini-3-flash-preview"]
-context_window = 1048576
+max_input_tokens = 1048576
 max_output_tokens = 65536
 accepts = ["temperature", "top_p", "max_output_tokens", "stop", "seed", "reasoning_effort"]
 reasoning_efforts = ["minimal", "low", "medium", "high"]
