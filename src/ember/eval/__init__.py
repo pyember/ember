@@ -13,12 +13,13 @@ Example:
     Score(value=1.0, extracted='4')
 """
 
-from ember.eval.encode import to_json
+from ember.eval.encode import json_value, to_json
 from ember.eval.jsonl import SCHEMA_VERSION, read_run
 from ember.eval.records import (
     Abort,
     AttemptRecord,
     Completed,
+    CutOff,
     Failed,
     ItemRecord,
     RunEnd,
@@ -43,6 +44,7 @@ __all__ = [
     "Abort",
     "AttemptRecord",
     "Completed",
+    "CutOff",
     "ExactMatch",
     "Failed",
     "ItemRecord",
@@ -55,6 +57,7 @@ __all__ = [
     "Scored",
     "Scorer",
     "Summary",
+    "json_value",
     "multiple_choice_prompt",
     "read_run",
     "run",

@@ -81,6 +81,11 @@ def test_numeric_answer_rejects_a_non_numeric_reference() -> None:
         ("Answer: E", None),
         ("Answer: c", None),
         ("C is the even one", None),
+        ("Answer: A careful reading gives C", None),
+        ("Answer: C because 4 is even", None),
+        ("Answer: C) 4", None),
+        ("Answer: (C).\nThat is my final choice.", "C"),
+        ("Reasoning.\r\nAnswer: C\r\n", "C"),
     ],
 )
 def test_multiple_choice_reads_the_last_answer_line(output: str, extracted: str | None) -> None:
@@ -103,3 +108,10 @@ def test_scores_outside_the_unit_interval_are_rejected() -> None:
     for value in (-0.1, 1.5, float("nan")):
         with pytest.raises(ValueError, match=r"in \[0, 1\]"):
             Score(value, None)
+
+
+def test_multiple_choice_does_not_read_a_word_as_a_letter() -> None:
+    # "I" is a valid letter once there are nine or more choices.
+    example = Example(question="q", answer="C", choices=tuple("0123456789"))
+    assert MultipleChoice()(example, "Answer: I believe it is C").extracted is None
+    assert MultipleChoice()(example, "Answer: I").extracted == "I"

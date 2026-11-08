@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Generic, TypeVar
 
 import ember
+from ember.data import Stream
 from ember.errors import ModelError
-from ember.eval.encode import to_json
+from ember.eval.encode import json_value, to_json
 from ember.eval.jsonl import RunWriter
 from ember.eval.records import (
     Abort,
@@ -53,7 +54,8 @@ def run(
     Records go to ``records`` as JSON lines (see `ember.eval.jsonl`) as each
     item finishes, so a run that dies still leaves everything before it.
 
-    Items run one after another, in order.
+    Items run one after another, in order. When ``items`` is an
+    `ember.data.Stream`, the run header records its `ember.data.Source`.
 
     Args:
         task: Produces an output for one item, for example by calling a model
@@ -66,14 +68,16 @@ def run(
         encode_output: Turns an output into JSON for the records; the default
             accepts JSON values.
         item_errors: Exception types that fail only the item that raised
-            them: the item is recorded as failed and the run goes on. Any other
-            exception stops the run, after an end record naming it is written.
+            them, whether from the task, the scorer or ``encode_output``: the
+            item is recorded as failed and the run goes on. Any other exception
+            stops the run, after an end record naming it is written.
 
     Returns:
         The records, exactly as `ember.eval.read_run` reads them back.
 
     Raises:
         FileExistsError: ``records`` already exists.
+        FileNotFoundError: The directory for ``records`` does not exist.
         Exception: Whatever the task, scorer, encoders or ``items`` raised,
             other than ``item_errors`` from the task.
     """
@@ -83,6 +87,7 @@ def run(
         started_at=datetime.datetime.now(datetime.UTC).isoformat(),
         ember_version=ember.__version__,
         scorer=repr(scorer),
+        source=items.source if isinstance(items, Stream) else None,
     )
     started = time.perf_counter()
     done: list[ItemRecord] = []
@@ -114,17 +119,23 @@ class _ItemRunner(Generic[ItemT, OutputT]):
     item_errors: tuple[type[Exception], ...]
 
     def __call__(self, index: int, item: ItemT) -> ItemRecord:
+        recorded_item = json_value(self.encode_item(item))
         attempts = _AttemptLog()
         started = time.perf_counter()
         with observing(attempts):
             try:
-                output = self.task(item)
+                outcome: Scored | Failed = self._score(item)
             except self.item_errors as exc:
-                outcome: Scored | Failed = Failed.of(exc)
-            else:
-                outcome = Scored(self.encode_output(output), self.scorer(item, output))
+                outcome = Failed.of(exc)
         latency_s = time.perf_counter() - started
-        return ItemRecord(index, self.encode_item(item), latency_s, outcome, attempts.records())
+        return ItemRecord(index, recorded_item, latency_s, outcome, attempts.records())
+
+    def _score(self, item: ItemT) -> Scored:
+        # Scoring and encoding read the output, and a deferred call raises its
+        # error on first read, so both run inside the item's error handling.
+        output = self.task(item)
+        score = self.scorer(item, output)
+        return Scored(json_value(self.encode_output(output)), score)
 
 
 class _AttemptLog:

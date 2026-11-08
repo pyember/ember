@@ -5,7 +5,10 @@ Every line carries ``"schema": 1`` and a ``"type"``:
 - ``run``: the header (`RunHeader`), always first.
 - ``item``: one `ItemRecord` with its attempts, written as the item finishes.
 - ``end``: the `RunEnd` with the summary, always last. A file without it was
-  cut off mid-run; everything before the cut is still readable.
+  cut off mid-run; everything before the cut is still readable, and an
+  incomplete last line is dropped.
+
+Item records appear in index order.
 
 This module is the only code that writes or parses that format.
 """
@@ -16,11 +19,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import IO, TypeVar
 
+from ember.data import Source
 from ember.errors import ErrorKind
 from ember.eval.records import (
     Abort,
     AttemptRecord,
     Completed,
+    CutOff,
     Failed,
     ItemRecord,
     RunEnd,
@@ -83,16 +88,12 @@ def read_run(path: Path) -> RunRecords:
         The run's records, with the summary recomputed from the item records.
 
     Raises:
-        ValueError: A line is not a valid record of schema version 1, the
-            records are out of order, or the summary written at the end does
-            not match the item records.
+        FileNotFoundError: ``path`` does not exist.
+        ValueError: A line other than an unterminated last one is not a valid
+            record of schema version 1, the records are out of order, or the
+            summary written at the end does not match the item records.
     """
-    with path.open(encoding="utf-8") as handle:
-        records = [
-            _Fields.parse(line, f"{path} line {number}")
-            for number, line in enumerate(handle, 1)
-            if line.strip()
-        ]
+    records, partial_dropped = _parse_lines(path)
     if not records:
         raise ValueError(f"{path}: empty run file")
     header = _decode_header(records[0].of_type("run"))
@@ -103,12 +104,43 @@ def read_run(path: Path) -> RunRecords:
             raise ValueError(f"{record.where}: a record follows the end record")
         if record.text("type") == "end":
             end = _decode_end(record)
-        else:
-            items.append(_decode_item(record.of_type("item")))
+            continue
+        item = _decode_item(record.of_type("item"))
+        if item.index != len(items):
+            raise ValueError(f"{record.where}: item index {item.index}, expected {len(items)}")
+        items.append(item)
     summary = summarize(items)
-    if end is not None and end[1] != summary:
+    if end is not None and partial_dropped:
+        raise ValueError(f"{path}: unterminated text after the end record")
+    if end is None:
+        return RunRecords(header, tuple(items), summary, CutOff(partial_dropped))
+    if end[1] != summary:
         raise ValueError(f"{path}: the end record's summary does not match the item records")
-    return RunRecords(header, tuple(items), summary, None if end is None else end[0])
+    return RunRecords(header, tuple(items), summary, end[0])
+
+
+def _parse_lines(path: Path) -> tuple[list["_Fields"], bool]:
+    """Parses every line; an unterminated last line that is not JSON is dropped."""
+    with path.open(encoding="utf-8", newline="") as handle:
+        lines = handle.read().split("\n")
+    last = lines.pop()  # Empty when the file ends with a newline, as every record does.
+    partial_dropped = bool(last.strip()) and not _is_json(last)
+    if not partial_dropped:
+        lines.append(last)
+    records = [
+        _Fields.parse(line, f"{path} line {number}")
+        for number, line in enumerate(lines, 1)
+        if line.strip()
+    ]
+    return records, partial_dropped
+
+
+def _is_json(line: str) -> bool:
+    try:
+        json.loads(line)
+    except json.JSONDecodeError:
+        return False
+    return True
 
 
 def _encode_header(header: RunHeader) -> _Object:
@@ -117,6 +149,17 @@ def _encode_header(header: RunHeader) -> _Object:
         "started_at": header.started_at,
         "ember_version": header.ember_version,
         "scorer": header.scorer,
+        "source": None if header.source is None else _encode_source(header.source),
+    }
+
+
+def _encode_source(source: Source) -> _Object:
+    return {
+        "path": source.path,
+        "config": source.config,
+        "split": source.split,
+        "revision": source.revision,
+        "limit": source.limit,
     }
 
 
@@ -247,6 +290,12 @@ class _Fields:
             raise self._fail(key, "a string")
         return value
 
+    def choice(self, key: str, allowed: tuple[str, ...]) -> str:
+        value = self.text(key)
+        if value not in allowed:
+            raise ValueError(f"{self.where}: {key!r} has unknown value {value!r}")
+        return value
+
     def optional_text(self, key: str) -> str | None:
         return None if self._get(key) is None else self.text(key)
 
@@ -292,17 +341,29 @@ class _Fields:
 
 
 def _decode_header(fields: _Fields) -> RunHeader:
+    source = fields.optional_nested("source")
     return RunHeader(
         run_id=fields.text("run_id"),
         started_at=fields.text("started_at"),
         ember_version=fields.text("ember_version"),
         scorer=fields.text("scorer"),
+        source=None if source is None else _decode_source(source),
+    )
+
+
+def _decode_source(fields: _Fields) -> Source:
+    return Source(
+        path=fields.text("path"),
+        config=fields.optional_text("config"),
+        split=fields.text("split"),
+        revision=fields.optional_text("revision"),
+        limit=fields.optional_integer("limit"),
     )
 
 
 def _decode_item(fields: _Fields) -> ItemRecord:
     outcome: Scored | Failed
-    if fields.text("outcome") == "scored":
+    if fields.choice("outcome", ("scored", "failed")) == "scored":
         score = Score(fields.number("score"), fields.optional_text("extracted"))
         outcome = Scored(fields.json("output"), score)
     else:
@@ -318,7 +379,7 @@ def _decode_item(fields: _Fields) -> ItemRecord:
 
 def _decode_attempt(fields: _Fields) -> AttemptRecord:
     outcome: Completed | Failed
-    if fields.text("outcome") == "completed":
+    if fields.choice("outcome", ("completed", "failed")) == "completed":
         cost = fields.optional_integer("cost_nanos")
         outcome = Completed(
             finish_reason=_member(FinishReason, fields, "finish_reason"),

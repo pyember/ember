@@ -122,10 +122,13 @@ def _decimal(number: str) -> decimal.Decimal:
 class MultipleChoice:
     """Correct when the chosen letter is the answer's letter.
 
-    The chosen letter is the one in the last ``Answer: X`` in the output
-    (``Answer`` in any case, ``X`` optionally in parentheses), or the whole
-    output when it is a single letter such as ``B``, ``(B)`` or ``B.``. Only the
-    letters of the example's choices count, and ``*`` emphasis is ignored.
+    The chosen letter is the one in the last line of the form ``Answer: X``
+    (``Answer`` in any case, ``X`` alone on the rest of the line, optionally in
+    parentheses or followed by a period), or the whole output when it is a
+    single letter such as ``B``, ``(B)`` or ``B.``. Only the letters of the
+    example's choices count, and ``*`` emphasis is ignored, so
+    ``**Answer: B**`` reads as ``B``. Text after the letter on its line, as in
+    ``Answer: A careful reading...``, means the line is not an answer.
     `multiple_choice_prompt` asks for exactly this format.
     """
 
@@ -134,7 +137,9 @@ class MultipleChoice:
             raise ValueError("MultipleChoice scores multiple-choice examples; this one has none")
         letters = LETTERS[: len(example.choices)]
         text = output.replace("*", "")
-        marked = re.findall(rf"(?i:answer)\s*:\s*\(?([{letters}])\)?(?![\w])", text)
+        marked = re.findall(
+            rf"(?i:answer)[^\S\n]*:[^\S\n]*\(?([{letters}])\)?\.?[^\S\n]*$", text, re.MULTILINE
+        )
         if marked:
             chosen: str | None = marked[-1]
         else:

@@ -12,6 +12,7 @@ import math
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
 
+from ember.data import Source
 from ember.errors import ErrorKind, ModelError
 from ember.eval.scorers import Score
 from ember.llm import FinishReason, ModelRef, Money, Result, Usage
@@ -22,6 +23,7 @@ __all__ = [
     "Abort",
     "AttemptRecord",
     "Completed",
+    "CutOff",
     "Failed",
     "ItemRecord",
     "RunEnd",
@@ -161,12 +163,15 @@ class RunHeader:
         started_at: Start time, ISO 8601 in UTC.
         ember_version: The ember version that ran it.
         scorer: The scorer's repr, which for built-in scorers names their rule.
+        source: Where the items came from, when they were an
+            `ember.data.Stream`; ``None`` otherwise.
     """
 
     run_id: str
     started_at: str
     ember_version: str
     scorer: str
+    source: Source | None
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -193,6 +198,18 @@ class RunEnd:
 
     elapsed_s: float
     abort: Abort | None
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class CutOff:
+    """A run file that stops before its end record, because the run died.
+
+    Attributes:
+        partial_record_dropped: The file ended inside a record, and that
+            incomplete last line was left out.
+    """
+
+    partial_record_dropped: bool
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -257,14 +274,13 @@ class RunRecords:
         header: The run's first record.
         items: The item records, in the order they finished.
         summary: Computed from ``items``.
-        end: The last record, or ``None`` when the file stops before it (the
-            process died mid-run).
+        end: The last record, or `CutOff` when the file stops before it.
     """
 
     header: RunHeader
     items: tuple[ItemRecord, ...]
     summary: Summary
-    end: RunEnd | None
+    end: RunEnd | CutOff
 
 
 def summarize(items: Sequence[ItemRecord]) -> Summary:

@@ -4,9 +4,11 @@ import json
 import threading
 from collections.abc import Sequence
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
+from ember import data
 from ember import eval as ember_eval
 from ember.data import Example
 from ember.errors import ErrorKind, ModelError
@@ -213,7 +215,7 @@ def test_a_file_cut_off_mid_run_still_reads(tmp_path: Path) -> None:
     path = tmp_path / "run.jsonl"
     path.write_text("".join(path.read_text().splitlines(keepends=True)[:3]))
     records = ember_eval.read_run(path)
-    assert records.end is None
+    assert records.end == ember_eval.CutOff(partial_record_dropped=False)
     assert records.summary.items == 2
 
 
@@ -249,3 +251,156 @@ def test_items_of_unknown_types_need_an_encoder(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="JSON has no such number"):
         ember_eval.to_json({"x": float("inf")})
     assert ember_eval.to_json({"a": (1, 2.5, None, True)}) == {"a": [1, 2.5, None, True]}
+
+
+def three_answered_items(tmp_path: Path) -> Path:
+    model = ScriptedModel({"0 + 0?": [reply("0")], "1 + 1?": [reply("2")], "2 + 2?": [reply("4")]})
+    run(tmp_path, model)
+    return tmp_path / "run.jsonl"
+
+
+def test_a_file_cut_mid_line_drops_only_the_partial_record(tmp_path: Path) -> None:
+    # The process died while writing item 1: the file ends inside that line.
+    path = three_answered_items(tmp_path)
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join(lines[:2]) + lines[2][: len(lines[2]) // 2])
+    records = ember_eval.read_run(path)
+    assert records.end == ember_eval.CutOff(partial_record_dropped=True)
+    assert [item.index for item in records.items] == [0]
+
+
+def test_a_bad_line_before_the_last_is_rejected(tmp_path: Path) -> None:
+    path = three_answered_items(tmp_path)
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join([lines[0], lines[1][:20] + "\n", *lines[2:]]))
+    with pytest.raises(ValueError, match="line 2: not JSON"):
+        ember_eval.read_run(path)
+
+
+def test_an_unterminated_last_line_that_parses_is_kept(tmp_path: Path) -> None:
+    path = three_answered_items(tmp_path)
+    path.write_text(path.read_text().rstrip("\n"))
+    records = ember_eval.read_run(path)
+    assert isinstance(records.end, ember_eval.RunEnd)
+
+
+@pytest.mark.parametrize(("line", "key"), [(1, "outcome"), (1, "attempts")])
+def test_unknown_outcome_values_are_rejected(tmp_path: Path, line: int, key: str) -> None:
+    path = three_answered_items(tmp_path)
+    lines = path.read_text().splitlines()
+    record = json.loads(lines[line])
+    if key == "outcome":
+        record["outcome"] = "skipped"
+    else:
+        record["attempts"][0]["outcome"] = "skipped"
+    lines[line] = json.dumps(record)
+    path.write_text("\n".join(lines) + "\n")
+    with pytest.raises(ValueError, match="'outcome' has unknown value 'skipped'"):
+        ember_eval.read_run(path)
+
+
+def test_items_out_of_order_are_rejected(tmp_path: Path) -> None:
+    path = three_answered_items(tmp_path)
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join([lines[0], lines[2], lines[1], *lines[3:]]))
+    with pytest.raises(ValueError, match="line 2: item index 1, expected 0"):
+        ember_eval.read_run(path)
+
+
+def test_a_missing_file_raises_file_not_found(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        ember_eval.read_run(tmp_path / "absent.jsonl")
+
+
+class Pending:
+    """A result that raises its error on first read, as calls do under xcs.jit and xcs.map."""
+
+    def __init__(self, outcome: str | ModelError) -> None:
+        self._outcome = outcome
+
+    @property
+    def text(self) -> str:
+        if isinstance(self._outcome, ModelError):
+            raise self._outcome
+        return self._outcome
+
+
+def test_an_error_raised_on_first_read_fails_only_its_item(tmp_path: Path) -> None:
+    outcomes: dict[str, str | ModelError] = {
+        "0 + 0?": "0",
+        "1 + 1?": error(ErrorKind.RATE_LIMITED, 429),
+        "2 + 2?": "4",
+    }
+    records = ember_eval.run(
+        lambda example: Pending(outcomes[example.question]),
+        ITEMS,
+        scorer=lambda example, output: NumericAnswer()(example, output.text),
+        encode_output=lambda output: output.text,
+        records=tmp_path / "run.jsonl",
+    )
+    assert (records.summary.scored, records.summary.failed) == (2, 1)
+    assert dict(records.summary.failures) == {"ModelError:rate_limited": 1}
+
+
+def test_an_item_that_cannot_be_recorded_is_never_sent(tmp_path: Path) -> None:
+    sent: list[object] = []
+
+    def task(item: object) -> str:
+        sent.append(item)
+        return "x"
+
+    with pytest.raises(TypeError, match="encode_item"):
+        ember_eval.run(
+            task,
+            [object()],
+            scorer=lambda i, o: ember_eval.Score(0.0, None),
+            records=tmp_path / "run.jsonl",
+        )
+    assert sent == []
+
+
+def test_records_hold_json_types_whatever_the_encoder_returns(tmp_path: Path) -> None:
+    records = ember_eval.run(
+        lambda example: example.answer,
+        ITEMS[:1],
+        scorer=NumericAnswer(),
+        encode_item=lambda example: MappingProxyType({"q": example.question, "pair": (1, 2)}),
+        encode_output=lambda output: (output,),
+        records=tmp_path / "run.jsonl",
+    )
+    assert records.items[0].item == {"q": "0 + 0?", "pair": [1, 2]}
+    assert records.items[0].outcome == Scored(["0"], ember_eval.Score(1.0, "0"))
+    assert records == ember_eval.read_run(tmp_path / "run.jsonl")
+
+
+def test_each_item_is_on_disk_before_the_next_starts(tmp_path: Path) -> None:
+    path = tmp_path / "run.jsonl"
+    lines_seen: list[int] = []
+
+    def task(example: Example) -> str:
+        lines_seen.append(len(path.read_text().splitlines()))
+        return example.answer
+
+    ember_eval.run(task, ITEMS, scorer=NumericAnswer(), records=path)
+    assert lines_seen == [1, 2, 3]
+
+
+def test_the_header_records_where_the_items_came_from(tmp_path: Path) -> None:
+    source = data.Source("openai/gsm8k", "main", "test", "740312add88f", 3)
+    records = ember_eval.run(
+        lambda example: example.answer,
+        data.Stream(source, iter(ITEMS)),
+        scorer=NumericAnswer(),
+        records=tmp_path / "run.jsonl",
+    )
+    assert records.header.source == source
+    assert ember_eval.read_run(tmp_path / "run.jsonl").header.source == source
+    plain = ember_eval.run(str, [], scorer=NumericAnswer(), records=tmp_path / "plain.jsonl")
+    assert plain.header.source is None
+
+
+def test_text_after_the_end_record_is_rejected(tmp_path: Path) -> None:
+    path = three_answered_items(tmp_path)
+    path.write_text(path.read_text() + '{"schema": 1, "type": "it')
+    with pytest.raises(ValueError, match="unterminated text after the end record"):
+        ember_eval.read_run(path)
