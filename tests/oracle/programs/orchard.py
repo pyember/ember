@@ -452,6 +452,18 @@ def fail_then_continue(model: Model, x: str) -> list[str]:
     return [first.text, second.text]
 
 
+def unread_stream(model: Model, x: str) -> str:
+    """Starts a stream and never reads it: both runs send its request, neither raises."""
+    model.stream(f"stream {x}")
+    note("started a stream")
+    return "done"
+
+
+def streamed_answer(model: Model, x: str) -> str:
+    """Reads a stream to the end."""
+    return "".join(model.stream(f"stream {x}"))
+
+
 def _counter() -> Callable[[], int]:
     count = 0
 

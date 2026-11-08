@@ -45,11 +45,26 @@ def test_outside_a_scope_wait_blocks_on_a_future_another_thread_completes() -> N
     assert runtime.wait(future) == "late"
 
 
-def test_outside_a_scope_dispatch_stream_returns_the_source_itself() -> None:
+def test_outside_a_scope_a_stream_is_sent_before_dispatch_stream_returns() -> None:
+    log: list[str] = []
+
     def source() -> Iterator[int]:
+        log.append("sent")
         yield from range(3)
 
-    assert list(runtime.dispatch_stream(source, label="s")) == [0, 1, 2]
+    stream = runtime.dispatch_stream(source, label="s")
+    assert log == ["sent"]
+    assert list(stream) == [0, 1, 2]
+
+
+def test_outside_a_scope_a_stream_failure_nobody_pulls_is_never_raised() -> None:
+    def source() -> Iterator[int]:
+        raise ProviderDown("never pulled")
+        yield 0
+
+    runtime.dispatch_stream(source, label="s")
+    with pytest.raises(ProviderDown, match="pulled"):
+        list(runtime.dispatch_stream(source, label="s"))
 
 
 def test_inside_a_scope_tasks_run_on_named_worker_threads_in_the_dispatching_context() -> None:
@@ -136,20 +151,46 @@ def test_closing_a_stream_early_stops_its_worker() -> None:
     assert len(produced) < 1000
 
 
-def test_a_stream_kept_but_unread_raises_its_failure_at_the_jit_boundary() -> None:
-    def source() -> Iterator[int]:
-        yield 1
-        raise ProviderDown("unread")
+class Holder:
+    """Keeps a reader alive in a reference cycle, collected only by the cycle collector."""
 
+    def __init__(self) -> None:
+        self.me = self
+        self.stream: Iterator[int] | None = None
+
+
+@pytest.mark.parametrize("fails_at", ["before its first item", "after one item"])
+@pytest.mark.parametrize("disposal", ["dropped", "closed", "held", "held in a cycle"])
+def test_an_unread_stream_failure_is_never_raised_however_the_reader_is_left(
+    disposal: str, fails_at: str
+) -> None:
+    pulled: list[int] = []
     kept: list[Iterator[int]] = []
+
+    def source() -> Iterator[int]:
+        for i in range(10):
+            time.sleep(0.05)
+            if fails_at == "before its first item" or i == 1:
+                raise ProviderDown("unread")
+            pulled.append(i)
+            yield i
 
     @xcs.jit
     def program() -> str:
-        kept.append(runtime.dispatch_stream(source, label="s"))
+        stream = runtime.dispatch_stream(source, label="s")
+        if disposal == "closed":
+            stream.close()  # type: ignore[attr-defined]
+        elif disposal == "held":
+            kept.append(stream)
+        elif disposal == "held in a cycle":
+            Holder().stream = stream
+        del stream
         return "returned"
 
-    with pytest.raises(ProviderDown, match="unread"):
-        program()
+    started = time.perf_counter()
+    assert program() == "returned"
+    assert time.perf_counter() - started < 0.5
+    assert len(pulled) <= 1
 
 
 def test_closing_a_stream_before_reading_it_stops_its_worker() -> None:
@@ -171,33 +212,7 @@ def test_closing_a_stream_before_reading_it_stops_its_worker() -> None:
     assert len(pulled) <= 2
 
 
-@pytest.mark.parametrize("failure_before_drop", [True, False])
-def test_dropping_a_stream_abandons_it_whenever_it_fails(failure_before_drop: bool) -> None:
-    pulled: list[int] = []
-
-    def source() -> Iterator[int]:
-        for i in range(10):
-            pulled.append(i)
-            if i == 1:
-                raise ProviderDown("abandoned")
-            yield i
-            time.sleep(0.0 if failure_before_drop else 0.2)
-
-    @xcs.jit
-    def program() -> str:
-        stream = runtime.dispatch_stream(source, label="s")
-        if failure_before_drop:
-            time.sleep(0.1)
-        del stream
-        return "returned"
-
-    started = time.perf_counter()
-    assert program() == "returned"
-    assert time.perf_counter() - started < 0.6
-    assert len(pulled) <= 2
-
-
-def test_a_stream_returned_from_jit_can_be_read_after_it_returns() -> None:
+def test_reading_a_stream_after_its_jit_call_returned_raises() -> None:
     def source() -> Iterator[int]:
         yield from range(3)
 
@@ -205,4 +220,17 @@ def test_a_stream_returned_from_jit_can_be_read_after_it_returns() -> None:
     def program() -> Iterator[int]:
         return runtime.dispatch_stream(source, label="s")
 
-    assert list(program()) == [0, 1, 2]
+    stream = program()
+    with pytest.raises(RuntimeError, match="abandoned when the jit call"):
+        next(stream)
+
+
+def test_a_stream_read_to_the_end_is_not_abandoned() -> None:
+    def source() -> Iterator[int]:
+        yield from range(3)
+
+    @xcs.jit
+    def program() -> list[int]:
+        return list(runtime.dispatch_stream(source, label="s"))
+
+    assert program() == [0, 1, 2]

@@ -198,6 +198,9 @@ CASES = [
     Case("strict_all", call(orchard.strict_all, ["a", "fail:b", "c"]), error=ModelError),
     Case("closure_state", call(orchard.closure_state, "x"), independent=2),
     Case("relay", repeat(orchard.relay, 2, "x")),
+    Case("unread_stream", call(orchard.unread_stream, "x")),
+    Case("unread_failing_stream", call(orchard.unread_stream, "fail:x")),
+    Case("streamed_answer", call(orchard.streamed_answer, "x")),
 ]
 
 

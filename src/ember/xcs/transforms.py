@@ -152,10 +152,15 @@ def _run_to_boundary(strand: strands.Strand, body: Callable[[], R]) -> R:
 
 
 def _settle(strand: strands.Strand, frame: Frame) -> list[BaseException]:
+    for channel, _ in frame.streams:
+        if not channel.read_to_end:
+            channel.close()
     position = 0
     while position < len(frame.pending):
         strand.wait(frame.pending[position])
         position += 1
+    for _, drained in frame.streams:
+        strand.wait(drained)
     frame.settled = True
     return frame.take_unread_failures()
 

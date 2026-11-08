@@ -12,7 +12,7 @@ import collections
 import concurrent.futures
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 
 from ember.errors import ErrorKind, ModelError
 from ember.llm import Completion, FinishReason, ModelRef, Request, Result, TextPart, Usage
@@ -64,6 +64,16 @@ class FakeModel:
             runtime.wait(future)
         return Completion(future, REF)
 
+    def stream(self, prompt: str) -> Iterator[str]:
+        """Streams the answer to ``prompt`` one character at a time."""
+        request = Request.from_prompt(prompt)
+        with self._lock:
+            self._reached += 1
+        reached_at = self._tick()
+        return runtime.dispatch_stream(
+            lambda: self._serve_stream(request, reached_at), label=str(REF)
+        )
+
     def requests(self) -> collections.Counter[str]:
         """The multiset of requests served so far."""
         with self._lock:
@@ -83,6 +93,9 @@ class FakeModel:
         with self._lock:
             self._clock += 1
             return self._clock
+
+    def _serve_stream(self, request: Request, reached_at: int) -> Iterator[str]:
+        yield from self._serve(request, reached_at).text
 
     def _serve(self, request: Request, reached_at: int) -> Result:
         served_at = self._tick()
