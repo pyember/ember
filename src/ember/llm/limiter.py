@@ -31,13 +31,18 @@ from concurrent.futures import Future
 from ember.errors import ErrorKind
 from ember.xcs import runtime
 
-__all__ = ["HeldByCaller", "Limiter", "LimiterState", "Permit"]
+__all__ = ["Limiter", "LimiterState", "Permit"]
 
 _BACKOFF_KINDS = frozenset({ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED})
 
 
 class HeldByCaller(Exception):
-    """The caller would wait for a slot that only the caller itself can free."""
+    """The caller would wait for a slot that only the caller itself can free.
+
+    An internal signal from `Limiter.acquire` to the client, raised under the
+    limiter's lock so the check is atomic. It never escapes the client, which
+    raises ``ModelError(BAD_REQUEST)`` in its place.
+    """
 
     def __init__(self, provider: str) -> None:
         self.provider = provider
