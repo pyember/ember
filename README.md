@@ -45,7 +45,7 @@ uv sync
 ### Setup
 
 ```bash
-ember setup  # Interactive wizard configures API keys
+export OPENAI_API_KEY=...          # or: ember configure set-key openai
 ```
 
 ## NON: Compound AI in One Line
@@ -109,21 +109,25 @@ pipeline = summarize >> translate
 result = pipeline("Long technical article...")
 ```
 
-### 3. Data — Streaming Pipelines
+### 3. Data and Evaluation
 
 ```python
-from ember.api import data, models
+from pathlib import Path
 
-# Stream and process datasets efficiently
-for example in data.stream("mmlu"):
-    answer = models("gpt-4o", example["question"])
-    print(f"Q: {example['question']}\nA: {answer}\n")
+from ember import data, models
+from ember.eval import NumericAnswer, run
 
-# Chain transformations
-results = (data.stream("gsm8k")
-    .filter(lambda x: x["difficulty"] > 7)
-    .transform(preprocess)
-    .batch(32))
+def solve(example: data.Example) -> str:
+    prompt = f"{example.question}\n\nEnd with a line of the form 'Answer: <number>'."
+    return models("openai/gpt-5", prompt).text
+
+records = run(
+    solve,
+    data.stream("gsm8k", limit=50),  # needs: pip install 'ember-ai[data]'
+    scorer=NumericAnswer(after="Answer:"),  # reads the number after the last "Answer:"
+    records=Path("gsm8k.jsonl"),  # every item and every request attempt
+)
+print(records.summary)  # score, failures, retries, unpriced calls, cost
 ```
 
 ### 4. XCS — Automatic Optimization
@@ -168,35 +172,32 @@ Ember auto-discovers models from your configured providers:
 
 ## Configuration
 
+Ember reads keys from `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`, or from
+`~/.ember/config.yaml` (or the file named by `EMBER_CONFIG`), which the CLI writes with mode 0600:
+
 ```bash
-# Interactive setup (recommended)
-ember setup
-
-# Manual configuration
-ember configure set providers.openai.api_key "sk-..."
-ember configure set providers.anthropic.api_key "sk-ant-..."
-
-# Verify
-ember test
+ember configure set-key openai      # prompts for the key; keys are never command-line arguments
+ember configure set local kind openai_compatible
+ember configure set local base_url http://localhost:11434/v1
+ember configure show                # keys are masked
 ```
 
-Runtime overrides:
+Runtime overrides apply to a block and are never written to disk:
 
 ```python
-from ember.context import context
+from ember import context
 
-with context.manager(providers={"openai": {"api_key": "sk-..."}}):
-    response = models("gpt-4o", "Hello!")
+with context.override(providers={"openai": {"api_key": "sk-..."}}):
+    response = models("openai/gpt-5", "Hello!")
 ```
 
 ## CLI Reference
 
 ```bash
-ember setup                    # Interactive setup wizard
-ember test                     # Test API connections
-ember models                   # List available models
-ember configure list           # Show configuration
-ember context view             # View runtime context
+ember configure show                          # print the config file, keys masked
+ember configure set-key PROVIDER              # save a key typed at a hidden prompt
+ember configure set PROVIDER FIELD VALUE      # FIELD is kind, base_url or api_key_env
+ember configure unset PROVIDER [FIELD]        # remove a field (even a misspelt one) or a provider
 ```
 
 ## Design Principles
