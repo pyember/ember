@@ -5,6 +5,7 @@ from collections.abc import Mapping
 
 from ember.data import Example
 from ember.llm.request import JsonValue
+from ember.non import Answer
 
 __all__ = ["json_value", "to_json"]
 
@@ -12,8 +13,11 @@ __all__ = ["json_value", "to_json"]
 def to_json(value: object) -> JsonValue:
     """Encodes an item or output for the records.
 
-    Accepts `ember.data.Example`, and JSON values: strings, numbers, booleans,
-    ``None``, and lists, tuples and string-keyed mappings of them.
+    Accepts `ember.data.Example`; a NON graph's `ember.non.Answer`, recorded
+    as ``{"text": ...}`` because its stage records hold results and errors,
+    and every call behind them is recorded as an attempt anyway; and JSON
+    values: strings, numbers, booleans, ``None``, and lists, tuples and
+    string-keyed mappings of them.
 
     Raises:
         TypeError: ``value`` is of another type; pass ``encode_item`` or
@@ -27,6 +31,8 @@ def to_json(value: object) -> JsonValue:
             "choices": list(value.choices),
             "metadata": dict(value.metadata),
         }
+    if isinstance(value, Answer):
+        return {"text": value.text}
     return json_value(value)
 
 
