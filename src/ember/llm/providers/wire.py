@@ -48,6 +48,7 @@ __all__ = [
     "count",
     "identifier",
     "json_object",
+    "kind_for_status",
     "malformed",
     "merge_extensions",
     "parse_arguments",
@@ -60,6 +61,30 @@ Body: TypeAlias = dict[str, JsonValue]
 """A JSON request body as a codec builds it."""
 
 _IDENTIFIER = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+
+
+_STATUS_KINDS: Mapping[int, ErrorKind] = {
+    400: ErrorKind.BAD_REQUEST,
+    401: ErrorKind.AUTH,
+    402: ErrorKind.PERMISSION,
+    403: ErrorKind.PERMISSION,
+    404: ErrorKind.NOT_FOUND,
+    408: ErrorKind.SERVER,
+    413: ErrorKind.BAD_REQUEST,
+    422: ErrorKind.BAD_REQUEST,
+    429: ErrorKind.RATE_LIMITED,
+    503: ErrorKind.OVERLOADED,
+    529: ErrorKind.OVERLOADED,
+}
+
+
+def kind_for_status(status: int) -> ErrorKind:
+    """Maps a non-success HTTP status to the kind of failure it reports."""
+    if status in _STATUS_KINDS:
+        return _STATUS_KINDS[status]
+    if 400 <= status < 500:
+        return ErrorKind.BAD_REQUEST
+    return ErrorKind.SERVER
 
 
 class WireError(Exception):

@@ -21,23 +21,9 @@ import httpx
 
 from ember.errors import ErrorKind, ModelError
 from ember.llm.providers.sse import SseEvent, parse
-from ember.llm.providers.wire import Body
+from ember.llm.providers.wire import Body, kind_for_status
 
-__all__ = ["Endpoint", "EventStream", "JsonResponse", "Transport", "kind_for_status"]
-
-_STATUS_KINDS: Mapping[int, ErrorKind] = {
-    400: ErrorKind.BAD_REQUEST,
-    401: ErrorKind.AUTH,
-    402: ErrorKind.PERMISSION,
-    403: ErrorKind.PERMISSION,
-    404: ErrorKind.NOT_FOUND,
-    408: ErrorKind.SERVER,
-    413: ErrorKind.BAD_REQUEST,
-    422: ErrorKind.BAD_REQUEST,
-    429: ErrorKind.RATE_LIMITED,
-    503: ErrorKind.OVERLOADED,
-    529: ErrorKind.OVERLOADED,
-}
+__all__ = ["Endpoint", "EventStream", "JsonResponse", "Transport"]
 
 _REASONS: Mapping[ErrorKind, str] = {
     ErrorKind.AUTH: "the provider rejected the credentials",
@@ -59,15 +45,6 @@ _NETWORK_FAILURES = (
     httpx.ProxyError,
     httpx.DecodingError,
 )
-
-
-def kind_for_status(status: int) -> ErrorKind:
-    """Maps a non-success HTTP status to the kind of failure it reports."""
-    if status in _STATUS_KINDS:
-        return _STATUS_KINDS[status]
-    if 400 <= status < 500:
-        return ErrorKind.BAD_REQUEST
-    return ErrorKind.SERVER
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
