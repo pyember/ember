@@ -25,7 +25,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     Args:
         argv: Arguments after the program name; defaults to ``sys.argv[1:]``.
     """
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args, extras = parser.parse_known_args(argv)
+    if extras:
+        # argparse would quote them, and a misplaced key must never be echoed.
+        parser.error("unexpected extra arguments (not shown)")
     handler: Handler = args.handler
     try:
         return handler(args)

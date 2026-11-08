@@ -1,14 +1,18 @@
 """``ember configure``: show and change the config file.
 
 Every change is checked against the rules the library applies when it loads
-the file, and is written only if the result would load. Keys are read with
-`getpass`, never from the command line, and are printed only masked.
+the file, and is written only if the result would load; a file that already
+fails to load is changed anyway, since the change may be its repair. Keys are
+read with `getpass`, never from the command line, and are printed only masked.
+A config file with comments is never rewritten, because rewriting would drop
+them: edit it by hand, or remove its comments first.
 """
 
 import argparse
 import dataclasses
 import getpass
 import os
+from collections.abc import Callable
 from types import MappingProxyType
 
 import yaml
@@ -53,14 +57,20 @@ def set_key(args: argparse.Namespace) -> int:
             f"unknown provider {provider!r}; known: {', '.join(sorted(providers))}. "
             f"To add one: ember configure set {provider} kind openai_compatible"
         )
-    settings = providers[provider]
-    key = getpass.getpass(f"API key for {provider} (input hidden): ").strip()
+    try:
+        key = getpass.getpass(f"API key for {provider} (input hidden): ").strip()
+    except EOFError:
+        key = ""
     if not key:
         raise ConfigError("no key entered; nothing was saved")
-    _save(provider, "api_key", key)
-    print(f"saved the {provider} key to {config.config_path()}")
-    if settings.api_key_env and os.environ.get(settings.api_key_env):
-        print(f"note: {settings.api_key_env} is set and takes precedence over the saved key")
+    _change(
+        lambda data: _with_field(data, provider, "api_key", key),
+        lambda: config.save_provider_field(provider, "api_key", key),
+        done=f"saved the {provider} key to {config.config_path()}",
+    )
+    env = providers[provider].api_key_env
+    if env and os.environ.get(env):
+        print(f"note: {env} is set and takes precedence over the saved key")
     return 0
 
 
@@ -68,33 +78,70 @@ def set_field(args: argparse.Namespace) -> int:
     """Sets a provider's kind, base_url or api_key_env."""
     provider: str = args.provider
     field: str = args.field
-    _save(provider, field, args.value)
-    print(f"set providers.{provider}.{field} in {config.config_path()}")
+    value: str = args.value
+    _change(
+        lambda data: _with_field(data, provider, field, value),
+        lambda: config.save_provider_field(provider, field, value),
+        done=f"set providers.{provider}.{field} in {config.config_path()}",
+    )
     return 0
 
 
 def unset(args: argparse.Namespace) -> int:
-    """Removes a provider field, or a provider, then checks that the file loads."""
+    """Removes a provider field, or a whole provider."""
     provider: str = args.provider
     field: str | None = args.field
-    config.remove_provider_field(provider, field)
     target = f"providers.{provider}" if field is None else f"providers.{provider}.{field}"
-    print(f"removed {target} from {config.config_path()}")
-    try:
-        context.from_config(config.load())
-    except ConfigError as exc:
-        raise ConfigError(f"the config still does not load: {exc}") from exc
+    _change(
+        lambda data: _without_field(data, provider, field),
+        lambda: config.remove_provider_field(provider, field),
+        done=f"removed {target} from {config.config_path()}",
+    )
     return 0
 
 
-def _save(provider: str, field: str, value: str) -> None:
-    """Writes one provider field if the resulting config would load."""
-    current = config.load()
-    fields = {**current.providers.get(provider, {}), field: value}
-    providers = {**current.providers, provider: MappingProxyType(fields)}
-    candidate = dataclasses.replace(current, providers=MappingProxyType(providers))
+def _change(
+    changed: Callable[[config.ConfigData], config.ConfigData],
+    write: Callable[[], None],
+    *,
+    done: str,
+) -> None:
+    """Writes a change only if the config still loads after it.
+
+    When the file already fails to load, the change is written anyway, since it
+    may be the repair, and the command fails if the file still does not load.
+    """
     try:
-        context.from_config(candidate)
+        current = config.load()
+        context.from_config(current)
+    except ConfigError:
+        write()
+        print(done)
+        try:
+            context.from_config(config.load())
+        except ConfigError as exc:
+            raise ConfigError(f"the config still does not load: {exc}") from None
+        return
+    try:
+        context.from_config(changed(current))
     except ConfigError as exc:
-        raise ConfigError(f"nothing was saved: {exc}") from exc
-    config.save_provider_field(provider, field, value)
+        raise ConfigError(f"nothing was saved: {exc}") from None
+    write()
+    print(done)
+
+
+def _with_field(
+    data: config.ConfigData, provider: str, field: str, value: str
+) -> config.ConfigData:
+    fields = {**data.providers.get(provider, {}), field: value}
+    providers = {**data.providers, provider: MappingProxyType(fields)}
+    return dataclasses.replace(data, providers=MappingProxyType(providers))
+
+
+def _without_field(data: config.ConfigData, provider: str, field: str | None) -> config.ConfigData:
+    providers = {name: fields for name, fields in data.providers.items() if name != provider}
+    if field is not None:
+        rest = {k: v for k, v in data.providers.get(provider, {}).items() if k != field}
+        if rest:
+            providers[provider] = MappingProxyType(rest)
+    return dataclasses.replace(data, providers=MappingProxyType(providers))

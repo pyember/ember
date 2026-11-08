@@ -2,6 +2,7 @@
 
 import ast
 import getpass
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ from ember import context
 from ember.cli import main
 
 KEY = "sk-secret-abcdefgh1234"
+SPAWNS = re.compile(r"input|system|popen|fork|forkpty|exec[lv]p?e?|spawn[lv]p?e?|posix_spawnp?")
 
 
 @pytest.fixture(autouse=True)
@@ -173,16 +175,88 @@ def test_an_openai_compatible_provider_is_set_up_field_by_field(config_file: Pat
     assert (local.kind, local.base_url) == ("openai_compatible", "http://localhost:11434/v1")
 
 
-def test_unset_reports_a_config_that_still_does_not_load(
+def test_unset_refuses_to_break_a_config_that_loads(
     config_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    config_file.write_text("providers:\n  local:\n    kind: openai_compatible\n    base_url: x\n")
+    text = "providers:\n  local:\n    kind: openai_compatible\n    base_url: x\n"
+    config_file.write_text(text)
     assert main(["configure", "unset", "local", "kind"]) == 1
-    assert "the config still does not load: provider 'local' needs kind" in (
-        capsys.readouterr().err
-    )
+    err = capsys.readouterr().err
+    assert "nothing was saved" in err and "provider 'local' needs kind" in err
+    assert config_file.read_text() == text
     assert main(["configure", "unset", "local"]) == 0
     assert "providers" not in config_file.read_text()
+
+
+def test_unset_repairs_a_config_that_does_not_load_and_says_what_remains(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("providers:\n  local:\n    base_url: x\n    api_kye: y\n")
+    assert main(["configure", "unset", "local", "api_kye"]) == 1
+    out, err = capsys.readouterr()
+    assert out.startswith("removed providers.local.api_kye")
+    assert f"the config still does not load: {config_file}: provider 'local' needs kind" in err
+    assert "api_kye" not in config_file.read_text()
+
+
+@pytest.mark.usefixtures("no_prompt")
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["configure", "set-key", "openai", KEY],
+        ["configure", "set-key", "openai", f"--key={KEY}"],
+        ["configure", "unset", "openai", "api_key", KEY],
+    ],
+)
+def test_extra_arguments_are_refused_without_echoing_them(
+    config_file: Path, capsys: pytest.CaptureFixture[str], argv: list[str]
+) -> None:
+    with pytest.raises(SystemExit) as exited:
+        main(argv)
+    assert exited.value.code == 2
+    out, err = capsys.readouterr()
+    assert KEY not in out and KEY not in err
+    assert "unexpected extra arguments (not shown)" in err
+    assert not config_file.exists()
+
+
+def test_set_key_without_a_terminal_saves_nothing(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def no_terminal(prompt: str = "") -> str:
+        raise EOFError
+
+    monkeypatch.setattr(getpass, "getpass", no_terminal)
+    assert main(["configure", "set-key", "openai"]) == 1
+    assert capsys.readouterr().err == "ember: error: no key entered; nothing was saved\n"
+    assert not config_file.exists()
+
+
+def test_context_errors_name_the_file(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_file.write_text("providers:\n  local:\n    kind: bogus\n")
+    assert main(["configure", "show"]) == 1
+    err = capsys.readouterr().err
+    assert err == f"ember: error: {config_file}: provider 'local' has unknown kind 'bogus'; " + (
+        "use openai, anthropic, gemini, openai_compatible\n"
+    )
+
+
+def test_a_file_with_comments_is_not_rewritten(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    text = "providers:\n  openai:  # work account\n    base_url: u\n"
+    config_file.write_text(text)
+    assert main(["configure", "set", "openai", "api_key_env", "WORK_KEY"]) == 1
+    assert f"{config_file} line 2: the file has comments" in capsys.readouterr().err
+    assert config_file.read_text() == text
+
+
+def test_configure_help_says_comments_block_rewrites(capsys: pytest.CaptureFixture[str]) -> None:
+    with pytest.raises(SystemExit):
+        main(["configure", "--help"])
+    assert "comments" in capsys.readouterr().out
 
 
 def test_unset_of_something_not_set_is_an_error(capsys: pytest.CaptureFixture[str]) -> None:
@@ -226,6 +300,6 @@ def test_cli_data_and_eval_never_start_processes_or_prompt() -> None:
                 offences.append(f"{path.name}:{node.lineno} imports {modules}")
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name | ast.Attribute):
                 name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr
-                if name in {"input", "system", "popen", "execv", "spawnv"}:
+                if SPAWNS.fullmatch(name):
                     offences.append(f"{path.name}:{node.lineno} calls {name}")
     assert paths and not offences, offences
