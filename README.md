@@ -118,12 +118,13 @@ from ember import data, models
 from ember.eval import NumericAnswer, run
 
 def solve(example: data.Example) -> str:
-    return models("openai/gpt-5", example.question).text
+    prompt = f"{example.question}\n\nEnd with a line of the form 'Answer: <number>'."
+    return models("openai/gpt-5", prompt).text
 
 records = run(
     solve,
     data.stream("gsm8k", limit=50),  # needs: pip install 'ember-ai[data]'
-    scorer=NumericAnswer(),
+    scorer=NumericAnswer(after="Answer:"),  # reads the number after the last "Answer:"
     records=Path("gsm8k.jsonl"),  # every item and every request attempt
 )
 print(records.summary)  # score, failures, retries, unpriced calls, cost
