@@ -9,7 +9,7 @@ import dataclasses
 from collections.abc import Iterator
 from typing import Protocol, TypeAlias
 
-from ember.llm.request import Request
+from ember.llm.request import Message, Request
 from ember.llm.result import (
     FinishReason,
     ReasoningDelta,
@@ -35,6 +35,9 @@ class Decoded:
         finish_reason: Why generation ended, mapped from the provider's value.
         usage: Token usage as the provider reported it.
         request_id: The provider's id for the request.
+        message: The assistant turn as the provider produced it, reasoning
+            state included, or ``None`` when it produced nothing. `text`,
+            `reasoning` and `tool_calls` are derived from it.
     """
 
     text: str
@@ -43,6 +46,7 @@ class Decoded:
     finish_reason: FinishReason
     usage: Usage
     request_id: str | None
+    message: Message | None
 
 
 StreamItem: TypeAlias = TextDelta | ReasoningDelta | ToolCallDelta | UsageEvent | Decoded

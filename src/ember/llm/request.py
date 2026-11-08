@@ -14,6 +14,7 @@ __all__ = [
     "JsonValue",
     "Message",
     "Part",
+    "ReasoningPart",
     "Request",
     "Role",
     "Sampling",
@@ -23,12 +24,15 @@ __all__ = [
     "ToolName",
     "ToolResultPart",
     "ToolSpec",
+    "WireApi",
 ]
 
 JsonValue: TypeAlias = (
     str | int | float | bool | None | Sequence["JsonValue"] | Mapping[str, "JsonValue"]
 )
 Role = Literal["user", "assistant", "tool"]
+WireApi = Literal["openai_chat", "openai_responses", "anthropic_messages", "gemini"]
+"""A provider wire protocol; each has exactly one codec."""
 ToolName = NewType("ToolName", str)
 """The name of one tool the model must call."""
 
@@ -71,6 +75,29 @@ class ToolCallPart:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
+class ReasoningPart:
+    """Reasoning the assistant produced, kept so the conversation can continue.
+
+    Some providers reject or degrade a tool-use turn whose earlier reasoning
+    is missing from the history (Anthropic thinking blocks, Gemini thought
+    signatures, OpenAI Responses reasoning items). A `Result.message` carries
+    these parts in the order the provider produced them; append that message
+    to the history unchanged. The codec for ``api`` sends ``state`` back
+    exactly as received; codecs for other wire protocols cannot use it and
+    leave the part out.
+
+    Attributes:
+        text: Readable reasoning summary; empty when the provider sent none.
+        api: The wire protocol that produced the part.
+        state: The provider's own data for this reasoning, opaque to callers.
+    """
+
+    text: str
+    api: WireApi
+    state: Mapping[str, JsonValue]
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
 class ToolResultPart:
     """The result of executing a tool call."""
 
@@ -79,12 +106,12 @@ class ToolResultPart:
     is_error: bool = False
 
 
-Part: TypeAlias = TextPart | ImagePart | ToolCallPart | ToolResultPart
+Part: TypeAlias = TextPart | ImagePart | ToolCallPart | ReasoningPart | ToolResultPart
 
 _ALLOWED_PARTS: Mapping[str, tuple[type, ...]] = MappingProxyType(
     {
         "user": (TextPart, ImagePart),
-        "assistant": (TextPart, ToolCallPart),
+        "assistant": (TextPart, ToolCallPart, ReasoningPart),
         "tool": (ToolResultPart,),
     }
 )
@@ -94,8 +121,8 @@ _ALLOWED_PARTS: Mapping[str, tuple[type, ...]] = MappingProxyType(
 class Message:
     """One conversation turn.
 
-    User turns hold text and images, assistant turns hold text and tool calls,
-    and tool turns hold tool results.
+    User turns hold text and images, assistant turns hold text, tool calls and
+    reasoning, and tool turns hold tool results.
     """
 
     role: Role
