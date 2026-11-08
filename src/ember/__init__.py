@@ -1,41 +1,11 @@
-"""Top-level package for the Ember compound AI framework.
+"""Ember: compose model calls into compound AI systems.
 
-Core APIs are available directly from the package:
-
-    import ember
-
-    # Invoke models
-    ember.models("gpt-4", "Hello")
-    ember.models.list()
-
-    # Define operators
-    @ember.op
-    def pipeline(text: str) -> str:
-        return ember.models("gpt-4", text)
-
-    # Load data
-    for record in ember.stream("mmlu", max_items=10):
-        print(record.question)
-
-    data = ember.load("mmlu", max_items=100)
-
-Specialized APIs remain accessible via submodules:
-    - ``ember.api.eval``: Evaluation pipelines
-    - ``ember.api.xcs``: JIT compilation (``jit``, ``vmap``)
-    - ``ember.non``: Experimental NON graph toolkit
+Importing ember reads no files, opens no connections and starts no threads.
+Configuration is read the first time a model call needs it.
 """
-
-from __future__ import annotations
 
 import importlib.metadata
 
-from ember.api.data import load, stream
-from ember.api.decorators import op
-from ember.api.models import models
+__all__ = ["__version__"]
 
-try:
-    __version__ = importlib.metadata.version("ember-ai")
-except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.1.0"
-
-__all__ = ["__version__", "load", "models", "op", "stream"]
+__version__ = importlib.metadata.version("ember-ai")
