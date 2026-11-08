@@ -231,7 +231,15 @@ def test_retryable_failures_are_retried_with_backoff(sleeps: list[float]) -> Non
 
 
 @pytest.mark.parametrize(
-    "kind", [ErrorKind.AUTH, ErrorKind.PERMISSION, ErrorKind.BAD_REQUEST, ErrorKind.NOT_FOUND]
+    "kind",
+    [
+        ErrorKind.AUTH,
+        ErrorKind.PERMISSION,
+        ErrorKind.QUOTA,
+        ErrorKind.BAD_REQUEST,
+        ErrorKind.NOT_FOUND,
+        ErrorKind.MALFORMED,
+    ],
 )
 def test_failures_that_cannot_succeed_on_retry_are_raised_at_once(
     kind: ErrorKind, sleeps: list[float]
@@ -260,13 +268,23 @@ def test_retry_after_is_honoured(sleeps: list[float]) -> None:
     assert sleeps == [2.0]
 
 
-def test_a_retry_after_beyond_max_delay_is_not_retried(sleeps: list[float]) -> None:
-    fake = FakeProvider([_rate_limited(21.0), Reply()])
+@pytest.mark.parametrize("retry_after_s", [20.001, 2.3e9])  # 2.3e9: "Retry-After" in 2099
+def test_a_retry_after_beyond_max_delay_is_raised_not_slept(
+    retry_after_s: float, sleeps: list[float]
+) -> None:
+    fake = FakeProvider([_rate_limited(retry_after_s), Reply()])
     with Client(provider_factory=fake.factory, sleep=sleeps.append) as client:
         with pytest.raises(ModelError) as caught:
             client.complete("gpt-5.5", "hi")
-    assert caught.value.retry_after_s == 21.0
+    assert caught.value.retry_after_s == retry_after_s
     assert (len(fake.requests), sleeps) == (1, [])
+
+
+def test_a_retry_after_at_max_delay_is_honoured(sleeps: list[float]) -> None:
+    fake = FakeProvider([_rate_limited(20.0), Reply()])
+    with Client(provider_factory=fake.factory, sleep=sleeps.append, jitter=lambda: 0.5) as client:
+        client.complete("gpt-5.5", "hi")
+    assert sleeps == [20.0]
 
 
 @pytest.mark.parametrize(
@@ -459,6 +477,29 @@ def test_a_stream_never_read_still_frees_its_permit(client: Client, fake: FakePr
     gc.collect()
     assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
     assert fake.requests == ()
+
+
+@pytest.mark.parametrize(
+    ("surface", "seam"), [(_complete, "dispatch"), (_stream, "dispatch_stream")]
+)
+def test_a_dispatch_that_cannot_start_returns_the_permit(
+    surface: Surface, seam: str, client: Client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = getattr(runtime, seam)
+    failures = iter([RuntimeError("can't start new thread")])
+
+    def start_or_fail(task: Callable[[], object], *, label: str) -> object:
+        failure = next(failures, None)
+        if failure is not None:
+            raise failure
+        return real(task, label=label)
+
+    monkeypatch.setattr(runtime, seam, start_or_fail)
+    with pytest.raises(RuntimeError, match="can't start new thread"):
+        surface(client, "gpt-5.5")
+    assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
+    list(surface(client, "gpt-5.5"))
+    assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
 
 
 # Lifetime.

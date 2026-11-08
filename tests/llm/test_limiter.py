@@ -74,7 +74,15 @@ def test_one_burst_of_rejections_halves_the_limit_once() -> None:
 
 
 @pytest.mark.parametrize(
-    "kind", [ErrorKind.SERVER, ErrorKind.TRANSPORT, ErrorKind.AUTH, ErrorKind.CANCELLED]
+    "kind",
+    [
+        ErrorKind.SERVER,
+        ErrorKind.TRANSPORT,
+        ErrorKind.AUTH,
+        ErrorKind.QUOTA,
+        ErrorKind.MALFORMED,
+        ErrorKind.CANCELLED,
+    ],
 )
 def test_other_failures_leave_the_limit_alone(kind: ErrorKind) -> None:
     limiter = Limiter()

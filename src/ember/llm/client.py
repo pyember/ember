@@ -346,7 +346,11 @@ class Client:
     def send(self, model: ModelName, request: Request) -> Completion:
         """Sends a prepared request; see the module docstring for the steps."""
         call = self._prepare(model, request)
-        future = runtime.dispatch(call.run, label=str(call.spec.ref))
+        try:
+            future = runtime.dispatch(call.run, label=str(call.spec.ref))
+        except BaseException:
+            call.finish()  # The task never started; return its permit and lease.
+            raise
         completion = Completion(future, call.spec.ref)
         if not runtime.deferred():
             runtime.wait(future)
@@ -355,7 +359,11 @@ class Client:
     def send_stream(self, model: ModelName, request: Request) -> Iterator[Event]:
         """Streams a prepared request; checks raise here, before anything is sent."""
         call = self._prepare(model, request)
-        return runtime.dispatch_stream(call.open_events, label=str(call.spec.ref))
+        try:
+            return runtime.dispatch_stream(call.open_events, label=str(call.spec.ref))
+        except BaseException:
+            call.finish()  # The stream never started; return its permit and lease.
+            raise
 
     def limiter_state(self, provider: str) -> LimiterState | None:
         """Returns ``provider``'s current limit and load, or ``None`` before its first call."""
