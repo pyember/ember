@@ -23,12 +23,17 @@ can land between the hub taking a wake from the queue and switching to it, so
 after an interrupt the hub queues again every parked greenlet whose future is
 done; the token makes a duplicate harmless. A child started by `start` returns
 straight to the greenlet that started it the first time it parks.
+
+`hold` keeps a set of children, and every greenlet they started, from
+resuming: their wakes wait until `stop` reaches each one. A map holds all its
+items before it stops any, so while one item unwinds (and perhaps waits in a
+``finally`` block), the others cannot run.
 """
 
 import contextvars
 import os
 import queue
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from typing import Any, TypeVar
 
@@ -54,7 +59,10 @@ class Scheduler:
         self._parked: dict[greenlet.greenlet, tuple[object, Future[Any]]] = {}
         self._hub: greenlet.greenlet | None = None
         self._children: set[greenlet.greenlet] = set()
+        self._spawners: dict[greenlet.greenlet, greenlet.greenlet] = {}
         self._starting: set[greenlet.greenlet] = set()
+        self._held: set[greenlet.greenlet] = set()
+        self._deferred: list[tuple[greenlet.greenlet, object]] = []
         self._closing = False
         self._closed = False
 
@@ -102,20 +110,27 @@ class Scheduler:
         child = greenlet.greenlet(self._child_main(run), parent=spawner)
         child.gr_context = context
         self._children.add(child)
+        self._spawners[child] = spawner
         self._starting.add(child)
         child.switch()
         return child
+
+    def hold(self, children: Iterable[greenlet.greenlet]) -> None:
+        """Keeps ``children``, and every greenlet they started, from resuming until stopped."""
+        self._held.update(child for child in children if not child.dead)
 
     def stop(self, child: greenlet.greenlet) -> None:
         """Ends a suspended child started by `start` and returns once it has finished.
 
         `greenlet.GreenletExit` is raised in the child where it is parked, so
         its ``finally`` blocks run. If the child parks again while unwinding,
-        this waits for it like any other greenlet. Does nothing if the child
-        has finished.
+        this waits for it like any other greenlet. Releases the child from
+        `hold`. Does nothing if the child has finished.
         """
+        self._held.discard(child)
         if child.dead:
             return
+        self._release_deferred()
         child.parent = greenlet.getcurrent()
         child.throw(greenlet.GreenletExit)
 
@@ -139,6 +154,8 @@ class Scheduler:
                 run()
             finally:
                 self._children.discard(current)
+                self._spawners.pop(current, None)
+                self._held.discard(current)
                 self._starting.discard(current)
 
         return main
@@ -177,8 +194,25 @@ class Scheduler:
     def _resume_next(self) -> None:
         parked, token = self._ready.get()
         waiting = self._parked.get(parked)
-        if waiting is not None and waiting[0] is token:
-            parked.switch()
+        if waiting is None or waiting[0] is not token:
+            return
+        if self._is_held(parked):
+            self._deferred.append((parked, token))
+            return
+        parked.switch()
+
+    def _is_held(self, candidate: greenlet.greenlet) -> bool:
+        current: greenlet.greenlet | None = candidate
+        while current is not None:
+            if current in self._held:
+                return True
+            current = self._spawners.get(current)
+        return False
+
+    def _release_deferred(self) -> None:
+        deferred, self._deferred = self._deferred, []
+        for wake in deferred:
+            self._ready.put(wake)
 
     def _queue_done_waits(self) -> None:
         for parked, (token, future) in list(self._parked.items()):

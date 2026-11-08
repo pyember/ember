@@ -113,6 +113,70 @@ def test_an_item_stopped_by_an_interrupt_still_has_its_requests_waited_for() -> 
     assert finished.is_set()
 
 
+def test_other_items_stay_held_while_a_stopped_item_waits_in_its_finally() -> None:
+    log: list[str] = []
+
+    def item(i: int) -> None:
+        if i == 0:
+            try:
+                call(0.5)
+            finally:
+                log.append(f"item 0 cleanup read {call(0.2)}")
+        elif i == 1:
+            call(0.05)
+            raise KeyboardInterrupt
+        else:
+            call(0.1)
+            log.append("item 2 continued past its wait")
+            runtime.dispatch(lambda: log.append("item 2 sent a request"), label="late")
+            call(1.0)
+
+    @xcs.jit
+    def program() -> None:
+        try:
+            xcs.map(item, range(3))
+        except KeyboardInterrupt:
+            log.append("map raised")
+
+    on_own_thread(program)
+    time.sleep(0.1)
+    assert log == ["item 0 cleanup read 0.2", "map raised"]
+
+
+def test_what_a_held_item_started_stays_held_too() -> None:
+    log: list[str] = []
+
+    def unwinding_leaf(_: int) -> None:
+        try:
+            call(0.5)
+        finally:
+            log.append(f"branch 0 leaf cleanup read {call(0.2)}")
+
+    def running_leaf(_: int) -> None:
+        call(0.1)
+        log.append("branch 2 leaf continued past its wait")
+
+    def branch(i: int) -> None:
+        if i == 0:
+            xcs.map(unwinding_leaf, range(1))
+        elif i == 1:
+            call(0.05)
+            raise KeyboardInterrupt
+        else:
+            xcs.map(running_leaf, range(1))
+
+    @xcs.jit
+    def program() -> None:
+        try:
+            xcs.map(branch, range(3))
+        except KeyboardInterrupt:
+            log.append("map raised")
+
+    on_own_thread(program)
+    time.sleep(0.1)
+    assert log == ["branch 0 leaf cleanup read 0.2", "map raised"]
+
+
 def run_script(script: str, tmp_path: Path) -> tuple[subprocess.CompletedProcess[str], float]:
     env = {**os.environ, "HOME": str(tmp_path), "EMBER_CONFIG": str(tmp_path / "none.yaml")}
     started = time.perf_counter()

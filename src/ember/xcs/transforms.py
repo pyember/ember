@@ -196,6 +196,7 @@ class _MapRun:
         self.all_started = False
         self.settled: Future[None] = Future()
         self.reads: set[Call] = set()
+        self.items: list[greenlet.greenlet] = []
 
     def started_all(self) -> None:
         self.all_started = True
@@ -214,7 +215,6 @@ class _MapRun:
 def _map_in(strand: strands.Strand, fn: Callable[[T], R], items: list[T]) -> list[R]:
     run = _MapRun()
     outcomes: list[Future[R]] = []
-    children: list[greenlet.greenlet] = []
     try:
         for item in items:
             if run.failed:
@@ -222,13 +222,14 @@ def _map_in(strand: strands.Strand, fn: Callable[[T], R], items: list[T]) -> lis
             outcome: Future[R] = Future()
             outcomes.append(outcome)
             run.running += 1
-            children.append(strand.spawn(functools.partial(_run_item, run, fn, item, outcome)))
+            run.items.append(strand.spawn(functools.partial(_run_item, run, fn, item, outcome)))
         run.started_all()
         strand.wait(run.settled)
         if run.interrupt is not None:
             raise run.interrupt
     except BaseException:
-        for child in children:
+        strand.scheduler.hold(run.items)
+        for child in run.items:
             strand.scheduler.stop(child)
         raise
     strand.absorb(frozenset(run.reads))
@@ -256,6 +257,7 @@ def _run_item(
         run.failed = True
         if run.interrupt is None and not isinstance(interrupt, greenlet.GreenletExit):
             run.interrupt = interrupt
+            child.scheduler.hold(run.items)
         outcome.set_exception(interrupt)
     else:
         outcome.set_result(result)
