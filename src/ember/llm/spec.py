@@ -120,7 +120,7 @@ class ModelSpec:
             known about such a model's limits or settings, so none are checked
             before sending; the provider rejects what it does not accept.
         sources: The provider pages the identity, limits and settings were
-            read from.
+            read from. The catalog loader requires them for every entry.
         as_of: The date they were read; ``None`` for an unknown model.
     """
 
@@ -145,5 +145,3 @@ class ModelSpec:
                 f"{self.ref}: accepts must include reasoning_effort exactly when "
                 "reasoning_efforts is non-empty"
             )
-        if self.known and (not self.sources or self.as_of is None):
-            raise ValueError(f"{self.ref}: a catalog model needs sources and as_of")

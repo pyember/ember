@@ -109,8 +109,3 @@ def test_model_spec_offers_reasoning_effort_exactly_when_it_lists_efforts() -> N
         ModelSpec(**common, accepts=frozenset({"reasoning_effort"}))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="reasoning_effort"):
         ModelSpec(**common, accepts=frozenset(), reasoning_efforts=frozenset({"low"}))  # type: ignore[arg-type]
-
-
-def test_a_catalog_model_must_say_where_its_values_came_from() -> None:
-    with pytest.raises(ValueError, match="sources and as_of"):
-        ModelSpec(ref=ModelRef("openai", "m"), wire_id="m", api="openai_responses")
