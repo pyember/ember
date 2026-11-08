@@ -1,5 +1,7 @@
 """Model calls: names, requests, results, the catalog, and providers."""
 
+from ember.llm.api import models
+from ember.llm.client import BoundModel, Client, using
 from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
 from ember.llm.request import (
@@ -29,6 +31,8 @@ from ember.llm.result import (
 from ember.llm.spec import ModelSpec, Rates
 
 __all__ = [
+    "BoundModel",
+    "Client",
     "Completion",
     "Done",
     "Event",
@@ -53,4 +57,6 @@ __all__ = [
     "ToolSpec",
     "Usage",
     "UsageEvent",
+    "models",
+    "using",
 ]
