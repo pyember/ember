@@ -44,13 +44,15 @@ class Limiter:
         permit.set_result(None)
 
 
-def limited_call(limiter: Limiter, latency_s: float) -> Callable[[str], str]:
+def limited_call(limiter: Limiter, latency_s: Callable[[str], float]) -> Callable[[str], str]:
+    """A model call shaped like the client's: permit, then dispatch, released in the task."""
+
     def call(prompt: str) -> str:
         runtime.wait(limiter.acquire())
 
         def task() -> str:
             try:
-                time.sleep(latency_s)
+                time.sleep(latency_s(prompt))
                 return prompt
             finally:
                 limiter.release()
@@ -128,10 +130,30 @@ def test_jit_calls_get_slots_in_arrival_order() -> None:
     assert [queue.pop() for _ in range(3)] == ["long", "outsider", "short"]
 
 
+def test_a_limiter_using_the_queue_grants_slots_by_predicted_remaining_path() -> None:
+    durations = {"first": 0.02, "short": 0.01, "long": 0.08, "middle": 0.04}
+    call = limited_call(Limiter(capacity=1), durations.__getitem__)
+    granted: list[str] = []
+
+    def item(name: str) -> None:
+        call(name)
+        granted.append(name)
+
+    @xcs.jit
+    def program() -> None:
+        xcs.map(item, list(durations))
+
+    program()
+    assert granted == ["first", "short", "long", "middle"]
+    granted.clear()
+    program()
+    assert granted == ["first", "long", "middle", "short"]
+
+
 @pytest.mark.slow
 def test_planning_shortens_the_makespan_under_a_capacity_limit() -> None:
     latency_s = 0.15
-    call = limited_call(Limiter(capacity=2), latency_s)
+    call = limited_call(Limiter(capacity=2), lambda _: latency_s)
     singles, chain = 8, 4
 
     def item(i: int) -> str:

@@ -133,7 +133,11 @@ class WaitQueue(Generic[T]):
         self._by_scope: dict[object, list[tuple[float, int, T]]] = {}
 
     def push(self, item: T) -> None:
-        """Adds ``item``, for the request the running greenlet sends next."""
+        """Adds ``item``, for the request the running greenlet sends next.
+
+        Call it on the acquiring greenlet: that is how the queue knows which
+        jit call and which request is waiting.
+        """
         serial = next(self._serial)
         strand = strands.current()
         if strand is None:
@@ -147,6 +151,8 @@ class WaitQueue(Generic[T]):
 
     def pop(self) -> T:
         """Removes and returns the item that gets the freed slot.
+
+        Any thread may call it, such as the worker whose task freed the slot.
 
         Raises:
             IndexError: The queue is empty.
@@ -178,7 +184,9 @@ def _run_call(
 ) -> None:
     try:
         result = context.run(task)
-    except BaseException as error:  # Re-raised unchanged by `wait`, on the reader's thread.
+    # A worker must never die with an unreported error, so whatever the task raises
+    # (SystemExit included) is relayed to the reader, as concurrent.futures does.
+    except BaseException as error:
         call.finished_at = time.monotonic()
         pending.set_exception(error)
     else:
@@ -196,7 +204,8 @@ def _drain(
     error: BaseException | None = None
     try:
         context.run(_pump, channel, source)
-    except BaseException as caught:  # Delivered to the reader after the items before it.
+    # Relayed to the reader after the items before it, for the same reason as `_run_call`.
+    except BaseException as caught:
         error = caught
     call.finished_at = time.monotonic()
     channel.end(error)
