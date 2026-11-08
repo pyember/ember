@@ -34,7 +34,9 @@ ToolName = NewType("ToolName", str)
 
 ToolChoice: TypeAlias = Literal["auto", "none", "required"] | ToolName
 
-_EMPTY: Mapping[str, JsonValue] = MappingProxyType({})
+
+def _no_extensions() -> Mapping[str, JsonValue]:
+    return MappingProxyType({})
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -189,7 +191,7 @@ class Request:
     tool_choice: ToolChoice = "auto"
     sampling: Sampling = DEFAULT_SAMPLING
     output_schema: Mapping[str, JsonValue] | None = None
-    extensions: Mapping[str, JsonValue] = _EMPTY
+    extensions: Mapping[str, JsonValue] = dataclasses.field(default_factory=_no_extensions)
 
     def __post_init__(self) -> None:
         if not self.messages:

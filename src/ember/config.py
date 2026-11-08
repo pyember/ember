@@ -52,11 +52,13 @@ class ConfigData:
         retry: Raw retry policy fields.
     """
 
-    providers: Mapping[str, Mapping[str, str]] = MappingProxyType({})
+    providers: Mapping[str, Mapping[str, str]] = dataclasses.field(
+        default_factory=lambda: MappingProxyType({})
+    )
     default_model: str | None = None
     require_price: bool = False
     max_in_flight_per_provider: int = 64
-    retry: Mapping[str, float] = MappingProxyType({})
+    retry: Mapping[str, float] = dataclasses.field(default_factory=lambda: MappingProxyType({}))
 
 
 def config_path() -> Path:
