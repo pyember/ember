@@ -19,6 +19,7 @@ import time
 from collections.abc import Callable
 from typing import Literal
 
+import clientmodel
 import fakemodel
 import orchard
 import pytest
@@ -28,7 +29,16 @@ from ember.errors import ModelError
 
 Program = Callable[..., object]
 Transform = Callable[[Program], Program]
-Drive = Callable[[Transform, fakemodel.FakeModel], object]
+Model = fakemodel.FakeModel | clientmodel.ClientModel
+Backend = Callable[..., Model]
+Drive = Callable[[Transform, Model], object]
+
+# Every case runs against the test fake, which dispatches through the runtime
+# directly, and against the real client through `ember.models`.
+BACKENDS = [
+    pytest.param(fakemodel.FakeModel, id="fake"),
+    pytest.param(clientmodel.ClientModel, id="client"),
+]
 
 SEMANTIC_LATENCY_S = 0.005
 OVERLAP_LATENCY_S = 0.25
@@ -85,14 +95,14 @@ def call(program: Program, *args: object, **kwargs: object) -> Drive:
 def repeat(program: Program, times: int, *args: object) -> Drive:
     """Calls one transformed program several times; nothing may carry over."""
 
-    def drive(transform: Transform, model: fakemodel.FakeModel) -> object:
+    def drive(transform: Transform, model: Model) -> object:
         transformed = transform(program)
         return [transformed(model, *args) for _ in range(times)]
 
     return drive
 
 
-def drive_persona(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_persona(transform: Transform, model: Model) -> object:
     reply = transform(orchard.persona_reply)
     answers = []
     for name in ("pirate", "lawyer", "lawyer"):
@@ -101,7 +111,7 @@ def drive_persona(transform: Transform, model: fakemodel.FakeModel) -> object:
     return answers
 
 
-def drive_aliasing(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_aliasing(transform: Transform, model: Model) -> object:
     aliased = transform(orchard.aliased_arguments)
     same: list[str] = []
     first = aliased(model, same, same)
@@ -111,7 +121,7 @@ def drive_aliasing(transform: Transform, model: fakemodel.FakeModel) -> object:
     return [first, same, second, dst, src]
 
 
-def drive_fanout(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_fanout(transform: Transform, model: Model) -> object:
     fanout = transform(orchard.fanout_from_global)
     answers = []
     for n in (1, 2, 2):
@@ -120,7 +130,7 @@ def drive_fanout(transform: Transform, model: fakemodel.FakeModel) -> object:
     return answers
 
 
-def drive_session(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_session(transform: Transform, model: Model) -> object:
     chat = transform(orchard.session_chat)
     session = orchard.Session()
     session.history.append("hello")
@@ -129,14 +139,14 @@ def drive_session(transform: Transform, model: fakemodel.FakeModel) -> object:
     return [first, chat(model, session, "q")]
 
 
-def drive_shared_config(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_shared_config(transform: Transform, model: Model) -> object:
     shared = transform(orchard.shared_config)
     first = shared(model, "x")
     orchard.CONFIG["k"] = 2
     return [first, shared(model, "x")]
 
 
-def drive_config_keywords(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_config_keywords(transform: Transform, model: Model) -> object:
     return [
         transform(orchard.send)(model, "m", config="prod"),
         transform(orchard.send)(model, "m", config={"parallel": False}),
@@ -144,12 +154,12 @@ def drive_config_keywords(transform: Transform, model: fakemodel.FakeModel) -> o
     ]
 
 
-def drive_temperature(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_temperature(transform: Transform, model: Model) -> object:
     ask = transform(orchard.ask_with_temperature)
     return [ask(model, "hi"), ask(model, "hi"), ask(model, "hi", temperature=0.1)]
 
 
-def drive_returned_stream(transform: Transform, model: fakemodel.FakeModel) -> object:
+def drive_returned_stream(transform: Transform, model: Model) -> object:
     stream = transform(orchard.returned_stream)(model, "a stream")
     orchard.note("reading after return")
     return "".join(stream)
@@ -212,15 +222,22 @@ CASES = [
 
 
 def execute(
-    case: Case, transform: Transform, latency_s: float, *, arrives_before_return: bool = False
+    case: Case,
+    transform: Transform,
+    latency_s: float,
+    *,
+    backend: Backend = fakemodel.FakeModel,
+    arrives_before_return: bool = False,
 ) -> Run:
     orchard.reset()
-    model = fakemodel.FakeModel(latency_s, case.answer, arrives_before_return=arrives_before_return)
+    model = backend(latency_s, case.answer, arrives_before_return=arrives_before_return)
     started = time.perf_counter()
     try:
         outcome: object = case.drive(transform, model)
     except Exception as error:  # The outcome under test; compared below.
         outcome = error
+    finally:
+        model.close()
     wall_s = time.perf_counter() - started
     return Run(
         outcome=outcome,
@@ -275,10 +292,11 @@ def divergences(case: Case, expected: Run, actual: Run) -> list[str]:
     return found
 
 
+@pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
-def test_jit_matches_plain(case: Case) -> None:
-    plain_run = execute(case, plain, SEMANTIC_LATENCY_S)
-    jit_run = execute(case, xcs.jit, SEMANTIC_LATENCY_S)
+def test_jit_matches_plain(case: Case, backend: Backend) -> None:
+    plain_run = execute(case, plain, SEMANTIC_LATENCY_S, backend=backend)
+    jit_run = execute(case, xcs.jit, SEMANTIC_LATENCY_S, backend=backend)
     assert divergences(case, plain_run, jit_run) == []
 
 
@@ -286,10 +304,11 @@ OVERLAP_CASES = [pytest.param(case, id=case.name) for case in CASES if case.inde
 
 
 @pytest.mark.slow
+@pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("case", OVERLAP_CASES)
-def test_jit_overlaps_independent_calls(case: Case) -> None:
-    plain_run = execute(case, plain, OVERLAP_LATENCY_S)
-    jit_run = execute(case, xcs.jit, OVERLAP_LATENCY_S)
+def test_jit_overlaps_independent_calls(case: Case, backend: Backend) -> None:
+    plain_run = execute(case, plain, OVERLAP_LATENCY_S, backend=backend)
+    jit_run = execute(case, xcs.jit, OVERLAP_LATENCY_S, backend=backend)
 
     assert jit_run.wall_s <= OVERLAP_LATENCY_S + OVERHEAD_S, (
         f"{case.independent} independent calls of {OVERLAP_LATENCY_S}s took "
@@ -299,7 +318,7 @@ def test_jit_overlaps_independent_calls(case: Case) -> None:
 
 
 def test_programs_live_in_unremarkable_modules() -> None:
-    for module in (orchard, fakemodel):
+    for module in (orchard, fakemodel, clientmodel):
         assert not module.__name__.startswith(("ember", "test", "__main__")), module.__name__
 
 
@@ -368,17 +387,23 @@ FAIL_THEN_CONTINUE = Case(
 )
 
 
+@pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("transform", [plain, xcs.jit], ids=["plain", "jit"])
-def test_failure_raises_at_the_same_place_however_fast_it_arrives(transform: Transform) -> None:
-    instant = execute(FAIL_THEN_CONTINUE, transform, 0.0, arrives_before_return=True)
-    delayed = execute(FAIL_THEN_CONTINUE, transform, 0.05)
+def test_failure_raises_at_the_same_place_however_fast_it_arrives(
+    transform: Transform, backend: Backend
+) -> None:
+    instant = execute(
+        FAIL_THEN_CONTINUE, transform, 0.0, backend=backend, arrives_before_return=True
+    )
+    delayed = execute(FAIL_THEN_CONTINUE, transform, 0.05, backend=backend)
     same_place = dataclasses.replace(FAIL_THEN_CONTINUE, raises_late=False)
     assert divergences(same_place, instant, delayed) == []
 
 
-def test_failure_raises_at_the_call_outside_jit_and_at_the_read_inside() -> None:
-    plain_run = execute(FAIL_THEN_CONTINUE, plain, 0.0, arrives_before_return=True)
-    jit_run = execute(FAIL_THEN_CONTINUE, xcs.jit, 0.0, arrives_before_return=True)
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_failure_raises_at_the_call_outside_jit_and_at_the_read_inside(backend: Backend) -> None:
+    plain_run = execute(FAIL_THEN_CONTINUE, plain, 0.0, backend=backend, arrives_before_return=True)
+    jit_run = execute(FAIL_THEN_CONTINUE, xcs.jit, 0.0, backend=backend, arrives_before_return=True)
     assert plain_run.effects == [("before",)]
     assert jit_run.effects == [("before",), ("after the failing call",), ("after the next call",)]
     assert divergences(FAIL_THEN_CONTINUE, plain_run, jit_run) == []

@@ -74,6 +74,9 @@ class FakeModel:
             lambda: self._serve_stream(request, reached_at), label=str(REF)
         )
 
+    def close(self) -> None:
+        """Nothing to release; present so the oracle can close any model."""
+
     def requests(self) -> collections.Counter[str]:
         """The multiset of requests served so far."""
         with self._lock:
