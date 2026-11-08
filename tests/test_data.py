@@ -3,6 +3,7 @@
 import dataclasses
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 from types import MappingProxyType
 
 import pytest
@@ -21,6 +22,11 @@ GSM8K_ROW = {
     "answer": "Janet sells 16 - 3 - 4 = <<16-3-4=9>>9 duck eggs a day.\n"
     "She makes 9 * 2 = $<<9*2=18>>18 every day.\n#### 18",
 }
+
+
+# Hub commits read from https://huggingface.co/api/datasets/<id> on 2026-11-07.
+MMLU_SHA = "c30699e8356da336a370243923dbaf21066bb9fe"
+GSM8K_SHA = "740312add88f781978c0658806c59bc2815b9866"
 
 
 class FakeHub:
@@ -84,7 +90,7 @@ def test_stream_opens_the_pinned_repository_without_remote_code(hub: FakeHub) ->
     examples = list(data.stream("mmlu"))
     assert [example.answer for example in examples] == ["B", "D", "A"]
     assert hub.calls == [
-        (("cais/mmlu", "all"), {"split": "test", "streaming": True, "revision": None})
+        (("cais/mmlu", "all"), {"split": "test", "streaming": True, "revision": MMLU_SHA})
     ]
 
 
@@ -153,3 +159,81 @@ def test_missing_extra_names_the_install_command(monkeypatch: pytest.MonkeyPatch
 def test_invalid_examples_cannot_be_built(kwargs: dict[str, object], message: str) -> None:
     with pytest.raises(ValueError, match=message):
         Example(**kwargs)  # type: ignore[arg-type]
+
+
+def test_named_datasets_are_pinned_to_a_hub_commit() -> None:
+    # The design promised pinned datasets; v0.2's first cut read the moving default branch.
+    assert DATASETS["mmlu"].revision == MMLU_SHA
+    assert DATASETS["gsm8k"].revision == GSM8K_SHA
+
+
+def test_a_stream_says_where_its_examples_come_from(hub: FakeHub) -> None:
+    examples = data.stream("mmlu", split="dev", limit=2)
+    assert examples.source == data.Source("cais/mmlu", "all", "dev", MMLU_SHA, 2)
+    assert len(list(examples)) == 2
+
+
+def test_an_empty_split_is_rejected(hub: FakeHub) -> None:
+    with pytest.raises(ValueError, match="split must be a non-empty string"):
+        data.stream("mmlu", split="")
+    assert hub.calls == []
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"path": ""}, "path must be a non-empty string"),
+        ({"split": ""}, "split must be a non-empty string"),
+        ({"config": ""}, "config must be None or a non-empty string"),
+        ({"revision": ""}, "revision must be None or a non-empty string"),
+    ],
+)
+def test_invalid_datasets_cannot_be_built(kwargs: dict[str, str], message: str) -> None:
+    fields = {"path": "a/b", "config": None, "split": "train", "revision": None} | kwargs
+    with pytest.raises(ValueError, match=message):
+        Dataset(to_example=DATASETS["gsm8k"].to_example, **fields)  # type: ignore[arg-type]
+
+
+def test_a_broken_install_is_not_reported_as_a_missing_extra(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    broken = tmp_path / "datasets"
+    broken.mkdir()
+    (broken / "__init__.py").write_text("import ember_test_missing_dependency\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+    monkeypatch.delitem(sys.modules, "datasets")
+    with pytest.raises(ImportError) as raised:
+        data.stream("gsm8k")
+    assert raised.value.name == "ember_test_missing_dependency"
+    assert "ember-ai[data]" not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"question": "q", "answer": 4}, "answer must be a string"),
+        ({"question": None, "answer": "4"}, "question must be a string"),
+        ({"question": "q", "answer": "A", "choices": ["x", "y"]}, "choices must be a tuple"),
+        ({"question": "q", "answer": "A", "choices": ("x", 2)}, "choices must be a tuple"),
+        ({"question": "q", "answer": "4", "metadata": {"n": 1}}, "metadata must map strings"),
+    ],
+)
+def test_wrongly_typed_examples_raise_value_error(kwargs: dict[str, object], message: str) -> None:
+    # v0.1-style rows with an integer answer raised AttributeError, which lost the row position.
+    with pytest.raises(ValueError, match=message):
+        Example(**kwargs)  # type: ignore[arg-type]
+
+
+def test_examples_own_their_metadata_and_hash() -> None:
+    metadata = {"subject": "algebra"}
+    example = Example(question="q", answer="4", metadata=metadata)
+    metadata["subject"] = "changed"
+    assert example.metadata == {"subject": "algebra"}
+    assert hash(example) == hash(Example(question="q", answer="4"))
+
+
+def test_a_mapping_that_builds_a_bad_example_names_the_row(hub: FakeHub) -> None:
+    hub.rows = [{"q": "2+2?", "a": 4}]
+    spec = Dataset("someone/arith", None, "train", lambda row: Example(row["q"], row["a"]))  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match=r"someone/arith \(default, train\) row 0: answer must"):
+        list(data.stream(spec))

@@ -11,8 +11,8 @@ Example:
     ['gsm8k', 'mmlu']
 """
 
-from ember.data.example import LETTERS, Dataset, Example, Row
+from ember.data.example import LETTERS, Dataset, Example, Row, Source
 from ember.data.named import DATASETS
-from ember.data.stream import stream
+from ember.data.stream import Stream, stream
 
-__all__ = ["DATASETS", "LETTERS", "Dataset", "Example", "Row", "stream"]
+__all__ = ["DATASETS", "LETTERS", "Dataset", "Example", "Row", "Source", "Stream", "stream"]

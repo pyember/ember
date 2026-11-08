@@ -55,10 +55,25 @@ def _gsm8k_example(row: Row) -> Example:
     )
 
 
+# Each revision is the repository's commit as read from
+# https://huggingface.co/api/datasets/<id> ("sha") on 2026-11-07. Moving a pin
+# changes what a named dataset means, so it is a deliberate, reviewed change.
 DATASETS: Mapping[str, Dataset] = MappingProxyType(
     {
-        "mmlu": Dataset("cais/mmlu", "all", "test", _mmlu_example),
-        "gsm8k": Dataset("openai/gsm8k", "main", "test", _gsm8k_example),
+        "mmlu": Dataset(
+            "cais/mmlu",
+            "all",
+            "test",
+            _mmlu_example,
+            revision="c30699e8356da336a370243923dbaf21066bb9fe",
+        ),
+        "gsm8k": Dataset(
+            "openai/gsm8k",
+            "main",
+            "test",
+            _gsm8k_example,
+            revision="740312add88f781978c0658806c59bc2815b9866",
+        ),
     }
 )
-"""Datasets `ember.data.stream` accepts by name."""
+"""Datasets `ember.data.stream` accepts by name, each pinned to a Hub commit."""
