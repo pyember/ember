@@ -272,7 +272,9 @@ class RunRecords:
 
     Attributes:
         header: The run's first record.
-        items: The item records, in the order they finished.
+        items: The item records, in index order. The run file holds them in
+            the order the items finished, which can differ when items run
+            concurrently.
         summary: Computed from ``items``.
         end: The last record, or `CutOff` when the file stops before it.
     """

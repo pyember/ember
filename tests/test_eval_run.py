@@ -299,11 +299,29 @@ def test_unknown_outcome_values_are_rejected(tmp_path: Path, line: int, key: str
         ember_eval.read_run(path)
 
 
-def test_items_out_of_order_are_rejected(tmp_path: Path) -> None:
+def test_items_that_finished_out_of_order_read_back_in_index_order(tmp_path: Path) -> None:
+    # Records are written as items finish, which under xcs.map need not be index order.
+    path = three_answered_items(tmp_path)
+    in_order = ember_eval.read_run(path)
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join([lines[0], lines[3], lines[1], lines[2], *lines[4:]]))
+    assert ember_eval.read_run(path) == in_order
+    assert [item.index for item in in_order.items] == [0, 1, 2]
+
+
+def test_a_repeated_item_index_is_rejected(tmp_path: Path) -> None:
     path = three_answered_items(tmp_path)
     lines = path.read_text().splitlines(keepends=True)
-    path.write_text("".join([lines[0], lines[2], lines[1], *lines[3:]]))
-    with pytest.raises(ValueError, match="line 2: item index 1, expected 0"):
+    path.write_text("".join([lines[0], lines[1], lines[1], *lines[3:]]))
+    with pytest.raises(ValueError, match="line 3: item index 0 appears twice"):
+        ember_eval.read_run(path)
+
+
+def test_a_finished_run_with_a_missing_item_is_rejected(tmp_path: Path) -> None:
+    path = three_answered_items(tmp_path)
+    lines = path.read_text().splitlines(keepends=True)
+    path.write_text("".join([lines[0], lines[1], *lines[3:]]))
+    with pytest.raises(ValueError, match="finished run is missing item 1"):
         ember_eval.read_run(path)
 
 

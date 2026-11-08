@@ -122,30 +122,48 @@ def _decimal(number: str) -> decimal.Decimal:
 class MultipleChoice:
     """Correct when the chosen letter is the answer's letter.
 
-    The chosen letter is the one in the last line of the form ``Answer: X``
-    (``Answer`` in any case, ``X`` alone on the rest of the line, optionally in
-    parentheses or followed by a period), or the whole output when it is a
-    single letter such as ``B``, ``(B)`` or ``B.``. Only the letters of the
-    example's choices count, and ``*`` emphasis is ignored, so
-    ``**Answer: B**`` reads as ``B``. Text after the letter on its line, as in
-    ``Answer: A careful reading...``, means the line is not an answer.
-    `multiple_choice_prompt` asks for exactly this format.
+    The chosen letter comes from the last ``Answer:`` line (``Answer`` in any
+    case) whose rest is a choice's letter, optionally in parentheses or followed
+    by ``)`` or ``.``, and then either nothing or exactly that choice's text: so
+    ``Answer: C``, ``Answer: (C).``, ``Answer: C) 4`` and ``Answer: C. 4`` all
+    choose C when C is ``4``. Any other text after the letter, as in
+    ``Answer: A careful reading...``, makes the line not an answer. Without
+    such a line, an output that is a single letter (``B``, ``(B)``, ``B.``)
+    is the choice. Only the letters of the example's choices count, and ``*``
+    emphasis is ignored. `multiple_choice_prompt` asks for this format.
     """
 
     def __call__(self, example: Example, output: str, /) -> Score:
         if not example.choices:
             raise ValueError("MultipleChoice scores multiple-choice examples; this one has none")
-        letters = LETTERS[: len(example.choices)]
         text = output.replace("*", "")
-        marked = re.findall(
-            rf"(?i:answer)[^\S\n]*:[^\S\n]*\(?([{letters}])\)?\.?[^\S\n]*$", text, re.MULTILINE
-        )
-        if marked:
-            chosen: str | None = marked[-1]
-        else:
-            alone = re.fullmatch(rf"\(?([{letters}])\)?\.?", text.strip())
-            chosen = alone.group(1) if alone else None
+        lines = re.findall(r"(?i:answer)[^\S\n]*:([^\n]*)", text)
+        answered = [_choice_on_line(rest, example.choices) for rest in lines]
+        chosen = next((letter for letter in reversed(answered) if letter is not None), None)
+        if chosen is None:
+            chosen = _choice_on_line(text, example.choices, allow_option_text=False)
         return Score(1.0 if chosen == example.answer else 0.0, chosen)
+
+
+_LETTER_THEN_TEXT = re.compile(r"\(?([A-Z])\)?\.?(?:\s+(.*))?", re.DOTALL)
+
+
+def _choice_on_line(
+    text: str, choices: tuple[str, ...], *, allow_option_text: bool = True
+) -> str | None:
+    """The letter ``text`` chooses: a letter, then nothing or that choice's own text."""
+    match = _LETTER_THEN_TEXT.fullmatch(text.strip())
+    if match is None:
+        return None
+    letter, option_text = match.groups()
+    index = LETTERS.index(letter)
+    if index >= len(choices):
+        return None
+    if option_text is not None and (
+        not allow_option_text or option_text.strip() != choices[index].strip()
+    ):
+        return None
+    return str(letter)
 
 
 def multiple_choice_prompt(example: Example) -> str:

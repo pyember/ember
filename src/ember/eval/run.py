@@ -78,8 +78,9 @@ def run(
     Raises:
         FileExistsError: ``records`` already exists.
         FileNotFoundError: The directory for ``records`` does not exist.
-        Exception: Whatever the task, scorer, encoders or ``items`` raised,
-            other than ``item_errors`` from the task.
+        Exception: Whatever ``items``, ``encode_item``, the task, the scorer
+            or ``encode_output`` raised, except ``item_errors`` raised by the
+            last three, which fail only their item.
     """
     runner = _ItemRunner(task, scorer, encode_item, encode_output, item_errors)
     header = RunHeader(
@@ -105,7 +106,11 @@ def run(
         end = RunEnd(time.perf_counter() - started, None)
         summary = summarize(done)
         writer.end(end, summary)
-    return RunRecords(header, tuple(done), summary, end)
+    return RunRecords(header, tuple(sorted(done, key=_by_index)), summary, end)
+
+
+def _by_index(record: ItemRecord) -> int:
+    return record.index
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

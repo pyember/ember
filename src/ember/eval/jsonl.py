@@ -8,7 +8,10 @@ Every line carries ``"schema": 1`` and a ``"type"``:
   cut off mid-run; everything before the cut is still readable, and an
   incomplete last line is dropped.
 
-Item records appear in index order.
+Item records appear in the order the items finished, so a run that dies
+loses no finished item; each index appears once, and a run that finished
+without an abort has every index from 0. `read_run` returns them in index
+order.
 
 This module is the only code that writes or parses that format.
 """
@@ -90,14 +93,16 @@ def read_run(path: Path) -> RunRecords:
     Raises:
         FileNotFoundError: ``path`` does not exist.
         ValueError: A line other than an unterminated last one is not a valid
-            record of schema version 1, the records are out of order, or the
-            summary written at the end does not match the item records.
+            record of schema version 1, the records are out of order, an item
+            index repeats or a finished run lacks one, or the summary written at
+            the end does not match the item records.
     """
     records, partial_dropped = _parse_lines(path)
     if not records:
         raise ValueError(f"{path}: empty run file")
     header = _decode_header(records[0].of_type("run"))
     items: list[ItemRecord] = []
+    seen: set[int] = set()
     end: tuple[RunEnd, Summary] | None = None
     for record in records[1:]:
         if end is not None:
@@ -106,9 +111,16 @@ def read_run(path: Path) -> RunRecords:
             end = _decode_end(record)
             continue
         item = _decode_item(record.of_type("item"))
-        if item.index != len(items):
-            raise ValueError(f"{record.where}: item index {item.index}, expected {len(items)}")
+        if item.index < 0 or item.index in seen:
+            problem = "is negative" if item.index < 0 else "appears twice"
+            raise ValueError(f"{record.where}: item index {item.index} {problem}")
+        seen.add(item.index)
         items.append(item)
+    if end is not None and end[0].abort is None:
+        missing = next((index for index in range(len(items)) if index not in seen), None)
+        if missing is not None:
+            raise ValueError(f"{path}: the finished run is missing item {missing}")
+    items.sort(key=_by_index)
     summary = summarize(items)
     if end is not None and partial_dropped:
         raise ValueError(f"{path}: unterminated text after the end record")
@@ -117,6 +129,10 @@ def read_run(path: Path) -> RunRecords:
     if end[1] != summary:
         raise ValueError(f"{path}: the end record's summary does not match the item records")
     return RunRecords(header, tuple(items), summary, end[0])
+
+
+def _by_index(item: ItemRecord) -> int:
+    return item.index
 
 
 def _parse_lines(path: Path) -> tuple[list["_Fields"], bool]:
