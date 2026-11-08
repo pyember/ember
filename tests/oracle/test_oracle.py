@@ -259,12 +259,7 @@ def test_jit_matches_plain(case: Case) -> None:
     assert divergences(case, plain_run, jit_run) == []
 
 
-NOT_YET_CONCURRENT = pytest.mark.xfail(
-    strict=True, reason="the synchronous runtime runs one call at a time"
-)
-OVERLAP_CASES = [
-    pytest.param(case, id=case.name, marks=NOT_YET_CONCURRENT) for case in CASES if case.independent
-]
+OVERLAP_CASES = [pytest.param(case, id=case.name) for case in CASES if case.independent]
 
 
 @pytest.mark.slow

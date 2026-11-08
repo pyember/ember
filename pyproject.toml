@@ -33,6 +33,7 @@ dev = [
     "mypy>=1.11",
     "pytest>=8.3",
     "ruff>=0.6",
+    "types-greenlet>=3.0",
     "types-pyyaml>=6.0",
 ]
 

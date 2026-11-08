@@ -13,18 +13,26 @@
 The limiter keeps the acquirers waiting for capacity in a `WaitQueue`, which
 decides who gets each freed slot.
 
+Inside `@xcs.jit` and `xcs.map`, `dispatch` returns a pending future at once
+and waiting lets other greenlets run. Outside them everything runs
+synchronously on the caller's thread, like plain Python.
+
 Tasks given to `dispatch` and `dispatch_stream` are leaf network I/O: they
 never call back into ember and never wait on other ember work, so worker
-threads cannot deadlock on each other.
-
-Until the scheduler lands, everything runs synchronously on the caller's
-thread, which is the behaviour outside `@xcs.jit` and `xcs.map` anyway.
+threads cannot deadlock on each other. Each runs in a copy of the context
+that was active where it was dispatched.
 """
 
 import collections
-from collections.abc import Callable, Iterator
+import contextvars
+import time
+from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import Future
 from typing import Generic, TypeVar
+
+from ember.xcs import strands, workers
+from ember.xcs.frames import Call, Pending
+from ember.xcs.streams import Channel, Ended, Item, Waiting
 
 __all__ = ["WaitQueue", "deferred", "dispatch", "dispatch_stream", "wait"]
 
@@ -34,34 +42,48 @@ T = TypeVar("T")
 def dispatch(task: Callable[[], T], *, label: str) -> "Future[T]":
     """Starts ``task`` and returns a future for its result.
 
+    Inside a scope the task runs on a worker thread and the future is
+    pending; outside one the task has already run when this returns.
+
     Args:
         task: One request's network I/O. It must not call into ember.
         label: Short description for recorded graphs, such as the model id.
     """
-    del label  # Recorded by the scheduler; unused when calls run synchronously.
-    future: Future[T] = Future()
-    try:
-        future.set_result(task())
-    except Exception as exc:  # Not handled here: `wait` re-raises it unchanged.
-        future.set_exception(exc)
-    return future
+    strand = strands.current()
+    if strand is None:
+        return _run_now(task)
+    call = strand.next_call(label)
+    pending: Pending[T] = Pending(frozenset({call}))
+    strand.frame.track(pending)
+    context = contextvars.copy_context()
+    workers.submit(lambda: _run_call(call, pending, context, task))
+    return pending
 
 
 def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterator[T]:
     """Starts a streaming request and returns an iterator over its items.
 
-    The scheduler drains ``source`` on a worker thread; the caller reads items
-    in order, and waiting for the next item lets other greenlets run. An error
-    raised by ``source`` is raised by the iterator, unchanged, after the items
-    that preceded it.
+    Inside a scope a worker drains ``source`` as items arrive, and waiting for
+    the next item lets other greenlets run. An error raised by ``source`` is
+    raised by the iterator, unchanged, after the items that preceded it.
+    Closing the iterator early stops the worker after its current item.
+    Outside a scope this returns ``source()`` itself.
 
     Args:
         source: Opens the stream and yields its items. It must not call into
             ember.
         label: Short description for recorded graphs.
     """
-    del label
-    return source()
+    strand = strands.current()
+    if strand is None:
+        return source()
+    call = strand.next_call(label)
+    drained: Pending[None] = Pending(frozenset({call}))
+    strand.frame.track(drained)
+    channel: Channel[T] = Channel()
+    context = contextvars.copy_context()
+    workers.submit(lambda: _drain(call, drained, channel, context, source))
+    return _read(channel, drained)
 
 
 def deferred() -> bool:
@@ -69,22 +91,33 @@ def deferred() -> bool:
 
     True inside `@xcs.jit` and `xcs.map`: a call returns a pending result at
     once and a failure raises when that result is first read. False
-    everywhere else: a call waits and raises at the call site, like any
-    synchronous function. The answer depends only on scope, never on timing.
+    everywhere else, including on worker threads: a call waits and raises at
+    the call site, like any synchronous function. The answer depends only on
+    scope, never on timing.
     """
-    return False
+    return strands.current() is not None
 
 
 def wait(future: "Future[T]") -> T:
-    """Returns the result of ``future``, raising its exception unchanged."""
+    """Returns the result of ``future``, raising its exception unchanged.
+
+    Inside a scope other greenlets run until ``future`` is done.
+    """
+    strand = strands.current()
+    if strand is not None:
+        strand.wait(future)
+    if isinstance(future, Pending):
+        future.read = True
+        if strand is not None:
+            strand.absorb(future.produced_by)
     return future.result()
 
 
 class WaitQueue(Generic[T]):
     """Acquirers waiting for a shared capacity, such as a provider's permits.
 
-    The scheduler decides who gets each freed slot. Until it lands, slots go
-    in arrival order. Not thread-safe: the owner calls it under its own lock.
+    The scheduler decides who gets each freed slot. For now, slots go in
+    arrival order. Not thread-safe: the owner calls it under its own lock.
     """
 
     def __init__(self) -> None:
@@ -106,3 +139,76 @@ class WaitQueue(Generic[T]):
 
     def __len__(self) -> int:
         return len(self._items)
+
+
+def _run_now(task: Callable[[], T]) -> "Future[T]":
+    future: Future[T] = Future()
+    try:
+        future.set_result(task())
+    except Exception as error:  # Re-raised unchanged by `wait`.
+        future.set_exception(error)
+    return future
+
+
+def _run_call(
+    call: Call, pending: "Pending[T]", context: contextvars.Context, task: Callable[[], T]
+) -> None:
+    try:
+        result = context.run(task)
+    except BaseException as error:  # Re-raised unchanged by `wait`, on the reader's thread.
+        call.finished_at = time.monotonic()
+        pending.set_exception(error)
+    else:
+        call.finished_at = time.monotonic()
+        pending.set_result(result)
+
+
+def _drain(
+    call: Call,
+    drained: "Pending[None]",
+    channel: Channel[T],
+    context: contextvars.Context,
+    source: Callable[[], Iterator[T]],
+) -> None:
+    error: BaseException | None = None
+    try:
+        context.run(_pump, channel, source)
+    except BaseException as caught:  # Delivered to the reader after the items before it.
+        error = caught
+    call.finished_at = time.monotonic()
+    channel.end(error)
+    if error is None:
+        drained.set_result(None)
+    else:
+        drained.set_exception(error)
+
+
+def _pump(channel: Channel[T], source: Callable[[], Iterator[T]]) -> None:
+    items = source()
+    try:
+        for item in items:
+            if not channel.put(item):
+                return
+    finally:
+        if isinstance(items, Generator):
+            items.close()
+
+
+def _read(channel: Channel[T], drained: "Pending[None]") -> Iterator[T]:
+    try:
+        while True:
+            step = channel.take()
+            if isinstance(step, Waiting):
+                wait(step.future)
+            elif isinstance(step, Ended):
+                if step.error is not None:
+                    raise step.error
+                return
+            elif isinstance(step, Item):
+                strand = strands.current()
+                if strand is not None:
+                    strand.absorb(drained.produced_by)
+                yield step.value
+    finally:
+        drained.read = True
+        channel.close()
