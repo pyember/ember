@@ -15,7 +15,7 @@ from ember.llm.request import Message
 from ember.operators.verifier import VERIFY_INSTRUCTIONS
 
 ROOT = Path(__file__).resolve().parents[1]
-FILES = ("docs/operators.md", "docs/non.md")
+FILES = ("README.md", "docs/operators.md", "docs/non.md")
 _BLOCK = re.compile(r"^```python\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
 

@@ -1,73 +1,33 @@
 # Contributing to Ember
 
-We welcome contributions that align with Ember's philosophy of simplicity and power.
-
-## Development Setup
+## Setup
 
 ```bash
-# Clone the repository
 git clone https://github.com/pyember/ember.git
 cd ember
-
-# Install dependencies with uv
-uv sync --all-extras
-
-# Run tests
-uv run pytest
-
-# Type checking
-uv run mypy src/
-
-# Linting and formatting
-uv run ruff check . --fix
-uv run ruff format .
+uv sync --group dev --all-extras
 ```
 
-## Code Standards
+## Before you open a pull request
 
-- **Style**: Google Python Style Guide with 100-character line limit
-- **Types**: Strict typing; aim for mypy `--strict` cleanliness
-- **Tests**: Maintain test coverage; add tests for new functionality
-- **Docs**: Google docstring format with Args/Returns/Raises sections
+```bash
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy                      # strict, over src/
+uv run pytest tests/<area>       # CI runs the whole suite on Python 3.11 and 3.13
+```
 
-## Pull Request Process
+## What we look for
 
-1. Fork the repository and create a feature branch
-2. Write tests for new functionality
-3. Ensure all tests pass: `uv run pytest`
-4. Ensure type checking passes: `uv run mypy src/`
-5. Ensure linting passes: `uv run ruff check .`
-6. Submit a pull request with a clear description
-
-### Commit Messages
-
-Use conventional commits:
-- `feat(models): add support for new provider`
-- `fix(xcs): resolve parallelization issue`
-- `docs(readme): update installation instructions`
-- `test(operators): add edge case coverage`
-
-## Design Principles
-
-When contributing, keep these principles in mind:
-
-1. **Simple by Default** - Basic usage requires no configuration
-2. **Progressive Disclosure** - Complexity available when needed
-3. **Composition Over Configuration** - Build complex from simple
-4. **Explicit Over Magic** - No hidden behaviors or `__getattr__` tricks
-
-## Areas for Contribution
-
-- **New Providers**: Add support for additional LLM providers
-- **Operators**: Create new composable operators for common patterns
-- **Data Sources**: Add loaders for popular datasets
-- **Documentation**: Improve examples and guides
-- **Performance**: Optimize critical paths with profiling data
-
-## Questions?
-
-Open an issue for questions about contributing or to discuss larger changes before implementing.
-
-## License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
+- [docs/design/v0.2.md](docs/design/v0.2.md) is the contract. A change to behaviour it describes
+  updates it in the same pull request.
+- Google Python style, `mypy --strict` clean, and functions short enough to read in one screen. No
+  `Any` without a reason, no `**kwargs` bags, no duck typing with `hasattr` or `getattr`, and no use
+  of another module's private names.
+- Errors are raised where they are detected, with a type and message that say what happened. A
+  fallback names the exception types it absorbs; nothing catches `Exception` to carry on.
+- Tests assert the contract, not the current output. A bug fix comes with a test that fails without
+  it. Tests never reach the network: use `ember.llm.fake.FakeProvider` with `ember.llm.using`, or
+  `httpx.MockTransport` for provider code.
+- Every Python example in `README.md` and `docs/*.md` runs in CI, so examples stay true.
+- Commit messages follow Conventional Commits, for example `fix(xcs): ...`.

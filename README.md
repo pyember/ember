@@ -1,12 +1,8 @@
 <p align="center">
-  <img src="docs/assets/logo_ember_icon@2x.png" alt="Ember Logo" width="120"/>
+  <img src="docs/assets/logo_ember_icon@2x.png" alt="Ember" width="120"/>
 </p>
 <p align="center">
   <img src="docs/assets/ember_workmark.svg" alt="Ember" width="280"/>
-</p>
-
-<p align="center">
-  <strong>Build AI systems with the elegance of print("Hello World")</strong>
 </p>
 
 <p align="center">
@@ -14,231 +10,257 @@
   <a href="https://pypi.org/project/ember-ai/"><img src="https://img.shields.io/pypi/v/ember-ai.svg" alt="PyPI"></a>
 </p>
 
----
+Ember composes model calls into larger systems: ensembles, judges, votes, verifiers and chains, as
+small typed objects or as one line of notation. Inside `@xcs.jit`, independent model calls run at
+the same time without any change to what your program computes. Every call reports what happened:
+the text, tool calls, why generation stopped, tokens by kind, the exact cost when the price is
+known, and the provider's request id.
 
-Ember is a compositional framework for compound AI systems. Think of it as PyTorch for "Networks of Networks" (NONs)—where neural networks compose neurons, Ember composes LLM calls into sophisticated reasoning architectures with automatic parallelization.
+Every Python example on this page runs in CI against a fake model.
 
-## Quick Start
-
-```python
-from ember.api import models
-
-# One line to call any model
-response = models("gpt-4o", "Explain quantum computing")
-print(response)
-```
-
-### Installation
+## Install
 
 ```bash
 pip install ember-ai
 ```
 
-Or from source:
+Ember reads keys from `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`. To save a key
+instead, run `ember configure set-key openai`, which prompts for it; keys are never command-line
+arguments.
 
-```bash
-git clone https://github.com/pyember/ember.git
-cd ember
-uv sync
-```
-
-### Setup
-
-```bash
-export OPENAI_API_KEY=...          # or: ember configure set-key openai
-```
-
-## NON: Compound AI in One Line
-
-Ember's compact notation lets you express sophisticated AI architectures concisely:
+## Call a model
 
 ```python
-from ember.non import build_graph
+import ember
 
-# 5 parallel GPT-4o instances synthesized by Claude
-system = build_graph(["5E@openai/gpt-4o(temp=0.7)", "1J@anthropic/claude-4-sonnet"])
-result = system(query="What's the most effective approach to climate change?")
-
-# With majority voting instead of judge synthesis
-voting = build_graph(["7E@openai/gpt-4o(temp=0.7)", "1M"])
-
-# Multi-branch architecture with verification
-advanced = build_graph([
-    "3E@openai/gpt-4o(temp=0.6)",      # Ensemble generation
-    "1V@anthropic/claude-4-sonnet",     # Verification
-    "1J@anthropic/claude-4-sonnet"      # Final synthesis
-])
+answer = ember.models("openai/gpt-5.5", "Name three prime numbers.")
+print(answer.text)
+print(answer.finish_reason, answer.usage.output, answer.cost)
 ```
 
-**Node types:** `E` (Ensemble), `J` (Judge), `M` (MostCommon), `V` (Verifier)
+A model is named `provider/name`, or by a catalog alias such as `gpt-5.5`. The call returns a
+`Completion`. Settings a model does not accept, such as `temperature` on a model that rejects it,
+raise `ValueError` before anything is sent. When the model's price is unknown, `cost` is `None`
+rather than a guess.
 
-## Core Concepts
-
-Ember provides four primitives that compose into powerful AI systems:
-
-### 1. Models — Direct LLM Access
+Streaming yields typed events and ends with the full result:
 
 ```python
-from ember.api import models
+from ember.llm import Done, TextDelta
 
-# Simple calls with any provider
-response = models("gpt-4o", "Write a haiku")
-response = models("claude-4-sonnet", "Explain recursion")
-response = models("gemini-2.5-pro", "Summarize this text")
-
-# Reusable configured instance
-assistant = models.instance("gpt-4o", temperature=0.7, system="You are helpful")
-response = assistant("How do I center a div?")
+for event in ember.models.stream("anthropic/claude-opus-5-5", "Write a haiku about rivers."):
+    if isinstance(event, TextDelta):
+        print(event.text, end="")
+    elif isinstance(event, Done):
+        print("\ntokens:", event.result.usage.output)
 ```
 
-### 2. Operators — Composable Building Blocks
+`ember.models.bind` fixes a model and its settings for reuse:
 
 ```python
-from ember.api import operators, models
-
-@operators.op
-def summarize(text: str) -> str:
-    return models("gpt-4o", f"Summarize: {text}")
-
-@operators.op
-def translate(text: str, lang: str = "Spanish") -> str:
-    return models("gpt-4o", f"Translate to {lang}: {text}")
-
-# Compose with >> operator
-pipeline = summarize >> translate
-result = pipeline("Long technical article...")
+terse = ember.models.bind("openai/gpt-5.5", system="Answer in one sentence.")
+print(terse("Why is the sky blue?").text)
 ```
 
-### 3. Data and Evaluation
+## Run independent calls at the same time
 
-```python
-from pathlib import Path
-
-from ember import data, models
-from ember.eval import NumericAnswer, run
-
-def solve(example: data.Example) -> str:
-    prompt = f"{example.question}\n\nEnd with a line of the form 'Answer: <number>'."
-    return models("openai/gpt-5", prompt).text
-
-records = run(
-    solve,
-    data.stream("gsm8k", limit=50),  # needs: pip install 'ember-ai[data]'
-    scorer=NumericAnswer(after="Answer:"),  # reads the number after the last "Answer:"
-    records=Path("gsm8k.jsonl"),  # every item and every request attempt
-)
-print(records.summary)  # score, failures, retries, unpriced calls, cost
-```
-
-### 4. XCS — Automatic Optimization
+Inside a function decorated with `@xcs.jit`, each model call is sent as soon as it is made and
+returns a pending `Completion`; reading it waits for that call only. Calls that do not read each
+other's results therefore overlap, and a call that reads an earlier result waits for exactly that
+result. The function still runs once, in program order, so it computes what it computes without
+`jit`.
 
 ```python
 from ember import xcs
 
-@xcs.jit  # Automatic parallelization
-def analyze_batch(items):
-    return [models("gpt-4o", item) for item in items]
 
-# vmap for vectorized execution
-fast_analyze = xcs.vmap(analyze_batch)
-results = fast_analyze(large_dataset)
+@xcs.jit
+def compare(topic: str) -> str:
+    pro = ember.models("openai/gpt-5.5", f"The strongest argument for {topic}.")
+    con = ember.models("anthropic/claude-opus-5-5", f"The strongest argument against {topic}.")
+    return ember.models(
+        "openai/gpt-5.5", f"Weigh these.\nFor: {pro.text}\nAgainst: {con.text}"
+    ).text
+
+
+print(compare("four-day work weeks"))
+graph = compare.graph()
+print([node.label for node in graph.nodes], graph.edges, graph.critical_path)
 ```
 
-## Local Models (No API Keys)
+The two arguments are requested together; the third call waits for both. `compare.graph()`
+describes the last run: each call, which results it waited for, its measured timings, and the
+critical path. When a provider's rate limit leaves requests waiting, the next run uses that graph
+to send the request on the longest remaining path first. Nothing is cached or replayed: every run
+executes your function.
 
-Try Ember with Ollama—no cloud accounts needed:
-
-```bash
-# Install Ollama
-brew install ollama && ollama serve  # macOS
-# Pull a model
-ollama pull llama3.2:1b
-```
+`xcs.map` runs a function over items concurrently and returns the results in order:
 
 ```python
-from ember.api import models
-print(models("ollama/llama3.2:1b", "Hello from Ember!"))
+answers = xcs.map(lambda q: ember.models("gemini/gemini-3.1-pro-preview", q).text,
+                  ["Capital of Peru?", "Capital of Chile?", "Capital of Ghana?"])
+print(answers)
 ```
 
-## Available Models
+Your code never runs in parallel with itself: functions started by `map` interleave only where one
+of them waits on a result. Only network requests use threads.
 
-Ember auto-discovers models from your configured providers:
+## Compose with operators
 
-| Provider | Models |
-|----------|--------|
-| **OpenAI** | gpt-5, gpt-4.1, gpt-4o, gpt-4o-mini, o1 |
-| **Anthropic** | claude-4-sonnet, claude-opus-4, claude-3.5-sonnet-latest |
-| **Google** | gemini-2.5-pro, gemini-2.5-flash, gemini-1.5-pro-latest |
+An operator is a frozen dataclass that turns one input into one output. `ModelCall` calls a model,
+`>>` chains steps, `Ensemble` runs several members concurrently, and `Judge`, `MajorityVote` and
+`Verifier` combine their answers:
 
-## Configuration
+```python
+from ember import op
+from ember.operators import Candidates, Ensemble, Judge, MajorityVote, ModelCall, TiePolicy
+from ember.operators import Succeeded, fold_answer
 
-Ember reads keys from `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `GEMINI_API_KEY`, or from
-`~/.ember/config.yaml` (or the file named by `EMBER_CONFIG`), which the CLI writes with mode 0600:
+summarize = ModelCall("openai/gpt-5.5", template="Summarize in one sentence:\n{input}")
+shorten = ModelCall("anthropic/claude-sonnet-5-5", template="Make this shorter:\n{input}")
+print((summarize >> shorten)("Ember composes model calls into larger systems.").text)
+
+panel = Ensemble(
+    (ModelCall("openai/gpt-5.5"), ModelCall("anthropic/claude-opus-5-5"),
+     ModelCall("gemini/gemini-3.1-pro-preview")),
+    quorum=2,
+)
+answers = tuple(o.value.text for o in panel("Is 1009 prime?") if isinstance(o, Succeeded))
+print(Judge(ModelCall("anthropic/claude-opus-5-5"))(Candidates("Is 1009 prime?", answers)).text)
+
+vote = MajorityVote(normalize=fold_answer, tie=TiePolicy.FIRST_SEEN)
+print(vote(Candidates("Capital of France?", ("Paris", " paris", "Lyon"))).answer)
+
+
+@op
+def word_count(text: str) -> int:
+    return len(text.split())
+
+
+print((summarize >> op(lambda c: c.text) >> word_count)("A long article about rivers."))
+```
+
+An ensemble returns every member's outcome, success or failure, and raises `QuorumError` when fewer
+than `quorum` succeed. Rate limits, overloads and server errors count as failed members; a bad key,
+an exhausted quota or an unknown model raises at once, because it would fail every member alike.
+[docs/operators.md](docs/operators.md) covers validation, verifiers and the rest.
+
+## Networks of networks in one line
+
+```python
+graph = ember.build_graph("5E@openai/gpt-5.5(reasoning_effort=low), 1J@anthropic/claude-opus-5-5")
+print(graph("What is the most effective way to cut household energy use?").text)
+
+voted = ember.build_graph("7E@gemini/gemini-3.1-pro-preview, 1M")
+print(voted("Is 1009 prime? Answer yes or no.").text)
+```
+
+`E` samples, `V` verifies, `J` judges and `M` takes a majority vote. A graph is an operator, its
+answer keeps every call's outcome, and its five `E` calls run at the same time.
+[docs/non.md](docs/non.md) has the grammar and parameters.
+
+## Evaluate
+
+`ember.eval.run` runs a task over items, scores each output, and writes one JSON line per item and
+per request attempt, retries included, so a run can be reconstructed from its file alone:
+
+```python
+import tempfile
+from pathlib import Path
+
+from ember.data import Example
+from ember.eval import NumericAnswer, run
+
+items = [
+    Example("A box holds 12 eggs. How many eggs are in 3 boxes?", "36"),
+    Example("Tom has 5 apples and eats 2. How many are left?", "3"),
+]
+
+
+def solve(example: Example) -> str:
+    prompt = f"{example.question}\nEnd with a line 'Answer: <number>'."
+    return ember.models("openai/gpt-5.5", prompt).text
+
+
+records = run(solve, items, scorer=NumericAnswer(after="Answer:"),
+              records=Path(tempfile.mkdtemp()) / "run.jsonl")
+summary = records.summary
+print(summary.mean_score, summary.failed, summary.retries, summary.unpriced_calls)
+```
+
+Failed items get no score rather than a zero, and the summary counts failures, retries and calls
+whose price is unknown. `ember.data.stream("gsm8k")` and `ember.data.stream("mmlu")` stream real
+benchmarks from the Hugging Face Hub at pinned revisions; install `ember-ai[data]` for them.
+
+## Configure
+
+`~/.ember/config.yaml`, or the file named by `EMBER_CONFIG`, holds providers and defaults. The CLI
+writes it with mode 0600 and never prints a key:
 
 ```bash
-ember configure set-key openai      # prompts for the key; keys are never command-line arguments
-ember configure set local kind openai_compatible
+ember configure set-key openai                      # prompts for the key
+ember configure set local kind openai_compatible    # any OpenAI-compatible server
 ember configure set local base_url http://localhost:11434/v1
-ember configure show                # keys are masked
-ember check gpt-5.5                 # one short request: finish reason, latency, request id, cost
+ember configure show                                # keys masked
+ember models                                        # the catalog: limits, prices, as-of dates
+ember check openai/gpt-5.5                          # one short call: finish reason, tokens, cost
 ```
 
-Runtime overrides apply to a block and are never written to disk:
+A provider of kind `openai_compatible` reaches any server that speaks OpenAI's Chat Completions
+API with streaming, such as Ollama, vLLM, Azure OpenAI's v1 endpoint or a gateway; call its models
+as `local/<model>`. Their cost is `None` unless the server reports one.
+
+Overrides apply to a block, are never written to disk, and reach every thread ember starts for
+calls made inside it:
 
 ```python
 from ember import context
 
-with context.override(providers={"openai": {"api_key": "sk-..."}}):
-    response = models("openai/gpt-5", "Hello!")
+with context.override(providers={"openai": {"api_key": "sk-example-key-0000"}}):
+    print(ember.models("openai/gpt-5.5", "Hello").text)
 ```
 
-## CLI Reference
+## Test your code
 
-```bash
-ember configure show                          # print the config file, keys masked
-ember configure set-key PROVIDER              # save a key typed at a hidden prompt
-ember configure set PROVIDER FIELD VALUE      # FIELD is kind, base_url or api_key_env
-ember configure unset PROVIDER [FIELD]        # remove a field (even a misspelt one) or a provider
-ember models                                  # list the model catalog with limits and prices
-ember check MODEL                             # send one short request and report the result
+`FakeProvider` stands in for every provider, and `ember.llm.using` scopes a client to a block. The
+fake goes through the same client as real calls, so price checks, rate limits and observers all
+run:
+
+```python
+from ember.llm import Client, ModelRef, Request, using
+from ember.llm.fake import FakeProvider, Reply
+
+
+def respond(model: ModelRef, request: Request) -> Reply:
+    return Reply(f"fake answer from {model}")
+
+
+fake = FakeProvider(respond=respond)
+with using(Client(provider_factory=fake.factory)):
+    print(ember.models("openai/gpt-5.5", "anything").text)
+print(len(fake.requests))
 ```
 
-## Design Principles
+## How it is built
 
-1. **Simple by Default** — Basic usage requires no configuration
-2. **Progressive Disclosure** — Complexity available when needed
-3. **Composition Over Configuration** — Build complex from simple
-4. **Automatic Optimization** — Fast by default, no manual tuning
+[docs/design/v0.2.md](docs/design/v0.2.md) is the contract the code is written to: the error
+kinds, the configuration rules, the request and result types, how providers are encoded, and the
+guarantees `jit` and `map` keep. An oracle suite runs programs that broke earlier versions of
+`jit`, plainly and under `jit`, and requires the same results, the same requests and the same side
+effects.
 
-## Architecture
-
-- **Model Registry** — Multi-provider LLM management with adaptive rate limiting
-- **Operator System** — Composable units with JAX-style transforms
-- **NON Engine** — Compact notation for compound AI architectures
-- **XCS Runtime** — Automatic parallelization and optimization
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
-
-## Development
+## Develop
 
 ```bash
 git clone https://github.com/pyember/ember.git
 cd ember
-uv sync --all-extras
-
-uv run pytest              # Run tests
-uv run mypy src/           # Type checking
-uv run ruff check . --fix  # Linting
+uv sync --group dev --all-extras
+uv run ruff check . && uv run ruff format --check . && uv run mypy
+uv run pytest tests/test_errors.py    # CI runs the whole suite
 ```
 
-## Contributing
-
-We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-MIT License. See [LICENSE](LICENSE).
-
-## Contributors
-
-See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the full list of contributors from Foundry, Stanford, UC Berkeley, IBM Research, Databricks, and other institutions who helped shape Ember.
+MIT. See [LICENSE](LICENSE).
