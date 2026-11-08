@@ -254,14 +254,17 @@ class Codec:
 
     Attributes:
         encode: Builds the JSON body that asks for a stream, for ``(spec, request)``.
-        decode_events: Turns ``(spec, events, request_id)`` into items ending
-            in exactly one `Decoded`; ``spec`` names the provider that
-            reasoning parts belong to.
+        decode_events: Turns ``(spec, request, events, request_id)`` into items
+            ending in exactly one `Decoded`; ``spec`` names the provider that
+            reasoning parts belong to, and ``request`` is the request the
+            stream answers.
         classify: Maps an HTTP error's ``(status, body)`` to a `Failure`.
     """
 
     encode: Callable[[ModelSpec, Request], Body]
-    decode_events: Callable[[ModelSpec, Iterable[SseEvent], str | None], Iterator[StreamItem]]
+    decode_events: Callable[
+        [ModelSpec, Request, Iterable[SseEvent], str | None], Iterator[StreamItem]
+    ]
     classify: Callable[[int, object], Failure]
 
 

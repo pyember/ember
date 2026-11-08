@@ -32,6 +32,7 @@ SPEC = ModelSpec(
     ref=ModelRef("gemini", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
 )
 FILES_URI = "https://generativelanguage.googleapis.com/v1beta/files/abc-123"
+ASK = Request.from_prompt("hi")
 
 
 def _encode(kit, request: Request, spec: ModelSpec = SPEC) -> dict:
@@ -39,7 +40,7 @@ def _encode(kit, request: Request, spec: ModelSpec = SPEC) -> dict:
 
 
 def _final(kit, *chunks: dict) -> Decoded:
-    final = list(gemini.decode_events(SPEC, kit.sse(*chunks), "ignored-header-id"))[-1]
+    final = list(gemini.decode_events(SPEC, ASK, kit.sse(*chunks), "ignored-header-id"))[-1]
     assert isinstance(final, Decoded)
     return final
 
@@ -338,7 +339,7 @@ def test_http_errors_carry_status_name_and_retry_delay(kit) -> None:
 
 
 def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
-    items = list(gemini.decode_events(SPEC, kit.events("gemini/stream_text.sse"), None))
+    items = list(gemini.decode_events(SPEC, ASK, kit.events("gemini/stream_text.sse"), None))
     usage = Usage(input=9, output=10, reasoning=4)
     assert items[:-1] == [
         TextDelta("AI learns"),
@@ -367,7 +368,9 @@ def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
 
 
 def test_streamed_function_call_deltas(kit) -> None:
-    items = list(gemini.decode_events(SPEC, kit.sse(kit.json("gemini/function_call.json")), None))
+    items = list(
+        gemini.decode_events(SPEC, ASK, kit.sse(kit.json("gemini/function_call.json")), None)
+    )
     calls = [item for item in items if isinstance(item, ToolCallDelta)]
     assert [(c.index, c.name, c.arguments_json) for c in calls] == [
         (0, "get_weather", '{"city":"Paris"}'),
@@ -378,7 +381,7 @@ def test_streamed_function_call_deltas(kit) -> None:
 def test_stream_without_a_finish_reason_is_cut(kit) -> None:
     events = kit.events("gemini/stream_text.sse")[:2]
     with pytest.raises(WireError) as caught:
-        list(gemini.decode_events(SPEC, events, None))
+        list(gemini.decode_events(SPEC, ASK, events, None))
     assert caught.value.kind is ErrorKind.TRANSPORT
 
 
@@ -388,8 +391,22 @@ def test_error_chunk_raises_with_its_status(kit) -> None:
     )
     received = []
     with pytest.raises(WireError) as caught:
-        for item in gemini.decode_events(SPEC, events, None):
+        for item in gemini.decode_events(SPEC, ASK, events, None):
             received.append(item)
     assert received == [TextDelta("AI learns")]
     assert caught.value.kind is ErrorKind.RATE_LIMITED
     assert "quota" not in caught.value.reason
+
+
+def test_identical_id_less_calls_in_different_turns_get_different_ids(kit) -> None:
+    chunk = kit.json("gemini/function_call.json")
+    del chunk["responseId"]
+    later = Request(
+        (Message.user("a"), Message.assistant("b"), Message.user("c")),
+    )
+    events = kit.sse(chunk)
+    first = list(gemini.decode_events(SPEC, ASK, events, None))[-1]
+    again = list(gemini.decode_events(SPEC, ASK, kit.sse(chunk), None))[-1]
+    second = list(gemini.decode_events(SPEC, later, kit.sse(chunk), None))[-1]
+    assert _id_less_call(first) == _id_less_call(again)
+    assert _id_less_call(first) != _id_less_call(second)

@@ -85,6 +85,8 @@ _POLICY_CODES = frozenset(
     {"bio_policy", "misalignment_policy_violation", "image_content_policy_violation"}
 )
 
+_ENCRYPTED_REASONING = "reasoning.encrypted_content"
+
 _TEXT_DELTAS = frozenset({"response.output_text.delta", "response.refusal.delta"})
 _REASONING_DELTAS = frozenset(
     {"response.reasoning_summary_text.delta", "response.reasoning_text.delta"}
@@ -116,10 +118,27 @@ def encode(spec: ModelSpec, request: Request) -> Body:
                 "strict": True,
             }
         }
-    if spec.reasoning_efforts:
-        body["include"] = ["reasoning.encrypted_content"]
     body["stream"] = True
-    return merge_extensions(body, request.extensions)
+    extensions = dict(request.extensions)
+    include = _include(spec, extensions.pop("include", []))
+    if include:
+        body["include"] = include
+    return merge_extensions(body, extensions)
+
+
+def _include(spec: ModelSpec, requested: JsonValue) -> list[JsonValue]:
+    """Returns ``include``: the caller's entries plus encrypted reasoning.
+
+    A reasoning model's request always asks for ``reasoning.encrypted_content``;
+    a caller's own ``include`` extension adds to that list instead of
+    colliding with it, keeping the caller's order.
+    """
+    if not isinstance(requested, list) or not all(isinstance(e, str) for e in requested):
+        raise ValueError("the include extension must be a list of strings")
+    include: list[JsonValue] = list(dict.fromkeys(requested))
+    if spec.reasoning_efforts and _ENCRYPTED_REASONING not in include:
+        include.append(_ENCRYPTED_REASONING)
+    return include
 
 
 def _sampling(sampling: Sampling) -> Body:
@@ -218,7 +237,7 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
 
 
 def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+    spec: ModelSpec, request: Request, events: Iterable[SseEvent], request_id: str | None
 ) -> Iterator[StreamItem]:
     """Decodes a streamed response.
 

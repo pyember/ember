@@ -4,8 +4,8 @@ This module is the only code that reads or writes Chat Completions shapes. The
 ``openai`` provider uses it for models whose catalog entry says
 ``api = "openai_chat"``, and every ``openai_compatible`` server uses it.
 Requests always stream and ask for usage with
-``stream_options.include_usage``; a compatible server that sends no usage
-chunk yields unmeasured usage.
+``stream_options.include_usage``, so a compatible server must support
+streaming; one that sends no usage chunk yields unmeasured usage.
 
 Wire reference, read 2026-11-07:
 https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
@@ -189,7 +189,7 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
 
 
 def decode_events(
-    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+    spec: ModelSpec, request: Request, events: Iterable[SseEvent], request_id: str | None
 ) -> Iterator[StreamItem]:
     """Decodes a streamed chat completion.
 

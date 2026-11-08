@@ -31,6 +31,7 @@ from ember.llm.spec import ModelSpec
 
 WEATHER = ToolSpec("get_weather", "Weather for a city.", {"type": "object"})
 SPEC = ModelSpec(ref=ModelRef("openai", "gpt-6-astra"), wire_id="gpt-6-astra", api="openai_chat")
+ASK = Request.from_prompt("hi")
 
 
 def _encode(kit, request: Request) -> dict:
@@ -44,7 +45,7 @@ def _chunks(kit) -> list[dict]:
 
 def _decode(kit, chunks: list[dict], done: bool = True) -> list:
     payloads = [*chunks, "[DONE]"] if done else chunks
-    return list(openai_chat.decode_events(SPEC, kit.sse(*payloads), "req"))
+    return list(openai_chat.decode_events(SPEC, ASK, kit.sse(*payloads), "req"))
 
 
 def _final(kit, chunks: list[dict]) -> Decoded:
@@ -208,7 +209,9 @@ def test_extensions_merge_recursively_and_collisions_raise(kit) -> None:
 
 
 def test_documented_stream_without_usage_is_unmeasured(kit) -> None:
-    items = list(openai_chat.decode_events(SPEC, kit.events("openai/chat_stream_text.sse"), "r"))
+    items = list(
+        openai_chat.decode_events(SPEC, ASK, kit.events("openai/chat_stream_text.sse"), "r")
+    )
     assert items[:-1] == [TextDelta("Hello")]
     done = items[-1]
     assert isinstance(done, Decoded)
@@ -279,7 +282,7 @@ def test_null_usage_details_are_zero(kit) -> None:
 
 def test_streamed_tool_calls_assemble_by_index_and_report_usage(kit) -> None:
     events = kit.events("openai/chat_stream_tool_calls.sse")
-    items = list(openai_chat.decode_events(SPEC, events, None))
+    items = list(openai_chat.decode_events(SPEC, ASK, events, None))
     deltas = [item for item in items if isinstance(item, ToolCallDelta)]
     assert [(d.index, d.id, d.name) for d in deltas[:2]] == [
         (0, "call_weather", "get_weather"),
@@ -336,7 +339,7 @@ def test_error_frame_in_stream_raises_and_is_never_text(kit, error, kind) -> Non
     received = []
     with pytest.raises(WireError) as caught:
         events = kit.sse(*_chunks(kit)[:2], {"error": error})
-        for item in openai_chat.decode_events(SPEC, events, None):
+        for item in openai_chat.decode_events(SPEC, ASK, events, None):
             received.append(item)
     assert received == [TextDelta("Hello")]
     assert caught.value.kind is kind
@@ -345,7 +348,7 @@ def test_error_frame_in_stream_raises_and_is_never_text(kit, error, kind) -> Non
 
 def test_two_turn_tool_loop_replays_only_result_message(kit) -> None:
     events = kit.events("openai/chat_stream_tool_calls.sse")
-    first = list(openai_chat.decode_events(SPEC, events, None))[-1]
+    first = list(openai_chat.decode_events(SPEC, ASK, events, None))[-1]
     assert isinstance(first, Decoded)
     foreign = ReasoningPart("r", api="openai_responses", provider="openai", state={"id": "rs"})
     turn = Message("assistant", (foreign, *first.message.parts))

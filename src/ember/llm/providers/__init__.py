@@ -7,7 +7,10 @@ call streams:
 - ``openai``: Chat Completions or Responses, chosen by the model's catalog
   ``api``.
 - ``openai_compatible``: Chat Completions at a configured ``base_url``; the
-  key is optional. Azure OpenAI works through it with the
+  key is optional. The server must support streaming (``stream: true`` with
+  a ``text/event-stream`` response), because every call streams; one that
+  answers with plain JSON fails with a `MALFORMED` error saying so. Azure
+  OpenAI works through it with the
   ``https://<resource>.openai.azure.com/openai/v1`` base URL, which accepts
   the key as a bearer token and needs no ``api-version``.
 - ``anthropic``: Messages, at API version

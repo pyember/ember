@@ -101,18 +101,22 @@ class HttpProvider:
         if spec.ref.provider != self._name:
             raise ValueError(f"model {spec.ref} is not served by provider {self._name!r}")
         route = self._router(spec)
-        return self._items(spec, route, route.codec.encode(spec, request))
+        return self._items(spec, request, route, route.codec.encode(spec, request))
 
     def close(self) -> None:
         """Releases the provider's HTTP connections."""
         self._transport.close()
 
-    def _items(self, spec: ModelSpec, route: Route, body: Body) -> Iterator[StreamItem]:
+    def _items(
+        self, spec: ModelSpec, request: Request, route: Route, body: Body
+    ) -> Iterator[StreamItem]:
         """Yields the stream's items; a failure says whether any reached the caller.
 
         `ModelError.before_first_byte` means the caller received nothing from
         this attempt, so it stays True for a failure that arrives before the
-        first item even when response bytes had already been read.
+        first item even when response bytes had already been read. Only the
+        codec's own work is classified: an exception the consumer throws in
+        at a ``yield`` passes through unchanged.
         """
         delivered = False
         try:
@@ -123,16 +127,22 @@ class HttpProvider:
                 classify=route.codec.classify,
                 params=route.params,
             ) as opened:
-                try:
-                    for item in route.codec.decode_events(spec, opened.events, opened.request_id):
-                        delivered = True
-                        yield item
-                except WireError as error:
-                    raise self._failed(error, spec, opened.request_id, delivered) from error
-                except _DECODE_FAILURES as error:
-                    reason = f"the response could not be decoded ({type(error).__name__})"
-                    undecodable = WireError(ErrorKind.MALFORMED, reason)
-                    raise self._failed(undecodable, spec, opened.request_id, delivered) from error
+                items = route.codec.decode_events(spec, request, opened.events, opened.request_id)
+                while True:
+                    try:
+                        item = next(items)
+                    except StopIteration:
+                        return
+                    except WireError as error:
+                        raise self._failed(error, spec, opened.request_id, delivered) from error
+                    except _DECODE_FAILURES as error:
+                        reason = f"the response could not be decoded ({type(error).__name__})"
+                        undecodable = WireError(ErrorKind.MALFORMED, reason)
+                        raise self._failed(
+                            undecodable, spec, opened.request_id, delivered
+                        ) from error
+                    delivered = True
+                    yield item
         except ModelError as error:
             if delivered or error.before_first_byte:
                 raise
