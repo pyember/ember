@@ -149,6 +149,12 @@ def drive_temperature(transform: Transform, model: fakemodel.FakeModel) -> objec
     return [ask(model, "hi"), ask(model, "hi"), ask(model, "hi", temperature=0.1)]
 
 
+def drive_returned_stream(transform: Transform, model: fakemodel.FakeModel) -> object:
+    stream = transform(orchard.returned_stream)(model, "a stream")
+    orchard.note("reading after return")
+    return "".join(stream)
+
+
 def answer_with_context(prompt: str) -> str:
     return f"<{prompt} served under {context.current().default_model}>"
 
@@ -199,6 +205,8 @@ CASES = [
     Case("closure_state", call(orchard.closure_state, "x"), independent=2),
     Case("relay", repeat(orchard.relay, 2, "x")),
     Case("unread_stream", call(orchard.unread_stream, "a stream")),
+    Case("unread_failing_stream", call(orchard.unread_stream, "fail:a stream")),
+    Case("stream_read_after_return", drive_returned_stream),
     Case("streamed_answer", call(orchard.streamed_answer, "a stream")),
 ]
 
@@ -374,17 +382,3 @@ def test_failure_raises_at_the_call_outside_jit_and_at_the_read_inside() -> None
     assert plain_run.effects == [("before",)]
     assert jit_run.effects == [("before",), ("after the failing call",), ("after the next call",)]
     assert divergences(FAIL_THEN_CONTINUE, plain_run, jit_run) == []
-
-
-UNREAD_FAILING_STREAM = Case("unread_failing_stream", call(orchard.unread_stream, "fail:a stream"))
-
-
-def test_an_unread_stream_failure_raises_at_the_call_outside_jit_and_never_inside() -> None:
-    plain_run = execute(UNREAD_FAILING_STREAM, plain, SEMANTIC_LATENCY_S)
-    jit_run = execute(UNREAD_FAILING_STREAM, xcs.jit, SEMANTIC_LATENCY_S)
-    assert type(plain_run.outcome) is ModelError
-    assert plain_run.effects == []
-    assert jit_run.outcome == "done"
-    assert jit_run.effects == [("started a stream",)]
-    assert jit_run.requests == plain_run.requests
-    assert sum(plain_run.requests.values()) == plain_run.reached == 1

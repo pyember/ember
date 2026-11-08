@@ -4,9 +4,9 @@ A `Frame` belongs to one `jit` call, or to a `map` call made outside any jit.
 Everything started inside it is recorded in it and in every enclosing frame:
 the `Call` behind each dispatched request or stream, for the graph; the
 `Pending` future of each request, so the boundary can wait for it and raise a
-failure nobody read; and each stream's channel, so the boundary can abandon a
-stream nobody read to the end and wait for that to take effect. A stream's
-failure belongs to its reader and is never raised at the boundary.
+failure nobody read; and the completion of each stream's worker, so the
+boundary can wait for it. A stream's failure belongs to its reader and
+is never raised at the boundary.
 """
 
 import time
@@ -16,7 +16,6 @@ from types import MappingProxyType
 from typing import Any, TypeAlias, TypeVar
 
 from ember.xcs.graph import Graph, Node
-from ember.xcs.streams import Channel
 
 __all__ = ["Call", "CallKey", "Frame", "Pending", "Plan"]
 
@@ -103,8 +102,8 @@ class Frame:
         self.calls: list[Call] = []
         # Results of every type the frame's code produced: user data.
         self.pending: list[Pending[Any]] = []
-        # Each stream's channel and the future its worker completes on finishing.
-        self.streams: list[tuple[Channel[Any], Future[None]]] = []
+        # Completed by each stream's worker when it finishes.
+        self.streams: list[Future[None]] = []
         self.settled = False
         """Whether the boundary waited for every pending result; only then is
         there a complete graph to record."""
@@ -138,10 +137,10 @@ class Frame:
         for frame in self.chain():
             frame.pending.append(pending)
 
-    def track_stream(self, channel: "Channel[T]", drained: "Future[None]") -> None:
-        """Adds a stream here and to every enclosing frame."""
+    def track_stream(self, drained: "Future[None]") -> None:
+        """Adds a stream's completion here and to every enclosing frame."""
         for frame in self.chain():
-            frame.streams.append((channel, drained))
+            frame.streams.append(drained)
 
     def planned_remaining_s(self, key: CallKey) -> float:
         """The plan's prediction for the call at ``key``; 0 without a plan."""

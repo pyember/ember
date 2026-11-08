@@ -459,6 +459,12 @@ def unread_stream(model: Model, prompt: str) -> str:
     return "done"
 
 
+def returned_stream(model: Model, prompt: str) -> Iterator[str]:
+    """Returns a stream for the caller to read after the call returns."""
+    note("returning a stream")
+    return model.stream(prompt)
+
+
 def streamed_answer(model: Model, prompt: str) -> str:
     """Reads a stream to the end."""
     return "".join(model.stream(prompt))

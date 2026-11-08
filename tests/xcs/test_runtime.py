@@ -45,53 +45,45 @@ def test_outside_a_scope_wait_blocks_on_a_future_another_thread_completes() -> N
     assert runtime.wait(future) == "late"
 
 
-def test_outside_a_scope_a_stream_is_opened_on_the_callers_thread_before_returning() -> None:
+def test_outside_a_scope_a_stream_is_sent_before_dispatch_stream_returns() -> None:
     log: list[str] = []
 
     def source() -> Iterator[int]:
         log.append(f"opened on {threading.current_thread().name}")
         yield from range(3)
-        log.append("read to the end")
 
     stream = runtime.dispatch_stream(source, label="s")
-    assert log == [f"opened on {threading.current_thread().name}"]
+    assert len(log) == 1 and log[0].startswith("opened on ember-xcs-worker-")
     assert list(stream) == [0, 1, 2]
-    assert log[-1] == "read to the end"
 
 
-def test_outside_a_scope_a_failure_before_the_first_item_raises_at_the_call_site() -> None:
+def test_outside_a_scope_a_stream_failure_is_raised_only_when_pulled() -> None:
     def source() -> Iterator[int]:
-        raise ProviderDown("refused")
+        raise ProviderDown("before the first item")
         yield 0
 
-    with pytest.raises(ProviderDown, match="refused"):
-        runtime.dispatch_stream(source, label="s")
-
-
-def test_outside_a_scope_a_later_failure_is_raised_only_when_pulled() -> None:
-    def source() -> Iterator[int]:
-        yield 0
-        raise ProviderDown("later")
-
-    unread = runtime.dispatch_stream(source, label="s")
+    runtime.dispatch_stream(source, label="s")
     stream = runtime.dispatch_stream(source, label="s")
-    assert next(stream) == 0
-    with pytest.raises(ProviderDown, match="later"):
+    with pytest.raises(ProviderDown, match="before the first item"):
         next(stream)
-    del unread
 
 
-def test_outside_a_scope_closing_an_unread_stream_closes_its_source() -> None:
-    log: list[str] = []
+def test_outside_a_scope_closing_an_unread_stream_stops_its_worker() -> None:
+    pulled: list[int] = []
+    closed = threading.Event()
 
     def source() -> Iterator[int]:
         try:
-            yield from range(3)
+            for i in range(10):
+                pulled.append(i)
+                yield i
+                time.sleep(0.1)
         finally:
-            log.append("source closed")
+            closed.set()
 
     runtime.dispatch_stream(source, label="s").close()  # type: ignore[attr-defined]
-    assert log == ["source closed"]
+    assert closed.wait(1.0)
+    assert len(pulled) <= 2
 
 
 def test_inside_a_scope_tasks_run_on_named_worker_threads_in_the_dispatching_context() -> None:
@@ -239,20 +231,43 @@ def test_closing_a_stream_before_reading_it_stops_its_worker() -> None:
     assert len(pulled) <= 2
 
 
-def test_reading_a_stream_after_its_jit_call_returned_raises() -> None:
+def test_a_stream_returned_from_jit_reads_everything_afterwards() -> None:
     def source() -> Iterator[int]:
-        yield from range(3)
+        for i in range(3):
+            time.sleep(0.05)
+            yield i
+        raise ProviderDown("after the last item")
 
     @xcs.jit
     def program() -> Iterator[int]:
         return runtime.dispatch_stream(source, label="s")
 
     stream = program()
-    with pytest.raises(RuntimeError, match="abandoned when the jit call"):
+    assert [next(stream) for _ in range(3)] == [0, 1, 2]
+    with pytest.raises(ProviderDown, match="after the last item"):
         next(stream)
 
 
-def test_a_stream_read_to_the_end_is_not_abandoned() -> None:
+def test_a_stream_kept_past_the_jit_call_is_drained_before_it_returns() -> None:
+    drained = threading.Event()
+    kept: list[Iterator[int]] = []
+
+    def source() -> Iterator[int]:
+        for i in range(3):
+            time.sleep(0.05)
+            yield i
+        drained.set()
+
+    @xcs.jit
+    def program() -> None:
+        kept.append(runtime.dispatch_stream(source, label="s"))
+
+    program()
+    assert drained.is_set()
+    assert list(kept[0]) == [0, 1, 2]
+
+
+def test_a_stream_read_to_the_end_inside_jit_returns_all_its_items() -> None:
     def source() -> Iterator[int]:
         yield from range(3)
 

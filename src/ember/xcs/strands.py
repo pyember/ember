@@ -20,7 +20,6 @@ import greenlet
 
 from ember.xcs.frames import Call, Frame, Pending, Plan
 from ember.xcs.scheduler import Scheduler
-from ember.xcs.streams import Channel
 
 __all__ = ["Strand", "current", "scope"]
 
@@ -85,11 +84,11 @@ class Strand:
         self.frame.record(call)
         self.frame.track(pending)
 
-    def record_stream(self, call: Call, channel: "Channel[T]", drained: "Future[None]") -> None:
-        """Records a stream handed to a worker: its call, channel and completion."""
+    def record_stream(self, call: Call, drained: "Future[None]") -> None:
+        """Records a stream handed to a worker: its call and its completion."""
         self.dispatched += 1
         self.frame.record(call)
-        self.frame.track_stream(channel, drained)
+        self.frame.track_stream(drained)
 
     def next_call_remaining_s(self) -> float:
         """The current plan's prediction for the next call this greenlet dispatches."""

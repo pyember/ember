@@ -14,9 +14,9 @@ The limiter keeps the acquirers waiting for capacity in a `WaitQueue`, which
 decides who gets each freed slot.
 
 Inside `@xcs.jit` and `xcs.map`, `dispatch` returns a pending future at once
-and waiting lets other greenlets run. Outside them everything runs
-synchronously on the caller's thread, like plain Python. Either way a stream's
-request is sent at its call site.
+and waiting lets other greenlets run. Outside them a call runs synchronously
+on the caller's thread, like plain Python. A stream is drained by a worker in
+both cases, so its request is sent at the call site.
 
 Tasks given to `dispatch` and `dispatch_stream` are leaf network I/O: they
 never call back into ember and never wait on other ember work, so worker
@@ -35,7 +35,7 @@ from typing import Generic, TypeVar
 
 from ember.xcs import strands, workers
 from ember.xcs.frames import Call, Pending
-from ember.xcs.streams import Channel, Closed, Ended, Waiting
+from ember.xcs.streams import Channel, Ended, Waiting
 
 __all__ = ["WaitQueue", "deferred", "dispatch", "dispatch_stream", "wait"]
 
@@ -70,20 +70,19 @@ def dispatch(task: Callable[[], T], *, label: str) -> "Future[T]":
 def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterator[T]:
     """Starts a streaming request here and returns an iterator over its items.
 
-    Outside a scope the stream is opened on the caller's thread and its first
-    item pulled before this returns, so the request is sent at the call site
-    and a failure before the first item raises here; the rest is pulled as
-    the iterator is read. Inside a scope a worker starts draining ``source``
-    at once and this returns immediately; waiting for the next item lets
-    other greenlets run.
+    A worker drains ``source`` from the call site, so the request is sent
+    here, inside a scope or not. Inside a scope this returns at once and
+    waiting for the next item lets other greenlets run; outside one it
+    returns once the stream has produced its first item or ended.
 
-    Otherwise an error raised by ``source`` is raised by the iterator,
-    unchanged, after the items that preceded it, and only to a reader that
-    reaches it: a failure the reader never pulls is never raised. Closing the
-    iterator, or dropping it, abandons the stream. A jit boundary abandons
-    every stream started in its call that was not read to the end, and waits
-    for the worker to stop; reading such a stream afterwards raises
-    RuntimeError.
+    An error raised by ``source`` is raised by the iterator, unchanged, after
+    the items that preceded it, and only to a reader that pulls it: a failure
+    never pulled is never raised. Closing the iterator, or dropping it,
+    abandons the stream: the worker stops when its next item arrives. A jit
+    boundary waits for the worker of every stream started in its call: an
+    abandoned stream's stops at its next item, and a stream whose iterator is
+    still alive drains to the end, so the iterator can be read after the jit
+    call returns.
 
     Args:
         source: Opens the stream and yields its items. It must not call into
@@ -91,18 +90,20 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
         label: Short description for recorded graphs.
 
     Raises:
-        RuntimeError: Inside a scope, no worker thread could start for the
-            stream; it was not opened.
+        RuntimeError: No worker thread could start for the stream; it was not
+            opened.
     """
     strand = strands.current()
-    if strand is None:
-        return _Started.open(source)
-    call = strand.next_call(label)
     channel: Channel[T] = Channel()
     drained: Future[None] = Future()
     context = contextvars.copy_context()
+    if strand is None:
+        workers.submit(lambda: _drain(None, drained, channel, context, source))
+        wait(channel.started)
+        return _Reader(channel, None)
+    call = strand.next_call(label)
     workers.submit(lambda: _drain(call, drained, channel, context, source))
-    strand.record_stream(call, channel, drained)
+    strand.record_stream(call, drained)
     return _Reader(channel, call)
 
 
@@ -214,7 +215,7 @@ def _run_call(
 
 
 def _drain(
-    call: Call,
+    call: Call | None,
     drained: "Future[None]",
     channel: Channel[T],
     context: contextvars.Context,
@@ -226,7 +227,8 @@ def _drain(
     # Relayed to the reader after the items before it, for the same reason as `_run_call`.
     except BaseException as caught:
         error = caught
-    call.finished_at = time.monotonic()
+    if call is not None:
+        call.finished_at = time.monotonic()
     channel.end(error)
     drained.set_result(None)
 
@@ -242,39 +244,10 @@ def _pump(channel: Channel[T], source: Callable[[], Iterator[T]]) -> None:
             items.close()
 
 
-class _Started(Iterator[T]):
-    """A stream opened on the caller's thread: its first item, then the rest."""
-
-    def __init__(self, items: Iterator[T]) -> None:
-        self._items = items
-        self._first: list[T] = []
-
-    @classmethod
-    def open(cls, source: Callable[[], Iterator[T]]) -> "_Started[T]":
-        """Opens ``source`` and pulls its first item; a failure raises here."""
-        started = cls(source())
-        try:
-            started._first.append(next(started._items))
-        except StopIteration:
-            pass
-        return started
-
-    def __next__(self) -> T:
-        if self._first:
-            return self._first.pop()
-        return next(self._items)
-
-    def close(self) -> None:
-        """Abandons the stream."""
-        self._first.clear()
-        if isinstance(self._items, Generator):
-            self._items.close()
-
-
 class _Reader(Iterator[T]):
     """Reads one stream's items. Closing or dropping it abandons the stream."""
 
-    def __init__(self, channel: Channel[T], call: Call) -> None:
+    def __init__(self, channel: Channel[T], call: Call | None) -> None:
         self._channel = channel
         self._call = call
         self._open = True
@@ -286,12 +259,6 @@ class _Reader(Iterator[T]):
             step = self._channel.take()
             if isinstance(step, Waiting):
                 wait(step.future)
-            elif isinstance(step, Closed):
-                self._open = False
-                raise RuntimeError(
-                    "this stream was abandoned when the jit call that started it returned; "
-                    "read a stream inside the jit call that starts it"
-                )
             elif isinstance(step, Ended):
                 self.close()
                 if step.error is not None:
@@ -308,5 +275,5 @@ class _Reader(Iterator[T]):
 
     def _note_read(self) -> None:
         strand = strands.current()
-        if strand is not None:
+        if strand is not None and self._call is not None:
             strand.absorb(frozenset({self._call}))
