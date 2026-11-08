@@ -85,7 +85,7 @@ def compare(topic: str) -> str:
 
 print(compare("four-day work weeks"))
 graph = compare.graph()
-print([node.label for node in graph.nodes], graph.edges(), graph.critical_path())
+print([node.label for node in graph.nodes], graph.edges, graph.critical_path)
 ```
 
 The two arguments are requested together; the third call waits for both. `compare.graph()`

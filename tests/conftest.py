@@ -19,6 +19,34 @@ from ember.llm.request import Message, Request, TextPart
 
 ReplyFn = Callable[[str, "str | tuple[Message, ...]"], "str | Reply | ErrorKind"]
 
+_PROVIDER_KEY_VARIABLES = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY")
+_REAL_HOME = Path.home()
+
+
+@pytest.fixture(scope="session")
+def real_home() -> Path:
+    """The home directory of whoever runs the suite; no test may read or write it."""
+    return _REAL_HOME
+
+
+@pytest.fixture(autouse=True)
+def isolated_config(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Path]:
+    """Points every test at an empty home and config, with no provider keys.
+
+    Applies to the whole suite so that no test can read the real
+    ``~/.ember/config.yaml`` or send a real key, whatever its file sets up.
+    """
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("EMBER_CONFIG", str(home / ".ember" / "config.yaml"))
+    for name in _PROVIDER_KEY_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    context.reload()
+    yield home
+    context.reload()
+
 
 @dataclasses.dataclass(frozen=True)
 class SentCall:
