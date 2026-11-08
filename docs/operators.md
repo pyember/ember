@@ -104,7 +104,7 @@ for outcome in panel("Name a prime number."):
     if isinstance(outcome, Succeeded):
         print(outcome.member, outcome.value.text)
     else:
-        print(outcome.member, "failed:", outcome.error.kind)
+        print(outcome.member, "failed:", outcome.error)
 ```
 
 A member is recorded as `Failed` when its model call failed for an operational reason (rate limit,
