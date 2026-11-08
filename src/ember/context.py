@@ -249,8 +249,18 @@ def from_config(data: config_file.ConfigData) -> Context:
 
     Raises:
         ConfigError: ``data`` is well-formed but describes an invalid context,
-            for example a provider with no kind.
+            for example a provider with no kind. The message names
+            ``data.path`` when the data came from a file.
     """
+    try:
+        return _build(data)
+    except ConfigError as exc:
+        if data.path is None:
+            raise
+        raise ConfigError(f"{data.path}: {exc}") from None
+
+
+def _build(data: config_file.ConfigData) -> Context:
     builtin = {
         name: ProviderSettings(name=name, kind=kind, api_key_env=env)
         for name, (kind, env) in BUILTIN_PROVIDERS.items()
@@ -271,12 +281,7 @@ def _root_context() -> Context:
     global _root
     with _root_lock:
         if _root is None:
-            path = config_file.config_path()
-            data = config_file.load(path)
-            try:
-                _root = from_config(data)
-            except ConfigError as exc:
-                raise ConfigError(f"{path}: {exc}") from exc
+            _root = from_config(config_file.load())
         return _root
 
 

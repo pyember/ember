@@ -4,6 +4,10 @@ This module is the only code that reads or writes the config file. The file
 lives at ``$EMBER_CONFIG`` or ``~/.ember/config.yaml``. A missing file means
 defaults; an unreadable or invalid file raises `ConfigError` naming the path.
 
+The writers keep the file's key order, refuse to rewrite a file that has
+comments (they would be lost), and replace the file atomically. They do not
+lock it: two processes writing at the same moment can lose one of the updates.
+
 Example file::
 
     default_model: openai/gpt-5
@@ -19,8 +23,11 @@ Example file::
 """
 
 import dataclasses
+import math
 import os
+import re
 import tempfile
+import urllib.parse
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
@@ -45,6 +52,7 @@ _TOP_LEVEL_KEYS = frozenset(
 _PROVIDER_KEYS = frozenset({"kind", "api_key", "api_key_env", "base_url"})
 _RETRY_KEYS = frozenset({"max_attempts", "base_delay_s", "max_delay_s"})
 _SECRET_KEYS = frozenset({"api_key"})
+_URL_KEYS = frozenset({"base_url"})
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -57,6 +65,8 @@ class ConfigData:
         require_price: Refuse requests whose price is unknown.
         max_in_flight_per_provider: Concurrent requests allowed per provider.
         retry: Raw retry policy fields.
+        path: The file this was read from, which errors about it name; ``None``
+            for data that did not come from a file.
     """
 
     providers: Mapping[str, Mapping[str, str]] = dataclasses.field(
@@ -66,6 +76,7 @@ class ConfigData:
     require_price: bool = False
     max_in_flight_per_provider: int = 64
     retry: Mapping[str, float] = dataclasses.field(default_factory=lambda: MappingProxyType({}))
+    path: Path | None = None
 
 
 def config_path() -> Path:
@@ -103,14 +114,14 @@ def save_provider_field(provider: str, field: str, value: str, path: Path | None
         path: File to write; defaults to `config_path()`.
 
     Raises:
-        ConfigError: The field is unknown, the resulting file would be invalid,
-            or the file cannot be written.
+        ConfigError: The field is unknown, the file has comments, the resulting
+            file would be invalid, or the file cannot be written.
     """
     if field not in _PROVIDER_KEYS:
         raise ConfigError(
             f"unknown provider field {field!r}; expected one of {sorted(_PROVIDER_KEYS)}"
         )
-    doc = _read(path or config_path())
+    doc = _read_for_rewrite(path or config_path())
     providers = doc.raw.setdefault("providers", {})
     if not isinstance(providers, dict):
         raise doc.error("providers must be a mapping", "providers")
@@ -118,8 +129,7 @@ def save_provider_field(provider: str, field: str, value: str, path: Path | None
     if not isinstance(entry, dict):
         raise doc.error(f"providers.{provider} must be a mapping", "providers", provider)
     entry[field] = value
-    _validate(doc)
-    _write_atomic(doc.path, yaml.safe_dump(doc.raw, sort_keys=True))
+    _rewrite(doc)
 
 
 def remove_provider_field(provider: str, field: str | None, path: Path | None = None) -> None:
@@ -135,10 +145,11 @@ def remove_provider_field(provider: str, field: str | None, path: Path | None = 
         path: File to write; defaults to `config_path()`.
 
     Raises:
-        ConfigError: Nothing by that name is set, the file cannot be read, the
-            resulting file would be invalid, or it cannot be written.
+        ConfigError: Nothing by that name is set, the file cannot be read or
+            has comments, the resulting file would be invalid, or it cannot be
+            written.
     """
-    doc = _read(path or config_path())
+    doc = _read_for_rewrite(path or config_path())
     target = f"providers.{provider}" if field is None else f"providers.{provider}.{field}"
     providers = doc.raw.get("providers")
     if not isinstance(providers, dict) or provider not in providers:
@@ -154,14 +165,17 @@ def remove_provider_field(provider: str, field: str | None, path: Path | None = 
             del providers[provider]
     if not providers:
         del doc.raw["providers"]
-    _validate(doc)
-    _write_atomic(doc.path, yaml.safe_dump(doc.raw, sort_keys=True))
+    _rewrite(doc)
 
 
 def redacted(data: ConfigData) -> dict[str, Any]:
-    """Returns the configuration as plain data with every credential masked."""
+    """Returns the configuration as plain data with every credential masked.
+
+    Keys show only their last four characters, and URLs lose their user
+    information and query string, where credentials are sometimes embedded.
+    """
     providers = {
-        name: {key: _mask(value) if key in _SECRET_KEYS else value for key, value in fields.items()}
+        name: {key: _redact_field(key, value) for key, value in fields.items()}
         for name, fields in data.providers.items()
     }
     return {
@@ -173,8 +187,24 @@ def redacted(data: ConfigData) -> dict[str, Any]:
     }
 
 
-def _mask(secret: str) -> str:
-    return "…" if len(secret) < 12 else f"…{secret[-4:]}"
+def _redact_field(key: str, value: str) -> str:
+    if key in _SECRET_KEYS:
+        return "…" if len(value) < 12 else f"…{value[-4:]}"
+    if key in _URL_KEYS:
+        return _redact_url(value)
+    return value
+
+
+def _redact_url(url: str) -> str:
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return "… (not a valid URL)"
+    netloc = parts.netloc
+    if "@" in netloc:
+        netloc = "…@" + netloc.rpartition("@")[2]
+    query = "…" if parts.query else ""
+    return urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -182,6 +212,7 @@ class _Document:
     """A parsed config file and the line of each mapping key, for error messages."""
 
     path: Path
+    text: str
     raw: dict[str, Any]
     key_lines: Mapping[tuple[str, ...], int]
 
@@ -196,19 +227,20 @@ def _read(path: Path) -> _Document:
     try:
         text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return _Document(path, {}, {})
+        return _Document(path, "", {}, {})
     except OSError as exc:
         raise ConfigError(f"cannot read {path}: {exc.strerror}") from exc
     try:
         raw = yaml.safe_load(text)
         node = yaml.compose(text, Loader=yaml.SafeLoader)
     except yaml.YAMLError as exc:
-        raise _syntax_error(path, exc) from exc
+        # Not chained: PyYAML's message quotes the offending line, which may hold a key.
+        raise _syntax_error(path, exc) from None
     if raw is None:
-        return _Document(path, {}, {})
+        return _Document(path, text, {}, {})
     if not isinstance(raw, dict):
         raise ConfigError(f"{path}: the top level must be a mapping")
-    return _Document(path, raw, _key_lines(node, ()))
+    return _Document(path, text, raw, _key_lines(node, ()))
 
 
 def _syntax_error(path: Path, exc: yaml.YAMLError) -> ConfigError:
@@ -254,6 +286,7 @@ def _validate(doc: _Document) -> ConfigData:
         require_price=require_price,
         max_in_flight_per_provider=in_flight,
         retry=MappingProxyType(retry),
+        path=doc.path,
     )
 
 
@@ -265,8 +298,9 @@ def _validate_retry(doc: _Document) -> dict[str, float]:
     if unknown:
         raise doc.error(f"retry accepts only {sorted(_RETRY_KEYS)}", "retry", unknown[0])
     for key, value in retry.items():
-        if not isinstance(value, int | float) or isinstance(value, bool):
-            raise doc.error(f"retry.{key} must be a number", "retry", key)
+        number = isinstance(value, int | float) and not isinstance(value, bool)
+        if not number or (isinstance(value, float) and not math.isfinite(value)):
+            raise doc.error(f"retry.{key} must be a finite number", "retry", key)
     return dict(retry)
 
 
@@ -294,6 +328,36 @@ def _validate_providers(doc: _Document) -> dict[str, Mapping[str, str]]:
     return providers
 
 
+def _read_for_rewrite(path: Path) -> _Document:
+    """Reads a file that is about to be rewritten; refuses one with comments."""
+    doc = _read(path)
+    comment_line = _first_comment_line(doc.text)
+    if comment_line is not None:
+        raise ConfigError(
+            f"{path} line {comment_line}: the file has comments, which rewriting it would "
+            "drop; edit it by hand, or remove its comments and run the command again"
+        )
+    return doc
+
+
+def _rewrite(doc: _Document) -> None:
+    """Validates the changed document and replaces the file with it."""
+    _validate(doc)
+    _write_atomic(doc.path, yaml.safe_dump(doc.raw, sort_keys=False, allow_unicode=True))
+
+
+def _first_comment_line(text: str) -> int | None:
+    scalars = [
+        (token.start_mark.index, token.end_mark.index)
+        for token in yaml.scan(text, Loader=yaml.SafeLoader)
+        if isinstance(token, yaml.ScalarToken)
+    ]
+    for match in re.finditer("#", text):
+        if not any(start <= match.start() < end for start, end in scalars):
+            return text.count("\n", 0, match.start()) + 1
+    return None
+
+
 def _write_atomic(path: Path, text: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -301,10 +365,22 @@ def _write_atomic(path: Path, text: str) -> None:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 handle.write(text)
+                handle.flush()
+                os.fsync(handle.fileno())
             os.chmod(tmp, 0o600)
             os.replace(tmp, path)
         except BaseException:
             Path(tmp).unlink(missing_ok=True)
             raise
+        _sync_directory(path.parent)
     except OSError as exc:
         raise ConfigError(f"cannot write {path}: {exc.strerror}") from exc
+
+
+def _sync_directory(directory: Path) -> None:
+    """Makes the rename that replaced the file durable."""
+    fd = os.open(directory, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
