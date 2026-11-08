@@ -15,8 +15,10 @@ def test_import_has_no_side_effects(tmp_path: Path) -> None:
         import sys, threading
         before = threading.active_count()
         import ember, ember.llm, ember.context, ember.config, ember.errors, ember.xcs
+        import ember.data, ember.eval, ember.cli
         assert threading.active_count() == before, "import started a thread"
-        heavy = {"datasets", "jax", "torch", "transformers", "openai", "anthropic"}
+        heavy = {"datasets", "huggingface_hub", "jax", "torch", "transformers"}
+        heavy |= {"openai", "anthropic"}
         loaded = heavy & set(sys.modules)
         assert not loaded, f"import loaded {sorted(loaded)}"
         """
