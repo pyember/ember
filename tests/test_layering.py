@@ -15,7 +15,7 @@ ALLOWED: dict[str, set[str]] = {
     "operators": {"errors", "config", "context", "xcs", "llm"},
     "non": {"errors", "config", "context", "xcs", "llm", "operators"},
     "data": {"errors", "config", "context", "xcs", "llm", "operators"},
-    "eval": {"errors", "config", "context", "xcs", "llm", "operators", "data"},
+    "eval": {"errors", "config", "context", "xcs", "llm", "operators", "non", "data"},
     "cli": {"errors", "config", "context", "xcs", "llm", "operators", "non", "data", "eval"},
 }
 

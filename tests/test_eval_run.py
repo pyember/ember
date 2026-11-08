@@ -12,7 +12,7 @@ import ember
 from ember import context, data
 from ember import eval as ember_eval
 from ember.data import Example
-from ember.errors import ErrorKind, ModelError
+from ember.errors import ErrorKind, ModelError, TieError
 from ember.eval import Completed, Failed, NumericAnswer, Scored
 from ember.llm import (
     Client,
@@ -29,6 +29,7 @@ from ember.llm import (
 )
 from ember.llm.fake import Fail, FakeProvider, Reply
 from ember.llm.observe import Attempt, Observer, active_observers
+from ember.non import build_graph
 
 MODEL = ModelRef("fake", "m1")
 
@@ -503,3 +504,46 @@ def test_a_run_through_the_real_client_records_its_retries_and_prices(tmp_path: 
     assert (summary.calls, summary.attempts, summary.retries) == (3, 4, 1)
     assert (summary.failed_attempts, summary.failed_calls) == (2, 1)
     assert (summary.unpriced_calls, summary.cost) == (0, price + price)
+
+
+def test_a_non_graph_run_records_answers_as_text_and_a_lost_quorum_per_item(
+    tmp_path: Path,
+) -> None:
+    graph = build_graph("2E@openai/gpt-5.5, 1M")
+
+    def respond(model: ModelRef, request: Request) -> Reply | Fail:
+        (part,) = request.messages[-1].parts
+        assert isinstance(part, TextPart)
+        example = next(example for example in ITEMS if example.question in part.text)
+        if example.answer == "2":
+            return Fail(ErrorKind.SERVER, status=500)
+        return Reply(example.answer, usage=Usage(input=10, output=1))
+
+    fake = FakeProvider(respond=respond)
+    with Client(provider_factory=fake.factory, sleep=lambda s: None) as client, using(client):
+        records = ember_eval.run(
+            lambda example: graph(example.question),
+            ITEMS,
+            scorer=lambda example, answer: NumericAnswer()(example, answer.text),
+            records=tmp_path / "run.jsonl",
+        )
+
+    assert records == ember_eval.read_run(tmp_path / "run.jsonl")
+    first, lost, third = records.items
+    assert first.outcome == Scored({"text": "0"}, ember_eval.Score(1.0, "0"))
+    assert third.outcome == Scored({"text": "4"}, ember_eval.Score(1.0, "4"))
+    assert isinstance(lost.outcome, Failed)
+    assert (lost.outcome.error_type, lost.outcome.kind) == ("QuorumError", None)
+    assert "quorum not met" in lost.outcome.message
+    assert len(lost.attempts) == 6  # Two members, each tried three times.
+    assert dict(records.summary.failures) == {"QuorumError": 1}
+
+
+def test_a_tied_vote_fails_only_its_item(tmp_path: Path) -> None:
+    def task(example: Example) -> str:
+        if example.answer == "2":
+            raise TieError(("2", "3"), 1)
+        return example.answer
+
+    records = ember_eval.run(task, ITEMS, scorer=NumericAnswer(), records=tmp_path / "run.jsonl")
+    assert (records.summary.scored, dict(records.summary.failures)) == (2, {"TieError": 1})

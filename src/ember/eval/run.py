@@ -11,7 +11,7 @@ from typing import Generic, TypeVar
 
 import ember
 from ember.data import Stream
-from ember.errors import ModelError
+from ember.errors import ModelError, QuorumError, TieError
 from ember.eval.encode import json_value, to_json
 from ember.eval.jsonl import RunWriter
 from ember.eval.records import (
@@ -43,7 +43,7 @@ def run(
     records: Path,
     encode_item: Callable[[ItemT], JsonValue] = to_json,
     encode_output: Callable[[OutputT], JsonValue] = to_json,
-    item_errors: tuple[type[Exception], ...] = (ModelError,),
+    item_errors: tuple[type[Exception], ...] = (ModelError, QuorumError, TieError),
 ) -> RunRecords:
     """Runs ``task`` on each item, scores each output, and records it all.
 
@@ -66,11 +66,15 @@ def run(
         encode_item: Turns an item into JSON for the records; the default
             accepts `ember.data.Example` and JSON values.
         encode_output: Turns an output into JSON for the records; the default
-            accepts JSON values.
+            accepts JSON values and records a NON graph's `ember.non.Answer`
+            as its text.
         item_errors: Exception types that fail only the item that raised
             them, whether from the task, the scorer or ``encode_output``: the
             item is recorded as failed and the run goes on. Any other exception
-            stops the run, after an end record naming it is written.
+            stops the run, after an end record naming it is written. The
+            default covers a failed model call, a composition that lost its
+            quorum, and a majority vote that tied; configuration errors and
+            bugs such as ``TypeError`` stop the run.
 
     Returns:
         The records, exactly as `ember.eval.read_run` reads them back.
