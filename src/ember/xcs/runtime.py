@@ -54,7 +54,7 @@ def dispatch(task: Callable[[], T], *, label: str) -> "Future[T]":
     if strand is None:
         return _run_now(task)
     call = strand.next_call(label)
-    pending: Pending[T] = Pending(frozenset({call}))
+    pending: Pending[T] = Pending(call)
     strand.frame.track(pending)
     context = contextvars.copy_context()
     workers.submit(lambda: _run_call(call, pending, context, task))
@@ -79,7 +79,7 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
     if strand is None:
         return source()
     call = strand.next_call(label)
-    drained: Pending[None] = Pending(frozenset({call}))
+    drained: Pending[None] = Pending(call)
     strand.frame.track(drained)
     channel: Channel[T] = Channel()
     context = contextvars.copy_context()
@@ -110,7 +110,7 @@ def wait(future: "Future[T]") -> T:
     if isinstance(future, Pending):
         future.read = True
         if strand is not None:
-            strand.absorb(future.produced_by)
+            strand.absorb(frozenset({future.call}))
     return future.result()
 
 
@@ -230,7 +230,7 @@ def _read(channel: Channel[T], drained: "Pending[None]") -> Iterator[T]:
             elif isinstance(step, Item):
                 strand = strands.current()
                 if strand is not None:
-                    strand.absorb(drained.produced_by)
+                    strand.absorb(frozenset({drained.call}))
                 yield step.value
     finally:
         drained.read = True

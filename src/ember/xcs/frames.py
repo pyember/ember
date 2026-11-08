@@ -2,9 +2,9 @@
 
 A `Frame` belongs to one `jit` call, or to a `map` call made outside any jit.
 Everything started inside it is recorded in it and in every enclosing frame:
-the `Call` behind each dispatched request, for the graph, and the `Pending`
-future of each dispatched request, stream and spawned task, so the frame's
-boundary can wait for all of them and raise a failure nobody read.
+the `Call` behind each dispatched request or stream, for the graph, and its
+`Pending` future, so the frame's boundary can wait for all of them and raise a
+failure nobody read.
 """
 
 import time
@@ -48,19 +48,19 @@ class Call:
 
 
 class Pending(Future[T]):
-    """A future created inside a scope.
+    """The future of a call dispatched inside a scope.
 
     Attributes:
+        call: The call; reading the outcome makes the reader's later calls
+            depend on it.
         read: Whether any code has read the outcome. A failure that is never
             read is raised at the boundary of the jit call that created it.
-        produced_by: The calls whose results the outcome depends on; reading
-            the outcome makes later calls by the reader depend on them.
     """
 
-    def __init__(self, produced_by: frozenset[Call]) -> None:
+    def __init__(self, call: Call) -> None:
         super().__init__()
+        self.call = call
         self.read = False
-        self.produced_by = produced_by
 
 
 class Plan:
