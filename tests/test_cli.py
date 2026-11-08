@@ -1,5 +1,6 @@
 """The ember command: parses first, never prints or accepts keys, repairs typos."""
 
+import ast
 import getpass
 import subprocess
 import sys
@@ -7,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import ember.cli
 from ember import context
 from ember.cli import main
 
@@ -205,3 +207,25 @@ def test_the_installed_command_survives_a_broken_home_config(tmp_path: Path) -> 
         f"ember: error: {home}/.ember/config.yaml line 2: not valid YAML "
         "(expected ',' or ']', but got '<stream end>')"
     ]
+
+
+def test_cli_data_and_eval_never_start_processes_or_prompt() -> None:
+    # v0.1 ran `npx -y @ember-ai/setup`, or blocked on input(), when a key was missing.
+    source = Path(ember.cli.__file__).parents[1]
+    paths = [path for unit in ("cli", "data", "eval") for path in (source / unit).rglob("*.py")]
+    offences = []
+    for path in paths:
+        for node in ast.walk(ast.parse(path.read_text(), filename=str(path))):
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                modules = [node.module or ""]
+            else:
+                modules = []
+            if {"subprocess", "pty", "webbrowser"} & {name.split(".")[0] for name in modules}:
+                offences.append(f"{path.name}:{node.lineno} imports {modules}")
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name | ast.Attribute):
+                name = node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+                if name in {"input", "system", "popen", "execv", "spawnv"}:
+                    offences.append(f"{path.name}:{node.lineno} calls {name}")
+    assert paths and not offences, offences
