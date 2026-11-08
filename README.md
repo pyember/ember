@@ -50,41 +50,27 @@ export OPENAI_API_KEY=...          # or: ember configure set-key openai
 
 ## NON: Compound AI in One Line
 
-A NON specification names a network of model calls in one line, and `build_graph` turns it into an
-operator that runs:
+Ember's compact notation lets you express sophisticated AI architectures concisely:
 
 ```python
-from ember import build_graph
+from ember.non import build_graph
 
-# Five samples, then a judge that reads all five and writes the answer.
-graph = build_graph("5E@openai/gpt-5(temperature=0.7), 1J@anthropic/claude-sonnet-4-5")
-answer = graph("What is the most effective way to cut household energy use?")
-print(answer.text)
+# 5 parallel GPT-4o instances synthesized by Claude
+system = build_graph(["5E@openai/gpt-4o(temp=0.7)", "1J@anthropic/claude-4-sonnet"])
+result = system(query="What's the most effective approach to climate change?")
 
-# Seven samples and a majority vote.
-voted = build_graph("7E@openai/gpt-5(temperature=0.7), 1M")
-print(voted("Is 1009 prime? Answer yes or no.").text)
+# With majority voting instead of judge synthesis
+voting = build_graph(["7E@openai/gpt-4o(temp=0.7)", "1M"])
 
-# Samples from two models, a verifier that keeps the answers it passes, then a judge.
-checked = build_graph(
-    "3E@openai/gpt-5, 3E@anthropic/claude-sonnet-4-5, 1V@openai/gpt-5, "
-    "1J@anthropic/claude-sonnet-4-5"
-)
-print(checked("Why is the sky blue? Two sentences.").text)
+# Multi-branch architecture with verification
+advanced = build_graph([
+    "3E@openai/gpt-4o(temp=0.6)",      # Ensemble generation
+    "1V@anthropic/claude-4-sonnet",     # Verification
+    "1J@anthropic/claude-4-sonnet"      # Final synthesis
+])
 ```
 
-| Stage | What it does |
-|-------|--------------|
-| `nE@model` | `n` calls to the model with the question. All E stages run concurrently. |
-| `nJ@model` | `n` judges, each reading the question and every answer; their answers replace the answers. |
-| `1V@model` | Checks each answer with its own call and keeps the ones that pass. |
-| `1M` | Majority vote: the answer most calls agree on, compared case- and space-insensitively. |
-
-A graph starts with E stages and ends with `1J` or `1M`. Model ids are `provider/name` and are passed
-through untouched, so `ollama/llama3.1:8b` works. E, J and V take `temperature`, `top_p`,
-`max_output_tokens`, `seed`, `reasoning_effort`, `system` and `quorum`, the number of calls that must
-succeed (for V, answers that must pass). A mistake raises `NonSyntaxError` pointing at its column.
-`answer.stages` keeps every call's outcome, including failures.
+**Node types:** `E` (Ensemble), `J` (Judge), `M` (MostCommon), `V` (Verifier)
 
 ## Core Concepts
 
@@ -107,77 +93,20 @@ response = assistant("How do I center a div?")
 
 ### 2. Operators — Composable Building Blocks
 
-An operator is a frozen dataclass with a `forward` method. Functions become operators with `@op`,
-and `>>` chains them, with mypy checking that each stage takes what the previous one returns:
-
 ```python
-import dataclasses
+from ember.api import operators, models
 
-from ember import op
-from ember.operators import Ensemble, ModelCall, Operator, Succeeded
+@operators.op
+def summarize(text: str) -> str:
+    return models("gpt-4o", f"Summarize: {text}")
 
+@operators.op
+def translate(text: str, lang: str = "Spanish") -> str:
+    return models("gpt-4o", f"Translate to {lang}: {text}")
 
-@op
-def tidy(text: str) -> str:
-    return " ".join(text.split())
-
-
-summarize = ModelCall("openai/gpt-5", template="Summarize in one sentence:\n{input}")
-pipeline = tidy >> summarize
-print(pipeline("  Ember composes   model calls.  ").text)
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class Exclaim(Operator[str, str]):
-    mark: str = "!"
-
-    def forward(self, input: str) -> str:
-        return input + self.mark
-
-
-louder = dataclasses.replace(Exclaim(), mark="!!!")  # Operators never change; replace copies.
-
-# Members run concurrently; every member's outcome comes back, failures included.
-panel = Ensemble(
-    (ModelCall("openai/gpt-5"), ModelCall("anthropic/claude-sonnet-4-5")),
-    quorum=1,
-)
-for outcome in panel("Name a prime number."):
-    if isinstance(outcome, Succeeded):
-        print(outcome.member, outcome.value.text)
-    else:
-        print(outcome.member, "failed:", outcome.error)
-```
-
-An ensemble records rate limits, overload, server and transport errors as failed members, and raises
-`QuorumError` when fewer than `quorum` members succeed. Errors that would fail every member alike,
-such as a bad key or an unknown model, are raised at once. `Judge`, `MajorityVote` and `Verifier`
-take a question with its candidate answers.
-
-Validation is optional and declared once, as pydantic models on the class:
-
-```python
-import dataclasses
-
-import pydantic
-
-from ember.operators import Operator
-
-
-class Question(pydantic.BaseModel):
-    model_config = pydantic.ConfigDict(extra="forbid")
-    text: str
-
-
-@dataclasses.dataclass(frozen=True, slots=True)
-class Length(Operator[Question, int]):
-    input_model = Question  # Checked strictly on every call.
-
-    def forward(self, input: Question) -> int:
-        return len(input.text)
-
-
-print(Length()({"text": "hello"}))  # 5; {"text": 5} or an extra key raises ValidationError
+# Compose with >> operator
+pipeline = summarize >> translate
+result = pipeline("Long technical article...")
 ```
 
 ### 3. Data and Evaluation

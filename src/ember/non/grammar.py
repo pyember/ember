@@ -14,14 +14,14 @@ whitespace, so ``openai/ft:gpt-4o-mini:acme::abc123`` and
 ``ollama/llama3.1:8b`` arrive unchanged. Every error is a `NonSyntaxError`
 carrying the column where it was detected.
 
-Beyond the grammar, a graph obeys these rules: it starts with one or more E
-stages and has no E stage after any other stage; it ends with ``1J`` or ``1M``,
-the stages that produce a single answer; M and V stages have count 1.
+Beyond the grammar, the stages come in this order: one or more E stages, at
+most one V stage, then J and M stages ending in ``1J`` or ``1M``. Those two
+leave a single answer, so neither appears before the end. M and V stages have
+count 1.
 """
 
 import dataclasses
 import enum
-import itertools
 import math
 import re
 from collections.abc import Mapping
@@ -37,7 +37,6 @@ __all__ = [
     "Role",
     "Stage",
     "VoteStage",
-    "max_answers_after",
     "parse",
 ]
 
@@ -356,35 +355,33 @@ class _Parser:
 
 
 def _check_graph(spec: str, stages: tuple[Stage, ...]) -> None:
-    """Checks the rules that span stages: E prefix, single-answer end, V quorum."""
-    if not _is_ensemble(stages[0]):
+    """Checks the stage order: E stages, an optional V, then J and M stages ending in 1J or 1M."""
+    generating = 0
+    while generating < len(stages) and _is_ensemble(stages[generating]):
+        generating += 1
+    if generating == 0:
         raise NonSyntaxError(spec, stages[0].column, "a graph starts with an E stage")
-    for previous, stage in itertools.pairwise(stages):
-        if _is_ensemble(stage) and not _is_ensemble(previous):
+    rest = stages[generating:]
+    for index, stage in enumerate(rest):
+        if _is_ensemble(stage):
             raise NonSyntaxError(spec, stage.column, "E stages come before J, V and M stages")
-    answers = 0
-    for stage in stages:
-        answers = max_answers_after(stage, answers)
-        if isinstance(stage, ModelStage) and stage.role is Role.VERIFIER:
-            _check_verifier_quorum(spec, stage, answers)
-    last = stages[-1]
-    if not (isinstance(last, VoteStage) or (last.role is Role.JUDGE and last.count == 1)):
-        raise NonSyntaxError(spec, last.column, "a graph ends with 1J or 1M, which give one answer")
+        if isinstance(stage, ModelStage) and stage.role is Role.VERIFIER and index > 0:
+            raise NonSyntaxError(spec, stage.column, "a V stage comes directly after the E stages")
+        if _leaves_one_answer(stage) and index < len(rest) - 1:
+            raise NonSyntaxError(spec, stage.column, "1J and 1M leave one answer and end the graph")
+    if not rest or not _leaves_one_answer(rest[-1]):
+        raise NonSyntaxError(spec, stages[-1].column, "a graph ends with 1J or 1M")
+    if isinstance(rest[0], ModelStage) and rest[0].role is Role.VERIFIER:
+        answers = sum(stage.count for stage in stages[:generating] if isinstance(stage, ModelStage))
+        _check_verifier_quorum(spec, rest[0], answers)
+
+
+def _leaves_one_answer(stage: Stage) -> bool:
+    return isinstance(stage, VoteStage) or (stage.role is Role.JUDGE and stage.count == 1)
 
 
 def _is_ensemble(stage: Stage) -> bool:
     return isinstance(stage, ModelStage) and stage.role is Role.ENSEMBLE
-
-
-def max_answers_after(stage: Stage, answers: int) -> int:
-    """The most answers that can exist after ``stage``, given ``answers`` before it."""
-    if isinstance(stage, VoteStage):
-        return 1
-    if stage.role is Role.ENSEMBLE:
-        return answers + stage.count
-    if stage.role is Role.JUDGE:
-        return stage.count
-    return answers
 
 
 def _check_verifier_quorum(spec: str, stage: ModelStage, answers: int) -> None:

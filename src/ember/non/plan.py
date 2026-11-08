@@ -14,7 +14,7 @@ from collections.abc import Callable
 from ember.llm.ref import ModelRef
 from ember.llm.result import Money, Usage
 from ember.llm.spec import ModelSpec, Rates
-from ember.non.grammar import ModelStage, Role, Stage, VoteStage, max_answers_after
+from ember.non.grammar import ModelStage, Role, Stage, VoteStage
 
 __all__ = ["Plan", "StagePlan", "plan"]
 
@@ -85,7 +85,7 @@ def plan(stages: tuple[Stage, ...], resolve: Callable[[ModelRef], ModelSpec]) ->
     answers = 0
     for stage in stages:
         calls = _calls(stage, answers)
-        answers = max_answers_after(stage, answers)
+        answers = _answers_after(stage, answers)
         if isinstance(stage, ModelStage):
             planned.append(_model_stage_plan(stage, calls, resolve(stage.model)))
         else:
@@ -100,6 +100,17 @@ def _calls(stage: Stage, answers_before: int) -> int:
     if stage.role is Role.VERIFIER:
         return answers_before
     return stage.count
+
+
+def _answers_after(stage: Stage, answers: int) -> int:
+    """The most answers that can exist after ``stage``, given ``answers`` before it."""
+    if isinstance(stage, VoteStage):
+        return 1
+    if stage.role is Role.ENSEMBLE:
+        return answers + stage.count
+    if stage.role is Role.JUDGE:
+        return stage.count
+    return answers
 
 
 def _model_stage_plan(stage: ModelStage, calls: int, spec: ModelSpec) -> StagePlan:

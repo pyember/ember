@@ -84,5 +84,5 @@ def test_cost_bounds_use_the_highest_output_rate_tier() -> None:
 
 
 def test_verifier_calls_follow_the_answers_it_can_see() -> None:
-    plan = build_graph("2E@a/priced, 1E@a/priced, 2J@a/priced, 1V@a/priced, 1J@a/priced")
-    assert [stage.calls for stage in plan.plan(_resolve).stages] == [2, 1, 2, 2, 1]
+    plan = build_graph("2E@a/priced, 1E@a/priced, 1V@a/priced, 2J@a/priced, 1M")
+    assert [stage.calls for stage in plan.plan(_resolve).stages] == [2, 1, 3, 2, 0]
