@@ -15,7 +15,7 @@ import time
 from collections.abc import Callable, Iterator
 
 from ember.errors import ErrorKind, ModelError
-from ember.llm import Completion, FinishReason, ModelRef, Request, Result, TextPart, Usage
+from ember.llm import Completion, FinishReason, Message, ModelRef, Request, Result, TextPart, Usage
 from ember.xcs import runtime
 
 REF = ModelRef("fake", "echo")
@@ -119,4 +119,5 @@ class FakeModel:
             model=REF,
             request_id=None,
             latency_s=self.latency_s,
+            message=Message.assistant(text),
         )
