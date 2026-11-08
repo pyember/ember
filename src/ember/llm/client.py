@@ -37,7 +37,7 @@ from collections.abc import Callable, Generator, Iterator, Mapping, Sequence
 from types import MappingProxyType, TracebackType
 
 from ember import context
-from ember.context import Context
+from ember.context import Context, ProviderSettings
 from ember.errors import ConfigError, ErrorKind, ModelError
 from ember.llm import catalog as catalog_module
 from ember.llm import observe, providers
@@ -47,7 +47,15 @@ from ember.llm.completion import Completion
 from ember.llm.limiter import Limiter, LimiterState, Permit
 from ember.llm.pool import ProviderFactory, ProviderPool
 from ember.llm.ref import ModelRef
-from ember.llm.request import JsonValue, Message, Request, Sampling, ToolChoice, ToolSpec
+from ember.llm.request import (
+    DEFAULT_SAMPLING,
+    JsonValue,
+    Message,
+    Request,
+    Sampling,
+    ToolChoice,
+    ToolSpec,
+)
 from ember.llm.result import Event
 from ember.llm.spec import ModelSpec, SamplingField
 from ember.xcs import runtime
@@ -384,13 +392,35 @@ class Client:
     ) -> None:
         self.close()
 
+    def check(self, model: ModelName, *, sampling: Sampling = DEFAULT_SAMPLING) -> ModelSpec:
+        """Raises what a call to ``model`` with ``sampling`` would raise before sending.
+
+        Resolves the model and checks its settings, its provider and the price
+        policy exactly as a call does, without building a provider, waiting
+        for capacity or sending anything.
+
+        Returns:
+            The resolved spec.
+
+        Raises:
+            ModelError: ``NOT_FOUND`` for an unknown model, ``UNPRICED`` under
+                ``require_price``.
+            ValueError: A setting the model does not accept.
+            ConfigError: No model given and no ``default_model``, or the
+                provider is not configured.
+        """
+        ctx = context.current()
+        spec, _, _ = self._preflight(model, sampling, keeps_list_price=True, ctx=ctx)
+        return spec
+
     def _prepare(self, model: ModelName, request: Request) -> Call:
         ctx = context.current()
-        spec = self._resolve(model, ctx)
-        check_settings(spec, request.sampling)
-        settings = ctx.provider(spec.ref.provider)
-        list_price = settings.base_url is None and extensions_keep_list_price(request)
-        _check_price(spec, list_price, ctx)
+        spec, settings, list_price = self._preflight(
+            model,
+            request.sampling,
+            keeps_list_price=extensions_keep_list_price(request),
+            ctx=ctx,
+        )
         lease = self._pool.lease(settings, ctx)
         try:
             permit = self._wait_for_permit(spec.ref.provider, ctx.max_in_flight_per_provider)
@@ -409,6 +439,22 @@ class Client:
             sleep=self._sleep,
             jitter=self._jitter,
         )
+
+    def _preflight(
+        self,
+        model: ModelName,
+        sampling: Sampling,
+        *,
+        keeps_list_price: bool,
+        ctx: Context,
+    ) -> tuple[ModelSpec, ProviderSettings, bool]:
+        """Every check a call makes before sending: model, settings, provider, price."""
+        spec = self._resolve(model, ctx)
+        check_settings(spec, sampling)
+        settings = ctx.provider(spec.ref.provider)
+        list_price = settings.base_url is None and keeps_list_price
+        _check_price(spec, list_price, ctx)
+        return spec, settings, list_price
 
     def _resolve(self, model: ModelName, ctx: Context) -> ModelSpec:
         if model is None:
