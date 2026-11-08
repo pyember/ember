@@ -13,7 +13,32 @@ from ember.llm.request import Sampling
 def test_check_resolves_an_alias_and_sends_nothing(client: Client, fake: FakeProvider) -> None:
     spec = client.check("gpt-5.5", sampling=Sampling(max_output_tokens=100))
     assert spec.ref == ModelRef("openai", "gpt-5.5")
-    assert (fake.requests, fake.built) == ((), ())
+    assert fake.requests == ()
+    assert [settings.name for settings in fake.built] == ["openai"]
+
+
+def test_check_builds_only_what_the_next_call_reuses(client: Client, fake: FakeProvider) -> None:
+    client.check("openai/gpt-5.5")
+    client.check("openai/gpt-5.5")
+    client.complete("openai/gpt-5.5", "hi").result()
+    assert len(fake.built) == 1
+    assert len(fake.requests) == 1
+
+
+def test_a_missing_key_raises_from_check_exactly_as_from_a_call() -> None:
+    with Client() as real:
+        with pytest.raises(ConfigError) as checked:
+            real.check("openai/gpt-5.5")
+        with pytest.raises(ConfigError) as called:
+            real.complete("openai/gpt-5.5", "hi")
+    assert str(checked.value) == str(called.value)
+    assert "has no API key" in str(checked.value)
+
+
+def test_a_provider_whose_key_is_optional_passes_check_without_one() -> None:
+    local = {"kind": "openai_compatible", "base_url": "http://127.0.0.1:9/v1"}
+    with context.override(providers={"local": local}), Client() as real:
+        assert real.check("local/any-model").ref == ModelRef("local", "any-model")
 
 
 @pytest.mark.parametrize(

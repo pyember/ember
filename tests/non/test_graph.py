@@ -7,13 +7,17 @@ the model and the prompt, never of arrival order.
 import dataclasses
 import threading
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from ember import build_graph
-from ember.errors import ErrorKind, ModelError, NonSyntaxError, QuorumError
-from ember.llm.fake import Reply
+from ember import build_graph, context
+from ember.context import Context, ProviderSettings
+from ember.errors import ConfigError, ErrorKind, ModelError, NonSyntaxError, QuorumError
+from ember.llm import Client, providers, using
+from ember.llm.fake import FakeProvider, Reply
+from ember.llm.provider import Provider
 from ember.llm.result import FinishReason
 from ember.non import NonGraph, Sampled, Verified, Voted
 from ember.operators import Ensemble, Failed, Operator, Succeeded
@@ -270,3 +274,26 @@ def test_a_verifier_shortfall_counts_passed_failed_and_unreadable(
     with pytest.raises(QuorumError) as raised:
         build_graph(spec)("q")
     assert str(raised.value) == "quorum not met: 1 passed, 1 failed, 1 unreadable; 2 required"
+
+
+def test_a_later_stage_without_a_key_sends_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EMBER_CONFIG", str(tmp_path / "config.yaml"))
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    context.reload()
+    fake = FakeProvider(default=Reply("draft"))
+
+    def real_rules_then_fake(settings: ProviderSettings, ctx: Context) -> Provider:
+        providers.build(settings, ctx).close()  # The real key and base URL rules.
+        return fake.factory(settings, ctx)
+
+    try:
+        with Client(provider_factory=real_rules_then_fake) as client, using(client):
+            with pytest.raises(ConfigError, match="'anthropic' has no API key"):
+                build_graph("3E@openai/gpt-5.5, 1J@anthropic/claude-opus-5-5")("q")
+    finally:
+        context.reload()
+    assert fake.requests == ()

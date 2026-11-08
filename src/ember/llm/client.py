@@ -395,9 +395,11 @@ class Client:
     def check(self, model: ModelName, *, sampling: Sampling = DEFAULT_SAMPLING) -> ModelSpec:
         """Raises what a call to ``model`` with ``sampling`` would raise before sending.
 
-        Resolves the model and checks its settings, its provider and the price
-        policy exactly as a call does, without building a provider, waiting
-        for capacity or sending anything.
+        Resolves the model, checks its settings and the price policy, and
+        obtains the provider from this client's pool, exactly as a call does,
+        so a missing key or base URL raises here too. It waits for no
+        capacity and sends nothing; a provider it builds stays pooled for the
+        next call.
 
         Returns:
             The resolved spec.
@@ -406,11 +408,13 @@ class Client:
             ModelError: ``NOT_FOUND`` for an unknown model, ``UNPRICED`` under
                 ``require_price``.
             ValueError: A setting the model does not accept.
-            ConfigError: No model given and no ``default_model``, or the
-                provider is not configured.
+            ConfigError: No model given and no ``default_model``, the provider
+                is not configured, or it cannot be built (a missing key or
+                base URL).
         """
         ctx = context.current()
-        spec, _, _ = self._preflight(model, sampling, keeps_list_price=True, ctx=ctx)
+        spec, settings, _ = self._preflight(model, sampling, keeps_list_price=True, ctx=ctx)
+        self._pool.lease(settings, ctx).release()
         return spec
 
     def _prepare(self, model: ModelName, request: Request) -> Call:
