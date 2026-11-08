@@ -86,13 +86,6 @@ wandb/
 **/model_path/
 **/wandb/
 
-# GraphRouter scratch
-embergraphrouter/.venv/
-embergraphrouter/cache/
-embergraphrouter/model/
-embergraphrouter/model_path/
-embergraphrouter/embergraphrouter.egg-info/
-
 # Scratch dirs created during agent runs
 @tmp/
 tmp_ctx_test*/
@@ -156,12 +149,6 @@ test_*.md
 # Ruff
 .ruff_cache/
 
-# # Ember gateway and Takumi (excluded from VCS)
-# # Code paths intentionally not tracked in ember-v2
-# src/ember/gateway/
-# src/ember/models/providers/takumi.py
-# src/ember/models/providers/takumi/
-
 # tox
 .tox/
 
@@ -194,25 +181,6 @@ node_modules/
 
 # Setup-wizard local artifacts
 src/ember/cli/setup-wizard/hello_ember*.py
-
-# Large dataset snapshots
-embergraphrouter/data/router_data.csv
-
-# Large router data files (CSV datasets)
-embergraphrouter/data/*.csv
-embergraphrouter/data/*.csv.gz
-embergraphrouter/data/.router_cache/
-embergraphrouter/data/.router_cache_backup_*/
-
-# GraphRouter datasets and checkpoints (download separately)
-embergraphrouter/data/**
-!embergraphrouter/data/README.md
-embergraphrouter/configs/*.pkl
-embergraphrouter/configs/config_local.yaml
-embergraphrouter_full.tar.gz
-embergraphrouter/model_path_eval/
-embergraphrouter/model_path_baseline/
-embergraphrouter/remote_backup_*/
 
 # Model checkpoints (weights)
 *.pt

@@ -15,10 +15,7 @@ from __future__ import annotations
 
 from ember.types import ProviderCapabilities
 
-PROVIDER_ALIASES: dict[str, str] = {
-    "azure_openai_east": "azure_openai",
-    "azure_openai_west": "azure_openai",
-}
+PROVIDER_ALIASES: dict[str, str] = {}
 
 # Canonical provider capability data grounded in upstream feature support.
 # Downstream consumers may further constrain these values based on runtime
