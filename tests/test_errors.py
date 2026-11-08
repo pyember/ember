@@ -20,11 +20,13 @@ def test_retryable_follows_kind(kind: ErrorKind, retryable: bool) -> None:
     assert error.retryable is retryable
 
 
-def test_transport_errors_retry_only_before_the_first_byte() -> None:
-    before = ModelError(ErrorKind.TRANSPORT, provider="p", model="m", reason="reset")
-    after = ModelError(
-        ErrorKind.TRANSPORT, provider="p", model="m", reason="reset", before_first_byte=False
-    )
+@pytest.mark.parametrize(
+    "kind",
+    [ErrorKind.TRANSPORT, ErrorKind.OVERLOADED, ErrorKind.RATE_LIMITED, ErrorKind.SERVER],
+)
+def test_no_error_is_retryable_after_the_caller_received_output(kind: ErrorKind) -> None:
+    before = ModelError(kind, provider="p", model="m", reason="x")
+    after = ModelError(kind, provider="p", model="m", reason="x", before_first_byte=False)
     assert before.retryable
     assert not after.retryable
 

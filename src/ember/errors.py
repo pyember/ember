@@ -59,8 +59,10 @@ class ModelError(EmberError):
         status: HTTP status code, when the failure came from an HTTP response.
         request_id: The provider's request id, when the provider sent one.
         retry_after_s: Seconds the provider asked the caller to wait.
-        before_first_byte: For transport failures, whether no response byte had
-            arrived yet. Only such failures are safe to retry.
+        before_first_byte: Whether the caller had received nothing from this
+            attempt when it failed. False once a stream has yielded any event;
+            non-streaming calls always leave it True. Only such failures are
+            safe to retry, whatever their kind.
     """
 
     def __init__(
@@ -87,10 +89,12 @@ class ModelError(EmberError):
 
     @property
     def retryable(self) -> bool:
-        """Whether sending the same request again can succeed."""
-        if self.kind is ErrorKind.TRANSPORT:
-            return self.before_first_byte
-        return self.kind in _RETRYABLE_KINDS
+        """Whether sending the same request again can succeed and repeat nothing.
+
+        A failure after the caller received part of the output is never
+        retryable: a retry would deliver that part twice.
+        """
+        return self.before_first_byte and self.kind in _RETRYABLE_KINDS
 
     def _render(self) -> str:
         parts = [f"{self.kind.value}: {self.reason}", f"model={self.provider}/{self.model}"]
