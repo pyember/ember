@@ -6,6 +6,7 @@ from ember.errors import ErrorKind
 from ember.llm.provider import Decoded
 from ember.llm.providers import anthropic_messages
 from ember.llm.providers.wire import WireError
+from ember.llm.ref import ModelRef
 from ember.llm.request import (
     ImagePart,
     Message,
@@ -26,8 +27,15 @@ from ember.llm.result import (
     Usage,
     UsageEvent,
 )
+from ember.llm.spec import ModelSpec
 
 WEATHER = ToolSpec("get_weather", "Weather for a city.", {"type": "object"})
+SPEC = ModelSpec(
+    ref=ModelRef("anthropic", "claude-opus-5-5"),
+    wire_id="claude-opus-5-5",
+    api="anthropic_messages",
+    max_output_tokens=64000,
+)
 
 
 def _encode(kit, request: Request, *, catalog_max: int | None = 64000) -> dict:
@@ -124,7 +132,7 @@ def test_images_use_base64_or_url_sources(kit) -> None:
 
 def test_tool_round_trip_replays_thinking_blocks_exactly_in_place(kit) -> None:
     response = kit.json("anthropic/message_thinking_tool_use.json")
-    decoded = anthropic_messages.decode(response, None)
+    decoded = anthropic_messages.decode(SPEC, response, None)
     assert decoded.message is not None
     request = Request(
         (
@@ -164,7 +172,12 @@ def test_other_apis_reasoning_and_empty_text_are_left_out(kit) -> None:
     turn = Message(
         "assistant",
         (
-            ReasoningPart("x", api="openai_responses", state={"type": "reasoning", "id": "rs"}),
+            ReasoningPart(
+                "x",
+                api="openai_responses",
+                provider="openai",
+                state={"type": "reasoning", "id": "rs"},
+            ),
             TextPart(""),
             ToolCallPart("toolu_1", "get_weather", {"city": "Oslo"}),
         ),
@@ -178,7 +191,7 @@ def test_other_apis_reasoning_and_empty_text_are_left_out(kit) -> None:
 
 
 def test_documented_reference_response_usage(kit) -> None:
-    decoded = anthropic_messages.decode(kit.json("anthropic/message_reference.json"), "req_9")
+    decoded = anthropic_messages.decode(SPEC, kit.json("anthropic/message_reference.json"), "req_9")
     assert decoded.text == "Hi! My name is Claude."
     assert decoded.finish_reason is FinishReason.STOP
     assert decoded.usage == Usage(input=2095, cache_read=2051, cache_write=2051, output=503)
@@ -186,7 +199,9 @@ def test_documented_reference_response_usage(kit) -> None:
 
 
 def test_thinking_tool_use_response(kit) -> None:
-    decoded = anthropic_messages.decode(kit.json("anthropic/message_thinking_tool_use.json"), None)
+    decoded = anthropic_messages.decode(
+        SPEC, kit.json("anthropic/message_thinking_tool_use.json"), None
+    )
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
     assert decoded.reasoning == "The user wants the weather in Paris; call the tool."
     assert decoded.text == "Let me check."
@@ -197,7 +212,9 @@ def test_thinking_tool_use_response(kit) -> None:
 
 
 def test_documented_mixed_tool_use_ignores_server_tools_and_has_no_usage(kit) -> None:
-    decoded = anthropic_messages.decode(kit.json("anthropic/message_mixed_tool_use.json"), None)
+    decoded = anthropic_messages.decode(
+        SPEC, kit.json("anthropic/message_mixed_tool_use.json"), None
+    )
     assert [c.name for c in decoded.tool_calls] == ["run_command"]
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
     assert decoded.usage == Usage(measured=False)
@@ -218,18 +235,20 @@ def test_documented_mixed_tool_use_ignores_server_tools_and_has_no_usage(kit) ->
 def test_every_stop_reason_maps(kit, stop_reason, finish) -> None:
     body = kit.json("anthropic/message_end_turn.json")
     body["stop_reason"] = stop_reason
-    assert anthropic_messages.decode(body, None).finish_reason is finish
+    assert anthropic_messages.decode(SPEC, body, None).finish_reason is finish
 
 
 def test_unknown_stop_reason_raises(kit) -> None:
     body = kit.json("anthropic/message_end_turn.json")
     body["stop_reason"] = "exception"
     with pytest.raises(WireError, match="exception"):
-        anthropic_messages.decode(body, None)
+        anthropic_messages.decode(SPEC, body, None)
 
 
 def test_documented_text_stream(kit) -> None:
-    items = list(anthropic_messages.decode_events(kit.events("anthropic/stream_text.sse"), "r"))
+    items = list(
+        anthropic_messages.decode_events(SPEC, kit.events("anthropic/stream_text.sse"), "r")
+    )
     usage = Usage(input=25, output=15)
     assert items[:3] == [TextDelta("Hello"), TextDelta("!"), UsageEvent(usage)]
     done = items[3]
@@ -244,7 +263,7 @@ def test_documented_text_stream(kit) -> None:
 
 def test_documented_tool_use_stream_without_trailing_blank_line(kit) -> None:
     items = list(
-        anthropic_messages.decode_events(kit.events("anthropic/stream_tool_use.sse"), None)
+        anthropic_messages.decode_events(SPEC, kit.events("anthropic/stream_tool_use.sse"), None)
     )
     calls = [item for item in items if isinstance(item, ToolCallDelta)]
     assert (calls[0].index, calls[0].id, calls[0].name) == (
@@ -262,7 +281,7 @@ def test_documented_tool_use_stream_without_trailing_blank_line(kit) -> None:
 
 def test_documented_thinking_stream_keeps_the_signed_block(kit) -> None:
     items = list(
-        anthropic_messages.decode_events(kit.events("anthropic/stream_thinking.sse"), None)
+        anthropic_messages.decode_events(SPEC, kit.events("anthropic/stream_thinking.sse"), None)
     )
     reasoning = [item.text for item in items if isinstance(item, ReasoningDelta)]
     assert len(reasoning) == 4
@@ -272,6 +291,7 @@ def test_documented_thinking_stream_keeps_the_signed_block(kit) -> None:
     assert thinking == ReasoningPart(
         "".join(reasoning),
         api="anthropic_messages",
+        provider="anthropic",
         state={
             "type": "thinking",
             "thinking": "".join(reasoning),
@@ -288,7 +308,7 @@ def test_documented_error_event_raises_overloaded_and_is_never_text(kit) -> None
     )
     received = []
     with pytest.raises(WireError) as caught:
-        for item in anthropic_messages.decode_events(events, None):
+        for item in anthropic_messages.decode_events(SPEC, events, None):
             received.append(item)
     assert received == [TextDelta("Hello")]
     assert caught.value.kind is ErrorKind.OVERLOADED
@@ -298,10 +318,10 @@ def test_documented_error_event_raises_overloaded_and_is_never_text(kit) -> None
 def test_unknown_events_are_skipped_and_a_cut_stream_raises(kit) -> None:
     events = kit.events("anthropic/stream_text.sse")
     extra = kit.sse({"type": "future_event", "detail": 1})
-    items = list(anthropic_messages.decode_events(events[:2] + extra + events[2:], None))
+    items = list(anthropic_messages.decode_events(SPEC, events[:2] + extra + events[2:], None))
     assert isinstance(items[-1], Decoded) and items[-1].text == "Hello!"
     with pytest.raises(WireError) as caught:
-        list(anthropic_messages.decode_events(events[:-1], None))
+        list(anthropic_messages.decode_events(SPEC, events[:-1], None))
     assert caught.value.kind is ErrorKind.TRANSPORT
 
 
@@ -309,3 +329,38 @@ def test_error_label_reads_the_documented_error_shape(kit) -> None:
     assert anthropic_messages.error_label(kit.json("anthropic/error_not_found.json")) == (
         "not_found_error"
     )
+
+
+def test_thinking_from_another_provider_is_not_sent(kit) -> None:
+    response = kit.json("anthropic/message_thinking_tool_use.json")
+    first = anthropic_messages.decode(SPEC, response, None)
+    proxy = ModelSpec(
+        ref=ModelRef("proxy", "claude-opus-5-5"),
+        wire_id="claude-opus-5-5",
+        api="anthropic_messages",
+        max_output_tokens=64000,
+    )
+    request = Request(
+        (
+            Message.user("Weather in Paris?"),
+            first.message,
+            Message("tool", (ToolResultPart("toolu_01A09q90qw90lq917835lq9", "18C"),)),
+        ),
+        tools=(WEATHER,),
+    )
+    assert anthropic_messages.encode(proxy, request, False)["messages"][1] == {
+        "role": "assistant",
+        "content": response["content"][2:],
+    }
+
+
+def test_empty_response_turn_is_left_out_of_the_history(kit) -> None:
+    body = kit.json("anthropic/message_end_turn.json")
+    body["content"] = []
+    first = anthropic_messages.decode(SPEC, body, None)
+    assert first.message == Message("assistant", (TextPart(""),))
+    request = Request((Message.user("hi"), first.message, Message.user("still there?")))
+    assert anthropic_messages.encode(SPEC, request, False)["messages"] == [
+        {"role": "user", "content": "hi"},
+        {"role": "user", "content": "still there?"},
+    ]

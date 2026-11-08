@@ -79,21 +79,35 @@ class ReasoningPart:
     """Reasoning the assistant produced, kept so the conversation can continue.
 
     Some providers reject or degrade a tool-use turn whose earlier reasoning
-    is missing from the history (Anthropic thinking blocks, Gemini thought
-    signatures, OpenAI Responses reasoning items). A `Result.message` carries
-    these parts in the order the provider produced them; append that message
-    to the history unchanged. The codec for ``api`` sends ``state`` back
-    exactly as received; codecs for other wire protocols cannot use it and
-    leave the part out.
+    is missing from the history: Anthropic thinking and redacted-thinking
+    blocks (a modified block is rejected), Gemini thought signatures, OpenAI
+    Responses reasoning items. `Result.message` carries these parts in the
+    order the provider produced them; append that message to the history
+    unchanged.
+
+    A codec sends ``state`` back exactly as received, and only when both
+    ``api`` and ``provider`` match the model the request goes to; any other
+    request leaves the part out, so one provider's state never reaches
+    another (an OpenAI-compatible gateway never receives OpenAI state). A
+    different model at the same provider receives it, and the provider
+    decides whether to accept it.
+
+    A Gemini thought signature rides on the part it arrived with: its
+    `ReasoningPart` (state ``{"thoughtSignature": ...}``) comes directly
+    before that text or tool-call part, and encoding puts it back there.
 
     Attributes:
-        text: Readable reasoning summary; empty when the provider sent none.
+        text: Readable reasoning (a summary or thinking text); empty when the
+            provider sent only encrypted or redacted state.
         api: The wire protocol that produced the part.
-        state: The provider's own data for this reasoning, opaque to callers.
+        provider: The configured provider name that produced it, as in
+            ``ModelRef.provider``.
+        state: The provider's own item for this reasoning, opaque to callers.
     """
 
     text: str
     api: WireApi
+    provider: str
     state: Mapping[str, JsonValue]
 
 

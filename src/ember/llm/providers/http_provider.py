@@ -11,6 +11,7 @@ import dataclasses
 from collections.abc import Callable, Iterator, Mapping
 from types import MappingProxyType
 
+from ember.errors import ModelError
 from ember.llm.provider import Decoded, StreamItem
 from ember.llm.providers.http import Transport
 from ember.llm.providers.wire import Body, Codec, WireError
@@ -69,7 +70,7 @@ class HttpProvider:
         route, body = self._prepare(spec, request, stream=False)
         response = self._transport.post(route.path, body, model=spec.ref.name, params=route.params)
         try:
-            return route.codec.decode(response.body, response.request_id)
+            return route.codec.decode(spec, response.body, response.request_id)
         except WireError as error:
             raise error.to_model_error(
                 provider=self._name,
@@ -100,15 +101,43 @@ class HttpProvider:
         return route, route.codec.encode(spec, request, stream)
 
     def _items(self, spec: ModelSpec, route: Route, body: Body) -> Iterator[StreamItem]:
-        with self._transport.stream(
-            route.path, body, model=spec.ref.name, params=route.params
-        ) as opened:
-            try:
-                yield from route.codec.decode_events(opened.events, opened.request_id)
-            except WireError as error:
-                raise error.to_model_error(
-                    provider=self._name,
-                    model=spec.ref.name,
-                    request_id=opened.request_id,
-                    before_first_byte=False,
-                ) from error
+        """Yields the stream's items; a failure says whether any reached the caller.
+
+        `ModelError.before_first_byte` means the caller received nothing from
+        this attempt, so it stays True for a failure that arrives before the
+        first item even when response bytes had already been read.
+        """
+        delivered = False
+        try:
+            with self._transport.stream(
+                route.path, body, model=spec.ref.name, params=route.params
+            ) as opened:
+                try:
+                    for item in route.codec.decode_events(spec, opened.events, opened.request_id):
+                        delivered = True
+                        yield item
+                except WireError as error:
+                    raise error.to_model_error(
+                        provider=self._name,
+                        model=spec.ref.name,
+                        request_id=opened.request_id,
+                        before_first_byte=not delivered,
+                    ) from error
+        except ModelError as error:
+            if delivered or error.before_first_byte:
+                raise
+            raise _undelivered(error) from error
+
+
+def _undelivered(error: ModelError) -> ModelError:
+    """Returns ``error`` marked as having delivered nothing to the caller."""
+    return ModelError(
+        error.kind,
+        provider=error.provider,
+        model=error.model,
+        reason=error.reason,
+        status=error.status,
+        request_id=error.request_id,
+        retry_after_s=error.retry_after_s,
+        before_first_byte=True,
+    )

@@ -35,6 +35,7 @@ from ember.llm.providers.wire import (
     malformed,
     merge_extensions,
     parse_event_data,
+    replays,
     stream_cut,
     string,
 )
@@ -100,7 +101,7 @@ def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
             (``stop``, ``seed``), or an extension collides with a field ember
             sets.
     """
-    body: Body = {"model": spec.wire_id, "input": _input(request.messages)}
+    body: Body = {"model": spec.wire_id, "input": _input(spec, request.messages)}
     if request.system is not None:
         body["instructions"] = request.system
     body.update(_sampling(request.sampling))
@@ -143,13 +144,13 @@ def _sampling(sampling: Sampling) -> Body:
     return fields
 
 
-def _input(messages: tuple[Message, ...]) -> list[JsonValue]:
+def _input(spec: ModelSpec, messages: tuple[Message, ...]) -> list[JsonValue]:
     items: list[JsonValue] = []
     for message in messages:
         if message.role == "user":
             items.append({"role": "user", "content": _user_content(message.parts)})
         elif message.role == "assistant":
-            items.extend(_assistant_items(message.parts))
+            items.extend(_assistant_items(spec, message.parts))
         else:
             items.extend(_tool_output(part) for part in message.parts)
     return items
@@ -167,7 +168,7 @@ def _user_content(parts: tuple[Part, ...]) -> JsonValue:
     return content
 
 
-def _assistant_items(parts: tuple[Part, ...]) -> Iterator[JsonValue]:
+def _assistant_items(spec: ModelSpec, parts: tuple[Part, ...]) -> Iterator[JsonValue]:
     """Encodes an assistant turn as input items, in order.
 
     Reasoning from this wire protocol is replayed as the item it came from;
@@ -183,7 +184,7 @@ def _assistant_items(parts: tuple[Part, ...]) -> Iterator[JsonValue]:
                 "name": part.name,
                 "arguments": arguments_json(part.arguments),
             }
-        elif isinstance(part, ReasoningPart) and part.api == "openai_responses":
+        elif isinstance(part, ReasoningPart) and replays(part, spec):
             yield part.state
 
 
@@ -215,22 +216,24 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
     return {"type": "function", "name": choice}
 
 
-def decode(body: object, request_id: str | None) -> Decoded:
+def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
     """Decodes a complete response object.
 
     Raises:
         WireError: The response failed, was cancelled, or is malformed.
     """
-    return _decode_response(json_object(body, "response"), request_id)
+    return _decode_response(json_object(body, "response"), request_id, spec.ref.provider)
 
 
-def _decode_response(response: Mapping[str, object], request_id: str | None) -> Decoded:
+def _decode_response(
+    response: Mapping[str, object], request_id: str | None, provider: str
+) -> Decoded:
     output = array(response.get("output"), "output")
     items = [json_object(item, "output[]") for item in output]
     finish = _finish(response, items)
     parts: list[AssistantPart] = []
     for index, item in enumerate(items):
-        parts.extend(_item_parts(item, index, finish))
+        parts.extend(_item_parts(item, index, finish, provider))
     return assemble(parts, finish, usage(response.get("usage")), request_id)
 
 
@@ -275,7 +278,7 @@ def _failure(error: object) -> FinishReason:
 
 
 def _item_parts(
-    item: Mapping[str, object], index: int, finish: FinishReason
+    item: Mapping[str, object], index: int, finish: FinishReason, provider: str
 ) -> Iterator[AssistantPart]:
     """Maps one output item; built-in tool items (search, code) carry no part."""
     kind = item.get("type")
@@ -287,7 +290,12 @@ def _item_parts(
             elif content.get("type") == "refusal":
                 yield TextPart(string(content.get("refusal"), "refusal.refusal"))
     elif kind == "reasoning":
-        yield ReasoningPart(text=_reasoning_text(item), api="openai_responses", state=as_json(item))
+        yield ReasoningPart(
+            text=_reasoning_text(item),
+            api="openai_responses",
+            provider=provider,
+            state=as_json(item),
+        )
     elif kind == "function_call":
         call = _function_call(item, index, finish)
         if call is not None:
@@ -341,7 +349,9 @@ def usage(value: object) -> Usage:
     )
 
 
-def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterator[StreamItem]:
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
     """Decodes a streamed response.
 
     Raises:
@@ -364,7 +374,7 @@ def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterato
             raise _stream_error(data)
         elif kind in _TERMINAL_EVENTS:
             response = json_object(data.get("response"), "terminal event response")
-            decoded = _decode_response(response, request_id)
+            decoded = _decode_response(response, request_id, spec.ref.provider)
             if decoded.usage.measured:
                 yield UsageEvent(decoded.usage)
             yield decoded

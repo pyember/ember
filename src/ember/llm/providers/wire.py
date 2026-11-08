@@ -53,6 +53,7 @@ __all__ = [
     "merge_extensions",
     "parse_arguments",
     "parse_event_data",
+    "replays",
     "stream_cut",
     "string",
 ]
@@ -226,14 +227,16 @@ class Codec:
 
     Attributes:
         encode: Builds the JSON body for ``(spec, request, stream)``.
-        decode: Turns a complete JSON response and the request id into `Decoded`.
-        decode_events: Turns a stream's events and the request id into stream
+        decode: Turns ``(spec, body, request_id)`` for a complete JSON response
+            into `Decoded`; ``spec`` names the provider its reasoning parts
+            belong to.
+        decode_events: Turns ``(spec, events, request_id)`` for a stream into
             items ending in exactly one `Decoded`.
     """
 
     encode: Callable[[ModelSpec, Request, bool], Body]
-    decode: Callable[[object, str | None], Decoded]
-    decode_events: Callable[[Iterable[SseEvent], str | None], Iterator[StreamItem]]
+    decode: Callable[[ModelSpec, object, str | None], Decoded]
+    decode_events: Callable[[ModelSpec, Iterable[SseEvent], str | None], Iterator[StreamItem]]
 
 
 AssistantPart: TypeAlias = TextPart | ToolCallPart | ReasoningPart
@@ -248,7 +251,9 @@ def assemble(
     """Builds `Decoded` from the assistant parts in the order the provider sent them.
 
     `Decoded.text`, `reasoning` and `tool_calls` are derived from the parts, so
-    they always agree with the replayable `Decoded.message`.
+    they always agree with the replayable `Decoded.message`. A response with
+    no parts is the turn ``(TextPart(""),)``, since a message holds at least
+    one part.
     """
     return Decoded(
         text="".join(part.text for part in parts if isinstance(part, TextPart)),
@@ -261,8 +266,17 @@ def assemble(
         finish_reason=finish_reason,
         usage=usage,
         request_id=request_id,
-        message=Message("assistant", tuple(parts)) if parts else None,
+        message=Message("assistant", tuple(parts) or (TextPart(""),)),
     )
+
+
+def replays(part: ReasoningPart, spec: ModelSpec) -> bool:
+    """Whether ``part`` is sent back in a request to ``spec``.
+
+    Only reasoning from the same wire protocol and the same configured
+    provider is replayed; any other request leaves it out.
+    """
+    return part.api == spec.api and part.provider == spec.ref.provider
 
 
 @dataclasses.dataclass(slots=True)
@@ -285,8 +299,10 @@ class StreamAccumulator:
     loop reads ``yield acc.text(key, delta)``.
     """
 
-    def __init__(self, api: WireApi) -> None:
+    def __init__(self, api: WireApi, provider: str) -> None:
+        """Creates an accumulator whose reasoning parts name ``api`` and ``provider``."""
         self._api: WireApi = api
+        self._provider = provider
         self._blocks: dict[object, _Block] = {}
         self._calls = 0
 
@@ -347,7 +363,11 @@ class StreamAccumulator:
             if block.kind == "text":
                 parts.append(TextPart(text))
             elif block.kind == "reasoning":
-                parts.append(ReasoningPart(text=text, api=self._api, state=block.state))
+                parts.append(
+                    ReasoningPart(
+                        text=text, api=self._api, provider=self._provider, state=block.state
+                    )
+                )
             else:
                 call = _complete_call(block, text, finish_reason)
                 if call is not None:

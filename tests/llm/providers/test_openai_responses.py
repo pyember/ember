@@ -6,6 +6,7 @@ from ember.errors import ErrorKind
 from ember.llm.provider import Decoded
 from ember.llm.providers import openai_responses
 from ember.llm.providers.wire import WireError
+from ember.llm.ref import ModelRef
 from ember.llm.request import (
     Message,
     ReasoningPart,
@@ -25,8 +26,12 @@ from ember.llm.result import (
     Usage,
     UsageEvent,
 )
+from ember.llm.spec import ModelSpec
 
 WEATHER = ToolSpec("get_current_weather", "Weather for a place.", {"type": "object"})
+SPEC = ModelSpec(
+    ref=ModelRef("openai", "gpt-6-astra"), wire_id="gpt-6-astra", api="openai_responses"
+)
 
 
 def _encode(kit, request: Request, stream: bool = False) -> dict:
@@ -92,8 +97,10 @@ def test_history_becomes_input_items_and_replays_only_this_apis_reasoning(kit) -
             Message(
                 "assistant",
                 (
-                    ReasoningPart("", api="openai_responses", state=item),
-                    ReasoningPart("x", api="gemini", state={"thoughtSignature": "s"}),
+                    ReasoningPart("", api="openai_responses", provider="openai", state=item),
+                    ReasoningPart(
+                        "x", api="gemini", provider="gemini", state={"thoughtSignature": "s"}
+                    ),
                     TextPart("Checking."),
                     ToolCallPart("call_1", "get_current_weather", {"location": "Boston"}),
                 ),
@@ -117,7 +124,7 @@ def test_history_becomes_input_items_and_replays_only_this_apis_reasoning(kit) -
 
 
 def test_documented_function_call_response(kit) -> None:
-    decoded = openai_responses.decode(kit.json("openai/responses_function_call.json"), "req")
+    decoded = openai_responses.decode(SPEC, kit.json("openai/responses_function_call.json"), "req")
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
     assert decoded.message == Message(
         "assistant",
@@ -133,7 +140,7 @@ def test_documented_function_call_response(kit) -> None:
 
 
 def test_documented_reasoning_response_splits_reasoning_tokens(kit) -> None:
-    decoded = openai_responses.decode(kit.json("openai/responses_reasoning.json"), None)
+    decoded = openai_responses.decode(SPEC, kit.json("openai/responses_reasoning.json"), None)
     assert decoded.text == "The classic tongue twister..."
     assert decoded.finish_reason is FinishReason.STOP
     assert decoded.usage == Usage(input=81, output=1035, reasoning=832)
@@ -148,11 +155,11 @@ def test_reasoning_items_become_replayable_parts(kit) -> None:
         "encrypted_content": "gAAAAB",
     }
     body["output"].insert(0, item)
-    decoded = openai_responses.decode(body, None)
+    decoded = openai_responses.decode(SPEC, body, None)
     assert decoded.reasoning == "Thinking about wood."
     assert decoded.message is not None
     assert decoded.message.parts[0] == ReasoningPart(
-        "Thinking about wood.", api="openai_responses", state=item
+        "Thinking about wood.", api="openai_responses", provider="openai", state=item
     )
 
 
@@ -167,13 +174,13 @@ def test_reasoning_items_become_replayable_parts(kit) -> None:
 def test_incomplete_responses_are_never_a_clean_stop(kit, reason, finish) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="incomplete", incomplete_details={"reason": reason})
-    assert openai_responses.decode(body, None).finish_reason is finish
+    assert openai_responses.decode(SPEC, body, None).finish_reason is finish
 
 
 def test_refusal_content_is_a_refusal(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body["output"][0]["content"] = [{"type": "refusal", "refusal": "I can't help."}]
-    decoded = openai_responses.decode(body, None)
+    decoded = openai_responses.decode(SPEC, body, None)
     assert (decoded.finish_reason, decoded.text) == (FinishReason.REFUSAL, "I can't help.")
 
 
@@ -189,7 +196,7 @@ def test_failed_responses_raise_with_the_code_but_not_the_message(kit, code, kin
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="failed", error={"code": code, "message": "raw upstream detail"})
     with pytest.raises(WireError) as caught:
-        openai_responses.decode(body, None)
+        openai_responses.decode(SPEC, body, None)
     assert caught.value.kind is kind
     assert code in caught.value.reason and "raw upstream" not in caught.value.reason
 
@@ -197,20 +204,20 @@ def test_failed_responses_raise_with_the_code_but_not_the_message(kit, code, kin
 def test_policy_failure_is_content_filtering(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body.update(status="failed", error={"code": "bio_policy", "message": "blocked"})
-    assert openai_responses.decode(body, None).finish_reason is FinishReason.CONTENT_FILTER
+    assert openai_responses.decode(SPEC, body, None).finish_reason is FinishReason.CONTENT_FILTER
 
 
 def test_cancelled_response_raises_cancelled(kit) -> None:
     body = kit.json("openai/responses_reasoning.json")
     body["status"] = "cancelled"
     with pytest.raises(WireError) as caught:
-        openai_responses.decode(body, None)
+        openai_responses.decode(SPEC, body, None)
     assert caught.value.kind is ErrorKind.CANCELLED
 
 
 def test_documented_text_stream(kit) -> None:
     items = list(
-        openai_responses.decode_events(kit.events("openai/responses_stream_text.sse"), "r")
+        openai_responses.decode_events(SPEC, kit.events("openai/responses_stream_text.sse"), "r")
     )
     assert items[0] == TextDelta("Hi")
     assert items[1] == UsageEvent(Usage(input=37, output=11))
@@ -222,7 +229,7 @@ def test_documented_text_stream(kit) -> None:
 
 def test_streamed_function_call_and_reasoning(kit) -> None:
     events = kit.events("openai/responses_stream_function_call.sse")
-    items = list(openai_responses.decode_events(events, None))
+    items = list(openai_responses.decode_events(SPEC, events, None))
     assert items[0] == ReasoningDelta("Need the weather.")
     calls = [item for item in items if isinstance(item, ToolCallDelta)]
     assert [(c.index, c.id, c.name, c.arguments_json) for c in calls] == [
@@ -245,7 +252,7 @@ def test_documented_error_event_raises_and_is_never_text(kit) -> None:
     )
     received = []
     with pytest.raises(WireError) as caught:
-        for item in openai_responses.decode_events(events, None):
+        for item in openai_responses.decode_events(SPEC, events, None):
             received.append(item)
     assert received == [TextDelta("Hi")]
     assert "Something went wrong" not in caught.value.reason
@@ -260,7 +267,7 @@ def test_incomplete_and_failed_terminal_events(kit) -> None:
     )
     items = list(
         openai_responses.decode_events(
-            prefix + kit.sse({"type": "response.incomplete", "response": incomplete}), None
+            SPEC, prefix + kit.sse({"type": "response.incomplete", "response": incomplete}), None
         )
     )
     assert isinstance(items[-1], Decoded) and items[-1].finish_reason is FinishReason.LENGTH
@@ -268,7 +275,7 @@ def test_incomplete_and_failed_terminal_events(kit) -> None:
     with pytest.raises(WireError):
         list(
             openai_responses.decode_events(
-                prefix + kit.sse({"type": "response.failed", "response": failed}), None
+                SPEC, prefix + kit.sse({"type": "response.failed", "response": failed}), None
             )
         )
 
@@ -276,5 +283,57 @@ def test_incomplete_and_failed_terminal_events(kit) -> None:
 def test_stream_cut_before_a_terminal_event_is_a_transport_error(kit) -> None:
     events = kit.events("openai/responses_stream_text.sse")[:-1]
     with pytest.raises(WireError) as caught:
-        list(openai_responses.decode_events(events, None))
+        list(openai_responses.decode_events(SPEC, events, None))
     assert caught.value.kind is ErrorKind.TRANSPORT
+
+
+def _loop_request(first: Decoded) -> Request:
+    return Request(
+        (
+            Message.user("What is the weather like in Boston today?"),
+            first.message,
+            Message("tool", (ToolResultPart("call_unLAR8MvFNptuiZK6K6HCy5k", "18C"),)),
+        ),
+        tools=(WEATHER,),
+    )
+
+
+def test_two_turn_tool_loop_replays_the_reasoning_item_verbatim(kit) -> None:
+    events = kit.events("openai/responses_stream_function_call.sse")
+    first = list(openai_responses.decode_events(SPEC, events, None))[-1]
+    assert isinstance(first, Decoded)
+    assert openai_responses.encode(SPEC, _loop_request(first), False)["input"] == [
+        {"role": "user", "content": "What is the weather like in Boston today?"},
+        {
+            "id": "rs_1",
+            "type": "reasoning",
+            "summary": [{"type": "summary_text", "text": "Need the weather."}],
+            "encrypted_content": "gAAAAopaque",
+        },
+        {
+            "type": "function_call",
+            "call_id": "call_unLAR8MvFNptuiZK6K6HCy5k",
+            "name": "get_current_weather",
+            "arguments": '{"location":"Boston, MA"}',
+        },
+        {
+            "type": "function_call_output",
+            "call_id": "call_unLAR8MvFNptuiZK6K6HCy5k",
+            "output": "18C",
+        },
+    ]
+
+
+def test_reasoning_from_another_provider_is_not_sent(kit) -> None:
+    events = kit.events("openai/responses_stream_function_call.sse")
+    first = list(openai_responses.decode_events(SPEC, events, None))[-1]
+    assert isinstance(first, Decoded)
+    gateway = ModelSpec(
+        ref=ModelRef("gateway", "gpt-6-astra"), wire_id="gpt-6-astra", api="openai_responses"
+    )
+    items = openai_responses.encode(gateway, _loop_request(first), False)["input"]
+    assert [item.get("type", "message") for item in items] == [
+        "message",
+        "function_call",
+        "function_call_output",
+    ]

@@ -44,6 +44,7 @@ from ember.llm.providers.wire import (
     malformed,
     merge_extensions,
     parse_event_data,
+    replays,
     stream_cut,
     string,
 )
@@ -110,7 +111,7 @@ def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
     body: Body = {
         "model": spec.wire_id,
         "max_tokens": _max_tokens(spec, request.sampling),
-        "messages": _messages(request.messages),
+        "messages": _messages(spec, request.messages),
     }
     if request.system is not None:
         body["system"] = request.system
@@ -158,13 +159,18 @@ def _output_config(request: Request) -> Body:
     return config
 
 
-def _messages(messages: tuple[Message, ...]) -> list[JsonValue]:
+def _messages(spec: ModelSpec, messages: tuple[Message, ...]) -> list[JsonValue]:
     encoded: list[JsonValue] = []
     for message in messages:
         if message.role == "user":
             encoded.append({"role": "user", "content": _user_content(message.parts)})
         elif message.role == "assistant":
-            encoded.append({"role": "assistant", "content": list(_assistant_blocks(message))})
+            blocks = list(_assistant_blocks(spec, message))
+            # A turn with nothing to replay (an empty response) is left out:
+            # the API rejects empty assistant content and merges the
+            # neighbouring user turns.
+            if blocks:
+                encoded.append({"role": "assistant", "content": blocks})
         else:
             encoded.append(
                 {"role": "user", "content": [_tool_result(part) for part in message.parts]}
@@ -195,7 +201,7 @@ def _image_source(part: ImagePart) -> JsonValue:
     }
 
 
-def _assistant_blocks(message: Message) -> Iterator[JsonValue]:
+def _assistant_blocks(spec: ModelSpec, message: Message) -> Iterator[JsonValue]:
     """Encodes an assistant turn's blocks in order.
 
     Empty text is left out because the API rejects empty text blocks; thinking
@@ -204,7 +210,7 @@ def _assistant_blocks(message: Message) -> Iterator[JsonValue]:
     for part in message.parts:
         if isinstance(part, TextPart) and part.text:
             yield {"type": "text", "text": part.text}
-        elif isinstance(part, ReasoningPart) and part.api == "anthropic_messages":
+        elif isinstance(part, ReasoningPart) and replays(part, spec):
             yield part.state
         elif isinstance(part, ToolCallPart):
             yield {"type": "tool_use", "id": part.id, "name": part.name, "input": part.arguments}
@@ -234,7 +240,7 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
     return {"type": "tool", "name": choice}
 
 
-def decode(body: object, request_id: str | None) -> Decoded:
+def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
     """Decodes a complete message.
 
     Raises:
@@ -244,22 +250,26 @@ def decode(body: object, request_id: str | None) -> Decoded:
     finish = _finish(message.get("stop_reason"))
     parts: list[AssistantPart] = []
     for index, raw in enumerate(array(message.get("content"), "content")):
-        part = _content_part(json_object(raw, f"content[{index}]"), index)
+        part = _content_part(json_object(raw, f"content[{index}]"), index, spec.ref.provider)
         if part is not None:
             parts.append(part)
     return assemble(parts, finish, usage(message.get("usage")), request_id)
 
 
-def _content_part(block: Mapping[str, object], index: int) -> AssistantPart | None:
+def _content_part(block: Mapping[str, object], index: int, provider: str) -> AssistantPart | None:
     """Maps one content block; server-tool blocks carry no part."""
     kind = block.get("type")
     if kind == "text":
         return TextPart(string(block.get("text"), f"content[{index}].text"))
     if kind == "thinking":
         text = string(block.get("thinking"), f"content[{index}].thinking")
-        return ReasoningPart(text=text, api="anthropic_messages", state=as_json(block))
+        return ReasoningPart(
+            text=text, api="anthropic_messages", provider=provider, state=as_json(block)
+        )
     if kind == "redacted_thinking":
-        return ReasoningPart(text="", api="anthropic_messages", state=as_json(block))
+        return ReasoningPart(
+            text="", api="anthropic_messages", provider=provider, state=as_json(block)
+        )
     if kind == "tool_use":
         return ToolCallPart(
             id=string(block.get("id"), f"content[{index}].id"),
@@ -306,9 +316,9 @@ def _optional_count(fields: Mapping[str, object], key: str) -> int:
 class _MessageStream:
     """State for one streamed message: blocks by index, usage and stop reason."""
 
-    def __init__(self, request_id: str | None) -> None:
+    def __init__(self, request_id: str | None, provider: str) -> None:
         self.request_id = request_id
-        self.acc = StreamAccumulator("anthropic_messages")
+        self.acc = StreamAccumulator("anthropic_messages", provider)
         self.kinds: dict[int, str] = {}
         self.signatures: dict[int, str] = {}
         self.usage_fields: dict[str, object] = {}
@@ -388,7 +398,9 @@ class _MessageStream:
         yield assemble(self.acc.parts(finish), finish, measured, self.request_id)
 
 
-def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterator[StreamItem]:
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
     """Decodes a streamed message.
 
     Unknown event and delta types are skipped, as the API's versioning policy
@@ -398,7 +410,7 @@ def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterato
         WireError: The stream reports an error, is malformed, or ends before
             ``message_stop``.
     """
-    state = _MessageStream(request_id)
+    state = _MessageStream(request_id, spec.ref.provider)
     for event in events:
         data = parse_event_data(event, "stream event")
         kind = data.get("type")

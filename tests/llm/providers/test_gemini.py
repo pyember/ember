@@ -6,6 +6,7 @@ from ember.errors import ErrorKind
 from ember.llm.provider import Decoded
 from ember.llm.providers import gemini
 from ember.llm.providers.wire import WireError
+from ember.llm.ref import ModelRef
 from ember.llm.request import (
     ImagePart,
     Message,
@@ -18,8 +19,12 @@ from ember.llm.request import (
     ToolSpec,
 )
 from ember.llm.result import FinishReason, TextDelta, ToolCallDelta, Usage, UsageEvent
+from ember.llm.spec import ModelSpec
 
 WEATHER = ToolSpec("get_weather", "Weather for a city.", {"type": "object"})
+SPEC = ModelSpec(
+    ref=ModelRef("gemini", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
+)
 
 
 def _encode(kit, request: Request) -> dict:
@@ -112,7 +117,7 @@ def test_images_are_inline_data_or_file_data(kit) -> None:
 
 def test_function_call_round_trip_returns_signatures_on_their_parts(kit) -> None:
     response = kit.json("gemini/function_call.json")
-    decoded = gemini.decode(response, None)
+    decoded = gemini.decode(SPEC, response, None)
     assert decoded.message is not None
     request = Request(
         (
@@ -166,8 +171,12 @@ def test_a_trailing_signature_is_returned_on_an_empty_text_part(kit) -> None:
         "assistant",
         (
             TextPart("Done."),
-            ReasoningPart("", api="gemini", state={"thoughtSignature": "sig-end"}),
-            ReasoningPart("", api="anthropic_messages", state={"type": "thinking"}),
+            ReasoningPart(
+                "", api="gemini", provider="gemini", state={"thoughtSignature": "sig-end"}
+            ),
+            ReasoningPart(
+                "", api="anthropic_messages", provider="anthropic", state={"type": "thinking"}
+            ),
         ),
     )
     contents = _encode(kit, Request((Message.user("hi"), turn, Message.user("ok"))))["contents"]
@@ -187,7 +196,7 @@ def test_tool_result_for_an_unknown_call_is_rejected(kit) -> None:
 
 
 def test_text_response_usage_and_request_id(kit) -> None:
-    decoded = gemini.decode(kit.json("gemini/text.json"), "ignored-header-id")
+    decoded = gemini.decode(SPEC, kit.json("gemini/text.json"), "ignored-header-id")
     assert decoded.text == "AI learns patterns from data."
     assert decoded.finish_reason is FinishReason.STOP
     assert decoded.request_id == "resp-gem-1"
@@ -195,7 +204,9 @@ def test_text_response_usage_and_request_id(kit) -> None:
     assert decoded.message == Message(
         "assistant",
         (
-            ReasoningPart("", api="gemini", state={"thoughtSignature": "CiQBVKhc7text"}),
+            ReasoningPart(
+                "", api="gemini", provider="gemini", state={"thoughtSignature": "CiQBVKhc7text"}
+            ),
             TextPart("AI learns patterns "),
             TextPart("from data."),
         ),
@@ -203,7 +214,7 @@ def test_text_response_usage_and_request_id(kit) -> None:
 
 
 def test_function_calls_finish_as_tool_calls_and_get_ids(kit) -> None:
-    decoded = gemini.decode(kit.json("gemini/function_call.json"), None)
+    decoded = gemini.decode(SPEC, kit.json("gemini/function_call.json"), None)
     assert decoded.finish_reason is FinishReason.TOOL_CALLS
     assert [(c.id, c.name) for c in decoded.tool_calls] == [
         ("fc-7", "get_weather"),
@@ -214,9 +225,10 @@ def test_function_calls_finish_as_tool_calls_and_get_ids(kit) -> None:
 
 
 def test_blocked_prompt_is_content_filtering(kit) -> None:
-    decoded = gemini.decode(kit.json("gemini/prompt_blocked.json"), None)
+    decoded = gemini.decode(SPEC, kit.json("gemini/prompt_blocked.json"), None)
     assert decoded.finish_reason is FinishReason.CONTENT_FILTER
-    assert decoded.message is None and decoded.usage == Usage(input=8)
+    assert decoded.message == Message("assistant", (TextPart(""),))
+    assert decoded.usage == Usage(input=8)
 
 
 @pytest.mark.parametrize(
@@ -233,7 +245,7 @@ def test_blocked_prompt_is_content_filtering(kit) -> None:
 def test_finish_reasons_are_never_reported_as_stop(kit, reason, finish) -> None:
     body = kit.json("gemini/text.json")
     body["candidates"][0]["finishReason"] = reason
-    assert gemini.decode(body, None).finish_reason is finish
+    assert gemini.decode(SPEC, body, None).finish_reason is finish
 
 
 @pytest.mark.parametrize(
@@ -248,14 +260,14 @@ def test_failed_generations_raise(kit, reason, kind) -> None:
     body = kit.json("gemini/text.json")
     body["candidates"][0]["finishReason"] = reason
     with pytest.raises(WireError) as caught:
-        gemini.decode(body, None)
+        gemini.decode(SPEC, body, None)
     assert caught.value.kind is kind
 
 
 def test_missing_usage_is_unmeasured(kit) -> None:
     body = kit.json("gemini/text.json")
     del body["usageMetadata"]
-    assert gemini.decode(body, None).usage == Usage(measured=False)
+    assert gemini.decode(SPEC, body, None).usage == Usage(measured=False)
 
 
 def test_error_body_label(kit) -> None:
@@ -265,7 +277,7 @@ def test_error_body_label(kit) -> None:
 
 
 def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
-    items = list(gemini.decode_events(kit.events("gemini/stream_text.sse"), None))
+    items = list(gemini.decode_events(SPEC, kit.events("gemini/stream_text.sse"), None))
     usage = Usage(input=9, output=10, reasoning=4)
     assert items[:-1] == [
         TextDelta("AI learns"),
@@ -285,7 +297,9 @@ def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
         "assistant",
         (
             TextPart("AI learns patterns"),
-            ReasoningPart("", api="gemini", state={"thoughtSignature": "CiQBVKhc7end"}),
+            ReasoningPart(
+                "", api="gemini", provider="gemini", state={"thoughtSignature": "CiQBVKhc7end"}
+            ),
             TextPart(" from data."),
         ),
     )
@@ -293,7 +307,7 @@ def test_text_stream_merges_chunks_and_keeps_the_signature(kit) -> None:
 
 def test_streamed_function_call(kit) -> None:
     chunk = kit.json("gemini/function_call.json")
-    items = list(gemini.decode_events(kit.sse(chunk), None))
+    items = list(gemini.decode_events(SPEC, kit.sse(chunk), None))
     calls = [item for item in items if isinstance(item, ToolCallDelta)]
     assert [(c.index, c.id, c.name, c.arguments_json) for c in calls] == [
         (0, "fc-7", "get_weather", '{"city":"Paris"}'),
@@ -301,13 +315,13 @@ def test_streamed_function_call(kit) -> None:
     ]
     done = items[-1]
     assert isinstance(done, Decoded) and done.finish_reason is FinishReason.TOOL_CALLS
-    assert done.message == gemini.decode(chunk, None).message
+    assert done.message == gemini.decode(SPEC, chunk, None).message
 
 
 def test_stream_without_a_finish_reason_is_cut(kit) -> None:
     events = kit.events("gemini/stream_text.sse")[:2]
     with pytest.raises(WireError) as caught:
-        list(gemini.decode_events(events, None))
+        list(gemini.decode_events(SPEC, events, None))
     assert caught.value.kind is ErrorKind.TRANSPORT
 
 
@@ -317,8 +331,30 @@ def test_error_chunk_raises_with_its_status(kit) -> None:
     )
     received = []
     with pytest.raises(WireError) as caught:
-        for item in gemini.decode_events(events, None):
+        for item in gemini.decode_events(SPEC, events, None):
             received.append(item)
     assert received == [TextDelta("AI learns")]
     assert caught.value.kind is ErrorKind.RATE_LIMITED
     assert "quota" not in caught.value.reason
+
+
+def test_signatures_and_thoughts_from_another_provider_are_not_sent(kit) -> None:
+    first = gemini.decode(SPEC, kit.json("gemini/function_call.json"), None)
+    vertex = ModelSpec(
+        ref=ModelRef("vertex", "gemini-3.8-flash"), wire_id="gemini-3.8-flash", api="gemini"
+    )
+    request = Request(
+        (
+            Message.user("Weather and time in Paris?"),
+            first.message,
+            Message("tool", (ToolResultPart("fc-7", "18C"), ToolResultPart("call_1", "12:00"))),
+        ),
+        tools=(WEATHER,),
+    )
+    assert gemini.encode(vertex, request, False)["contents"][1] == {
+        "role": "model",
+        "parts": [
+            {"functionCall": {"id": "fc-7", "name": "get_weather", "args": {"city": "Paris"}}},
+            {"functionCall": {"id": "call_1", "name": "get_time", "args": {"zone": "CET"}}},
+        ],
+    }

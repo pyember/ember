@@ -50,6 +50,7 @@ from ember.llm.providers.wire import (
     malformed,
     merge_extensions,
     parse_event_data,
+    replays,
     stream_cut,
     string,
 )
@@ -120,8 +121,8 @@ def encode(spec: ModelSpec, request: Request, stream: bool) -> Body:
         ValueError: A tool result answers no earlier call, the effort has no
             thinking level, or an extension collides with a field ember sets.
     """
-    del spec, stream
-    body: Body = {"contents": _contents(request.messages)}
+    del stream
+    body: Body = {"contents": _contents(spec, request.messages)}
     if request.system is not None:
         body["systemInstruction"] = {"parts": [{"text": request.system}]}
     config = _generation_config(request)
@@ -160,7 +161,7 @@ def _generation_config(request: Request) -> Body:
     return config
 
 
-def _contents(messages: tuple[Message, ...]) -> list[JsonValue]:
+def _contents(spec: ModelSpec, messages: tuple[Message, ...]) -> list[JsonValue]:
     contents: list[JsonValue] = []
     call_names: dict[str, str] = {}
     for message in messages:
@@ -170,7 +171,7 @@ def _contents(messages: tuple[Message, ...]) -> list[JsonValue]:
             call_names.update(
                 (part.id, part.name) for part in message.parts if isinstance(part, ToolCallPart)
             )
-            contents.append({"role": "model", "parts": _model_parts(message.parts)})
+            contents.append({"role": "model", "parts": _model_parts(spec, message.parts)})
         else:
             parts = [_function_response(part, call_names) for part in message.parts]
             contents.append({"role": "user", "parts": parts})
@@ -188,13 +189,13 @@ def _user_part(part: Part) -> JsonValue:
     return {"inlineData": {"mimeType": part.media_type, "data": data}}
 
 
-def _model_parts(parts: tuple[Part, ...]) -> list[JsonValue]:
+def _model_parts(spec: ModelSpec, parts: tuple[Part, ...]) -> list[JsonValue]:
     """Encodes a model turn, putting each signature back on the part it came with."""
     encoded: list[JsonValue] = []
     signature: JsonValue = None
     for part in parts:
         if isinstance(part, ReasoningPart):
-            if part.api != "gemini":
+            if not replays(part, spec):
                 continue
             if set(part.state) == {_SIGNATURE}:
                 signature = part.state[_SIGNATURE]
@@ -246,7 +247,7 @@ def _calling_config(choice: ToolChoice) -> JsonValue:
     return {"mode": "ANY", "allowedFunctionNames": [choice]}
 
 
-def decode(body: object, request_id: str | None) -> Decoded:
+def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
     """Decodes a complete response.
 
     Gemini documents no request-id header; the body's ``responseId`` is the
@@ -270,7 +271,7 @@ def decode(body: object, request_id: str | None) -> Decoded:
     parts: list[AssistantPart] = []
     ordinal = 0
     for raw in raw_parts:
-        parts.extend(_parts_of(raw, ordinal))
+        parts.extend(_parts_of(raw, ordinal, spec.ref.provider))
         if "functionCall" in raw:
             ordinal += 1
     return assemble(parts, finish, _usage_of(response), response_id)
@@ -306,16 +307,16 @@ def _candidate_parts(candidate: Mapping[str, object]) -> list[Mapping[str, objec
     return [json_object(part, "content.parts[]") for part in array(raw, "content.parts")]
 
 
-def _parts_of(raw: Mapping[str, object], ordinal: int) -> Iterator[AssistantPart]:
+def _parts_of(raw: Mapping[str, object], ordinal: int, provider: str) -> Iterator[AssistantPart]:
     """Maps one response part; code-execution and media parts carry no part."""
     if raw.get("thought") is True:
         text = string(raw.get("text", ""), "thought text")
-        yield ReasoningPart(text=text, api="gemini", state=as_json(raw))
+        yield ReasoningPart(text=text, api="gemini", provider=provider, state=as_json(raw))
         return
     signature = raw.get(_SIGNATURE)
     if signature is not None:
         state = {_SIGNATURE: string(signature, "thoughtSignature")}
-        yield ReasoningPart(text="", api="gemini", state=state)
+        yield ReasoningPart(text="", api="gemini", provider=provider, state=state)
     if "functionCall" in raw:
         yield _function_call(raw["functionCall"], ordinal)
     elif "text" in raw:
@@ -374,7 +375,9 @@ def _usage_of(response: Mapping[str, object]) -> Usage:
     )
 
 
-def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterator[StreamItem]:
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
     """Decodes a streamed response.
 
     Raises:
@@ -382,7 +385,7 @@ def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterato
             a chunk with a finish reason.
     """
     del request_id
-    stream = _ChunkStream()
+    stream = _ChunkStream(spec.ref.provider)
     for event in events:
         yield from stream.chunk(parse_event_data(event, "stream chunk"))
     yield from stream.finish()
@@ -391,8 +394,8 @@ def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterato
 class _ChunkStream:
     """State for one stream: open block, finish reason, last usage and id."""
 
-    def __init__(self) -> None:
-        self.acc = StreamAccumulator("gemini")
+    def __init__(self, provider: str) -> None:
+        self.acc = StreamAccumulator("gemini", provider)
         self.block = 0
         self.open_kind = ""
         self.calls = 0

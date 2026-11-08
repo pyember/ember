@@ -36,8 +36,8 @@ class Decoded:
         usage: Token usage as the provider reported it.
         request_id: The provider's id for the request.
         message: The assistant turn as the provider produced it, reasoning
-            state included, or ``None`` when it produced nothing. `text`,
-            `reasoning` and `tool_calls` are derived from it.
+            state included; a single empty `TextPart` when it produced
+            nothing. `text`, `reasoning` and `tool_calls` are derived from it.
     """
 
     text: str
@@ -46,7 +46,7 @@ class Decoded:
     finish_reason: FinishReason
     usage: Usage
     request_id: str | None
-    message: Message | None
+    message: Message
 
 
 StreamItem: TypeAlias = TextDelta | ReasoningDelta | ToolCallDelta | UsageEvent | Decoded

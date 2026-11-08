@@ -135,9 +135,10 @@ class Result:
         model: The model that served the call.
         request_id: The provider's id for the request, when it sent one.
         latency_s: Seconds from sending the request to the last byte.
-        message: The assistant turn to append to the conversation to continue
-            it: text, tool calls and opaque reasoning state in the order the
-            provider produced them. ``None`` when the model produced nothing.
+        message: The assistant turn to append to the conversation, followed
+            by any tool results, to continue it: text, reasoning and tool calls
+            in the order the provider produced them. A single empty
+            `TextPart` when the model produced nothing.
     """
 
     text: str
@@ -149,7 +150,7 @@ class Result:
     model: ModelRef
     request_id: str | None
     latency_s: float
-    message: Message | None
+    message: Message
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

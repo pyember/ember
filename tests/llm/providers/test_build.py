@@ -215,8 +215,14 @@ def test_codec_failures_become_model_errors_with_identity(kit, recorder) -> None
     )
 
 
-def test_mid_stream_error_frame_is_a_model_error_after_the_first_byte(kit, recorder) -> None:
-    text = kit.text("anthropic/stream_text.sse").split("event: content_block_delta")[0]
+@pytest.mark.parametrize(("events_before_error", "delivered"), [(3, False), (4, True)])
+def test_mid_stream_error_frame_says_whether_the_caller_received_anything(
+    kit, recorder, events_before_error, delivered
+) -> None:
+    # message_start, content_block_start and ping yield nothing; the fourth
+    # event is the first text delta.
+    events = kit.text("anthropic/stream_text.sse").split("\n\n")
+    text = "\n\n".join(events[:events_before_error]) + "\n\n"
     text += kit.text("anthropic/stream_error_overloaded.sse")
     provider, _ = _provider(
         kit,
@@ -225,14 +231,29 @@ def test_mid_stream_error_frame_is_a_model_error_after_the_first_byte(kit, recor
         lambda request: kit.sse_response(text, **{"request-id": "req_s"}),
     )
     spec = kit.spec("anthropic_messages", provider="anthropic", max_output_tokens=1024)
+    received = []
+    with pytest.raises(ModelError) as caught:
+        for item in provider.stream(spec, Request.from_prompt("hi")):
+            received.append(item)
+    error = caught.value
+    assert len(received) == int(delivered)
+    assert (error.kind, error.request_id) == (ErrorKind.OVERLOADED, "req_s")
+    assert error.before_first_byte is not delivered
+    assert error.retryable is not delivered
+
+
+def test_cut_before_any_item_is_retryable_transport(kit, recorder) -> None:
+    text = kit.text("anthropic/stream_text.sse").split("event: content_block_delta")[0]
+    provider, _ = _provider(
+        kit,
+        recorder,
+        kit.settings("anthropic", "anthropic", key=KEY),
+        lambda request: kit.sse_response(text),
+    )
+    spec = kit.spec("anthropic_messages", provider="anthropic", max_output_tokens=1024)
     with pytest.raises(ModelError) as caught:
         list(provider.stream(spec, Request.from_prompt("hi")))
-    error = caught.value
-    assert (error.kind, error.before_first_byte, error.request_id) == (
-        ErrorKind.OVERLOADED,
-        False,
-        "req_s",
-    )
+    assert (caught.value.kind, caught.value.retryable) == (ErrorKind.TRANSPORT, True)
 
 
 def test_stream_end_to_end(kit, recorder) -> None:

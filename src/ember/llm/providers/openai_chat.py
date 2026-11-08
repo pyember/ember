@@ -203,12 +203,13 @@ def _tool_choice(choice: ToolChoice) -> JsonValue:
     return {"type": "function", "function": {"name": choice}}
 
 
-def decode(body: object, request_id: str | None) -> Decoded:
+def decode(spec: ModelSpec, body: object, request_id: str | None) -> Decoded:
     """Decodes a complete chat completion.
 
     Raises:
         WireError: The response is malformed or reports an unknown finish.
     """
+    del spec  # Chat Completions returns no reasoning state to attribute.
     response = json_object(body, "response")
     choice = _only_choice(response)
     message = json_object(choice.get("message"), "choices[0].message")
@@ -302,14 +303,16 @@ def _details(fields: Mapping[str, object], key: str) -> Mapping[str, object]:
     return {} if value is None else json_object(value, f"usage.{key}")
 
 
-def decode_events(events: Iterable[SseEvent], request_id: str | None) -> Iterator[StreamItem]:
+def decode_events(
+    spec: ModelSpec, events: Iterable[SseEvent], request_id: str | None
+) -> Iterator[StreamItem]:
     """Decodes a streamed chat completion.
 
     Raises:
         WireError: The stream reports an error, is malformed, or ends before
             ``data: [DONE]``.
     """
-    acc = StreamAccumulator("openai_chat")
+    acc = StreamAccumulator("openai_chat", spec.ref.provider)
     finish_raw: object = None
     refused = False
     measured: Usage | None = None
