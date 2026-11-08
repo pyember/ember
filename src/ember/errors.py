@@ -13,6 +13,8 @@ __all__ = [
     "ErrorKind",
     "ModelError",
     "NonSyntaxError",
+    "QuorumError",
+    "TieError",
 ]
 
 
@@ -128,3 +130,63 @@ class NonSyntaxError(EmberError, ValueError):
         self.reason = reason
         pointer = " " * column + "^"
         super().__init__(f"{reason} at column {column}\n  {spec}\n  {pointer}")
+
+
+class QuorumError(EmberError):
+    """Fewer members of a composition counted than its quorum requires.
+
+    A member counts when it succeeded and, where the composition asks more of
+    an answer (a usable finish, a passing verdict), its answer qualified. The
+    message counts each outcome and names each failed member's error; it never
+    contains model output.
+
+    Attributes:
+        required: Members that must count.
+        succeeded: Members that counted.
+        counted_as: The word for counting in the message, such as
+            ``"succeeded"``, ``"usable"`` or ``"passed"``.
+        rejected: ``(member index, reason)`` for each member that answered but
+            did not count, such as ``"unusable (content_filter)"``.
+        failures: ``(member index, error)`` for each member whose call failed.
+    """
+
+    def __init__(
+        self,
+        *,
+        required: int,
+        succeeded: int,
+        failures: tuple[tuple[int, EmberError], ...],
+        rejected: tuple[tuple[int, str], ...] = (),
+        counted_as: str = "succeeded",
+    ) -> None:
+        self.required = required
+        self.succeeded = succeeded
+        self.counted_as = counted_as
+        self.rejected = rejected
+        self.failures = failures
+        counts = [f"{succeeded} {counted_as}"]
+        reasons = [reason for _, reason in rejected]
+        counts += [f"{reasons.count(reason)} {reason}" for reason in dict.fromkeys(reasons)]
+        if failures:
+            counts.append(f"{len(failures)} errored")
+        parts = [f"quorum not met: {', '.join(counts)}", f"{required} required"]
+        parts += [f"member {index}: {error}" for index, error in failures]
+        super().__init__("; ".join(parts))
+
+
+class TieError(EmberError):
+    """A majority vote tied and its tie policy is to raise.
+
+    The message never contains the answers, which are model output; read
+    `tied` for them.
+
+    Attributes:
+        tied: The tied answers after normalization, in the order first seen.
+        votes: Votes each tied answer received.
+    """
+
+    def __init__(self, tied: tuple[str, ...], votes: int) -> None:
+        self.tied = tied
+        self.votes = votes
+        noun = "vote" if votes == 1 else "votes"
+        super().__init__(f"majority vote tied: {len(tied)} answers have {votes} {noun} each")

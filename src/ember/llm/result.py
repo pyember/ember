@@ -48,9 +48,17 @@ class Money:
     nanos: int
 
     @classmethod
-    def from_dollars(cls, dollars: decimal.Decimal) -> "Money":
-        """Converts exactly, rounding half to even only below one nano-dollar."""
-        nanos = (dollars * _NANOS_PER_DOLLAR).to_integral_value(rounding=decimal.ROUND_HALF_EVEN)
+    def from_dollars(
+        cls, dollars: decimal.Decimal, *, rounding: str = decimal.ROUND_HALF_EVEN
+    ) -> "Money":
+        """Converts exactly, rounding only below one nano-dollar.
+
+        Args:
+            dollars: The amount.
+            rounding: A `decimal` rounding mode; half to even by default, and
+                ``decimal.ROUND_CEILING`` for an upper bound.
+        """
+        nanos = (dollars * _NANOS_PER_DOLLAR).to_integral_value(rounding=rounding)
         return cls(int(nanos))
 
     @property

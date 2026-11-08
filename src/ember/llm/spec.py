@@ -69,11 +69,16 @@ class Rates:
     as_of: datetime.date
     long_context: LongContextRates | None = None
 
-    def cost(self, usage: Usage) -> Money | None:
+    def cost(self, usage: Usage, *, rounding: str = decimal.ROUND_HALF_EVEN) -> Money | None:
         """Prices ``usage`` exactly, rounding once to the nano-dollar.
 
         The arithmetic runs in a fixed decimal context, so the caller's decimal
         precision and rounding settings cannot change the result.
+
+        Args:
+            usage: The tokens to price.
+            rounding: How the final nano-dollar is rounded; half to even by
+                default, and ``decimal.ROUND_CEILING`` for an upper bound.
 
         Returns:
             The cost, or ``None`` when ``usage`` includes cache reads or writes
@@ -94,7 +99,7 @@ class Rates:
                 return None
             total = usage.input * rates.input + cache_read + cache_write
             total += usage.output * rates.output
-            return Money.from_dollars(total / _PER_MILLION)
+            return Money.from_dollars(total / _PER_MILLION, rounding=rounding)
 
 
 def _priced(tokens: int, rate: decimal.Decimal | None) -> decimal.Decimal | None:
