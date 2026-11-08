@@ -376,3 +376,41 @@ def test_jit_costs_little_when_the_body_makes_no_calls() -> None:
         jitted(session, x)
     per_call_s = (time.perf_counter() - started) / calls
     assert per_call_s < 200e-6, f"{per_call_s * 1e6:.1f} us per call"
+
+
+class Interrupt(BaseException):
+    """Stands in for KeyboardInterrupt."""
+
+
+def test_an_interrupt_in_a_map_item_tears_the_scope_down() -> None:
+    cleaned_up: list[int] = []
+
+    def item(i: int) -> None:
+        try:
+            runtime.wait(runtime.dispatch(lambda: time.sleep(0.02 if i == 0 else 0.5), label="s"))
+            if i == 0:
+                raise Interrupt
+        finally:
+            cleaned_up.append(i)
+
+    @xcs.jit
+    def program() -> None:
+        xcs.map(item, range(2))
+
+    with pytest.raises(Interrupt):
+        program()
+    assert sorted(cleaned_up) == [0, 1]
+    assert runtime.deferred() is False
+    assert xcs.jit(lambda: xcs.map(lambda x: x, [1, 2]))() == [1, 2]
+
+
+def test_attributes_of_the_function_do_not_replace_jit_methods() -> None:
+    def program() -> str:
+        return "ran"
+
+    program.graph = "an attribute of the function"  # type: ignore[attr-defined]
+    jitted = xcs.jit(program)
+    assert jitted() == "ran"
+    assert isinstance(jitted.graph(), xcs.Graph)
+    assert jitted.__name__ == "program"
+    assert jitted.__wrapped__ is program

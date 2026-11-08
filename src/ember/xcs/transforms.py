@@ -50,11 +50,11 @@ class Jitted(Generic[P, R]):
             raise TypeError(f"jit cannot run async function {fn.__qualname__}")
         if inspect.isgeneratorfunction(fn):
             raise TypeError(f"jit cannot run generator function {fn.__qualname__}")
+        functools.update_wrapper(self, fn, updated=())
         self._fn = fn
         self._lock = threading.Lock()
         self._graph: Graph | None = None
         self._plan: Plan | None = None
-        functools.update_wrapper(self, fn)
 
     def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
         with self._lock:
