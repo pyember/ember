@@ -118,7 +118,8 @@ A member is recorded as `Failed` when its model call failed for an operational r
 overload, server error, transport failure, cancellation) or when it is itself an ensemble whose
 quorum failed. Every other error raises at once: a bad key, a missing permission, an exhausted
 quota, an unknown model, a bad request, a response ember cannot decode, a missing price, or a bug in
-your code would fail every member alike, and a quorum met despite it would hide the outage. An ensemble cannot be empty, and its members must be operators.
+your code would fail every member alike, and a quorum met despite it would hide the outage. An
+ensemble cannot be empty, and its members must be operators.
 
 ## Judges, votes and verifiers
 

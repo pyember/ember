@@ -100,9 +100,21 @@ provider and stages out of order are all rejected before anything is sent.
 
 ## Planning
 
-`graph.plan(resolve)` bounds one run before it starts, given a function that returns a model's
-catalog entry. Per stage and in total, it gives the most model calls, output tokens and output cost
-a run can incur, from each stage's `max_output_tokens` and the catalog's limits and prices. Every
-figure is an upper bound. Input tokens are not bounded, because they depend on the question and on
-what earlier stages write, and calls the client retries are not counted. A bound is `None` when the
-catalog does not know the model's limit or price.
+`graph.plan(catalog)` bounds one run before it starts. Per stage and in total, it gives the most
+model calls, output tokens and output cost a run can incur, from each stage's `max_output_tokens` and
+the catalog's limits and prices:
+
+```python
+from ember.llm import catalog
+
+plan = build_graph("3E@openai/gpt-5.5(max_output_tokens=2000), 1J@anthropic/claude-opus-5-5").plan(
+    catalog.default()
+)
+for stage in plan.stages:
+    print(stage.calls, stage.output_tokens_bound, stage.output_cost_bound)
+print("at most", plan.calls, "calls and", plan.output_cost_bound, "of output")
+```
+
+Every figure is an upper bound. Input tokens are not bounded, because they depend on the question
+and on what earlier stages write, and calls the client retries are not counted. A bound is `None`
+when the catalog does not list the model's limit or price.

@@ -19,13 +19,11 @@ every stage's outcomes beside it.
 
 import dataclasses
 import functools
-from collections.abc import Callable
 
 from ember import xcs
 from ember.errors import QuorumError
+from ember.llm.catalog import Catalog
 from ember.llm.completion import Completion
-from ember.llm.ref import ModelRef
-from ember.llm.spec import ModelSpec
 from ember.non.grammar import ModelStage, Role, Stage, VoteStage, parse
 from ember.non.plan import Plan, plan
 from ember.operators.base import Operator
@@ -117,13 +115,14 @@ class NonGraph(Operator[str, Answer]):
         """Returns the parsed stages."""
         return parse(self.spec)
 
-    def plan(self, resolve: Callable[[ModelRef], ModelSpec]) -> Plan:
+    def plan(self, catalog: Catalog) -> Plan:
         """Returns upper bounds for one run; see `ember.non.plan`.
 
         Args:
-            resolve: Returns the catalog spec for a model.
+            catalog: Where model limits and rates come from, usually
+                ``ember.llm.catalog.default()``.
         """
-        return plan(self.stages(), resolve)
+        return plan(self.stages(), catalog)
 
     def forward(self, input: str) -> Answer:
         if not isinstance(input, str):

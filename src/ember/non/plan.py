@@ -1,22 +1,25 @@
 """Static bounds for one run of a NON graph, computed before any request.
 
 A plan counts model calls and bounds output tokens and their cost from each
-stage's ``max_output_tokens`` or, failing that, the model's catalog limit and
-rates. Every figure is an upper bound. Input tokens are not bounded: they
+stage's ``max_output_tokens`` and the model's catalog limit and rates. A model
+the catalog does not list has no known limit or price, so its bounds are
+``None``. Every figure is an upper bound. Input tokens are not bounded: they
 depend on the question and on the answers earlier stages write, and ember
 never estimates token counts. Calls the client retries after a failed attempt
 are not counted.
 """
 
 import dataclasses
-from collections.abc import Callable
+import decimal
 
-from ember.llm.ref import ModelRef
-from ember.llm.result import Money, Usage
+from ember.llm.catalog import Catalog
+from ember.llm.result import Money
 from ember.llm.spec import ModelSpec, Rates
 from ember.non.grammar import ModelStage, Role, Stage, VoteStage
 
 __all__ = ["Plan", "StagePlan", "plan"]
+
+_PER_MILLION = decimal.Decimal(1_000_000)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -73,13 +76,13 @@ class Plan:
         return total
 
 
-def plan(stages: tuple[Stage, ...], resolve: Callable[[ModelRef], ModelSpec]) -> Plan:
+def plan(stages: tuple[Stage, ...], catalog: Catalog) -> Plan:
     """Bounds one run of ``stages``.
 
     Args:
         stages: A parsed graph.
-        resolve: Returns the catalog spec for a model, such as the catalog's
-            resolution function.
+        catalog: Where model limits and rates come from, usually
+            ``ember.llm.catalog.default()``.
     """
     planned: list[StagePlan] = []
     answers = 0
@@ -87,7 +90,7 @@ def plan(stages: tuple[Stage, ...], resolve: Callable[[ModelRef], ModelSpec]) ->
         calls = _calls(stage, answers)
         answers = _answers_after(stage, answers)
         if isinstance(stage, ModelStage):
-            planned.append(_model_stage_plan(stage, calls, resolve(stage.model)))
+            planned.append(_model_stage_plan(stage, calls, catalog.get(str(stage.model))))
         else:
             planned.append(StagePlan(stage, 0, None, 0, Money(0)))
     return Plan(tuple(planned))
@@ -113,23 +116,25 @@ def _answers_after(stage: Stage, answers: int) -> int:
     return answers
 
 
-def _model_stage_plan(stage: ModelStage, calls: int, spec: ModelSpec) -> StagePlan:
+def _model_stage_plan(stage: ModelStage, calls: int, spec: ModelSpec | None) -> StagePlan:
+    model_limit = None if spec is None else spec.max_output_tokens
     limits = [
         limit
-        for limit in (stage.params.sampling.max_output_tokens, spec.max_output_tokens)
+        for limit in (stage.params.sampling.max_output_tokens, model_limit)
         if limit is not None
     ]
     if not limits:
         return StagePlan(stage, calls, None, None, None)
     per_call = min(limits)
     tokens = calls * per_call
-    cost = None if spec.rates is None else _output_cost_bound(spec.rates, tokens)
+    rates = None if spec is None else spec.rates
+    cost = None if rates is None else _output_cost_bound(rates, tokens)
     return StagePlan(stage, calls, per_call, tokens, cost)
 
 
 def _output_cost_bound(rates: Rates, tokens: int) -> Money:
-    usage = Usage(output=tokens)
-    cost = rates.cost(usage)
+    """Prices ``tokens`` output tokens at the highest output rate of any tier."""
+    per_million = rates.output
     if rates.long_context is not None:
-        cost = max(cost, rates.long_context.rates.cost(usage))
-    return cost
+        per_million = max(per_million, rates.long_context.rates.output)
+    return Money.from_dollars(tokens * per_million / _PER_MILLION)

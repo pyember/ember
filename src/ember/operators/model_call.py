@@ -5,11 +5,11 @@ import string
 from collections.abc import Sequence
 from typing import TypeAlias, TypeGuard
 
+from ember.llm.api import models
 from ember.llm.completion import Completion
 from ember.llm.ref import ModelRef
 from ember.llm.request import Message, Sampling
 from ember.operators.base import Operator
-from ember.operators.upstream import models
 
 __all__ = ["ModelCall", "Prompt"]
 

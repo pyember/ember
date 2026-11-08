@@ -1,51 +1,70 @@
 """A NON plan: exact call counts and labelled output bounds from the catalog."""
 
-import datetime
-import decimal
-
 from ember import build_graph
-from ember.llm.ref import ModelRef
+from ember.llm.catalog import Catalog
 from ember.llm.result import Money
-from ember.llm.spec import LongContextRates, ModelSpec, Rates
 
+CATALOG = Catalog.from_toml(
+    """
+[[model]]
+id = "openai/priced"
+wire_id = "priced"
+api = "openai_responses"
+aliases = []
+max_output_tokens = 1000
+accepts = ["max_output_tokens"]
+reasoning_efforts = []
+sources = ["https://example.com/models/priced"]
+as_of = 2026-11-01
 
-def _rates(output: str, long_output: str | None = None) -> Rates:
-    long_context = None
-    if long_output is not None:
-        long_context = LongContextRates(200_000, _rates(long_output))
-    return Rates(
-        input=decimal.Decimal("1"),
-        cache_read=decimal.Decimal("0.1"),
-        cache_write=decimal.Decimal("1.25"),
-        output=decimal.Decimal(output),
-        source_url="https://example.com/pricing",
-        as_of=datetime.date(2026, 11, 1),
-        long_context=long_context,
-    )
+[model.rates]
+input = "1"
+cache_read = "0.1"
+output = "10"
+source_url = "https://example.com/pricing"
+as_of = 2026-11-01
 
+[[model]]
+id = "openai/tiered"
+wire_id = "tiered"
+api = "openai_responses"
+aliases = []
+max_output_tokens = 100
+accepts = ["max_output_tokens"]
+reasoning_efforts = []
+sources = ["https://example.com/models/tiered"]
+as_of = 2026-11-01
 
-SPECS = {
-    "a/priced": ModelSpec(
-        ModelRef("a", "priced"), "priced", "openai_chat", max_output_tokens=1000, rates=_rates("10")
-    ),
-    "a/tiered": ModelSpec(
-        ModelRef("a", "tiered"),
-        "tiered",
-        "openai_chat",
-        max_output_tokens=100,
-        rates=_rates("10", long_output="15"),
-    ),
-    "a/unknown": ModelSpec(ModelRef("a", "unknown"), "unknown", "openai_chat", known=False),
-}
+[model.rates]
+input = "1"
+output = "10"
+source_url = "https://example.com/pricing"
+as_of = 2026-11-01
 
+[model.rates.long_context]
+above_prompt_tokens = 200000
+input = "2"
+output = "15"
 
-def _resolve(model: ModelRef) -> ModelSpec:
-    return SPECS[str(model)]
+[[model]]
+id = "openai/unpriced"
+wire_id = "unpriced"
+api = "openai_responses"
+aliases = []
+max_output_tokens = 500
+accepts = ["max_output_tokens"]
+reasoning_efforts = []
+sources = ["https://example.com/models/unpriced"]
+as_of = 2026-11-01
+"""
+)
 
 
 def test_calls_and_bounds_per_stage() -> None:
-    graph = build_graph("3E@a/priced(max_output_tokens=200), 1V@a/priced, 1J@a/unknown")
-    ensemble, verifier, judge = graph.plan(_resolve).stages
+    graph = build_graph(
+        "3E@openai/priced(max_output_tokens=200), 1V@openai/priced, 1J@openai/not-in-catalog"
+    )
+    ensemble, verifier, judge = graph.plan(CATALOG).stages
     assert (ensemble.calls, ensemble.max_output_tokens, ensemble.output_tokens_bound) == (
         3,
         200,
@@ -62,27 +81,34 @@ def test_calls_and_bounds_per_stage() -> None:
 
 
 def test_totals_are_unknown_when_any_stage_is_unbounded() -> None:
-    plan = build_graph("3E@a/priced, 1J@a/unknown").plan(_resolve)
+    plan = build_graph("3E@openai/priced, 1J@openai/not-in-catalog").plan(CATALOG)
     assert (plan.calls, plan.output_tokens_bound, plan.output_cost_bound) == (4, None, None)
 
 
+def test_a_known_limit_without_a_price_bounds_tokens_but_not_cost() -> None:
+    plan = build_graph("2E@openai/unpriced, 1M").plan(CATALOG)
+    assert (plan.output_tokens_bound, plan.output_cost_bound) == (1000, None)
+
+
 def test_a_vote_stage_makes_no_calls_and_totals_add_up() -> None:
-    plan = build_graph("2E@a/priced, 1M").plan(_resolve)
+    plan = build_graph("2E@openai/priced, 1M").plan(CATALOG)
     assert [stage.calls for stage in plan.stages] == [2, 0]
     assert (plan.calls, plan.output_tokens_bound) == (2, 2000)
     assert plan.output_cost_bound == Money(20_000_000)
 
 
 def test_the_stage_limit_never_exceeds_the_model_limit() -> None:
-    plan = build_graph("1E@a/priced(max_output_tokens=5000), 1M").plan(_resolve)
+    plan = build_graph("1E@openai/priced(max_output_tokens=5000), 1M").plan(CATALOG)
     assert plan.stages[0].max_output_tokens == 1000
 
 
 def test_cost_bounds_use_the_highest_output_rate_tier() -> None:
-    plan = build_graph("2E@a/tiered, 1M").plan(_resolve)
+    plan = build_graph("2E@openai/tiered, 1M").plan(CATALOG)
     assert plan.output_cost_bound == Money(3_000_000)  # 200 tokens at $15 per million.
 
 
 def test_verifier_calls_follow_the_answers_it_can_see() -> None:
-    plan = build_graph("2E@a/priced, 1E@a/priced, 1V@a/priced, 2J@a/priced, 1M")
-    assert [stage.calls for stage in plan.plan(_resolve).stages] == [2, 1, 3, 2, 0]
+    graph = build_graph(
+        "2E@openai/priced, 1E@openai/priced, 1V@openai/priced, 2J@openai/priced, 1M"
+    )
+    assert [stage.calls for stage in graph.plan(CATALOG).stages] == [2, 1, 3, 2, 0]

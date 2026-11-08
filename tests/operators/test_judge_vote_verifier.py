@@ -91,13 +91,11 @@ def test_verdicts_are_read_from_the_last_line_only(text: str, verdict: Verdict) 
 def test_verifier_checks_each_answer_and_records_operational_failures(
     fake_models: Callable[..., Any],
 ) -> None:
-    overloaded = ModelError(ErrorKind.OVERLOADED, provider="openai", model="gpt-5", reason="x")
-
-    def reply(model: str, prompt: str) -> str | ModelError:
+    def reply(model: str, prompt: str) -> str | ErrorKind:
         if prompt.endswith("Answer:\nLyon"):
             return "VERDICT: FAIL"
         if prompt.endswith("Answer:\nMarseille"):
-            return overloaded
+            return ErrorKind.OVERLOADED
         return "VERDICT: PASS"
 
     fake = fake_models(reply)
@@ -107,13 +105,13 @@ def test_verifier_checks_each_answer_and_records_operational_failures(
     assert isinstance(first, Succeeded) and isinstance(first.value, Check)
     assert (first.value.answer, first.value.verdict) == ("Paris", Verdict.PASS)
     assert isinstance(second, Succeeded) and second.value.verdict is Verdict.FAIL
-    assert third == Failed(2, overloaded)
+    assert isinstance(third, Failed) and third.member == 2
+    assert isinstance(third.error, ModelError) and third.error.kind is ErrorKind.OVERLOADED
     assert len(fake.calls) == 3
 
 
 def test_verifier_propagates_fatal_errors(fake_models: Callable[..., Any]) -> None:
-    denied = ModelError(ErrorKind.AUTH, provider="openai", model="gpt-5", reason="bad key")
-    fake_models(lambda model, prompt: denied)
+    fake_models(lambda model, prompt: ErrorKind.AUTH)
     with pytest.raises(ModelError) as raised:
         Verifier(ModelCall("openai/gpt-5"))(Candidates("q", ("a", "b")))
-    assert raised.value is denied
+    assert raised.value.kind is ErrorKind.AUTH

@@ -120,11 +120,11 @@ def test_a_completion_input_is_read_as_its_text(fake_models: Callable[..., Any])
 
 def test_rshift_feeds_one_calls_text_to_the_next(fake_models: Callable[..., Any]) -> None:
     fake = fake_models(lambda model, prompt: f"[{prompt}]")
-    pipeline = ModelCall("a/first") >> ModelCall("b/second", template="again {input}")
+    pipeline = ModelCall("openai/first") >> ModelCall("anthropic/second", template="again {input}")
     assert pipeline("x").text == "[again [x]]"
     assert [(call.model, call.prompt) for call in fake.calls] == [
-        ("a/first", "x"),
-        ("b/second", "again [x]"),
+        ("openai/first", "x"),
+        ("anthropic/second", "again [x]"),
     ]
 
 
