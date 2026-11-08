@@ -87,11 +87,15 @@ class Strand:
         """The current plan's prediction for the next call this greenlet dispatches."""
         return self.frame.planned_remaining_s((self.path, self.dispatched))
 
-    def spawn(self, body: Callable[["Strand"], None]) -> None:
+    def spawn(self, body: Callable[["Strand"], None]) -> greenlet.greenlet:
         """Runs ``body`` in a new greenlet, in a copy of this greenlet's context.
 
         The new strand starts with this strand's frame and reads. ``body``
-        runs until it first waits, then this greenlet continues.
+        runs until it first waits, then this greenlet continues. ``body``
+        must not raise.
+
+        Returns:
+            The new greenlet, which `Scheduler.stop` can end.
         """
         path = (*self.path, self.spawned)
         self.spawned += 1
@@ -102,7 +106,7 @@ class Strand:
             _CURRENT.set(child)
             body(child)
 
-        self.scheduler.start(run, contextvars.copy_context())
+        return self.scheduler.start(run, contextvars.copy_context())
 
 
 def current() -> Strand | None:

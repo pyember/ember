@@ -20,6 +20,8 @@ from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from typing import Generic, ParamSpec, TypeVar, overload
 
+import greenlet
+
 from ember.xcs import strands
 from ember.xcs.frames import Call, Frame, Plan
 from ember.xcs.graph import Graph
@@ -105,8 +107,16 @@ def map(fn: Callable[[T], R], items: Iterable[T]) -> list[R]:
     Each item runs in its own greenlet on the caller's thread, with a copy of
     the caller's context. Items start in order, each running until it first
     waits before the next starts, so every item starts before any continues
-    past a wait. If one raises, no further items start, the items already
-    started finish, and the error of the earliest failed item is raised.
+    past a wait. If one raises an exception, no further items start, the items
+    already started finish, and the error of the earliest failed item is
+    raised.
+
+    An interrupt (a `BaseException` that is not an `Exception`, such as
+    KeyboardInterrupt), raised in an item or arriving while the map waits,
+    stops the map at once: every started item that has not finished gets
+    `greenlet.GreenletExit` where it waits, and the interrupt is raised once
+    they have unwound. Requests they already sent still finish before the
+    enclosing jit call returns.
     """
     work = list(items)
     if not work:
@@ -161,20 +171,46 @@ class _MapRun:
 
     def __init__(self) -> None:
         self.failed = False
+        self.interrupt: BaseException | None = None
+        self.running = 0
+        self.all_started = False
+        self.settled: Future[None] = Future()
         self.reads: set[Call] = set()
+
+    def started_all(self) -> None:
+        self.all_started = True
+        self._settle_if_done()
+
+    def item_finished(self) -> None:
+        self.running -= 1
+        self._settle_if_done()
+
+    def _settle_if_done(self) -> None:
+        done = self.interrupt is not None or (self.all_started and self.running == 0)
+        if done and not self.settled.done():
+            self.settled.set_result(None)
 
 
 def _map_in(strand: strands.Strand, fn: Callable[[T], R], items: list[T]) -> list[R]:
     run = _MapRun()
     outcomes: list[Future[R]] = []
-    for item in items:
-        if run.failed:
-            break
-        outcome: Future[R] = Future()
-        outcomes.append(outcome)
-        strand.spawn(functools.partial(_run_item, run, fn, item, outcome))
-    for outcome in outcomes:
-        strand.wait(outcome)
+    children: list[greenlet.greenlet] = []
+    try:
+        for item in items:
+            if run.failed:
+                break
+            outcome: Future[R] = Future()
+            outcomes.append(outcome)
+            run.running += 1
+            children.append(strand.spawn(functools.partial(_run_item, run, fn, item, outcome)))
+        run.started_all()
+        strand.wait(run.settled)
+        if run.interrupt is not None:
+            raise run.interrupt
+    except BaseException:
+        for child in children:
+            strand.scheduler.stop(child)
+        raise
     strand.absorb(frozenset(run.reads))
     errors = [error for outcome in outcomes if (error := outcome.exception()) is not None]
     if errors:
@@ -192,7 +228,15 @@ def _run_item(
     except Exception as error:  # Raised by `map` in item order.
         run.failed = True
         outcome.set_exception(error)
+    # An interrupt stops the whole map, which raises it; GreenletExit means the
+    # map is stopping this item because of one.
+    except BaseException as interrupt:
+        run.failed = True
+        if run.interrupt is None and not isinstance(interrupt, greenlet.GreenletExit):
+            run.interrupt = interrupt
+        outcome.set_exception(interrupt)
     else:
         outcome.set_result(result)
     finally:
         run.reads |= child.reads
+        run.item_finished()

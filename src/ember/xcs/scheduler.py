@@ -10,10 +10,18 @@ run user code.
 A scheduler serves one scope, the outermost `jit` or `map` call on a thread.
 The greenlet that opened the scope (the owner) keeps running the scope's body.
 A hub greenlet, whose parent is the owner, picks the next greenlet to run each
-time the running one parks.
+time the running one parks. The hub lives as long as the scope: an interrupt
+such as KeyboardInterrupt that arrives while the thread waits in the hub is
+raised in the owner, which the hub only ever runs for while the owner is
+parked, and the scope stays usable if the owner catches it.
 
-Invariant: every suspended greenlet is woken exactly once. A parked greenlet is
-queued once by its future's callback, and a child started by `start` returns
+Invariant: each suspension is resumed exactly once. A parked greenlet is woken
+by its future's callback with a token for that suspension, and the greenlet
+withdraws the token as soon as the suspension ends, however it ends (resumed,
+interrupted, or stopped), so any later wake for it is dropped. An interrupt
+can land between the hub taking a wake from the queue and switching to it, so
+after an interrupt the hub queues again every parked greenlet whose future is
+done; the token makes a duplicate harmless. A child started by `start` returns
 straight to the greenlet that started it the first time it parks.
 """
 
@@ -21,7 +29,7 @@ import contextvars
 import queue
 from collections.abc import Callable
 from concurrent.futures import Future
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import greenlet
 
@@ -39,7 +47,9 @@ class Scheduler:
 
     def __init__(self) -> None:
         self._owner = greenlet.getcurrent()
-        self._ready: queue.SimpleQueue[greenlet.greenlet] = queue.SimpleQueue()
+        self._ready: queue.SimpleQueue[tuple[greenlet.greenlet, object]] = queue.SimpleQueue()
+        # Results of every type the scope's code waits on: user data.
+        self._parked: dict[greenlet.greenlet, tuple[object, Future[Any]]] = {}
         self._hub: greenlet.greenlet | None = None
         self._children: set[greenlet.greenlet] = set()
         self._starting: set[greenlet.greenlet] = set()
@@ -49,20 +59,30 @@ class Scheduler:
         """Suspends the running greenlet until ``future`` is done.
 
         Other greenlets run meanwhile. Returns at once if ``future`` is done.
+        An exception thrown into the greenlet while it is parked (an
+        interrupt, or `stop`) is raised here, and the future's later wake is
+        dropped.
         """
         if future.done():
             return
         current = greenlet.getcurrent()
-        future.add_done_callback(lambda _: self._ready.put(current))
-        self._suspend(current)
+        token = object()
+        self._parked[current] = (token, future)
+        future.add_done_callback(lambda _: self._ready.put((current, token)))
+        try:
+            self._suspend(current)
+        finally:
+            del self._parked[current]
 
-    def start(self, run: Callable[[], None], context: contextvars.Context) -> None:
+    def start(self, run: Callable[[], None], context: contextvars.Context) -> greenlet.greenlet:
         """Runs ``run`` in a new greenlet until it first parks or finishes.
 
         Control then returns to the caller; the new greenlet resumes later,
-        when what it parked on is done. ``run`` executes in ``context``.
-        ``run`` must catch the exceptions it means to report; anything it lets
-        escape propagates to the caller of `start` or to the scope's owner.
+        when what it parked on is done. ``run`` executes in ``context`` and
+        must not raise: it reports its own outcome.
+
+        Returns:
+            The new greenlet, for `stop`.
         """
         spawner = greenlet.getcurrent()
         child = greenlet.greenlet(self._child_main(run), parent=spawner)
@@ -70,17 +90,29 @@ class Scheduler:
         self._children.add(child)
         self._starting.add(child)
         child.switch()
+        return child
+
+    def stop(self, child: greenlet.greenlet) -> None:
+        """Ends a suspended child started by `start` and returns once it has finished.
+
+        `greenlet.GreenletExit` is raised in the child where it is parked, so
+        its ``finally`` blocks run. If the child parks again while unwinding,
+        this waits for it like any other greenlet. Does nothing if the child
+        has finished.
+        """
+        if child.dead:
+            return
+        child.parent = greenlet.getcurrent()
+        child.throw(greenlet.GreenletExit)
 
     def close(self) -> None:
         """Ends the scope, on the owner, after its body has finished.
 
-        Greenlets still suspended (possible only after an interrupt such as
-        KeyboardInterrupt) are killed with `greenlet.GreenletExit`.
+        Greenlets still suspended (possible only after an interrupt) are ended
+        with `stop`.
         """
         for child in list(self._children):
-            child.parent = self._owner
-            child.throw(greenlet.GreenletExit)
-        self._children.clear()
+            self.stop(child)
         if self._hub is not None and not self._hub.dead:
             self._closing = True
             self._hub.switch()
@@ -98,6 +130,8 @@ class Scheduler:
 
     def _suspend(self, current: greenlet.greenlet) -> None:
         hub = self._hub_greenlet()
+        if hub.dead:
+            raise RuntimeError("the scope's scheduler has stopped")
         if current in self._starting:
             self._starting.discard(current)
             spawner = current.parent
@@ -115,4 +149,23 @@ class Scheduler:
 
     def _run_hub(self) -> None:
         while not self._closing:
-            self._ready.get().switch()
+            try:
+                self._resume_next()
+            except greenlet.GreenletExit:
+                raise
+            # Not absorbed: an interrupt that arrives while the thread waits here
+            # belongs to the owner, which is parked; the hub carries on afterwards.
+            except BaseException as interrupt:
+                self._queue_done_waits()
+                self._owner.throw(interrupt)
+
+    def _resume_next(self) -> None:
+        parked, token = self._ready.get()
+        waiting = self._parked.get(parked)
+        if waiting is not None and waiting[0] is token:
+            parked.switch()
+
+    def _queue_done_waits(self) -> None:
+        for parked, (token, future) in list(self._parked.items()):
+            if future.done():
+                self._ready.put((parked, token))
