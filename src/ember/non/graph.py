@@ -1,34 +1,44 @@
 """Running a NON graph.
 
 `build_graph` returns a `NonGraph`: an operator from a question to an `Answer`.
-Each run compiles the parsed stages to the operators in `ember.operators`:
+A run first checks every model stage with the active client, as a call would
+before sending, so a bad model or setting in any stage fails before the first
+request. Then it compiles the parsed stages to the operators in
+`ember.operators`:
 
-- The E stages run concurrently. Each is an `Ensemble` of ``count`` identical
-  `ModelCall`s with quorum ``quorum`` (default: all of them). Their answers, in
-  stage order and then member order, are the candidates.
-- A J stage is an `Ensemble` of ``count`` `Judge`s, each reading the question
-  and every candidate. Their answers become the candidates.
-- A V stage is a `Verifier`. The answers that pass become the candidates; fewer
-  than ``quorum`` (default 1) passing raises `QuorumError`.
+- The E stages run concurrently. Each makes ``count`` calls at once, as an
+  `Ensemble` of `ModelCall`s does. Their usable answers, in stage order and
+  then member order, are the candidates.
+- A J stage makes ``count`` `Judge` calls at once, each reading the question
+  and every candidate. Their usable answers become the candidates.
+- A V stage is a `Verifier`. The answers that pass become the candidates.
 - An M stage is a `MajorityVote` comparing answers by `fold_answer` and
   settling ties by `TiePolicy.FIRST_SEEN`. The winner is the only candidate.
 
-The answer is the one candidate the last stage leaves. `Answer.stages` records
-every stage's outcomes beside it.
+An answer is usable only when its call finished with `FinishReason.STOP`; a
+refusal, a filtered, truncated or tool-call reply is kept in the stage's
+record but is never a candidate. An E or J stage with a ``seed`` gives member
+``i`` the seed ``seed + i``, so no two members send the same request. A stage
+with fewer usable answers (or, for V, passing answers) than its quorum raises
+`QuorumError`. The answer is the one candidate the last stage leaves, and
+`Answer.stages` records every stage's outcomes beside it.
 """
 
 import dataclasses
 import functools
+from collections.abc import Callable
 
 from ember import xcs
-from ember.errors import QuorumError
+from ember.errors import EmberError, QuorumError
 from ember.llm.catalog import Catalog
+from ember.llm.client import active
 from ember.llm.completion import Completion
+from ember.llm.result import FinishReason
 from ember.non.grammar import ModelStage, Role, Stage, VoteStage, parse
 from ember.non.plan import Plan, plan
 from ember.operators.base import Operator
 from ember.operators.candidates import Candidates
-from ember.operators.ensemble import Ensemble, Failed, Outcome, Succeeded
+from ember.operators.ensemble import Failed, Outcome, Succeeded, run_members
 from ember.operators.judge import Judge
 from ember.operators.model_call import ModelCall
 from ember.operators.verifier import Check, Verdict, Verifier
@@ -46,8 +56,21 @@ class Sampled:
 
     @property
     def answers(self) -> tuple[str, ...]:
-        """The texts of the calls that succeeded."""
-        return tuple(o.value.text for o in self.outcomes if isinstance(o, Succeeded))
+        """The texts of the calls that finished with `FinishReason.STOP`."""
+        return tuple(
+            o.value.text
+            for o in self.outcomes
+            if isinstance(o, Succeeded) and o.value.finish_reason is FinishReason.STOP
+        )
+
+    @property
+    def rejected(self) -> tuple[tuple[int, str], ...]:
+        """``(member, reason)`` for each call that answered but is not usable."""
+        return tuple(
+            (o.member, f"unusable ({o.value.finish_reason.value})")
+            for o in self.outcomes
+            if isinstance(o, Succeeded) and o.value.finish_reason is not FinishReason.STOP
+        )
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -64,6 +87,16 @@ class Verified:
             o.value.answer
             for o in self.checks
             if isinstance(o, Succeeded) and o.value.verdict is Verdict.PASS
+        )
+
+    @property
+    def rejected(self) -> tuple[tuple[int, str], ...]:
+        """``(answer, reason)`` for each answer the verifier did not pass."""
+        reasons = {Verdict.FAIL: "failed", Verdict.UNREADABLE: "unreadable"}
+        return tuple(
+            (o.member, reasons[o.value.verdict])
+            for o in self.checks
+            if isinstance(o, Succeeded) and o.value.verdict is not Verdict.PASS
         )
 
 
@@ -103,7 +136,7 @@ class NonGraph(Operator[str, Answer]):
     Attributes:
         spec: The specification. It is parsed when the graph is constructed,
             so an invalid one raises `NonSyntaxError` there, and again on each
-            run, which costs microseconds.
+            run.
     """
 
     spec: str
@@ -128,6 +161,7 @@ class NonGraph(Operator[str, Answer]):
         if not isinstance(input, str):
             raise TypeError(f"a NON graph takes a question string, got {type(input)}")
         stages = self.stages()
+        _check_before_sending(stages)
         generation = [s for s in stages if isinstance(s, ModelStage) and s.role is Role.ENSEMBLE]
         records: list[StageRecord] = list(xcs.map(functools.partial(_generate, input), generation))
         answers = tuple(answer for record in records for answer in record.answers)
@@ -153,10 +187,19 @@ def build_graph(spec: str) -> NonGraph:
     return NonGraph(spec)
 
 
+def _check_before_sending(stages: tuple[Stage, ...]) -> None:
+    """Raises, for the first stage that would fail, what its calls would raise before sending."""
+    client = active()
+    for stage in stages:
+        if isinstance(stage, ModelStage):
+            client.check(stage.model, sampling=stage.params.sampling)
+
+
 def _generate(question: str, stage: ModelStage) -> Sampled:
-    call = _model_call(stage)
-    ensemble = Ensemble((call,) * stage.count, quorum=_quorum(stage, default=stage.count))
-    return Sampled(stage, ensemble(question))
+    calls: list[Callable[[], Completion]] = [
+        functools.partial(call, question) for call in _member_calls(stage)
+    ]
+    return _require_usable(Sampled(stage, run_members(calls)))
 
 
 def _refine(stage: Stage, candidates: Candidates) -> StageRecord:
@@ -165,26 +208,56 @@ def _refine(stage: Stage, candidates: Candidates) -> StageRecord:
             stage, MajorityVote(normalize=fold_answer, tie=TiePolicy.FIRST_SEEN)(candidates)
         )
     if stage.role is Role.JUDGE:
-        judge = Judge(_model_call(stage))
-        judges = Ensemble((judge,) * stage.count, quorum=_quorum(stage, default=stage.count))
-        return Sampled(stage, judges(candidates))
+        calls: list[Callable[[], Completion]] = [
+            functools.partial(Judge(call), candidates) for call in _member_calls(stage)
+        ]
+        return _require_usable(Sampled(stage, run_members(calls)))
     if stage.role is Role.VERIFIER:
-        return _verify(stage, candidates)
+        return _require_passed(Verified(stage, Verifier(_member_calls(stage)[0])(candidates)))
     raise AssertionError(f"parse keeps E stages before every other stage, found {stage}")
 
 
-def _verify(stage: ModelStage, candidates: Candidates) -> Verified:
-    record = Verified(stage, Verifier(_model_call(stage))(candidates))
-    required = _quorum(stage, default=1)
+def _member_calls(stage: ModelStage) -> list[ModelCall]:
+    """One call per member; with a seed, member ``i`` uses ``seed + i``."""
+    params = stage.params
+    sampling = params.sampling
+    base = ModelCall(stage.model, system=params.system, sampling=sampling)
+    if sampling.seed is None:
+        return [base] * stage.count
+    return [
+        dataclasses.replace(base, sampling=dataclasses.replace(sampling, seed=sampling.seed + i))
+        for i in range(stage.count)
+    ]
+
+
+def _require_usable(record: Sampled) -> Sampled:
+    required = _quorum(record.stage, default=record.stage.count)
     if len(record.answers) < required:
-        failures = tuple((o.member, o.error) for o in record.checks if isinstance(o, Failed))
-        raise QuorumError(required=required, succeeded=len(record.answers), failures=failures)
+        raise QuorumError(
+            required=required,
+            succeeded=len(record.answers),
+            counted_as="usable",
+            rejected=record.rejected,
+            failures=_failures(record.outcomes),
+        )
     return record
 
 
-def _model_call(stage: ModelStage) -> ModelCall:
-    params = stage.params
-    return ModelCall(stage.model, system=params.system, sampling=params.sampling)
+def _require_passed(record: Verified) -> Verified:
+    required = _quorum(record.stage, default=1)
+    if len(record.answers) < required:
+        raise QuorumError(
+            required=required,
+            succeeded=len(record.answers),
+            counted_as="passed",
+            rejected=record.rejected,
+            failures=_failures(record.checks),
+        )
+    return record
+
+
+def _failures(outcomes: tuple[Outcome[object], ...]) -> tuple[tuple[int, EmberError], ...]:
+    return tuple((o.member, o.error) for o in outcomes if isinstance(o, Failed))
 
 
 def _quorum(stage: ModelStage, *, default: int) -> int:

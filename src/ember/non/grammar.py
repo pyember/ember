@@ -24,7 +24,7 @@ import dataclasses
 import enum
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import NoReturn
 
 from ember.errors import NonSyntaxError
@@ -144,8 +144,9 @@ _PUNCTUATION: Mapping[str, _Kind] = {
     ")": _Kind.RPAREN,
     "=": _Kind.EQUALS,
 }
-_NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
-_INTEGER = re.compile(r"[+-]?\d+")
+_NUMBER = re.compile(r"[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?")
+_INTEGER = re.compile(r"[+-]?[0-9]+")
+_COUNT = re.compile(r"[0-9]+")
 _WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_-]*")
 _MODEL = re.compile(r"[^\s(),]+")
 
@@ -253,7 +254,7 @@ class _Parser:
         return VoteStage(count_token.column)
 
     def _count(self, token: _Token) -> int:
-        if not token.text.isdigit():
+        if _COUNT.fullmatch(token.text) is None:
             self._fail(token, "a stage count is a whole number such as 3")
         count = int(token.text)
         if count < 1:
@@ -267,7 +268,7 @@ class _Parser:
             self._fail(token, f"model {token.text!r} is not of the form provider/name")
 
     def _params(self) -> Params:
-        opening = self._expect(_Kind.LPAREN, "expected '('")
+        self._expect(_Kind.LPAREN, "expected '('")
         values: dict[str, _Token] = {}
         while True:
             key = self._expect(_Kind.WORD, "expected a parameter name")
@@ -282,7 +283,7 @@ class _Parser:
                 break
             self._advance()
         self._expect(_Kind.RPAREN, "expected ',' or ')'")
-        return self._typed_params(opening, values)
+        return self._typed_params(values)
 
     def _value(self) -> _Token:
         token = self._advance()
@@ -290,26 +291,39 @@ class _Parser:
             self._fail(token, "expected a value")
         return token
 
-    def _typed_params(self, opening: _Token, values: Mapping[str, _Token]) -> Params:
+    def _typed_params(self, values: Mapping[str, _Token]) -> Params:
+        sampling = self._sampling(values)
+        quorum = self._int(values.get("quorum"))
+        if quorum is not None and quorum < 1:
+            self._fail(values["quorum"], "quorum is at least 1")
+        return Params(sampling=sampling, system=self._str(values.get("system")), quorum=quorum)
+
+    def _sampling(self, values: Mapping[str, _Token]) -> Sampling:
+        """Types each sampling value and range-checks it at its own column."""
         temperature = self._float(values.get("temperature"))
         top_p = self._float(values.get("top_p"))
         max_output_tokens = self._int(values.get("max_output_tokens"))
         seed = self._int(values.get("seed"))
         reasoning_effort = self._str(values.get("reasoning_effort"))
-        try:
-            sampling = Sampling(
-                temperature=temperature,
-                top_p=top_p,
-                max_output_tokens=max_output_tokens,
-                seed=seed,
-                reasoning_effort=reasoning_effort,
-            )
-        except ValueError as exc:  # A range check in Sampling; it names the field.
-            self._fail(opening, str(exc))
-        quorum = self._int(values.get("quorum"))
-        if quorum is not None and quorum < 1:
-            self._fail(values["quorum"], "quorum is at least 1")
-        return Params(sampling=sampling, system=self._str(values.get("system")), quorum=quorum)
+        one_field_checks: tuple[tuple[str, Callable[[], Sampling]], ...] = (
+            ("temperature", lambda: Sampling(temperature=temperature)),
+            ("top_p", lambda: Sampling(top_p=top_p)),
+            ("max_output_tokens", lambda: Sampling(max_output_tokens=max_output_tokens)),
+            ("seed", lambda: Sampling(seed=seed)),
+            ("reasoning_effort", lambda: Sampling(reasoning_effort=reasoning_effort)),
+        )
+        for name, check in one_field_checks:
+            try:
+                check()
+            except ValueError as exc:  # Sampling's range check, which names the field.
+                self._fail(values[name], str(exc))
+        return Sampling(
+            temperature=temperature,
+            top_p=top_p,
+            max_output_tokens=max_output_tokens,
+            seed=seed,
+            reasoning_effort=reasoning_effort,
+        )
 
     def _float(self, token: _Token | None) -> float | None:
         if token is None:

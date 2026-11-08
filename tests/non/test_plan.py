@@ -112,3 +112,30 @@ def test_verifier_calls_follow_the_answers_it_can_see() -> None:
         "2E@openai/priced, 1E@openai/priced, 1V@openai/priced, 2J@openai/priced, 1M"
     )
     assert [stage.calls for stage in graph.plan(CATALOG).stages] == [2, 1, 3, 2, 0]
+
+
+TINY = Catalog.from_toml(
+    """
+[[model]]
+id = "openai/tiny"
+wire_id = "tiny"
+api = "openai_responses"
+aliases = []
+max_output_tokens = 1
+accepts = ["max_output_tokens"]
+reasoning_efforts = []
+sources = ["https://example.com/models/tiny"]
+as_of = 2026-11-01
+
+[model.rates]
+input = "0.0000001"
+output = "0.0000015"
+source_url = "https://example.com/pricing"
+as_of = 2026-11-01
+"""
+)
+
+
+def test_cost_bounds_round_up_to_the_next_nano_dollar() -> None:
+    plan = build_graph("1E@openai/tiny, 1M").plan(TINY)
+    assert plan.output_cost_bound == Money(1)  # 0.0015 nano-dollars, rounded up.

@@ -13,6 +13,8 @@ import pytest
 
 from ember import build_graph
 from ember.errors import ErrorKind, ModelError, NonSyntaxError, QuorumError
+from ember.llm.fake import Reply
+from ember.llm.result import FinishReason
 from ember.non import NonGraph, Sampled, Verified, Voted
 from ember.operators import Ensemble, Failed, Operator, Succeeded
 
@@ -162,3 +164,109 @@ def test_a_graph_takes_only_a_question_string(fake_models: Callable[..., Any]) -
     with pytest.raises(TypeError, match="question string"):
         NonGraph("1E@openai/m, 1M")({"query": "q"})  # type: ignore[arg-type]
     assert fake.calls == []
+
+
+def _first_n_calls(n: int, first: Reply | str, rest: Reply | str) -> Callable[..., Reply | str]:
+    """A reply that gives ``first`` to the first ``n`` calls to arrive and ``rest`` after."""
+    lock = threading.Lock()
+    seen: list[None] = []
+
+    def reply(model: str, prompt: str) -> Reply | str:
+        with lock:
+            seen.append(None)
+            early = len(seen) <= n
+        return first if early else rest
+
+    return reply
+
+
+@pytest.mark.parametrize(
+    "finish",
+    [
+        FinishReason.CONTENT_FILTER,
+        FinishReason.REFUSAL,
+        FinishReason.LENGTH,
+        FinishReason.TOOL_CALLS,
+    ],
+)
+def test_only_answers_that_stopped_become_candidates(
+    fake_models: Callable[..., Any], finish: FinishReason
+) -> None:
+    fake_models(_first_n_calls(2, Reply("", finish_reason=finish), "Paris"))
+    answer = build_graph("3E@openai/m(quorum=1), 1M")("Capital of France?")
+    assert answer.text == "Paris"
+    generated = answer.stages[0]
+    assert isinstance(generated, Sampled)
+    assert generated.answers == ("Paris",)
+    unusable = [o for o in generated.outcomes if isinstance(o, Succeeded)]
+    assert sorted(o.value.finish_reason.value for o in unusable) == sorted(
+        [finish.value, finish.value, "stop"]
+    )
+
+
+def test_unusable_answers_count_against_the_quorum(fake_models: Callable[..., Any]) -> None:
+    fake_models(_first_n_calls(2, Reply("", finish_reason=FinishReason.CONTENT_FILTER), "Paris"))
+    with pytest.raises(QuorumError) as raised:
+        build_graph("3E@openai/m(quorum=2), 1M")("q")
+    assert (raised.value.required, raised.value.succeeded) == (2, 1)
+    assert sorted(reason for _, reason in raised.value.rejected) == [
+        "unusable (content_filter)",
+        "unusable (content_filter)",
+    ]
+    assert str(raised.value).startswith(
+        "quorum not met: 1 usable, 2 unusable (content_filter); 2 required"
+    )
+
+
+def test_a_judge_that_refuses_is_not_an_answer(fake_models: Callable[..., Any]) -> None:
+    refusal = Reply("I can't help with that.", finish_reason=FinishReason.REFUSAL)
+    fake_models(lambda model, prompt: refusal if model == "anthropic/j" else "draft")
+    with pytest.raises(QuorumError, match=r"0 usable, 1 unusable \(refusal\); 1 required"):
+        build_graph("2E@openai/m, 1J@anthropic/j")("q")
+
+
+def test_a_seed_is_derived_per_member(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: "same")
+    build_graph("3E@openai/m(seed=7), 1E@openai/n, 2J@anthropic/j(seed=0), 1M")("q")
+    seeds: dict[str, list[int | None]] = {}
+    for call in fake.calls:
+        seeds.setdefault(call.model, []).append(call.seed)
+    assert sorted(seeds["openai/m"]) == [7, 8, 9]  # type: ignore[type-var]
+    assert seeds["openai/n"] == [None]
+    assert sorted(seeds["anthropic/j"]) == [0, 1]  # type: ignore[type-var]
+
+
+@pytest.mark.parametrize(
+    ("spec", "error"),
+    [
+        ("2E@openai/m, 1J@openai/gpt-5.5(temperature=0.5)", ValueError),
+        ("2E@openai/m, 1V@openai/gpt-5.5(reasoning_effort=enormous), 1M", ValueError),
+        ("2E@openai/m, 1J@nowhere/judge", ModelError),
+    ],
+)
+def test_every_stage_is_checked_before_anything_is_sent(
+    fake_models: Callable[..., Any], spec: str, error: type[Exception]
+) -> None:
+    fake = fake_models(lambda model, prompt: "x")
+    with pytest.raises(error):
+        build_graph(spec)("q")
+    assert fake.provider.requests == ()
+
+
+def test_a_verifier_shortfall_counts_passed_failed_and_unreadable(
+    fake_models: Callable[..., Any],
+) -> None:
+    def reply(model: str, prompt: str) -> str:
+        if model != "anthropic/v":
+            return model.removeprefix("openai/")
+        if prompt.endswith("Answer:\nfail"):
+            return "VERDICT: FAIL"
+        if prompt.endswith("Answer:\nmumble"):
+            return "verdict: pass"
+        return "VERDICT: PASS"
+
+    fake_models(reply)
+    spec = "1E@openai/ok, 1E@openai/fail, 1E@openai/mumble, 1V@anthropic/v(quorum=2), 1M"
+    with pytest.raises(QuorumError) as raised:
+        build_graph(spec)("q")
+    assert str(raised.value) == "quorum not met: 1 passed, 1 failed, 1 unreadable; 2 required"

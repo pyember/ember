@@ -17,7 +17,7 @@ from ember.llm.fake import Answer, Fail, FakeProvider, Reply
 from ember.llm.ref import ModelRef
 from ember.llm.request import Message, Request, TextPart
 
-ReplyFn = Callable[[str, "str | tuple[Message, ...]"], "str | ErrorKind"]
+ReplyFn = Callable[[str, "str | tuple[Message, ...]"], "str | Reply | ErrorKind"]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -35,9 +35,10 @@ class SentCall:
 class FakeModels:
     """A `FakeProvider` that answers with ``reply(model, prompt)``.
 
-    ``reply`` returns the answer text, or an `ErrorKind` for the call to fail
-    with. Each answer takes ``latency_s``, slept here on the thread that runs
-    the request so that `peak_in_flight` counts requests answered at once.
+    ``reply`` returns the answer text, a whole `Reply` (to set its finish
+    reason, for example), or an `ErrorKind` for the call to fail with. Each
+    answer takes ``latency_s``, slept here on the thread that runs the request
+    so that `peak_in_flight` counts requests answered at once.
     """
 
     def __init__(self, reply: ReplyFn, latency_s: float) -> None:
@@ -69,7 +70,9 @@ class FakeModels:
         finally:
             with self._lock:
                 self._in_flight -= 1
-        return Fail(outcome) if isinstance(outcome, ErrorKind) else Reply(outcome)
+        if isinstance(outcome, ErrorKind):
+            return Fail(outcome)
+        return outcome if isinstance(outcome, Reply) else Reply(outcome)
 
 
 def _sent(model: ModelRef, request: Request) -> SentCall:

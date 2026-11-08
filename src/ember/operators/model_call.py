@@ -52,6 +52,8 @@ class ModelCall(Operator[Prompt, Completion]):
     sampling: Sampling = Sampling()
 
     def __post_init__(self) -> None:
+        if not isinstance(self.model, str | ModelRef):
+            raise TypeError(f"ModelCall model must be a str or ModelRef, got {type(self.model)}")
         if isinstance(self.model, str) and not self.model.strip():
             raise ValueError("ModelCall needs a model")
         if self.template is not None:

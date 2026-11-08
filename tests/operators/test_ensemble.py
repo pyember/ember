@@ -119,6 +119,21 @@ def test_construction_rejects_illegal_ensembles() -> None:
         Ensemble((echo,))  # type: ignore[call-arg]  # quorum is required
 
 
+@pytest.mark.parametrize("quorum", [True, 1.0, "1"])
+def test_quorum_must_be_an_int(quorum: object) -> None:
+    with pytest.raises(TypeError, match="quorum must be an int"):
+        Ensemble((echo,), quorum=quorum)  # type: ignore[arg-type]
+
+
+def test_quorum_shortfall_message_counts_and_names_failures() -> None:
+    first = _error(ErrorKind.RATE_LIMITED)
+    with pytest.raises(QuorumError) as raised:
+        Ensemble((Fails(first), echo, Fails(first)), quorum=2)("a")
+    message = str(raised.value)
+    assert message.startswith("quorum not met: 1 succeeded, 2 errored; 2 required; member 0: ")
+    assert "; member 2: " in message
+
+
 def test_replace_cannot_produce_an_invalid_ensemble() -> None:
     ensemble = Ensemble((echo, echo), quorum=2)
     with pytest.raises(ValueError):

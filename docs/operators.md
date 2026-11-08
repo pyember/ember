@@ -153,9 +153,11 @@ for check in Verifier(ModelCall("openai/gpt-5.5"))(candidates):
         print(check.value.answer, check.value.verdict)
 ```
 
-`fold_answer` collapses whitespace and case. `TiePolicy.FIRST_SEEN` lets the tied answer that
-appears first win; `TiePolicy.RAISE` raises `TieError`. A verifier reply that does not end with
-`VERDICT: PASS` or `VERDICT: FAIL` is `Verdict.UNREADABLE`, never a guess.
+`fold_answer` turns runs of whitespace into one space, strips the ends and folds case.
+`TiePolicy.FIRST_SEEN` lets the tied answer that appears first win; `TiePolicy.RAISE` raises
+`TieError`. The last line of a verifier's reply that is not blank must be exactly `VERDICT: PASS` or
+`VERDICT: FAIL`; anything else, including other case or spacing, is `Verdict.UNREADABLE`, never a
+guess.
 
 ## Validation
 

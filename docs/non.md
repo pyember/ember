@@ -27,10 +27,10 @@ print(checked("Why is the sky blue? Two sentences.").text)
 
 | Stage | What it does |
 |-------|--------------|
-| `nE@model` | `n` calls to the model with the question. All E stages run concurrently, and their answers are pooled in stage order. |
+| `nE@model` | `n` calls to the model with the question. All E stages run concurrently, and their usable answers are pooled in stage order. |
 | `1V@model` | Checks each answer with its own call and keeps the ones that pass. |
-| `nJ@model` | `n` judges, each reading the question and every answer. Their answers replace the answers. |
-| `1M` | Majority vote: the answer most calls agree on, compared ignoring case and whitespace. The tied answer seen first wins a tie. |
+| `nJ@model` | `n` judges, each reading the question and every answer. Their usable answers replace the answers. |
+| `1M` | Majority vote: the answer most calls agree on, compared after `fold_answer` (runs of whitespace become one space, the ends are stripped, and case is folded). The tied answer seen first wins a tie. |
 
 Stages come in this order: one or more E stages, at most one V stage, then J and M stages ending in
 `1J` or `1M`. Those two leave a single answer, so neither appears before the end. V and M have
@@ -46,7 +46,8 @@ E, J and V stages take parameters in parentheses:
 | Parameter | Type | Meaning |
 |-----------|------|---------|
 | `temperature`, `top_p` | number | Sampling settings, range-checked. |
-| `max_output_tokens`, `seed` | whole number | Per call. |
+| `max_output_tokens` | whole number | Per call. |
+| `seed` | whole number | E and J give member `i` the seed `seed + i`, so no two calls are identical. |
 | `reasoning_effort` | word | For models that support it. |
 | `system` | word or `"quoted string"` | System instructions. Escapes are `\"` and `\\`. |
 | `quorum` | whole number | E and J: calls that must succeed (default all). V: answers that must pass (default 1). |
@@ -62,9 +63,13 @@ tolerant = build_graph(
 print(tolerant("Largest planet?").text)
 ```
 
-A stage whose successes fall short of its quorum raises `QuorumError`. Rate limits, overload,
-server and transport errors count as failed calls; any other error, such as a bad key or an unknown
-model, raises at once.
+Only an answer whose call finished normally is usable. A refusal, a filtered reply, a reply cut off
+at `max_output_tokens`, or a reply that asked for a tool stays in the stage's record but never
+becomes a candidate, and it counts against the stage's quorum. A stage with fewer usable (for V,
+passing) answers than its quorum raises `QuorumError`, whose message counts what each call did, for
+example `quorum not met: 1 usable, 2 unusable (content_filter); 2 required`. Rate limits, overload,
+server and transport errors and cancellations count as failed calls; any other error, such as a bad
+key, an exhausted quota or an unknown model, raises at once.
 
 ## What a run returns
 
@@ -95,8 +100,10 @@ for spec in ("0E@openai/gpt-5.5, 1M", "3E@openai/gpt-5.5(seed=1.5), 1M", "3E@gpt
         print(error.column, error.reason)
 ```
 
-Counts below 1, unknown or duplicate parameters, values of the wrong type, model ids without a
-provider and stages out of order are all rejected before anything is sent.
+Counts below 1, unknown or duplicate parameters, values of the wrong type or out of range, model ids
+without a provider and stages out of order are all rejected when the graph is built. When it runs,
+every stage's model and settings are checked first, so an unknown model or a setting a model does not
+accept in any stage raises before the first request is sent.
 
 ## Planning
 

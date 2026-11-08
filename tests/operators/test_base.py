@@ -117,6 +117,64 @@ def test_validation_models_must_forbid_extra_keys() -> None:
             output_model = dict  # type: ignore[assignment]
 
 
+class LaxInner(pydantic.BaseModel):
+    n: int
+
+
+class StrictInner(pydantic.BaseModel):
+    model_config = pydantic.ConfigDict(extra="forbid")
+    n: int
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [LaxInner, list[LaxInner], LaxInner | None, dict[str, tuple[int, LaxInner]]],
+    ids=["direct", "list", "optional", "nested-containers"],
+)
+def test_nested_models_must_forbid_extra_keys_too(annotation: object) -> None:
+    outer = pydantic.create_model(
+        "Outer",
+        __config__=pydantic.ConfigDict(extra="forbid"),
+        inner=(annotation, ...),
+    )
+    with pytest.raises(TypeError, match="LaxInner must set"):
+
+        @dataclasses.dataclass(frozen=True, slots=True)
+        class UsesOuter(Operator[object, int]):
+            input_model = outer
+
+
+def test_strict_nested_models_and_self_references_are_accepted() -> None:
+    class Tree(pydantic.BaseModel):
+        model_config = pydantic.ConfigDict(extra="forbid")
+        inner: list[StrictInner]
+        children: "list[Tree]" = []
+
+    @dataclasses.dataclass(frozen=True, slots=True)
+    class UsesTree(Operator[Tree, int]):
+        input_model = Tree
+
+        def forward(self, input: Tree) -> int:
+            return len(input.inner)
+
+    assert UsesTree()({"inner": [{"n": 1}], "children": []}) == 1  # type: ignore[arg-type]
+    with pytest.raises(pydantic.ValidationError):
+        UsesTree()({"inner": [{"n": 1, "secret": 2}]})  # type: ignore[arg-type]
+
+
+def test_an_incompletely_defined_model_fails_when_the_class_is_defined() -> None:
+    class Pending(pydantic.BaseModel):
+        model_config = pydantic.ConfigDict(extra="forbid")
+        doc: "OnlyImportedForTypeChecking"  # type: ignore[name-defined]  # noqa: F821
+
+    assert Pending.__pydantic_complete__ is False
+    with pytest.raises(TypeError, match="Pending is not fully defined"):
+
+        @dataclasses.dataclass(frozen=True, slots=True)
+        class UsesPending(Operator[Pending, int]):
+            input_model = Pending
+
+
 def test_nothing_is_inferred_from_parameter_names_or_annotations() -> None:
     @dataclasses.dataclass(frozen=True, slots=True)
     class Annotated(Operator[Req, object]):
@@ -137,6 +195,12 @@ def test_op_builds_an_immutable_operator_at_decoration() -> None:
     assert shout("hi") == "HI"
     with pytest.raises(dataclasses.FrozenInstanceError):
         shout.fn = str.lower  # type: ignore[misc]
+
+
+@pytest.mark.parametrize("fn", [42, "upper", None])
+def test_a_function_operator_needs_a_callable(fn: object) -> None:
+    with pytest.raises(TypeError, match="callable"):
+        FunctionOperator(fn)  # type: ignore[arg-type]
 
 
 def test_op_rejects_functions_that_cannot_take_exactly_one_argument() -> None:

@@ -13,13 +13,11 @@ import dataclasses
 import decimal
 
 from ember.llm.catalog import Catalog
-from ember.llm.result import Money
+from ember.llm.result import Money, Usage
 from ember.llm.spec import ModelSpec, Rates
 from ember.non.grammar import ModelStage, Role, Stage, VoteStage
 
 __all__ = ["Plan", "StagePlan", "plan"]
-
-_PER_MILLION = decimal.Decimal(1_000_000)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -133,8 +131,12 @@ def _model_stage_plan(stage: ModelStage, calls: int, spec: ModelSpec | None) -> 
 
 
 def _output_cost_bound(rates: Rates, tokens: int) -> Money:
-    """Prices ``tokens`` output tokens at the highest output rate of any tier."""
-    per_million = rates.output
-    if rates.long_context is not None:
-        per_million = max(per_million, rates.long_context.rates.output)
-    return Money.from_dollars(tokens * per_million / _PER_MILLION)
+    """Prices ``tokens`` output tokens at every rate tier, rounded up, and keeps the most."""
+    tiers = [rates] if rates.long_context is None else [rates, rates.long_context.rates]
+    costs: list[Money] = []
+    for tier in tiers:
+        cost = tier.cost(Usage(output=tokens), rounding=decimal.ROUND_CEILING)
+        if cost is None:
+            raise AssertionError("output-only usage has no cache tokens, so it always has a price")
+        costs.append(cost)
+    return max(costs)

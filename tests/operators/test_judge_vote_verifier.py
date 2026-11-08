@@ -68,6 +68,12 @@ def test_ties_follow_the_declared_policy() -> None:
     assert str(raised.value) == "majority vote tied: 2 answers have 2 votes each"
 
 
+def test_a_one_vote_tie_says_vote_not_votes() -> None:
+    with pytest.raises(TieError) as raised:
+        MajorityVote(normalize=str, tie=TiePolicy.RAISE)(Candidates("q", ("a", "b")))
+    assert str(raised.value) == "majority vote tied: 2 answers have 1 vote each"
+
+
 def test_vote_has_no_default_policy() -> None:
     with pytest.raises(TypeError):
         MajorityVote()  # type: ignore[call-arg]
@@ -77,14 +83,19 @@ def test_vote_has_no_default_policy() -> None:
     ("text", "verdict"),
     [
         ("Looks right.\nVERDICT: PASS", Verdict.PASS),
-        ("wrong year\n\nverdict: fail\n\n", Verdict.FAIL),
-        ("VERDICT:PASS", Verdict.PASS),
+        ("Wrong year.\nVERDICT: FAIL\n\n", Verdict.FAIL),
+        ("wrong year\n\nverdict: fail\n\n", Verdict.UNREADABLE),
+        ("VERDICT:PASS", Verdict.UNREADABLE),
+        ("VERDICT:  PASS", Verdict.UNREADABLE),
+        ("  VERDICT: PASS", Verdict.UNREADABLE),
+        ("VERDICT: PASS ", Verdict.UNREADABLE),
+        ("Verdict: Pass", Verdict.UNREADABLE),
         ("VERDICT: PASS, mostly", Verdict.UNREADABLE),
         ("VERDICT: PASS\nbut actually not", Verdict.UNREADABLE),
         ("", Verdict.UNREADABLE),
     ],
 )
-def test_verdicts_are_read_from_the_last_line_only(text: str, verdict: Verdict) -> None:
+def test_the_last_line_must_be_exactly_a_verdict(text: str, verdict: Verdict) -> None:
     assert read_verdict(text) is verdict
 
 

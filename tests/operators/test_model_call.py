@@ -76,6 +76,12 @@ def test_there_is_no_default_model() -> None:
         ModelCall("  ")
 
 
+@pytest.mark.parametrize("model", [None, 123, b"openai/gpt-5.5"])
+def test_the_model_must_be_a_string_or_a_model_ref(model: object) -> None:
+    with pytest.raises(TypeError, match="str or ModelRef"):
+        ModelCall(model)  # type: ignore[arg-type]
+
+
 @pytest.mark.parametrize(
     ("template", "found"),
     [

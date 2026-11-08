@@ -1,15 +1,15 @@
 """`Verifier`: a model checks each candidate answer against the question.
 
 Every answer is checked by its own call, and the calls run concurrently. The
-model is asked to end its reply with ``VERDICT: PASS`` or ``VERDICT: FAIL``;
-a reply that ends any other way is recorded as `Verdict.UNREADABLE`, never
-guessed.
+model is asked to end its reply with a line that reads exactly
+``VERDICT: PASS`` or ``VERDICT: FAIL``. The last line that is not blank must
+match one of them character for character; anything else, including other
+case or spacing, is `Verdict.UNREADABLE`, never guessed.
 """
 
 import dataclasses
 import enum
 import functools
-import re
 
 from ember.llm.result import Result
 from ember.operators.base import Operator
@@ -24,8 +24,6 @@ VERIFY_INSTRUCTIONS = (
     "Explain briefly, then end with a line that reads exactly VERDICT: PASS or VERDICT: FAIL."
 )
 
-_VERDICT_LINE = re.compile(r"verdict:\s*(pass|fail)", re.IGNORECASE)
-
 
 class Verdict(enum.Enum):
     """What the verifying model concluded about one answer."""
@@ -33,6 +31,9 @@ class Verdict(enum.Enum):
     PASS = "pass"
     FAIL = "fail"
     UNREADABLE = "unreadable"
+
+
+_VERDICTS = {"VERDICT: PASS": Verdict.PASS, "VERDICT: FAIL": Verdict.FAIL}
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -80,9 +81,6 @@ class Verifier(Operator[Candidates, tuple[Outcome[Check], ...]]):
 
 
 def read_verdict(text: str) -> Verdict:
-    """Reads the verdict from the last non-empty line of ``text``."""
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    match = _VERDICT_LINE.fullmatch(lines[-1]) if lines else None
-    if match is None:
-        return Verdict.UNREADABLE
-    return Verdict.PASS if match.group(1).casefold() == "pass" else Verdict.FAIL
+    """Reads the verdict from the last line of ``text`` that is not blank."""
+    lines = [line for line in text.splitlines() if line.strip()]
+    return _VERDICTS.get(lines[-1], Verdict.UNREADABLE) if lines else Verdict.UNREADABLE

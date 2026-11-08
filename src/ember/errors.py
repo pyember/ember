@@ -133,11 +133,20 @@ class NonSyntaxError(EmberError, ValueError):
 
 
 class QuorumError(EmberError):
-    """Fewer members of a composition succeeded than its quorum requires.
+    """Fewer members of a composition counted than its quorum requires.
+
+    A member counts when it succeeded and, where the composition asks more of
+    an answer (a usable finish, a passing verdict), its answer qualified. The
+    message counts each outcome and names each failed member's error; it never
+    contains model output.
 
     Attributes:
-        required: Successes the quorum requires.
-        succeeded: Successes that arrived.
+        required: Members that must count.
+        succeeded: Members that counted.
+        counted_as: The word for counting in the message, such as
+            ``"succeeded"``, ``"usable"`` or ``"passed"``.
+        rejected: ``(member index, reason)`` for each member that answered but
+            did not count, such as ``"unusable (content_filter)"``.
         failures: ``(member index, error)`` for each member whose call failed.
     """
 
@@ -147,13 +156,22 @@ class QuorumError(EmberError):
         required: int,
         succeeded: int,
         failures: tuple[tuple[int, EmberError], ...],
+        rejected: tuple[tuple[int, str], ...] = (),
+        counted_as: str = "succeeded",
     ) -> None:
         self.required = required
         self.succeeded = succeeded
+        self.counted_as = counted_as
+        self.rejected = rejected
         self.failures = failures
-        reasons = "; ".join(f"member {index}: {error}" for index, error in failures)
-        message = f"quorum not met: {succeeded} succeeded, {required} required"
-        super().__init__(f"{message}; {reasons}" if reasons else message)
+        counts = [f"{succeeded} {counted_as}"]
+        reasons = [reason for _, reason in rejected]
+        counts += [f"{reasons.count(reason)} {reason}" for reason in dict.fromkeys(reasons)]
+        if failures:
+            counts.append(f"{len(failures)} errored")
+        parts = [f"quorum not met: {', '.join(counts)}", f"{required} required"]
+        parts += [f"member {index}: {error}" for index, error in failures]
+        super().__init__("; ".join(parts))
 
 
 class TieError(EmberError):
@@ -170,4 +188,5 @@ class TieError(EmberError):
     def __init__(self, tied: tuple[str, ...], votes: int) -> None:
         self.tied = tied
         self.votes = votes
-        super().__init__(f"majority vote tied: {len(tied)} answers have {votes} votes each")
+        noun = "vote" if votes == 1 else "votes"
+        super().__init__(f"majority vote tied: {len(tied)} answers have {votes} {noun} each")

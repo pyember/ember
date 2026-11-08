@@ -30,6 +30,7 @@ Example:
 import dataclasses
 import inspect
 import itertools
+import typing
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
@@ -63,11 +64,34 @@ def _require_boundary_model(cls: type, name: str, model: object) -> None:
 
     if not (isinstance(model, type) and issubclass(model, pydantic.BaseModel)):
         raise TypeError(f"{cls.__qualname__}.{name} must be a pydantic model class")
-    if model.model_config.get("extra") != "forbid":
-        raise TypeError(
-            f"{cls.__qualname__}.{name}: {model.__qualname__} must set "
-            "model_config = ConfigDict(extra='forbid')"
-        )
+    for nested in _models_reachable_from(model):
+        where = f"{cls.__qualname__}.{name}: {nested.__qualname__}"
+        if not nested.__pydantic_complete__:
+            raise TypeError(
+                f"{where} is not fully defined; define or import every type it names "
+                "and call model_rebuild() before using it"
+            )
+        if nested.model_config.get("extra") != "forbid":
+            raise TypeError(f"{where} must set model_config = ConfigDict(extra='forbid')")
+
+
+def _models_reachable_from(model: "type[BaseModel]") -> "list[type[BaseModel]]":
+    """``model`` and every model its fields name, inside containers and unions too."""
+    import pydantic
+
+    found: list[type[pydantic.BaseModel]] = []
+    pending: list[object] = [model]
+    while pending:
+        annotation = pending.pop()
+        if inspect.isclass(annotation) and issubclass(annotation, pydantic.BaseModel):
+            if annotation in found:
+                continue
+            found.append(annotation)
+            if annotation.__pydantic_complete__:
+                pending.extend(field.annotation for field in annotation.model_fields.values())
+        else:
+            pending.extend(typing.get_args(annotation))
+    return found
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -174,6 +198,10 @@ class FunctionOperator(Operator[In, Out]):
     """
 
     fn: Callable[[In], Out]
+
+    def __post_init__(self) -> None:
+        if not callable(self.fn):
+            raise TypeError(f"FunctionOperator needs a callable, got {type(self.fn).__name__}")
 
     def forward(self, input: In) -> Out:
         return self.fn(input)

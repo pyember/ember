@@ -98,6 +98,8 @@ class Ensemble(Operator[In, tuple[Outcome[Out], ...]]):
         for index, member in enumerate(self.members):
             if not isinstance(member, Operator):
                 raise TypeError(f"Ensemble member {index} is not an Operator; wrap it with @op")
+        if isinstance(self.quorum, bool) or not isinstance(self.quorum, int):
+            raise TypeError(f"quorum must be an int, got {type(self.quorum).__name__}")
         if not 1 <= self.quorum <= len(self.members):
             raise ValueError(f"quorum must be between 1 and {len(self.members)}, got {self.quorum}")
 
