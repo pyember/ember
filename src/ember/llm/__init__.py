@@ -5,6 +5,7 @@ from ember.llm.ref import ModelRef
 from ember.llm.request import (
     ImagePart,
     Message,
+    ReasoningPart,
     Request,
     Sampling,
     TextPart,
@@ -39,6 +40,7 @@ __all__ = [
     "Money",
     "Rates",
     "ReasoningDelta",
+    "ReasoningPart",
     "Request",
     "Result",
     "Sampling",

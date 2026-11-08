@@ -147,8 +147,11 @@ def image_url(part: ImagePart) -> str:
 
 
 def _assistant(message: Message) -> JsonValue:
-    """Encodes an assistant turn. Chat Completions has no way to replay
-    reasoning, so `ReasoningPart`s are left out."""
+    """Encodes an assistant turn.
+
+    Chat Completions has no way to replay reasoning, so `ReasoningPart`s are
+    left out.
+    """
     texts = [part.text for part in message.parts if isinstance(part, TextPart)]
     calls = [part for part in message.parts if isinstance(part, ToolCallPart)]
     encoded: dict[str, JsonValue] = {"role": "assistant"}
