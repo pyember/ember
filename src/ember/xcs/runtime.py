@@ -10,6 +10,9 @@
 - `deferred()` to decide where a failed call raises: at the call site when
   it returns False, at the first read of its result when it returns True.
 
+The limiter keeps the acquirers waiting for capacity in a `WaitQueue`, which
+decides who gets each freed slot.
+
 Tasks given to `dispatch` and `dispatch_stream` are leaf network I/O: they
 never call back into ember and never wait on other ember work, so worker
 threads cannot deadlock on each other.
@@ -18,11 +21,12 @@ Until the scheduler lands, everything runs synchronously on the caller's
 thread, which is the behaviour outside `@xcs.jit` and `xcs.map` anyway.
 """
 
+import collections
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
-from typing import TypeVar
+from typing import Generic, TypeVar
 
-__all__ = ["deferred", "dispatch", "dispatch_stream", "wait"]
+__all__ = ["WaitQueue", "deferred", "dispatch", "dispatch_stream", "wait"]
 
 T = TypeVar("T")
 
@@ -74,3 +78,31 @@ def deferred() -> bool:
 def wait(future: "Future[T]") -> T:
     """Returns the result of ``future``, raising its exception unchanged."""
     return future.result()
+
+
+class WaitQueue(Generic[T]):
+    """Acquirers waiting for a shared capacity, such as a provider's permits.
+
+    The scheduler decides who gets each freed slot. Until it lands, slots go
+    in arrival order. Not thread-safe: the owner calls it under its own lock.
+    """
+
+    def __init__(self) -> None:
+        self._items: collections.deque[T] = collections.deque()
+
+    def push(self, item: T) -> None:
+        """Adds ``item``, for the request the caller sends next."""
+        self._items.append(item)
+
+    def pop(self) -> T:
+        """Removes and returns the item that gets the freed slot.
+
+        Raises:
+            IndexError: The queue is empty.
+        """
+        if not self._items:
+            raise IndexError("pop from an empty WaitQueue")
+        return self._items.popleft()
+
+    def __len__(self) -> int:
+        return len(self._items)
