@@ -1,61 +1,38 @@
-"""Critical-path planning: who gets a freed slot when requests wait for capacity."""
+"""Critical-path planning: who gets a freed slot when requests wait for capacity.
+
+The limiter is `ember.llm.limiter.Limiter`, which keeps its waiters in a
+`runtime.WaitQueue`; the calls take and release permits as the client does.
+"""
 
 import threading
 import time
 from collections.abc import Callable
-from concurrent.futures import Future
 
 import pytest
 
 from ember import xcs
+from ember.llm.limiter import Limiter
 from ember.xcs import runtime
 
 
-class Limiter:
-    """A fixed-capacity limiter that keeps its waiters in a `runtime.WaitQueue`.
+def limited_call(capacity: int, latency_s: Callable[[str], float]) -> Callable[[str], str]:
+    """A model call shaped like the client's, through ember's own limiter.
 
-    It releases inside the dispatched task, as the client does, so a freed slot
-    is granted before the task's reader wakes.
+    It waits for a permit with `runtime.wait`, dispatches, and releases the
+    permit inside the task, so a freed slot is granted before the reader
+    wakes. No outcome is recorded, so the limit stays at ``capacity``.
     """
-
-    def __init__(self, capacity: int) -> None:
-        self._lock = threading.Lock()
-        self._free = capacity
-        self._waiters: runtime.WaitQueue[Future[None]] = runtime.WaitQueue()
-
-    def acquire(self) -> "Future[None]":
-        permit: Future[None] = Future()
-        with self._lock:
-            granted = self._free > 0
-            if granted:
-                self._free -= 1
-            else:
-                self._waiters.push(permit)
-        if granted:
-            permit.set_result(None)
-        return permit
-
-    def release(self) -> None:
-        with self._lock:
-            if not self._waiters:
-                self._free += 1
-                return
-            permit = self._waiters.pop()
-        permit.set_result(None)
-
-
-def limited_call(limiter: Limiter, latency_s: Callable[[str], float]) -> Callable[[str], str]:
-    """A model call shaped like the client's: permit, then dispatch, released in the task."""
+    limiter = Limiter()
 
     def call(prompt: str) -> str:
-        runtime.wait(limiter.acquire())
+        permit = runtime.wait(limiter.acquire("fake", cap=capacity))
 
         def task() -> str:
             try:
                 time.sleep(latency_s(prompt))
                 return prompt
             finally:
-                limiter.release()
+                permit.release()
 
         return runtime.wait(runtime.dispatch(task, label="limited"))
 
@@ -132,7 +109,7 @@ def test_jit_calls_get_slots_in_arrival_order() -> None:
 
 def test_a_limiter_using_the_queue_grants_slots_by_predicted_remaining_path() -> None:
     durations = {"first": 0.02, "short": 0.01, "long": 0.08, "middle": 0.04}
-    call = limited_call(Limiter(capacity=1), durations.__getitem__)
+    call = limited_call(1, durations.__getitem__)
     granted: list[str] = []
 
     def item(name: str) -> None:
@@ -153,7 +130,7 @@ def test_a_limiter_using_the_queue_grants_slots_by_predicted_remaining_path() ->
 @pytest.mark.slow
 def test_planning_shortens_the_makespan_under_a_capacity_limit() -> None:
     latency_s = 0.15
-    call = limited_call(Limiter(capacity=2), lambda _: latency_s)
+    call = limited_call(2, lambda _: latency_s)
     singles, chain = 8, 4
 
     def item(i: int) -> str:
