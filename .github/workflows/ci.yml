@@ -67,3 +67,5 @@ jobs:
           uv pip install --python /tmp/clean/bin/python dist/*.whl
           cd /tmp
           HOME=/tmp/empty-home /tmp/clean/bin/python -c "import ember, sys; print(ember.__version__); sys.exit(0)"
+          # The model catalog is package data: fail if the wheel lacks it.
+          HOME=/tmp/empty-home /tmp/clean/bin/python -c "from ember.llm import catalog; spec = catalog.default().resolve('gpt-5.5'); assert spec.known and spec.rates is not None; print(spec.ref, spec.wire_id)"

@@ -6,6 +6,8 @@ Configuration is read the first time a model call needs it.
 
 import importlib.metadata
 
-__all__ = ["__version__"]
+from ember.llm.api import models
+
+__all__ = ["__version__", "models"]
 
 __version__ = importlib.metadata.version("ember-ai")

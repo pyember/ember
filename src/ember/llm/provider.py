@@ -12,6 +12,7 @@ from typing import Protocol, TypeAlias
 from ember.llm.request import Message, Request
 from ember.llm.result import (
     FinishReason,
+    Money,
     ReasoningDelta,
     TextDelta,
     ToolCall,
@@ -38,6 +39,9 @@ class Decoded:
         message: The assistant turn as the provider produced it, reasoning
             state included; a single empty `TextPart` when it produced
             nothing. `text`, `reasoning` and `tool_calls` are derived from it.
+        cost: What the provider billed for the request, when its response
+            says so. The client prefers it to a cost computed from the
+            catalog's rates.
     """
 
     text: str
@@ -47,6 +51,7 @@ class Decoded:
     usage: Usage
     request_id: str | None
     message: Message
+    cost: Money | None = None
 
 
 StreamItem: TypeAlias = TextDelta | ReasoningDelta | ToolCallDelta | UsageEvent | Decoded

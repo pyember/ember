@@ -57,7 +57,8 @@ class ModelError(EmberError):
 
     Attributes:
         kind: Why the call failed.
-        provider: Provider name, for example ``"openai"``.
+        provider: Provider name, for example ``"openai"``; empty when the
+            caller named no provider, as with an unknown bare model name.
         model: Model name as the caller wrote it.
         reason: Short human-readable explanation written by ember.
         status: HTTP status code, when the failure came from an HTTP response.
@@ -101,7 +102,8 @@ class ModelError(EmberError):
         return self.before_first_byte and self.kind in _RETRYABLE_KINDS
 
     def _render(self) -> str:
-        parts = [f"{self.kind.value}: {self.reason}", f"model={self.provider}/{self.model}"]
+        name = f"{self.provider}/{self.model}" if self.provider else self.model
+        parts = [f"{self.kind.value}: {self.reason}", f"model={name}"]
         if self.status is not None:
             parts.append(f"status={self.status}")
         if self.request_id is not None:

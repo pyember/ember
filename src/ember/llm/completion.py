@@ -9,6 +9,7 @@ finished by the time the caller sees the `Completion`.
 from concurrent.futures import Future
 
 from ember.llm.ref import ModelRef
+from ember.llm.request import Message
 from ember.llm.result import FinishReason, Money, Result, ToolCall, Usage
 from ember.xcs import runtime
 
@@ -52,6 +53,11 @@ class Completion:
     def reasoning(self) -> str:
         """Reasoning summary text, if the provider returned one."""
         return self.result().reasoning
+
+    @property
+    def message(self) -> Message:
+        """The assistant turn to append to the conversation to continue it."""
+        return self.result().message
 
     @property
     def tool_calls(self) -> tuple[ToolCall, ...]:
