@@ -70,7 +70,7 @@ def test_every_item_starts_before_any_item_continues_past_a_wait() -> None:
     def item(i: int) -> int:
         log.append((i, "start"))
         time.sleep(0.01)
-        runtime.wait(runtime.dispatch(lambda: None, label="instant"))
+        runtime.wait(runtime.dispatch(lambda: time.sleep(0.02), label="short"))
         log.append((i, "resumed"))
         return i
 
@@ -112,7 +112,7 @@ def test_items_already_started_finish_before_the_error_is_raised() -> None:
     finished: list[int] = []
 
     def item(i: int) -> int:
-        runtime.wait(runtime.dispatch(lambda: time.sleep(0.05 * i), label="sleep"))
+        runtime.wait(runtime.dispatch(lambda: time.sleep(0.02 + 0.05 * i), label="sleep"))
         if i == 0:
             raise ValueError("item 0")
         finished.append(i)
@@ -125,12 +125,14 @@ def test_items_already_started_finish_before_the_error_is_raised() -> None:
 
 def test_the_earliest_failed_item_wins_whatever_order_they_fail_in() -> None:
     def item(i: int) -> int:
-        runtime.wait(runtime.dispatch(lambda: time.sleep(0.1 if i == 0 else 0.0), label="s"))
+        runtime.wait(runtime.dispatch(lambda: time.sleep(0.2 if i == 0 else 0.05), label="s"))
         raise ValueError(f"item {i}")
 
     with pytest.raises(ValueError, match="item 0") as raised:
         xcs.map(item, range(3))
-    assert any("2 other results also failed" in note for note in raised.value.__notes__)
+    assert raised.value.__notes__ == [
+        "2 other items also raised: ValueError: item 1; ValueError: item 2"
+    ]
 
 
 def test_nested_maps_cannot_deadlock() -> None:

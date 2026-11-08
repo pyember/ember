@@ -4,9 +4,10 @@ A `Strand` is the scheduler's record of one greenlet: the frame it runs in,
 the calls whose results it has read, and its position in the program. The
 running greenlet finds its strand through a contextvar. Every greenlet gets
 its own copy of its spawner's context, so the lookup also checks that the
-strand belongs to the running greenlet: code on another thread or in a
-greenlet ember did not start is outside the scope, even if it copied the
-context.
+strand belongs to the running greenlet and that its scope is still open: code
+on another thread, in a greenlet ember did not start, or running after the
+scope ended (an asyncio callback scheduled inside it, say) is outside the
+scope, even if it copied the context.
 """
 
 import contextlib
@@ -112,7 +113,7 @@ class Strand:
 def current() -> Strand | None:
     """The running greenlet's strand, or ``None`` outside any scope."""
     strand = _CURRENT.get()
-    if strand is None or strand.greenlet is not greenlet.getcurrent():
+    if strand is None or strand.scheduler.closed or strand.greenlet is not greenlet.getcurrent():
         return None
     return strand
 

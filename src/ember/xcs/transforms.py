@@ -88,6 +88,8 @@ class Jitted(Generic[P, R]):
         return types.MethodType(self, instance)
 
     def _remember(self, frame: Frame) -> None:
+        if not frame.settled:
+            return  # Stopped before its calls finished: keep the previous graph.
         graph = frame.graph()
         plan = frame.next_plan(graph) if frame.parent is None else None
         with self._lock:
@@ -139,12 +141,12 @@ def _run_to_boundary(strand: strands.Strand, body: Callable[[], R]) -> R:
     try:
         result = body()
     except Exception as error:
-        _note_failures(error, _settle(strand, frame))
+        _note_unread(error, _settle(strand, frame))
         raise
     failures = _settle(strand, frame)
     if failures:
         first, *others = failures
-        _note_failures(first, others)
+        _note_unread(first, others)
         raise first
     return result
 
@@ -154,16 +156,34 @@ def _settle(strand: strands.Strand, frame: Frame) -> list[BaseException]:
     while position < len(frame.pending):
         strand.wait(frame.pending[position])
         position += 1
+    frame.settled = True
     return frame.take_unread_failures()
 
 
-def _note_failures(error: BaseException, others: list[BaseException]) -> None:
-    if not others:
+def _note_unread(error: BaseException, others: list[BaseException]) -> None:
+    _note_others(
+        error,
+        others,
+        one="1 other result also failed and was never read",
+        many="{} other results also failed and were never read",
+    )
+
+
+def _note_others(error: BaseException, others: list[BaseException], *, one: str, many: str) -> None:
+    """Notes on ``error`` the distinct failures in ``others``, showing a few."""
+    distinct: list[BaseException] = []
+    for other in others:
+        if other is not error and not any(other is seen for seen in distinct):
+            distinct.append(other)
+    if not distinct:
         return
-    shown = "; ".join(f"{type(other).__name__}: {other}" for other in others[:_MAX_NOTED_FAILURES])
-    hidden = len(others) - _MAX_NOTED_FAILURES
+    shown = "; ".join(
+        f"{type(other).__name__}: {other}" for other in distinct[:_MAX_NOTED_FAILURES]
+    )
+    hidden = len(distinct) - _MAX_NOTED_FAILURES
     more = f" and {hidden} more" if hidden > 0 else ""
-    error.add_note(f"{len(others)} other results also failed and were never read: {shown}{more}")
+    lead = one if len(distinct) == 1 else many.format(len(distinct))
+    error.add_note(f"{lead}: {shown}{more}")
 
 
 class _MapRun:
@@ -215,7 +235,9 @@ def _map_in(strand: strands.Strand, fn: Callable[[T], R], items: list[T]) -> lis
     errors = [error for outcome in outcomes if (error := outcome.exception()) is not None]
     if errors:
         first, *others = errors
-        _note_failures(first, others)
+        _note_others(
+            first, others, one="1 other item also raised", many="{} other items also raised"
+        )
         raise first
     return [outcome.result() for outcome in outcomes]
 

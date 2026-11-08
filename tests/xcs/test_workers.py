@@ -67,3 +67,26 @@ def test_a_forked_child_gets_a_fresh_pool() -> None:
         os._exit(status)
     _, status = os.waitpid(child, 0)
     assert os.waitstatus_to_exitcode(status) == 0
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="os.fork is POSIX only")
+def test_a_child_forked_inside_a_scope_fails_at_its_first_wait() -> None:
+    @xcs.jit
+    def program() -> int:
+        pending = runtime.dispatch(lambda: (time.sleep(0.2), 7)[1], label="in flight")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            child = os.fork()
+        if child == 0:
+            signal.alarm(10)
+            try:
+                runtime.wait(pending)
+            except RuntimeError:
+                os._exit(0)
+            os._exit(1)
+        assert runtime.wait(pending) == 7
+        return child
+
+    child = program()
+    _, status = os.waitpid(child, 0)
+    assert os.waitstatus_to_exitcode(status) == 0

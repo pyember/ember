@@ -27,13 +27,14 @@ import contextvars
 import heapq
 import itertools
 import time
+import weakref
 from collections.abc import Callable, Generator, Iterator
 from concurrent.futures import Future
 from typing import Generic, TypeVar
 
 from ember.xcs import strands, workers
 from ember.xcs.frames import Call, Pending
-from ember.xcs.streams import Channel, Ended, Item, Waiting
+from ember.xcs.streams import Channel, Ended, Waiting
 
 __all__ = ["WaitQueue", "deferred", "dispatch", "dispatch_stream", "wait"]
 
@@ -71,7 +72,10 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
     Inside a scope a worker drains ``source`` as items arrive, and waiting for
     the next item lets other greenlets run. An error raised by ``source`` is
     raised by the iterator, unchanged, after the items that preceded it.
-    Closing the iterator early stops the worker after its current item.
+    Closing the iterator, or dropping it, whether or not reading has started,
+    abandons the stream: the worker stops when the next item arrives (until
+    then the enclosing jit boundary waits for it and the request keeps its
+    permit), and a failure the reader did not receive is not raised.
     Outside a scope this returns ``source()`` itself.
 
     Args:
@@ -92,7 +96,7 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
     context = contextvars.copy_context()
     workers.submit(lambda: _drain(call, drained, channel, context, source))
     strand.record(call, drained)
-    return _read(channel, drained)
+    return _Reader(channel, drained)
 
 
 def deferred() -> bool:
@@ -234,21 +238,38 @@ def _pump(channel: Channel[T], source: Callable[[], Iterator[T]]) -> None:
             items.close()
 
 
-def _read(channel: Channel[T], drained: "Pending[None]") -> Iterator[T]:
-    try:
-        while True:
-            step = channel.take()
+class _Reader(Iterator[T]):
+    """Reads one stream's items. Closing or dropping it, before or after
+    reading starts, abandons the stream."""
+
+    def __init__(self, channel: Channel[T], drained: "Pending[None]") -> None:
+        self._channel = channel
+        self._drained = drained
+        self._open = True
+        self._abandon = weakref.finalize(self, _abandon, channel, drained)
+
+    def __next__(self) -> T:
+        while self._open:
+            step = self._channel.take()
             if isinstance(step, Waiting):
                 wait(step.future)
             elif isinstance(step, Ended):
+                self.close()
                 if step.error is not None:
                     raise step.error
-                return
-            elif isinstance(step, Item):
+            else:
                 strand = strands.current()
                 if strand is not None:
-                    strand.absorb(frozenset({drained.call}))
-                yield step.value
-    finally:
-        drained.read = True
-        channel.close()
+                    strand.absorb(frozenset({self._drained.call}))
+                return step.value
+        raise StopIteration
+
+    def close(self) -> None:
+        """Abandons the stream; the worker stops when the next item arrives."""
+        self._open = False
+        self._abandon()
+
+
+def _abandon(channel: Channel[T], drained: "Pending[None]") -> None:
+    drained.read = True
+    channel.close()

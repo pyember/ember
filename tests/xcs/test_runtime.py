@@ -136,18 +136,65 @@ def test_closing_a_stream_early_stops_its_worker() -> None:
     assert len(produced) < 1000
 
 
-def test_an_unread_stream_failure_raises_at_the_jit_boundary() -> None:
+def test_a_stream_kept_but_unread_raises_its_failure_at_the_jit_boundary() -> None:
     def source() -> Iterator[int]:
         yield 1
         raise ProviderDown("unread")
 
+    kept: list[Iterator[int]] = []
+
     @xcs.jit
     def program() -> str:
-        runtime.dispatch_stream(source, label="s")
+        kept.append(runtime.dispatch_stream(source, label="s"))
         return "returned"
 
     with pytest.raises(ProviderDown, match="unread"):
         program()
+
+
+def test_closing_a_stream_before_reading_it_stops_its_worker() -> None:
+    pulled: list[int] = []
+
+    def source() -> Iterator[int]:
+        for i in range(10):
+            pulled.append(i)
+            yield i
+            time.sleep(0.2)
+
+    @xcs.jit
+    def program() -> None:
+        runtime.dispatch_stream(source, label="s").close()  # type: ignore[attr-defined]
+
+    started = time.perf_counter()
+    program()
+    assert time.perf_counter() - started < 0.6
+    assert len(pulled) <= 2
+
+
+@pytest.mark.parametrize("failure_before_drop", [True, False])
+def test_dropping_a_stream_abandons_it_whenever_it_fails(failure_before_drop: bool) -> None:
+    pulled: list[int] = []
+
+    def source() -> Iterator[int]:
+        for i in range(10):
+            pulled.append(i)
+            if i == 1:
+                raise ProviderDown("abandoned")
+            yield i
+            time.sleep(0.0 if failure_before_drop else 0.2)
+
+    @xcs.jit
+    def program() -> str:
+        stream = runtime.dispatch_stream(source, label="s")
+        if failure_before_drop:
+            time.sleep(0.1)
+        del stream
+        return "returned"
+
+    started = time.perf_counter()
+    assert program() == "returned"
+    assert time.perf_counter() - started < 0.6
+    assert len(pulled) <= 2
 
 
 def test_a_stream_returned_from_jit_can_be_read_after_it_returns() -> None:

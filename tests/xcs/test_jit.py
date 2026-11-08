@@ -4,6 +4,7 @@ Model calls go through the oracle's `FakeModel`, which reaches the scheduler
 through `ember.xcs.runtime` exactly as the client does.
 """
 
+import asyncio
 import contextvars
 import gc
 import sys
@@ -145,7 +146,10 @@ def test_an_unread_failure_raises_at_the_boundary_with_its_original_type() -> No
     with pytest.raises(ModelError) as first_read:
         pending[0].result()
     assert first_read.value is raised.value
-    assert any("1 other results also failed" in note for note in raised.value.__notes__)
+    assert raised.value.__notes__ == [
+        "1 other result also failed and was never read: "
+        "ModelError: rate_limited: told to fail model=fake/echo"
+    ]
     assert all(completion.done() for completion in pending)
 
 
@@ -414,3 +418,23 @@ def test_attributes_of_the_function_do_not_replace_jit_methods() -> None:
     assert isinstance(jitted.graph(), xcs.Graph)
     assert jitted.__name__ == "program"
     assert jitted.__wrapped__ is program
+
+
+def test_code_that_runs_after_the_scope_ends_is_outside_it() -> None:
+    seen: list[object] = []
+    captured: list[contextvars.Context] = []
+
+    async def main() -> None:
+        @xcs.jit
+        def handler() -> None:
+            captured.append(contextvars.copy_context())
+            loop = asyncio.get_running_loop()
+            loop.call_soon(lambda: seen.append(runtime.deferred()))
+            loop.call_soon(lambda: seen.append(runtime.dispatch(lambda: 1, label="late").done()))
+
+        handler()
+        await asyncio.sleep(0.05)
+
+    asyncio.run(main())
+    assert seen == [False, True]
+    assert captured[0].run(runtime.deferred) is False

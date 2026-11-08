@@ -100,6 +100,9 @@ class Frame:
         self.calls: list[Call] = []
         # Results of every type the frame's code produced: user data.
         self.pending: list[Pending[Any]] = []
+        self.settled = False
+        """Whether the boundary waited for every pending result; only then is
+        there a complete graph to record."""
 
     def chain(self) -> Iterator["Frame"]:
         """This frame and its enclosing frames, innermost first."""

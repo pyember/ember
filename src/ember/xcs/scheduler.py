@@ -26,6 +26,7 @@ straight to the greenlet that started it the first time it parks.
 """
 
 import contextvars
+import os
 import queue
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -46,6 +47,7 @@ class Scheduler:
     """
 
     def __init__(self) -> None:
+        self._pid = os.getpid()
         self._owner = greenlet.getcurrent()
         self._ready: queue.SimpleQueue[tuple[greenlet.greenlet, object]] = queue.SimpleQueue()
         # Results of every type the scope's code waits on: user data.
@@ -54,6 +56,12 @@ class Scheduler:
         self._children: set[greenlet.greenlet] = set()
         self._starting: set[greenlet.greenlet] = set()
         self._closing = False
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        """Whether the scope has ended; nothing may run on this scheduler after it."""
+        return self._closed
 
     def park(self, future: "Future[T]") -> None:
         """Suspends the running greenlet until ``future`` is done.
@@ -62,9 +70,15 @@ class Scheduler:
         An exception thrown into the greenlet while it is parked (an
         interrupt, or `stop`) is raised here, and the future's later wake is
         dropped.
+
+        Raises:
+            RuntimeError: The process forked inside the scope. The parent's
+                workers do not exist in the child, so nothing would wake it.
         """
         if future.done():
             return
+        if os.getpid() != self._pid:
+            raise RuntimeError("a jit or map scope cannot wait in a process forked inside it")
         current = greenlet.getcurrent()
         token = object()
         self._parked[current] = (token, future)
@@ -111,6 +125,7 @@ class Scheduler:
         Greenlets still suspended (possible only after an interrupt) are ended
         with `stop`.
         """
+        self._closed = True
         for child in list(self._children):
             self.stop(child)
         if self._hub is not None and not self._hub.dead:
