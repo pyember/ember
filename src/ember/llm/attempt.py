@@ -33,7 +33,13 @@ from ember.llm.request import Request
 from ember.llm.result import Done, Event, Money, Result
 from ember.llm.spec import ModelSpec
 
-__all__ = ["PRICE_NEUTRAL_EXTENSIONS", "Call", "cost_of", "list_price_applies", "retry_delay"]
+__all__ = [
+    "PRICE_NEUTRAL_EXTENSIONS",
+    "Call",
+    "cost_of",
+    "extensions_keep_list_price",
+    "retry_delay",
+]
 
 # Bounds 2**n so a very large attempt count cannot overflow a float.
 _MAX_DOUBLINGS = 62
@@ -84,22 +90,29 @@ PRICE_NEUTRAL_EXTENSIONS: frozenset[str] = frozenset(
 )
 
 
-def list_price_applies(request: Request) -> bool:
-    """Whether the catalog's rates price ``request``: no extension changes the price."""
+def extensions_keep_list_price(request: Request) -> bool:
+    """Whether no extension on ``request`` may change what the provider charges."""
     return request.extensions.keys() <= PRICE_NEUTRAL_EXTENSIONS
 
 
-def cost_of(spec: ModelSpec, request: Request, decoded: Decoded) -> Money | None:
+def cost_of(spec: ModelSpec, decoded: Decoded, *, list_price: bool) -> Money | None:
     """The call's exact cost, or ``None`` when it cannot be known exactly.
 
-    The provider's own figure wins. Otherwise the catalog's rates price the
-    usage, unless the model has no rates, the usage was not measured, an
-    extension may have changed the price, or the usage includes a kind of
-    token the model has no rate for.
+    Args:
+        spec: The model the call went to.
+        decoded: What the provider answered.
+        list_price: Whether the catalog's rates apply to the call: it went to
+            the provider's public endpoint and no extension changed the price.
+
+    Returns:
+        The provider's own figure when it sent one. Otherwise the catalog's
+        price for the usage, or ``None`` when the rates do not apply, the model
+        has none, the usage was not measured, or it includes a kind of token
+        the model has no rate for.
     """
     if decoded.cost is not None:
         return decoded.cost
-    if spec.rates is None or not decoded.usage.measured or not list_price_applies(request):
+    if not list_price or spec.rates is None or not decoded.usage.measured:
         return None
     return spec.rates.cost(decoded.usage)
 
@@ -117,6 +130,7 @@ class Call:
         retry: The retry policy of the context the call was made in.
         reporter: Delivers attempts to the observers active where the call
             was made.
+        list_price: Whether the catalog's rates price this call.
         sleep: Waits between attempts.
         jitter: Returns a uniform random number in [0, 1).
     """
@@ -128,6 +142,7 @@ class Call:
     permit: Permit
     retry: RetryPolicy
     reporter: Reporter
+    list_price: bool
     sleep: Callable[[float], None]
     jitter: Callable[[], float]
     started: bool = dataclasses.field(default=False, init=False, repr=False)
@@ -239,7 +254,7 @@ class Call:
             tool_calls=decoded.tool_calls,
             finish_reason=decoded.finish_reason,
             usage=decoded.usage,
-            cost=cost_of(self.spec, self.request, decoded),
+            cost=cost_of(self.spec, decoded, list_price=self.list_price),
             model=self.spec.ref,
             request_id=decoded.request_id,
             latency_s=time.monotonic() - started,

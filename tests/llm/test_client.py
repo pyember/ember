@@ -182,6 +182,25 @@ def test_only_price_neutral_extensions_keep_a_computed_cost(
         assert result.cost == cost
 
 
+def test_a_custom_base_url_is_unpriced_unless_the_provider_reports_a_cost() -> None:
+    fake = FakeProvider([Reply(usage=Usage(input=3)), Reply(usage=Usage(input=3), cost=Money(5))])
+    gateway = {"openai": {"base_url": "https://gateway.example/v1"}}
+    with Client(provider_factory=fake.factory) as client, context.override(providers=gateway):
+        assert client.complete("gpt-6-luna", "hi").cost is None
+        assert client.complete("gpt-6-luna", "hi").cost == Money(5)
+
+
+def test_require_price_refuses_a_custom_base_url_before_sending(
+    client: Client, fake: FakeProvider
+) -> None:
+    gateway = {"openai": {"base_url": "https://gateway.example/v1"}}
+    with context.override(require_price=True, providers=gateway):
+        with pytest.raises(ModelError) as caught:
+            client.complete("gpt-6-luna", "hi")
+    assert caught.value.kind is ErrorKind.UNPRICED
+    assert (fake.requests, fake.built) == ((), ())
+
+
 def test_accepted_settings_are_sent(client: Client, fake: FakeProvider) -> None:
     client.complete("gpt-5.5", "hi", reasoning_effort="xhigh", max_output_tokens=128_000)
     sampling = fake.requests[0].request.sampling

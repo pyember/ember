@@ -41,7 +41,7 @@ from ember.context import Context
 from ember.errors import ConfigError, ErrorKind, ModelError
 from ember.llm import catalog as catalog_module
 from ember.llm import observe, providers
-from ember.llm.attempt import Call, list_price_applies
+from ember.llm.attempt import Call, extensions_keep_list_price
 from ember.llm.catalog import Catalog
 from ember.llm.completion import Completion
 from ember.llm.limiter import HeldByCaller, Limiter, LimiterState, Permit
@@ -388,8 +388,10 @@ class Client:
         ctx = context.current()
         spec = self._resolve(model, ctx)
         check_settings(spec, request.sampling)
-        _check_price(spec, request, ctx)
-        lease = self._pool.lease(ctx.provider(spec.ref.provider), ctx)
+        settings = ctx.provider(spec.ref.provider)
+        list_price = settings.base_url is None and extensions_keep_list_price(request)
+        _check_price(spec, list_price, ctx)
+        lease = self._pool.lease(settings, ctx)
         try:
             permit = self._wait_for_permit(spec, ctx.max_in_flight_per_provider, streaming)
         except BaseException:
@@ -403,6 +405,7 @@ class Client:
             permit=permit,
             retry=ctx.retry,
             reporter=observe.reporter(),
+            list_price=list_price,
             sleep=self._sleep,
             jitter=self._jitter,
         )
@@ -416,8 +419,9 @@ class Client:
         return table.resolve(model, providers=ctx.providers)
 
     def _wait_for_permit(self, spec: ModelSpec, cap: int, streaming: bool) -> Permit:
-        # Outside xcs a stream advances only as its thread reads it, so only
-        # that thread can free its slot, whatever greenlet it is running.
+        # Outside xcs a stream advances only as it is read, and it belongs to
+        # the thread that opened it, wherever it is later read: only that
+        # thread can be relied on to free its slot.
         provider = spec.ref.provider
         try:
             pending = self._limiter.acquire(
@@ -450,13 +454,13 @@ class Client:
         self._limiter = Limiter()
 
 
-def _check_price(spec: ModelSpec, request: Request, ctx: Context) -> None:
+def _check_price(spec: ModelSpec, list_price: bool, ctx: Context) -> None:
     if not ctx.require_price:
         return
     if spec.rates is None:
         reason = "the model has no published price and require_price is set"
-    elif not list_price_applies(request):
-        reason = "an extension may change the price and require_price is set"
+    elif not list_price:
+        reason = "a custom base_url or an extension may change the price and require_price is set"
     else:
         return
     raise ModelError(

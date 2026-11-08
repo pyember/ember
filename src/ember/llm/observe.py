@@ -10,8 +10,9 @@ An observer that raises cannot cost the caller a result it paid for, or hide
 the attempt from other observers: every observer still receives the attempt,
 the call's outcome is delivered as usual, and the observer's exceptions are
 raised together, as an `ExceptionGroup`, when its `observing()` block exits.
-An attempt reported after that block has exited raises the observer's
-exception at once.
+Calls deferred inside ``@xcs.jit`` can finish after that block exits; an
+observer that raises then is reported through `sys.unraisablehook`, the channel
+for errors that have nowhere to propagate, naming the observer and the call.
 
 Every attempt of a call is reported before the call's outcome can be read:
 before its `Completion` holds a result or an error, and before a stream yields
@@ -33,7 +34,10 @@ Example:
 import contextlib
 import contextvars
 import dataclasses
+import sys
 import threading
+import traceback
+import types
 from collections.abc import Generator
 from typing import Protocol
 
@@ -85,18 +89,45 @@ class _Sink:
     def deliver(self, attempt: Attempt) -> None:
         try:
             self.observer.on_attempt(attempt)
-        except Exception as error:  # Held for the block's exit; see the module docstring.
+        except Exception as error:  # Never raised into the call; see the module docstring.
             with self._lock:
                 if self._open:
                     self._errors.append(error)
                     return
-            raise
+            _report_unraisable(
+                error,
+                f"Exception ignored in observer {self.observer!r} for call {attempt.call_id}, "
+                "after its observing() block exited",
+                self.observer,
+            )
 
     def close(self) -> list[Exception]:
         with self._lock:
             self._open = False
             errors, self._errors = self._errors, []
         return errors
+
+
+@dataclasses.dataclass(slots=True)
+class _Unraisable:
+    """The fields `sys.unraisablehook` reads from its argument."""
+
+    exc_type: type[BaseException]
+    exc_value: BaseException | None
+    exc_traceback: types.TracebackType | None
+    err_msg: str | None
+    object: object
+
+
+def _report_unraisable(error: Exception, message: str, source: object) -> None:
+    hook = sys.unraisablehook
+    if hook is sys.__unraisablehook__:
+        # The built-in hook accepts only an argument type Python does not
+        # expose, so print what it would print.
+        print(f"{message}: {source!r}", file=sys.stderr)
+        traceback.print_exception(error, file=sys.stderr)
+        return
+    hook(_Unraisable(type(error), error, error.__traceback__, message, source))
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
