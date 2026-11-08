@@ -13,6 +13,8 @@ __all__ = [
     "ErrorKind",
     "ModelError",
     "NonSyntaxError",
+    "QuorumError",
+    "TieError",
 ]
 
 
@@ -128,3 +130,44 @@ class NonSyntaxError(EmberError, ValueError):
         self.reason = reason
         pointer = " " * column + "^"
         super().__init__(f"{reason} at column {column}\n  {spec}\n  {pointer}")
+
+
+class QuorumError(EmberError):
+    """Fewer members of a composition succeeded than its quorum requires.
+
+    Attributes:
+        required: Successes the quorum requires.
+        succeeded: Successes that arrived.
+        failures: ``(member index, error)`` for each member whose call failed.
+    """
+
+    def __init__(
+        self,
+        *,
+        required: int,
+        succeeded: int,
+        failures: tuple[tuple[int, EmberError], ...],
+    ) -> None:
+        self.required = required
+        self.succeeded = succeeded
+        self.failures = failures
+        reasons = "; ".join(f"member {index}: {error}" for index, error in failures)
+        message = f"quorum not met: {succeeded} succeeded, {required} required"
+        super().__init__(f"{message}; {reasons}" if reasons else message)
+
+
+class TieError(EmberError):
+    """A majority vote tied and its tie policy is to raise.
+
+    The message never contains the answers, which are model output; read
+    `tied` for them.
+
+    Attributes:
+        tied: The tied answers after normalization, in the order first seen.
+        votes: Votes each tied answer received.
+    """
+
+    def __init__(self, tied: tuple[str, ...], votes: int) -> None:
+        self.tied = tied
+        self.votes = votes
+        super().__init__(f"majority vote tied: {len(tied)} answers have {votes} votes each")
