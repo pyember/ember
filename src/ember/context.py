@@ -31,6 +31,7 @@ __all__ = [
     "RetryPolicy",
     "Secret",
     "current",
+    "from_config",
     "override",
     "reload",
 ]
@@ -240,15 +241,16 @@ def override(
         _ACTIVE.reset(token)
 
 
-def _root_context() -> Context:
-    global _root
-    with _root_lock:
-        if _root is None:
-            _root = _context_from_file(config_file.load())
-        return _root
+def from_config(data: config_file.ConfigData) -> Context:
+    """Builds the context that ``data`` describes, on top of the built-in providers.
 
+    The root context is built this way from the config file. The CLI also uses
+    it to check a change before writing it.
 
-def _context_from_file(data: config_file.ConfigData) -> Context:
+    Raises:
+        ConfigError: ``data`` is well-formed but describes an invalid context,
+            for example a provider with no kind.
+    """
     builtin = {
         name: ProviderSettings(name=name, kind=kind, api_key_env=env)
         for name, (kind, env) in BUILTIN_PROVIDERS.items()
@@ -263,6 +265,19 @@ def _context_from_file(data: config_file.ConfigData) -> Context:
         ),
         retry=_retry_policy(data.retry),
     )
+
+
+def _root_context() -> Context:
+    global _root
+    with _root_lock:
+        if _root is None:
+            path = config_file.config_path()
+            data = config_file.load(path)
+            try:
+                _root = from_config(data)
+            except ConfigError as exc:
+                raise ConfigError(f"{path}: {exc}") from exc
+        return _root
 
 
 def _merge_providers(
@@ -304,8 +319,10 @@ _KINDS: Mapping[str, ProviderKind] = MappingProxyType(
 
 
 def _provider_kind(name: str, kind: str | None) -> ProviderKind:
-    if kind is None or kind not in _KINDS:
+    if kind is None:
         raise ConfigError(f"provider {name!r} needs kind: {', '.join(_KINDS)}")
+    if kind not in _KINDS:
+        raise ConfigError(f"provider {name!r} has unknown kind {kind!r}; use {', '.join(_KINDS)}")
     return _KINDS[kind]
 
 
