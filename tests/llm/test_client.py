@@ -8,13 +8,12 @@ import sys
 import threading
 import time
 from collections.abc import Callable, Iterator
-from concurrent.futures import Future
 from pathlib import Path
 
 import pytest
 
 import ember
-from ember import context
+from ember import context, xcs
 from ember.context import RetryPolicy
 from ember.errors import ConfigError, ErrorKind, ModelError
 from ember.llm import Client, Completion, Message, using
@@ -422,18 +421,33 @@ def test_outside_jit_a_failed_call_raises_at_the_call_site() -> None:
             client.complete("gpt-5.5", "hi")
 
 
-def test_when_deferred_a_failed_call_raises_on_first_read(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(runtime, "deferred", lambda: True)
+def test_inside_jit_a_failed_call_raises_on_first_read() -> None:
     fake = FakeProvider([Fail(ErrorKind.AUTH)])
-    with Client(provider_factory=fake.factory) as client:
+    steps: list[str] = []
+
+    def program(client: Client) -> str:
         completion = client.complete("gpt-5.5", "hi")
+        steps.append("returned")
+        return completion.text
+
+    with Client(provider_factory=fake.factory) as client:
         with pytest.raises(ModelError) as caught:
-            completion.text  # noqa: B018
-        assert caught.value.kind is ErrorKind.AUTH
-        with pytest.raises(ModelError, match="not_found"):
-            client.complete("gpt5.5", "hi")
+            xcs.jit(program)(client)
+    assert caught.value.kind is ErrorKind.AUTH
+    assert steps == ["returned"]
+
+
+def test_inside_jit_a_call_that_cannot_be_sent_raises_at_the_call_site(client: Client) -> None:
+    steps: list[str] = []
+
+    def program(client: Client) -> None:
+        steps.append("before")
+        client.complete("gpt5.5", "hi")
+        steps.append("after")
+
+    with pytest.raises(ModelError, match="not_found"):
+        xcs.jit(program)(client)
+    assert steps == ["before"]
 
 
 # Observers.
@@ -452,57 +466,47 @@ def test_observers_active_at_the_call_site_see_each_call_once(client: Client) ->
     assert all(isinstance(a.outcome, Result) for a in outer.attempts)
 
 
-class GatedRuntime:
-    """Runs dispatched tasks on a thread once released, with deferred results."""
-
-    def __init__(self) -> None:
-        self.gate = threading.Event()
-
-    def dispatch(self, task: Callable[[], Result], *, label: str) -> "Future[Result]":
-        future: Future[Result] = Future()
-
-        def run() -> None:
-            assert self.gate.wait(timeout=10)
-            try:
-                future.set_result(task())
-            except ModelError as error:
-                future.set_exception(error)
-
-        threading.Thread(target=run).start()
-        return future
-
-
 @pytest.mark.parametrize(
     ("script", "fails"),
     [([Fail(ErrorKind.OVERLOADED), Reply("ok")], False), ([Fail(ErrorKind.AUTH)], True)],
     ids=["succeeds", "fails"],
 )
-def test_every_attempt_is_reported_before_the_outcome_is_readable(
-    script: list[Fail | Reply], fails: bool, monkeypatch: pytest.MonkeyPatch
+def test_inside_jit_every_attempt_is_reported_before_the_outcome_is_readable(
+    script: list[Fail | Reply], fails: bool
 ) -> None:
-    gated = GatedRuntime()
-    monkeypatch.setattr(runtime, "dispatch", gated.dispatch)
-    monkeypatch.setattr(runtime, "deferred", lambda: True)
+    gate = threading.Event()
+    answers = iter(script)
     pending: list[Completion] = []
     done_when_reported: list[bool] = []
+    seen_on_read: list[int] = []
+
+    def respond(model: ModelRef, request: Request) -> Fail | Reply:
+        assert gate.wait(timeout=10)
+        return next(answers)
 
     class Watch(Recorder):
         def on_attempt(self, attempt: Attempt) -> None:
             done_when_reported.append(pending[0].done())
             super().on_attempt(attempt)
 
+    def program(client: Client) -> str:
+        pending.append(client.complete("gpt-5.5", "hi"))
+        gate.set()
+        text = pending[0].text
+        seen_on_read.append(len(watch.attempts))
+        return text
+
     watch = Watch()
-    fake = FakeProvider(script)
+    fake = FakeProvider(respond=respond)
     with Client(provider_factory=fake.factory, sleep=lambda _: None) as client:
         with observing(watch):
-            pending.append(client.complete("gpt-5.5", "hi"))
-        gated.gate.set()
-        if fails:
-            with pytest.raises(ModelError):
-                pending[0].result()
-        else:
-            assert pending[0].text == "ok"
-        assert len(watch.attempts) == len(script)
+            if fails:
+                with pytest.raises(ModelError):
+                    xcs.jit(program)(client)
+                assert len(watch.attempts) == len(script)
+            else:
+                assert xcs.jit(program)(client) == "ok"
+                assert seen_on_read == [len(script)]
     assert done_when_reported == [False] * len(script)
 
 
@@ -534,6 +538,33 @@ def test_an_observer_that_raises_keeps_the_result_and_the_other_observers(
             assert completion.text == "ok"
             assert len(recorder.attempts) == 1
     assert caught.value.exceptions == (broken.error,)
+
+
+def test_inside_jit_an_observer_error_after_its_block_exits_never_reaches_the_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: list[object] = []
+    monkeypatch.setattr(sys, "unraisablehook", received.append)
+    gate = threading.Event()
+    broken, recorder = Broken(), Recorder()
+
+    def respond(model: ModelRef, request: Request) -> Reply:
+        assert gate.wait(timeout=10)
+        return Reply("ok")
+
+    def program(client: Client) -> str:
+        with observing(broken), observing(recorder):
+            completion = client.complete("gpt-5.5", "hi")
+        gate.set()  # Both blocks exit before the call finishes.
+        return completion.text
+
+    fake = FakeProvider(respond=respond)
+    with Client(provider_factory=fake.factory) as client:
+        assert xcs.jit(program)(client) == "ok"
+    assert len(recorder.attempts) == 1
+    [unraisable] = received
+    assert unraisable.exc_value is broken.error  # type: ignore[attr-defined]
+    assert recorder.attempts[0].call_id in unraisable.err_msg  # type: ignore[attr-defined]
 
 
 # Streams.
@@ -587,31 +618,48 @@ def test_the_client_never_replays_a_stream_that_delivered_output(sleeps: list[fl
     assert (fake.streams, sleeps) == (1, [])
 
 
+class PausingStream(FakeProvider):
+    """Streams one item, then waits for ``resume`` before the rest."""
+
+    def __init__(self) -> None:
+        super().__init__(default=Reply("two"))
+        self.resume = threading.Event()
+
+    def stream(self, spec: ModelSpec, request: Request) -> Iterator[StreamItem]:
+        yield TextDelta("one ")
+        assert self.resume.wait(timeout=10)
+        yield from super().stream(spec, request)
+
+
+def _assert_one_cancelled_attempt(recorder: Recorder) -> None:
+    _wait_for(lambda: len(recorder.attempts) == 1)
+    [attempt] = recorder.attempts
+    assert isinstance(attempt.outcome, ModelError)
+    assert attempt.outcome.kind is ErrorKind.CANCELLED
+
+
 def test_a_stream_dropped_mid_loop_is_reported_cancelled_and_frees_its_permit() -> None:
     recorder = Recorder()
-    fake = FakeProvider(default=Reply("one two three"))
+    fake = PausingStream()
     with Client(provider_factory=fake.factory) as client, observing(recorder):
         for _ in client.stream("gpt-5.5", "hi"):
             break
         gc.collect()
-        assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
-    assert len(fake.requests) == 1
-    [attempt] = recorder.attempts
-    assert isinstance(attempt.outcome, ModelError)
-    assert attempt.outcome.kind is ErrorKind.CANCELLED
+        fake.resume.set()
+        _assert_one_cancelled_attempt(recorder)
+        _wait_for(lambda: client.limiter_state("openai") == LimiterState(64, 0, 0))
 
 
 def test_an_abandoned_stream_is_reported_cancelled_and_frees_its_permit() -> None:
     recorder = Recorder()
-    fake = FakeProvider(default=Reply("one two three"))
+    fake = PausingStream()
     with Client(provider_factory=fake.factory) as client, observing(recorder):
         events = client.stream("gpt-5.5", "hi")
         assert next(events) == TextDelta("one ")
         events.close()  # type: ignore[attr-defined]
-        assert client.limiter_state("openai") == LimiterState(limit=64, in_flight=0, waiting=0)
-    [attempt] = recorder.attempts
-    assert isinstance(attempt.outcome, ModelError)
-    assert attempt.outcome.kind is ErrorKind.CANCELLED
+        fake.resume.set()
+        _assert_one_cancelled_attempt(recorder)
+        _wait_for(lambda: client.limiter_state("openai") == LimiterState(64, 0, 0))
 
 
 def test_reading_to_done_and_stopping_is_not_a_cancellation(client: Client) -> None:
@@ -644,6 +692,22 @@ def test_a_failure_before_the_first_event_raises_at_the_first_read() -> None:
             next(events)
         assert caught.value.kind is ErrorKind.AUTH
         _wait_for(lambda: client.limiter_state("openai") == LimiterState(64, 0, 0))
+
+
+def test_inside_jit_a_stream_failure_before_the_first_event_raises_at_the_first_read() -> None:
+    fake = FakeProvider([Fail(ErrorKind.AUTH)])
+    steps: list[str] = []
+
+    def program(client: Client) -> Event:
+        events = client.stream("gpt-5.5", "hi")
+        steps.append("returned")
+        return next(events)
+
+    with Client(provider_factory=fake.factory) as client:
+        with pytest.raises(ModelError) as caught:
+            xcs.jit(program)(client)
+    assert caught.value.kind is ErrorKind.AUTH
+    assert steps == ["returned"]
 
 
 @pytest.mark.parametrize(
