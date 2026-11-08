@@ -180,7 +180,7 @@ def test_an_openai_compatible_provider_is_set_up_field_by_field(config_file: Pat
 def test_unset_refuses_to_break_a_config_that_loads(
     config_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    text = "providers:\n  local:\n    kind: openai_compatible\n    base_url: x\n"
+    text = "providers:\n  local:\n    kind: openai_compatible\n    base_url: http://h/v1\n"
     config_file.write_text(text)
     assert main(["configure", "unset", "local", "kind"]) == 1
     err = capsys.readouterr().err
@@ -193,7 +193,7 @@ def test_unset_refuses_to_break_a_config_that_loads(
 def test_unset_repairs_a_config_that_does_not_load_and_says_what_remains(
     config_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    config_file.write_text("providers:\n  local:\n    base_url: x\n    api_kye: y\n")
+    config_file.write_text("providers:\n  local:\n    base_url: http://h/v1\n    api_kye: y\n")
     assert main(["configure", "unset", "local", "api_kye"]) == 1
     out, err = capsys.readouterr()
     assert out.startswith("removed providers.local.api_kye")
@@ -248,7 +248,7 @@ def test_context_errors_name_the_file(
 def test_a_file_with_comments_is_not_rewritten(
     config_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    text = "providers:\n  openai:  # work account\n    base_url: u\n"
+    text = "providers:\n  openai:  # work account\n    base_url: http://h/v1\n"
     config_file.write_text(text)
     assert main(["configure", "set", "openai", "api_key_env", "WORK_KEY"]) == 1
     assert f"{config_file} line 2: the file has comments" in capsys.readouterr().err
@@ -266,7 +266,7 @@ def test_unset_of_something_not_set_is_an_error(
 ) -> None:
     assert main(["configure", "unset", "openai", "base_url"]) == 1
     assert f"PROVIDER is not in {config_file}; providers there: none" in capsys.readouterr().err
-    config_file.write_text("providers:\n  openai:\n    base_url: u\n")
+    config_file.write_text("providers:\n  openai:\n    base_url: http://h/v1\n")
     assert main(["configure", "unset", "openai", "api_key"]) == 1
     assert "FIELD is not set for openai; fields set there: base_url" in capsys.readouterr().err
 
@@ -318,9 +318,14 @@ COMMANDS = (
     ("configure", "set-key", "local"),
     ("configure", "set", "local", "base_url", "http://h/v1"),
     ("configure", "set", "local", "kind", "openai_compatible"),
+    ("configure", "set", "local", "api_key_env", "LOCAL_API_KEY"),
     ("configure", "unset", "local", "base_url"),
     ("configure", "unset", "local"),
 )
+
+
+# Every option the parsers define, in full and abbreviated, plus one they do not.
+FLAGS = ("--version", "--vers", "--help", "--he", "-h", "--x")
 
 
 def key_in_every_slot() -> list[tuple[str, ...]]:
@@ -329,7 +334,7 @@ def key_in_every_slot() -> list[tuple[str, ...]]:
         for slot in range(len(command)):
             cases.add((*command[:slot], KEY, *command[slot + 1 :]))
         for slot in range(len(command) + 1):
-            for token in (KEY, f"--{KEY}", f"--x={KEY}", f"-{KEY}"):
+            for token in (KEY, f"--{KEY}", f"-{KEY}", *(f"{flag}={KEY}" for flag in FLAGS)):
                 cases.add((*command[:slot], token, *command[slot:]))
     return sorted(cases)
 
@@ -355,3 +360,33 @@ def test_output_never_echoes_a_key_given_in_any_argument_slot(
     out, err = capsys.readouterr()
     assert KEY not in out + err + crash
     assert crash == ""
+    assert main(["configure", "show"]) == 0
+    assert KEY not in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("base_url", KEY, "providers.local.base_url must be an http or https URL"),
+        ("base_url", "localhost:11434/v1", "providers.local.base_url must be an http or https URL"),
+        ("api_key_env", KEY, "providers.local.api_key_env must be an environment variable name"),
+    ],
+)
+def test_non_secret_fields_refuse_values_that_could_be_a_misplaced_key(
+    config_file: Path, capsys: pytest.CaptureFixture[str], field: str, value: str, message: str
+) -> None:
+    text = "providers:\n  local:\n    kind: openai_compatible\n"
+    config_file.write_text(text)
+    assert main(["configure", "set", "local", field, value]) == 1
+    err = capsys.readouterr().err
+    assert message in err and value not in err
+    assert config_file.read_text() == text
+
+
+def test_a_provider_name_that_could_be_a_key_is_refused(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["configure", "set", KEY, "kind", "openai_compatible"]) == 1
+    err = capsys.readouterr().err
+    assert "provider names must be" in err and KEY not in err
+    assert not config_file.exists()

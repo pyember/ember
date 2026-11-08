@@ -26,6 +26,7 @@ import dataclasses
 import math
 import os
 import re
+import sys
 import tempfile
 import urllib.parse
 from collections.abc import Mapping
@@ -54,6 +55,11 @@ _PROVIDER_KEYS = frozenset({"kind", "api_key", "api_key_env", "base_url"})
 _RETRY_KEYS = frozenset({"max_attempts", "base_delay_s", "max_delay_s"})
 _SECRET_KEYS = frozenset({"api_key"})
 _URL_KEYS = frozenset({"base_url"})
+# Names and non-secret values are shown unmasked, so each has a format a
+# misplaced key cannot pass; error messages describe the format and never
+# repeat the value.
+_PROVIDER_NAME = re.compile(r"[a-z][a-z0-9_]{0,31}")
+_ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -219,15 +225,20 @@ def _redact_field(key: str, value: str) -> str:
 
 
 def _redact_url(url: str) -> str:
-    try:
-        parts = urllib.parse.urlsplit(url)
-    except ValueError:
-        return "… (not a valid URL)"
-    netloc = parts.netloc
-    if "@" in netloc:
-        netloc = "…@" + netloc.rpartition("@")[2]
-    query = "…" if parts.query else ""
-    return urllib.parse.urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
+    """Masks user information and the query string, with or without a scheme."""
+    scheme, separator, rest = url.partition("://")
+    prefix = f"{scheme}{separator}" if separator else ""
+    if not separator:
+        rest = url
+    end = min([index for index in map(rest.find, "/?#") if index >= 0], default=len(rest))
+    authority, tail = rest[:end], rest[end:]
+    if "@" in authority:
+        authority = "…@" + authority.rpartition("@")[2]
+    path, question, query_and_fragment = tail.partition("?")
+    if question:
+        _, hash_mark, fragment = query_and_fragment.partition("#")
+        tail = f"{path}?…{hash_mark}{fragment}"
+    return f"{prefix}{authority}{tail}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -333,9 +344,12 @@ def _validate_providers(doc: _Document) -> dict[str, Mapping[str, str]]:
         raise doc.error("providers must be a mapping", "providers")
     providers: dict[str, Mapping[str, str]] = {}
     for name, fields in raw.items():
-        if not isinstance(name, str) or not name or "/" in name:
+        if not isinstance(name, str) or not _PROVIDER_NAME.fullmatch(name):
             raise doc.error(
-                "provider names must be non-empty and contain no '/'", "providers", str(name)
+                "provider names must be lowercase letters, digits and _, starting with a letter, "
+                "at most 32 characters",
+                "providers",
+                str(name),
             )
         if not isinstance(fields, dict):
             raise doc.error(f"providers.{name} must be a mapping", "providers", name)
@@ -345,8 +359,9 @@ def _validate_providers(doc: _Document) -> dict[str, Mapping[str, str]]:
                 f"providers.{name}: unknown keys {unknown}", "providers", name, unknown[0]
             )
         for key, value in fields.items():
-            if not isinstance(value, str):
-                raise doc.error(f"providers.{name}.{key} must be a string", "providers", name, key)
+            problem = _field_problem(key, value)
+            if problem is not None:
+                raise doc.error(f"providers.{name}.{key} {problem}", "providers", name, key)
         providers[name] = MappingProxyType(dict(fields))
     return providers
 
@@ -381,6 +396,25 @@ def _first_comment_line(text: str) -> int | None:
     return None
 
 
+def _field_problem(key: str, value: object) -> str | None:
+    """Says what is wrong with a provider field's value, without repeating it."""
+    if not isinstance(value, str):
+        return "must be a string"
+    if key in _URL_KEYS and not _is_http_url(value):
+        return "must be an http or https URL"
+    if key == "api_key_env" and not _ENV_NAME.fullmatch(value):
+        return "must be an environment variable name (letters, digits and _)"
+    return None
+
+
+def _is_http_url(value: str) -> bool:
+    try:
+        parts = urllib.parse.urlsplit(value)
+    except ValueError:
+        return False
+    return parts.scheme in ("http", "https") and bool(parts.hostname)
+
+
 def _write_atomic(path: Path, text: str) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -402,7 +436,9 @@ def _write_atomic(path: Path, text: str) -> None:
 
 def _sync_directory(directory: Path) -> None:
     """Makes the rename that replaced the file durable."""
-    fd = os.open(directory, os.O_RDONLY)
+    if sys.platform == "win32":
+        return  # Windows cannot open a directory to fsync it; its renames need no such step.
+    fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(fd)
     finally:

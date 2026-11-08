@@ -2,8 +2,10 @@
 
 import os
 import stat
+import sys
 import traceback
 from pathlib import Path
+from types import MappingProxyType
 
 import pytest
 
@@ -25,7 +27,11 @@ def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     [
         ("default_model: x\nprovders: {}\n", "line 2", "unknown keys ['provders']"),
         ("providers:\n  openai:\n    base_url: 3\n", "line 3", "providers.openai.base_url must be"),
-        ("providers:\n  a/b:\n    kind: openai\n", "line 2", "contain no '/'"),
+        ("providers:\n  a/b:\n    kind: openai\n", "line 2", "provider names must be"),
+        ("providers:\n  My-Proxy:\n    kind: openai\n", "line 2", "provider names must be"),
+        ("providers:\n  p:\n    base_url: ftp://h/v1\n", "line 3", "must be an http or https URL"),
+        ("providers:\n  p:\n    base_url: h:8080/v1\n", "line 3", "must be an http or https URL"),
+        ("providers:\n  p:\n    api_key_env: 1KEY\n", "line 3", "an environment variable name"),
         ("providers:\n  local: x\n", "line 2", "providers.local must be a mapping"),
         ("retry:\n  max_attempts: 3\n  max_atempts: 4\n", "line 3", "retry accepts only"),
         ("retry:\n  max_attempts: three\n", "line 2", "retry.max_attempts must be a finite number"),
@@ -61,13 +67,15 @@ def test_remove_provider_field_removes_a_misspelt_key(config_file: Path) -> None
 
 
 def test_removing_the_last_field_removes_the_provider_and_the_section(config_file: Path) -> None:
-    config_file.write_text("default_model: openai/gpt-5\nproviders:\n  openai:\n    base_url: u\n")
+    config_file.write_text(
+        "default_model: openai/gpt-5\nproviders:\n  openai:\n    base_url: http://h/v1\n"
+    )
     config.remove_provider_field("openai", "base_url")
     assert config_file.read_text() == "default_model: openai/gpt-5\n"
 
 
 def test_remove_refuses_what_is_not_set(config_file: Path) -> None:
-    config_file.write_text("providers:\n  openai:\n    base_url: u\n")
+    config_file.write_text("providers:\n  openai:\n    base_url: http://h/v1\n")
     with pytest.raises(ConfigError, match="providers.openai.api_key is not set"):
         config.remove_provider_field("openai", "api_key")
     with pytest.raises(ConfigError, match="providers.gemini is not set"):
@@ -116,10 +124,12 @@ def test_redacted_masks_credentials_inside_urls(config_file: Path) -> None:
 
 
 def test_writes_keep_the_file_order(config_file: Path) -> None:
-    config_file.write_text("retry:\n  max_attempts: 2\nproviders:\n  openai:\n    base_url: u\n")
+    config_file.write_text(
+        "retry:\n  max_attempts: 2\nproviders:\n  openai:\n    base_url: http://h/v1\n"
+    )
     config.save_provider_field("openai", "api_key_env", "MY_KEY")
     assert config_file.read_text() == (
-        "retry:\n  max_attempts: 2\nproviders:\n  openai:\n    base_url: u\n"
+        "retry:\n  max_attempts: 2\nproviders:\n  openai:\n    base_url: http://h/v1\n"
         "    api_key_env: MY_KEY\n"
     )
 
@@ -128,7 +138,7 @@ def test_writes_keep_the_file_order(config_file: Path) -> None:
     ("text", "line"),
     [
         ("# my settings\nproviders: {}\n", 1),
-        ("providers:\n  openai:\n    base_url: u  # proxy\n", 3),
+        ("providers:\n  openai:\n    base_url: http://h/v1  # proxy\n", 3),
     ],
 )
 def test_writers_refuse_to_drop_comments(config_file: Path, text: str, line: int) -> None:
@@ -164,3 +174,21 @@ def test_provider_fields_reads_a_file_that_load_rejects(config_file: Path) -> No
     with pytest.raises(ConfigError):
         config.load()
     assert config.provider_fields() == {"openai": ("api_kye",), "local": ()}
+
+
+def test_redacted_masks_userinfo_without_a_scheme() -> None:
+    data = config.ConfigData(
+        providers=MappingProxyType({"p": MappingProxyType({"base_url": "user:sk-x-0000@host/v1"})})
+    )
+    assert config.redacted(data)["providers"]["p"]["base_url"] == "…@host/v1"
+
+
+def test_windows_skips_the_directory_fsync(
+    config_file: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    synced: list[int] = []
+    monkeypatch.setattr(os, "fsync", synced.append)
+    monkeypatch.setattr(sys, "platform", "win32")
+    config.save_provider_field("openai", "api_key_env", "MY_KEY")
+    assert len(synced) == 1
+    assert config.load().providers["openai"]["api_key_env"] == "MY_KEY"
