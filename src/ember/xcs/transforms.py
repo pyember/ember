@@ -103,9 +103,10 @@ def map(fn: Callable[[T], R], items: Iterable[T]) -> list[R]:
     """Runs ``fn`` on each item concurrently and returns the results in order.
 
     Each item runs in its own greenlet on the caller's thread, with a copy of
-    the caller's context. Items start in order. If one raises, no further
-    items start, the items already started finish, and the error of the
-    earliest failed item is raised.
+    the caller's context. Items start in order, each running until it first
+    waits before the next starts, so every item starts before any continues
+    past a wait. If one raises, no further items start, the items already
+    started finish, and the error of the earliest failed item is raised.
     """
     work = list(items)
     if not work:
