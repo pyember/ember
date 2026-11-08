@@ -144,7 +144,10 @@ class Context:
         retry: Retry policy for retryable errors.
         connect_timeout_s: Bound on establishing a connection.
         idle_timeout_s: Bound on waiting for the next response byte. This is a
-            liveness bound, not a cap on total generation time.
+            liveness bound, not a cap on total generation time. Reasoning
+            models can stream nothing for many minutes while they think, so
+            the default is generous; a dead connection is caught sooner by
+            TCP keepalive on the provider's connection.
     """
 
     providers: Mapping[str, ProviderSettings]
@@ -153,7 +156,7 @@ class Context:
     max_in_flight_per_provider: int = 64
     retry: RetryPolicy = RetryPolicy()
     connect_timeout_s: float = 10.0
-    idle_timeout_s: float = 300.0
+    idle_timeout_s: float = 1800.0
 
     def provider(self, name: str) -> ProviderSettings:
         """Returns the settings for ``name``.
