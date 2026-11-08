@@ -157,3 +157,10 @@ def test_writes_are_synced_to_disk(config_file: Path, monkeypatch: pytest.Monkey
     monkeypatch.setattr(os, "fsync", fsync)
     config.save_provider_field("openai", "api_key_env", "MY_KEY")
     assert synced == ["file", "dir"]
+
+
+def test_provider_fields_reads_a_file_that_load_rejects(config_file: Path) -> None:
+    config_file.write_text("providers:\n  openai:\n    api_kye: x\n  local: oops\n")
+    with pytest.raises(ConfigError):
+        config.load()
+    assert config.provider_fields() == {"openai": ("api_kye",), "local": ()}

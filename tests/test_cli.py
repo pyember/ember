@@ -5,6 +5,7 @@ import getpass
 import re
 import subprocess
 import sys
+import traceback
 from pathlib import Path
 
 import pytest
@@ -129,7 +130,9 @@ def test_set_key_for_an_unknown_provider_fails_before_prompting(
     config_file: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["configure", "set-key", "opnai"]) == 1
-    assert "unknown provider 'opnai'" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "PROVIDER is not a configured provider; known: anthropic, gemini, openai." in err
+    assert "opnai" not in err
     assert not config_file.exists()
 
 
@@ -153,17 +156,16 @@ def test_interrupting_the_prompt_exits_130(
 @pytest.mark.parametrize(
     ("argv", "message"),
     [
-        (["set", "local", "base_url", "http://h/v1"], "provider 'local' needs kind"),
-        (["set", "local", "kind", "bogus"], "provider 'local' has unknown kind 'bogus'"),
-        (["set", "openai", "kind", "anthropic"], "its kind cannot change"),
+        (["set", "local", "base_url", "http://h/v1"], "PROVIDER is not a configured provider"),
+        (["set", "local", "kind", "bogus"], "KIND must be one of openai, anthropic, gemini"),
+        (["set", "openai", "kind", "anthropic"], "config.yaml: provider 'openai' is openai"),
     ],
 )
 def test_changes_the_library_would_reject_are_not_written(
     config_file: Path, capsys: pytest.CaptureFixture[str], argv: list[str], message: str
 ) -> None:
     assert main(["configure", *argv]) == 1
-    err = capsys.readouterr().err
-    assert "nothing was saved" in err and message in err
+    assert message in capsys.readouterr().err
     assert not config_file.exists()
 
 
@@ -259,9 +261,14 @@ def test_configure_help_says_comments_block_rewrites(capsys: pytest.CaptureFixtu
     assert "comments" in capsys.readouterr().out
 
 
-def test_unset_of_something_not_set_is_an_error(capsys: pytest.CaptureFixture[str]) -> None:
+def test_unset_of_something_not_set_is_an_error(
+    config_file: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert main(["configure", "unset", "openai", "base_url"]) == 1
-    assert "providers.openai.base_url is not set" in capsys.readouterr().err
+    assert f"PROVIDER is not in {config_file}; providers there: none" in capsys.readouterr().err
+    config_file.write_text("providers:\n  openai:\n    base_url: u\n")
+    assert main(["configure", "unset", "openai", "api_key"]) == 1
+    assert "FIELD is not set for openai; fields set there: base_url" in capsys.readouterr().err
 
 
 def test_the_installed_command_survives_a_broken_home_config(tmp_path: Path) -> None:
@@ -303,3 +310,48 @@ def test_cli_data_and_eval_never_start_processes_or_prompt() -> None:
                 if SPAWNS.fullmatch(name):
                     offences.append(f"{path.name}:{node.lineno} calls {name}")
     assert paths and not offences, offences
+
+
+# Every subcommand with every argument filled in; the key is put in each slot in turn.
+COMMANDS = (
+    ("configure", "show"),
+    ("configure", "set-key", "local"),
+    ("configure", "set", "local", "base_url", "http://h/v1"),
+    ("configure", "set", "local", "kind", "openai_compatible"),
+    ("configure", "unset", "local", "base_url"),
+    ("configure", "unset", "local"),
+)
+
+
+def key_in_every_slot() -> list[tuple[str, ...]]:
+    cases: set[tuple[str, ...]] = set()
+    for command in COMMANDS:
+        for slot in range(len(command)):
+            cases.add((*command[:slot], KEY, *command[slot + 1 :]))
+        for slot in range(len(command) + 1):
+            for token in (KEY, f"--{KEY}", f"--x={KEY}", f"-{KEY}"):
+                cases.add((*command[:slot], token, *command[slot:]))
+    return sorted(cases)
+
+
+@pytest.mark.parametrize("argv", key_in_every_slot())
+def test_output_never_echoes_a_key_given_in_any_argument_slot(
+    config_file: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    argv: tuple[str, ...],
+) -> None:
+    config_file.write_text(
+        "providers:\n  local:\n    kind: openai_compatible\n    base_url: http://h/v1\n"
+    )
+    type_key(monkeypatch, "sk-typed-at-the-prompt-0000")
+    crash = ""
+    try:
+        main(list(argv))
+    except SystemExit:
+        pass
+    except Exception as exc:  # Recorded, then asserted absent below.
+        crash = "".join(traceback.format_exception(exc))
+    out, err = capsys.readouterr()
+    assert KEY not in out + err + crash
+    assert crash == ""

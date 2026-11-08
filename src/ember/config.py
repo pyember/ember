@@ -41,6 +41,7 @@ __all__ = [
     "ConfigData",
     "config_path",
     "load",
+    "provider_fields",
     "redacted",
     "remove_provider_field",
     "save_provider_field",
@@ -166,6 +167,28 @@ def remove_provider_field(provider: str, field: str | None, path: Path | None = 
     if not providers:
         del doc.raw["providers"]
     _rewrite(doc)
+
+
+def provider_fields(path: Path | None = None) -> Mapping[str, tuple[str, ...]]:
+    """Returns each provider entry in the file and the names of the fields it sets.
+
+    Values are not validated, so this also reads a file that `load` rejects;
+    `ember configure` uses it to check what a repair would remove.
+
+    Raises:
+        ConfigError: The file cannot be read, is not valid YAML, or its
+            ``providers`` is not a mapping.
+    """
+    doc = _read(path or config_path())
+    providers = doc.raw.get("providers", {})
+    if not isinstance(providers, dict):
+        raise doc.error("providers must be a mapping", "providers")
+    return MappingProxyType(
+        {
+            str(name): tuple(str(key) for key in fields) if isinstance(fields, dict) else ()
+            for name, fields in providers.items()
+        }
+    )
 
 
 def redacted(data: ConfigData) -> dict[str, Any]:

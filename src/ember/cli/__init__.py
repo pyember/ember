@@ -9,6 +9,7 @@ print as one line and exit with status 1; usage errors exit with status 2.
 import argparse
 import sys
 from collections.abc import Callable, Sequence
+from typing import NoReturn
 
 import ember
 from ember.cli import configure
@@ -17,6 +18,39 @@ from ember.errors import ConfigError, ModelError
 __all__ = ["main"]
 
 Handler = Callable[[argparse.Namespace], int]
+
+EXTRA_ARGUMENTS = "unexpected extra arguments (not shown)"
+# Messages this package writes itself; any other argparse message is replaced.
+_OWN_MESSAGES = (EXTRA_ARGUMENTS, configure.KEYS_NOT_IN_ARGV, configure.FIELD_CHOICES)
+
+
+class _Parser(argparse.ArgumentParser):
+    """An argument parser whose errors never quote what was typed.
+
+    Some argparse errors quote the offending argument ("invalid choice:
+    'sk-...'"), and a key typed in the wrong place must never be printed. Each
+    message is therefore one of this package's own, or is built only from the
+    parser's definition: its program name, usage and subcommand names.
+
+    Attributes:
+        commands: The subcommands this parser accepts, for its error message.
+    """
+
+    commands: tuple[str, ...] = ()
+
+    def error(self, message: str) -> NoReturn:
+        self.print_usage(sys.stderr)
+        self.exit(2, f"{self.prog}: error: {self._safe_message(message)}\n")
+
+    def _safe_message(self, message: str) -> str:
+        for own in _OWN_MESSAGES:
+            if message.endswith(own):
+                return own
+        if "invalid choice" in message and self.commands:
+            return f"unknown command; choose from {', '.join(self.commands)}"
+        if "required" in message:
+            return "missing arguments; see the usage above"
+        return "invalid arguments; see the usage above"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -29,7 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args, extras = parser.parse_known_args(argv)
     if extras:
         # argparse would quote them, and a misplaced key must never be echoed.
-        parser.error("unexpected extra arguments (not shown)")
+        parser.error(EXTRA_ARGUMENTS)
     handler: Handler = args.handler
     try:
         return handler(args)
@@ -41,8 +75,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 130
 
 
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="ember", description="Compose and evaluate model calls.")
+def _parser() -> _Parser:
+    parser = _Parser(prog="ember", description="Compose and evaluate model calls.")
     parser.add_argument("--version", action="version", version=f"ember {ember.__version__}")
     commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
@@ -69,4 +103,6 @@ def _parser() -> argparse.ArgumentParser:
     unset.add_argument("provider")
     unset.add_argument("field", nargs="?", help="any field name, including a misspelt one")
     unset.set_defaults(handler=configure.unset)
+    parser.commands = tuple(commands.choices)
+    configure_parser.commands = tuple(actions.choices)
     return parser
