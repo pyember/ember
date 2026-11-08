@@ -137,8 +137,13 @@ class Limiter:
         future: Future[Permit] = Future()
         with self._lock:
             state = self._providers.setdefault(provider, _Provider(limit=cap))
-            state.waiters.push(_Waiter(future, cap))
-            granted = self._admit(provider, state)
+            if state.waiting() == 0 and state.in_flight < min(state.limit, cap):
+                state.in_flight += 1
+                granted = [(future, Permit(self, provider, cap, state.epoch))]
+            else:
+                # Pushed on the caller's greenlet, so the scheduler sees who waits.
+                state.waiters.push(_Waiter(future, cap))
+                granted = self._admit(provider, state)
         _deliver(granted)
         return future
 

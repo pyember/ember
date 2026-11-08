@@ -405,7 +405,7 @@ class Client:
                 raise ConfigError("no model given and no default_model configured")
             model = ctx.default_model
         table = self._catalog if self._catalog is not None else catalog_module.default()
-        return table.resolve(model, ctx.providers)
+        return table.resolve(model, providers=ctx.providers)
 
     def _wait_for_permit(self, provider: str, cap: int) -> Permit:
         pending = self._limiter.acquire(provider, cap=cap)

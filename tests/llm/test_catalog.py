@@ -43,16 +43,16 @@ def test_every_value_cites_an_official_page_and_a_date() -> None:
 
 def test_ids_aliases_and_snapshot_ids_resolve_to_one_spec() -> None:
     table = catalog.default()
-    spec = table.resolve("anthropic/claude-opus-4-5", PROVIDERS)
+    spec = table.resolve("anthropic/claude-opus-4-5", providers=PROVIDERS)
     assert spec.wire_id == "claude-opus-4-5-20251101"
-    assert table.resolve("claude-opus-4-5", PROVIDERS) is spec
-    assert table.resolve("anthropic/claude-opus-4-5-20251101", PROVIDERS) is spec
-    assert table.resolve(ModelRef("anthropic", "claude-opus-4-5"), PROVIDERS) is spec
+    assert table.resolve("claude-opus-4-5", providers=PROVIDERS) is spec
+    assert table.resolve("anthropic/claude-opus-4-5-20251101", providers=PROVIDERS) is spec
+    assert table.resolve(ModelRef("anthropic", "claude-opus-4-5"), providers=PROVIDERS) is spec
 
 
 def test_alias_names_the_model_the_provider_page_names() -> None:
     # OpenAI's GPT-5.6 Sol page: "The `gpt-5.6` alias routes requests to GPT-5.6 Sol."
-    spec = catalog.default().resolve("gpt-5.6", PROVIDERS)
+    spec = catalog.default().resolve("gpt-5.6", providers=PROVIDERS)
     assert spec.ref == ModelRef("openai", "gpt-5.6-sol")
 
 
@@ -66,7 +66,7 @@ def test_alias_names_the_model_the_provider_page_names() -> None:
     ],
 )
 def test_uncatalogued_model_on_a_configured_provider_is_sent_as_named(model: str, api: str) -> None:
-    spec = catalog.default().resolve(model, PROVIDERS)
+    spec = catalog.default().resolve(model, providers=PROVIDERS)
     provider, _, name = model.partition("/")
     assert spec.ref == ModelRef(provider, name)
     assert (spec.wire_id, spec.api, spec.known) == (name, api, False)
@@ -76,7 +76,7 @@ def test_uncatalogued_model_on_a_configured_provider_is_sent_as_named(model: str
 @pytest.mark.parametrize("name", ["gpt-5.5-turbo", "gpt5.5", "opus", "llama3.2:1b"])
 def test_bare_unknown_names_are_not_found_and_never_guessed(name: str) -> None:
     with pytest.raises(ModelError) as caught:
-        catalog.default().resolve(name, PROVIDERS)
+        catalog.default().resolve(name, providers=PROVIDERS)
     error = caught.value
     assert (error.kind, error.provider, error.model) == (ErrorKind.NOT_FOUND, "", name)
     assert not error.retryable
@@ -85,13 +85,13 @@ def test_bare_unknown_names_are_not_found_and_never_guessed(name: str) -> None:
 
 
 def test_a_suffix_on_a_known_id_is_a_different_model() -> None:
-    spec = catalog.default().resolve("openai/gpt-5.5-turbo", PROVIDERS)
+    spec = catalog.default().resolve("openai/gpt-5.5-turbo", providers=PROVIDERS)
     assert (spec.wire_id, spec.known) == ("gpt-5.5-turbo", False)
 
 
 def test_unconfigured_provider_is_not_found() -> None:
     with pytest.raises(ModelError) as caught:
-        catalog.default().resolve("mystery/model-1", PROVIDERS)
+        catalog.default().resolve("mystery/model-1", providers=PROVIDERS)
     assert caught.value.kind is ErrorKind.NOT_FOUND
     assert "configured providers: anthropic, local, openai" in str(caught.value)
 
@@ -99,7 +99,7 @@ def test_unconfigured_provider_is_not_found() -> None:
 def test_long_context_rates_start_above_the_published_threshold() -> None:
     # Anthropic's pricing page: Haiku 5.5 input is $0.10/MTok for prompts up to
     # 100,000 tokens and $0.50/MTok for prompts over 100,000 tokens.
-    rates = catalog.default().resolve("claude-haiku-5-5", PROVIDERS).rates
+    rates = catalog.default().resolve("claude-haiku-5-5", providers=PROVIDERS).rates
     assert rates is not None
     assert rates.cost(Usage(input=100_000)) == Money(10_000_000)
     assert rates.cost(Usage(input=100_001)) == Money(50_000_500)
@@ -188,3 +188,11 @@ def test_no_code_outside_the_catalog_names_a_catalog_model() -> None:
         if value in names
     }
     assert not offenders, sorted(offenders)
+
+
+def test_without_providers_only_catalog_models_resolve() -> None:
+    assert catalog.default().resolve("gpt-5.5").ref == ModelRef("openai", "gpt-5.5")
+    with pytest.raises(ModelError) as caught:
+        catalog.default().resolve("openai/gpt-5")
+    assert caught.value.kind is ErrorKind.NOT_FOUND
+    assert "configured providers: none" in str(caught.value)

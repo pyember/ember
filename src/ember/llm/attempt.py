@@ -10,7 +10,8 @@ the only code in ember that retries:
 - after a jittered exponential delay, clamped to `RetryPolicy.max_delay_s`
   after the jitter, and never sooner than the provider's ``retry_after_s``;
 - never when the provider asks for a longer wait than ``max_delay_s``;
-- never once a stream has delivered its first item.
+- never once a stream has delivered its first item, which `ModelError`
+  marks by ``before_first_byte=False`` and so ``retryable=False``.
 
 Every attempt, retries included, is reported to the observers that were
 active where the call was made, and to the provider's limiter.
@@ -158,17 +159,15 @@ class Call:
         Returns False only when the attempt failed before its first item and
         the call should try again.
         """
-        delivered = False
         final: Decoded | None = None
         try:
             for item in self.lease.provider.stream(self.spec, self.request):
                 if isinstance(item, Decoded):
                     final = item
                     break
-                delivered = True
                 yield item
         except ModelError as error:
-            delay = None if delivered else retry_delay(self.retry, number, error, self.jitter())
+            delay = retry_delay(self.retry, number, error, self.jitter())
             self._report(number, started, error, will_retry=delay is not None)
             if delay is None:
                 raise

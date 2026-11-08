@@ -6,6 +6,11 @@ attempt, including retries, to every observer active at the call site.
 Observers run on whichever thread finished the attempt and must return quickly
 and never raise.
 
+Every attempt of a call is reported before the call's outcome can be read:
+before its `Completion` holds a result or an error, and before a stream yields
+`Done` or raises. A caller that has read a call's outcome has therefore seen
+all of that call's attempts.
+
 Example:
     >>> from ember.llm.observe import Attempt, observing
     >>> class Collect:

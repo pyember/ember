@@ -17,7 +17,7 @@ There is no prefix matching, no live discovery and no network access.
 
 Example:
     >>> from ember.llm import catalog
-    >>> catalog.default().resolve("gpt-5.5", {}).ref
+    >>> catalog.default().resolve("gpt-5.5").ref
     ModelRef(provider='openai', name='gpt-5.5')
 """
 
@@ -58,6 +58,7 @@ _UNKNOWN_MODEL_API: Mapping[ProviderKind, WireApi] = MappingProxyType(
     }
 )
 _WIRE_APIS: frozenset[str] = frozenset(get_args(WireApi))
+_NO_PROVIDERS: Mapping[str, ProviderSettings] = MappingProxyType({})
 
 
 class CatalogError(ValueError):
@@ -105,7 +106,10 @@ class Catalog:
         return self._by_name.get(name)
 
     def resolve(
-        self, model: str | ModelRef, providers: Mapping[str, ProviderSettings]
+        self,
+        model: str | ModelRef,
+        *,
+        providers: Mapping[str, ProviderSettings] = _NO_PROVIDERS,
     ) -> ModelSpec:
         """Resolves a model name to its spec, as the module docstring describes.
 
@@ -113,6 +117,7 @@ class Catalog:
             model: ``provider/name``, a bare alias, or a parsed `ModelRef`.
             providers: The configured providers, which decide whether an
                 uncatalogued ``provider/name`` can be sent and over which API.
+                With none, only catalog models resolve.
 
         Raises:
             ModelError: ``NOT_FOUND`` for a bare name that is not an alias or a

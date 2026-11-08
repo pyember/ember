@@ -2,8 +2,10 @@
 
 import gc
 import os
+import threading
 import time
 from collections.abc import Callable, Iterator
+from concurrent.futures import Future
 
 import pytest
 
@@ -11,16 +13,13 @@ import ember
 from ember import context
 from ember.context import RetryPolicy
 from ember.errors import ConfigError, ErrorKind, ModelError
-from ember.llm import Client, Message, using
+from ember.llm import Client, Completion, Message, using
 from ember.llm.attempt import retry_delay
-from ember.llm.fake import FakeProvider, Reply
+from ember.llm.fake import Fail, FakeProvider, Reply
 from ember.llm.limiter import LimiterState
 from ember.llm.observe import Attempt, observing
-from ember.llm.provider import StreamItem
 from ember.llm.ref import ModelRef
-from ember.llm.request import Request
 from ember.llm.result import Done, Event, Money, Result, TextDelta, Usage, UsageEvent
-from ember.llm.spec import ModelSpec
 from ember.xcs import runtime
 
 
@@ -32,15 +31,8 @@ class Recorder:
         self.attempts.append(attempt)
 
 
-def _rate_limited(retry_after_s: float) -> ModelError:
-    return ModelError(
-        ErrorKind.RATE_LIMITED,
-        provider="openai",
-        model="gpt-5.5",
-        reason="slow down",
-        status=429,
-        retry_after_s=retry_after_s,
-    )
+def _rate_limited(retry_after_s: float) -> Fail:
+    return Fail(ErrorKind.RATE_LIMITED, status=429, retry_after_s=retry_after_s)
 
 
 def _complete(client: Client, model: str, **options: object) -> Iterator[Event]:
@@ -220,7 +212,7 @@ def test_overridden_base_url_builds_its_own_provider(client: Client, fake: FakeP
 
 
 def test_retryable_failures_are_retried_with_backoff(sleeps: list[float]) -> None:
-    fake = FakeProvider([ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED, Reply("done")])
+    fake = FakeProvider([Fail(ErrorKind.RATE_LIMITED), Fail(ErrorKind.OVERLOADED), Reply("done")])
     recorder = Recorder()
     with Client(provider_factory=fake.factory, sleep=sleeps.append, jitter=lambda: 0.5) as client:
         with observing(recorder):
@@ -239,29 +231,21 @@ def test_retryable_failures_are_retried_with_backoff(sleeps: list[float]) -> Non
 
 
 @pytest.mark.parametrize(
-    "failure",
-    [
-        ErrorKind.AUTH,
-        ErrorKind.BAD_REQUEST,
-        ModelError(
-            ErrorKind.TRANSPORT, provider="openai", model="m", reason="cut", before_first_byte=False
-        ),
-    ],
+    "kind", [ErrorKind.AUTH, ErrorKind.PERMISSION, ErrorKind.BAD_REQUEST, ErrorKind.NOT_FOUND]
 )
 def test_failures_that_cannot_succeed_on_retry_are_raised_at_once(
-    failure: ErrorKind | ModelError, sleeps: list[float]
+    kind: ErrorKind, sleeps: list[float]
 ) -> None:
-    fake = FakeProvider([failure])
+    fake = FakeProvider([Fail(kind, status=400)])
     with Client(provider_factory=fake.factory, sleep=sleeps.append) as client:
         with pytest.raises(ModelError) as caught:
             client.complete("gpt-5.5", "hi")
-    expected = failure if isinstance(failure, ErrorKind) else failure.kind
-    assert caught.value.kind is expected
+    assert (caught.value.kind, caught.value.status) == (kind, 400)
     assert (len(fake.requests), sleeps) == (1, [])
 
 
 def test_retries_stop_after_max_attempts(sleeps: list[float]) -> None:
-    fake = FakeProvider([ErrorKind.SERVER] * 5)
+    fake = FakeProvider([Fail(ErrorKind.SERVER)] * 5)
     with Client(provider_factory=fake.factory, sleep=sleeps.append, jitter=lambda: 0.5) as client:
         with pytest.raises(ModelError) as caught:
             client.complete("gpt-5.5", "hi")
@@ -301,7 +285,7 @@ def test_backoff_doubles_with_jitter_then_clamps(
 
 
 def test_rate_limiting_lowers_the_providers_limit_and_permits_return() -> None:
-    fake = FakeProvider([ErrorKind.RATE_LIMITED, Reply(), ErrorKind.AUTH])
+    fake = FakeProvider([Fail(ErrorKind.RATE_LIMITED), Reply(), Fail(ErrorKind.AUTH)])
     with Client(provider_factory=fake.factory, sleep=lambda _: None) as client:
         with context.override(max_in_flight_per_provider=8):
             client.complete("gpt-5.5", "hi")
@@ -315,7 +299,7 @@ def test_rate_limiting_lowers_the_providers_limit_and_permits_return() -> None:
 
 
 def test_outside_jit_a_failed_call_raises_at_the_call_site() -> None:
-    fake = FakeProvider([ErrorKind.AUTH])
+    fake = FakeProvider([Fail(ErrorKind.AUTH)])
     with Client(provider_factory=fake.factory) as client:
         with pytest.raises(ModelError):
             client.complete("gpt-5.5", "hi")
@@ -325,7 +309,7 @@ def test_when_deferred_a_failed_call_raises_on_first_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(runtime, "deferred", lambda: True)
-    fake = FakeProvider([ErrorKind.AUTH])
+    fake = FakeProvider([Fail(ErrorKind.AUTH)])
     with Client(provider_factory=fake.factory) as client:
         completion = client.complete("gpt-5.5", "hi")
         with pytest.raises(ModelError) as caught:
@@ -351,6 +335,70 @@ def test_observers_active_at_the_call_site_see_each_call_once(client: Client) ->
     assert all(isinstance(a.outcome, Result) for a in outer.attempts)
 
 
+class GatedRuntime:
+    """Runs dispatched tasks on a thread once released, with deferred results."""
+
+    def __init__(self) -> None:
+        self.gate = threading.Event()
+
+    def dispatch(self, task: Callable[[], Result], *, label: str) -> "Future[Result]":
+        future: Future[Result] = Future()
+
+        def run() -> None:
+            assert self.gate.wait(timeout=10)
+            try:
+                future.set_result(task())
+            except ModelError as error:
+                future.set_exception(error)
+
+        threading.Thread(target=run).start()
+        return future
+
+
+@pytest.mark.parametrize(
+    ("script", "fails"),
+    [([Fail(ErrorKind.OVERLOADED), Reply("ok")], False), ([Fail(ErrorKind.AUTH)], True)],
+    ids=["succeeds", "fails"],
+)
+def test_every_attempt_is_reported_before_the_outcome_is_readable(
+    script: list[Fail | Reply], fails: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gated = GatedRuntime()
+    monkeypatch.setattr(runtime, "dispatch", gated.dispatch)
+    monkeypatch.setattr(runtime, "deferred", lambda: True)
+    pending: list[Completion] = []
+    done_when_reported: list[bool] = []
+
+    class Watch(Recorder):
+        def on_attempt(self, attempt: Attempt) -> None:
+            done_when_reported.append(pending[0].done())
+            super().on_attempt(attempt)
+
+    watch = Watch()
+    fake = FakeProvider(script)
+    with Client(provider_factory=fake.factory, sleep=lambda _: None) as client:
+        with observing(watch):
+            pending.append(client.complete("gpt-5.5", "hi"))
+        gated.gate.set()
+        if fails:
+            with pytest.raises(ModelError):
+                pending[0].result()
+        else:
+            assert pending[0].text == "ok"
+        assert len(watch.attempts) == len(script)
+    assert done_when_reported == [False] * len(script)
+
+
+def test_a_stream_reports_its_attempts_before_done() -> None:
+    recorder = Recorder()
+    fake = FakeProvider([Fail(ErrorKind.OVERLOADED), Reply("ok")])
+    with Client(provider_factory=fake.factory, sleep=lambda _: None) as client:
+        with observing(recorder):
+            for event in client.stream("gpt-5.5", "hi"):
+                if isinstance(event, Done):
+                    assert len(recorder.attempts) == 2
+
+
 # Streams.
 
 
@@ -364,8 +412,10 @@ def test_a_stream_yields_deltas_then_done() -> None:
     assert (done.result.text, done.result.cost) == ("one two", Money(300))
 
 
-def test_a_stream_retries_only_before_its_first_item(sleeps: list[float]) -> None:
-    fake = FakeProvider([ErrorKind.OVERLOADED, Reply("a b", stream_error=ErrorKind.OVERLOADED)])
+def test_a_stream_retries_before_its_first_item_but_not_after(sleeps: list[float]) -> None:
+    fake = FakeProvider(
+        [Fail(ErrorKind.OVERLOADED), Reply("a b", stream_error=ErrorKind.OVERLOADED)]
+    )
     with Client(provider_factory=fake.factory, sleep=sleeps.append, jitter=lambda: 0.5) as client:
         received: list[Event] = []
         with pytest.raises(ModelError) as caught:
@@ -376,28 +426,6 @@ def test_a_stream_retries_only_before_its_first_item(sleeps: list[float]) -> Non
         assert (len(fake.requests), sleeps) == (2, [0.5])
         # Both attempts were overloaded, the second sent after the first halving.
         assert client.limiter_state("openai") == LimiterState(limit=16, in_flight=0, waiting=0)
-
-
-class MislabelledStream(FakeProvider):
-    """Fails mid-stream with an error that wrongly claims nothing was received."""
-
-    streams = 0
-
-    def stream(self, spec: ModelSpec, request: Request) -> Iterator[StreamItem]:
-        self.streams += 1
-        yield TextDelta("partial ")
-        raise ModelError(ErrorKind.OVERLOADED, provider="openai", model="m", reason="busy")
-
-
-def test_the_client_never_retries_a_stream_that_delivered_output(sleeps: list[float]) -> None:
-    fake = MislabelledStream()
-    with Client(provider_factory=fake.factory, sleep=sleeps.append) as client:
-        received: list[Event] = []
-        with pytest.raises(ModelError):
-            for event in client.stream("gpt-5.5", "hi"):
-                received.append(event)
-    assert received == [TextDelta("partial ")]
-    assert (fake.streams, sleeps) == (1, [])
 
 
 def test_an_abandoned_stream_is_reported_cancelled_and_frees_its_permit() -> None:

@@ -176,3 +176,24 @@ def test_threads_block_at_the_cap_and_all_finish() -> None:
 def test_cap_must_be_positive() -> None:
     with pytest.raises(ValueError, match="at least 1"):
         Limiter().acquire("openai", cap=0)
+
+
+def test_a_newcomer_never_overtakes_a_waiting_caller() -> None:
+    limiter = Limiter()
+    held = _grant(limiter, cap=4)
+    narrow = limiter.acquire("openai", cap=1)  # waits: its own cap of one is in use
+    wide = limiter.acquire("openai", cap=4)  # room under four, but arrived later
+    assert not narrow.done() and not wide.done()
+    held.release()
+    assert narrow.done() and wide.done()
+    assert limiter.state("openai") == LimiterState(limit=4, in_flight=2, waiting=0)
+
+
+def test_a_cancelled_head_does_not_hold_back_a_newcomer() -> None:
+    limiter = Limiter()
+    held = _grant(limiter, cap=1)
+    abandoned = limiter.acquire("openai", cap=1)
+    assert abandoned.cancel()
+    held.release()
+    assert limiter.acquire("openai", cap=1).done()
+    assert limiter.state("openai") == LimiterState(limit=1, in_flight=1, waiting=0)
