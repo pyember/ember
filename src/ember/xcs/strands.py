@@ -17,7 +17,7 @@ from typing import TypeVar
 
 import greenlet
 
-from ember.xcs.frames import Call, Frame, Plan
+from ember.xcs.frames import Call, Frame, Pending, Plan
 from ember.xcs.scheduler import Scheduler
 
 __all__ = ["Strand", "current", "scope"]
@@ -74,11 +74,14 @@ class Strand:
         self.reads = (self.reads - implied) | calls
 
     def next_call(self, label: str) -> Call:
-        """Records a call this greenlet is dispatching now."""
-        call = Call(label, self.reads, (self.path, self.dispatched))
+        """The call this greenlet dispatches next; nothing is recorded yet."""
+        return Call(label, self.reads, (self.path, self.dispatched))
+
+    def record(self, call: Call, pending: "Pending[T]") -> None:
+        """Records ``call``, which has been handed to a worker, and its future."""
         self.dispatched += 1
         self.frame.record(call)
-        return call
+        self.frame.track(pending)
 
     def next_call_remaining_s(self) -> float:
         """The current plan's prediction for the next call this greenlet dispatches."""

@@ -49,15 +49,19 @@ def dispatch(task: Callable[[], T], *, label: str) -> "Future[T]":
     Args:
         task: One request's network I/O. It must not call into ember.
         label: Short description for recorded graphs, such as the model id.
+
+    Raises:
+        RuntimeError: Inside a scope, no worker thread could start for the
+            task; it was not sent and nothing waits for it.
     """
     strand = strands.current()
     if strand is None:
         return _run_now(task)
     call = strand.next_call(label)
     pending: Pending[T] = Pending(call)
-    strand.frame.track(pending)
     context = contextvars.copy_context()
     workers.submit(lambda: _run_call(call, pending, context, task))
+    strand.record(call, pending)
     return pending
 
 
@@ -74,16 +78,20 @@ def dispatch_stream(source: Callable[[], Iterator[T]], *, label: str) -> Iterato
         source: Opens the stream and yields its items. It must not call into
             ember.
         label: Short description for recorded graphs.
+
+    Raises:
+        RuntimeError: Inside a scope, no worker thread could start for the
+            stream; it was not opened and nothing waits for it.
     """
     strand = strands.current()
     if strand is None:
         return source()
     call = strand.next_call(label)
     drained: Pending[None] = Pending(call)
-    strand.frame.track(drained)
     channel: Channel[T] = Channel()
     context = contextvars.copy_context()
     workers.submit(lambda: _drain(call, drained, channel, context, source))
+    strand.record(call, drained)
     return _read(channel, drained)
 
 

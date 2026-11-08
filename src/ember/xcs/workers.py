@@ -46,31 +46,41 @@ class WorkerPool:
         self._serial = itertools.count(1)
 
     def submit(self, task: Callable[[], None]) -> None:
-        """Queues ``task`` to run on a worker thread.
+        """Runs ``task`` on an idle thread, or on a new thread started for it.
 
-        ``task`` must not raise: it reports its own outcome, for example by
-        completing a future.
+        All or nothing: when a new thread is needed and cannot start (the
+        process is at its thread limit), the error is raised here and ``task``
+        never runs. ``task`` must not raise: it reports its own outcome, for
+        example by completing a future.
+
+        Raises:
+            RuntimeError: No thread is idle and a new one could not start.
         """
         with self._lock:
-            self._tasks.append(task)
-            if self._idle >= len(self._tasks):
+            if self._idle > len(self._tasks):
+                self._tasks.append(task)
                 self._has_work.notify()
-            else:
-                self._threads += 1
-                thread = threading.Thread(
-                    target=self._work, name=f"{self._name}-{next(self._serial)}", daemon=True
-                )
-                thread.start()
+                return
+            thread = threading.Thread(
+                target=self._work,
+                args=(task,),
+                name=f"{self._name}-{next(self._serial)}",
+                daemon=True,
+            )
+            thread.start()
+            self._threads += 1
 
     def thread_count(self) -> int:
         """Threads currently alive in the pool."""
         with self._lock:
             return self._threads
 
-    def _work(self) -> None:
+    def _work(self, first: Callable[[], None]) -> None:
+        task: Callable[[], None] | None = first
         try:
-            while (task := self._next_task()) is not None:
+            while task is not None:
                 task()
+                task = self._next_task()
         except BaseException:
             with self._lock:
                 self._threads -= 1
