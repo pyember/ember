@@ -30,7 +30,9 @@ payloads):
 https://ai.google.dev/api/generate-content
 https://ai.google.dev/api/generate-content/stream-generate-content
 https://ai.google.dev/gemini-api/docs/troubleshooting
-https://google.aip.dev/193 and google/rpc/error_details.proto (``RetryInfo``)
+https://ai.google.dev/gemini-api/docs/generate-content/api-errors (error body, read 2026-11-08)
+https://google.aip.dev/193 and google/rpc/error_details.proto (``RetryInfo``,
+``ErrorInfo``); google/api/error_reason.proto (``ErrorInfo`` reasons)
 """
 
 import base64
@@ -124,6 +126,14 @@ _SYNTHETIC_ID_PREFIX = "ember-gemini-"
 _FILES_URI = re.compile(r"https://generativelanguage\.googleapis\.com/[^?#]*/files/[^/?#]+")
 _RETRY_INFO = "type.googleapis.com/google.rpc.RetryInfo"
 _DURATION = re.compile(r"(\d+(?:\.\d+)?)s")
+_ERROR_INFO = "type.googleapis.com/google.rpc.ErrorInfo"
+_GOOGLEAPIS = "googleapis.com"
+
+# ``ErrorInfo`` reasons (domain googleapis.com) that mean the credential is
+# bad: Gemini reports an invalid, unknown or expired key as HTTP 400
+# INVALID_ARGUMENT with reason API_KEY_INVALID, so the status alone would say
+# BAD_REQUEST. Reasons from google/api/error_reason.proto.
+_AUTH_REASONS = frozenset({"API_KEY_INVALID", "CREDENTIALS_MISSING"})
 
 
 def encode(spec: ModelSpec, request: Request) -> Body:
@@ -473,16 +483,39 @@ def classify(status: int, body: object) -> Failure:
 
 
 def _failure(status: int | None, body: object) -> Failure:
-    """Reads a Google ``error`` object: its code, status name and retry delay."""
+    """Reads a Google ``error`` object: its reason, code, status name and retry delay.
+
+    A credential reason in ``ErrorInfo`` decides first, then the error's own
+    ``code``, then the HTTP status.
+    """
     error = body.get("error") if isinstance(body, dict) else None
     if not isinstance(error, dict):
         return Failure(ErrorKind.SERVER if status is None else kind_for_status(status))
+    details = error.get("details")
+    retry_after_s = _retry_delay_s(details)
+    reason = _googleapis_reason(details)
+    if reason in _AUTH_REASONS:
+        return Failure(ErrorKind.AUTH, reason, retry_after_s)
     code = error.get("code")
     if isinstance(code, int) and not isinstance(code, bool):
         kind = kind_for_status(code)
     else:
         kind = ErrorKind.SERVER if status is None else kind_for_status(status)
-    return Failure(kind, identifier(error.get("status")), _retry_delay_s(error.get("details")))
+    return Failure(kind, identifier(error.get("status")), retry_after_s)
+
+
+def _googleapis_reason(details: object) -> str | None:
+    """Returns the ``ErrorInfo.reason`` of domain googleapis.com, if one is sent."""
+    if not isinstance(details, list):
+        return None
+    for detail in details:
+        if (
+            isinstance(detail, dict)
+            and detail.get("@type") == _ERROR_INFO
+            and detail.get("domain") == _GOOGLEAPIS
+        ):
+            return identifier(detail.get("reason"))
+    return None
 
 
 def _retry_delay_s(details: object) -> float | None:

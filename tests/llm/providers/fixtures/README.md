@@ -44,7 +44,7 @@ about, so each variant's provenance is the file it starts from.
 
 The Gemini reference documents `GenerateContentResponse`, `Candidate`, `Part`
 and `UsageMetadata` as schemas with no example payloads, so every Gemini file
-is assembled from https://ai.google.dev/api/generate-content and
+except `error_api_key_invalid.json` is assembled from https://ai.google.dev/api/generate-content and
 https://ai.google.dev/api/generate-content/stream-generate-content (one
 `GenerateContentResponse` per `data:` line). The error shape (`code`,
 `message`, `status`) and the `RESOURCE_EXHAUSTED` status are from
@@ -56,12 +56,19 @@ https://ai.google.dev/gemini-api/docs/troubleshooting.
 | `gemini/function_call.json` | a `thought: true` summary part, function calls with and without `id`, signatures on parts, tool-use prompt tokens |
 | `gemini/prompt_blocked.json` | `promptFeedback.blockReason` with no candidates |
 | `gemini/error_resource_exhausted.json` | the Google error body |
+| `gemini/error_api_key_invalid.json` | verbatim, read 2026-11-08: the "Error response format" example on https://ai.google.dev/gemini-api/docs/generate-content/api-errors, an invalid key reported as HTTP 400 `INVALID_ARGUMENT` with a `google.rpc.ErrorInfo` detail whose reason is `API_KEY_INVALID` |
 | `gemini/stream_text.sse` | three chunks; the last carries `finishReason` and the final usage |
 
 A `GenerateContentResponse` is also one stream chunk, so the JSON files are
 decoded as single-chunk streams. `RetryInfo` in the error test follows
 `google/rpc/error_details.proto` in https://github.com/googleapis/googleapis,
-which https://google.aip.dev/193 names for error details.
+which https://google.aip.dev/193 names for error details. The credential
+reasons treated as authentication failures, `API_KEY_INVALID` ("the provided
+API key is invalid. It may be in a bad format, cannot be found, or has been
+expired") and `CREDENTIALS_MISSING`, are defined for the `googleapis.com`
+domain in `google/api/error_reason.proto` in the same repository
+(https://github.com/googleapis/googleapis/blob/master/google/api/error_reason.proto);
+an expired key has no reason of its own and reports `API_KEY_INVALID`.
 
 ## Usage fields not on the reference pages' examples
 

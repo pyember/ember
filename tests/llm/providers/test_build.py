@@ -349,3 +349,19 @@ def test_an_exception_the_consumer_throws_in_is_not_relabelled(kit, recorder) ->
     assert next(items) == TextDelta("Hello")
     with pytest.raises(ValueError, match="consumer"):
         items.throw(ValueError("consumer gave up"))
+
+
+def test_gemini_invalid_key_reaches_the_caller_as_auth(kit, recorder) -> None:
+    provider, record = _provider(
+        kit,
+        recorder,
+        kit.settings("gemini", "gemini", key=KEY),
+        lambda request: httpx.Response(400, json=kit.json("gemini/error_api_key_invalid.json")),
+    )
+    spec = kit.spec("gemini", provider="gemini", wire_id="gemini-3.8-flash")
+    with pytest.raises(ModelError) as caught:
+        provider.send(spec, Request.from_prompt("hi"))
+    error = caught.value
+    assert (error.kind, error.status, error.retryable) == (ErrorKind.AUTH, 400, False)
+    assert "API_KEY_INVALID" in str(error) and "not valid" not in str(error)
+    assert len(record.requests) == 1
