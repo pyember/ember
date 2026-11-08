@@ -152,7 +152,10 @@ def test_planning_shortens_the_makespan_under_a_capacity_limit() -> None:
         program()
         makespans.append(time.perf_counter() - started)
     unplanned, planned = makespans
-    # FIFO runs the singles first and the chain last: 8 rounds of latency.
-    # The plan starts the chain first: close to max(chain, 12 calls / 2) = 6.
+    # FIFO runs the four rounds of singles first and the chain after: 8 rounds.
+    # With the plan the chain starts in round 2. The lower bound is 6 rounds,
+    # but the client frees a permit inside the task, before the chain's next
+    # request can queue, so a slot freed by a link may go to a single first:
+    # the worst case is 7 rounds. Half a round of margin absorbs timer noise.
     assert unplanned >= 8 * latency_s
-    assert planned <= unplanned - 1.0 * latency_s, f"{unplanned=:.3f}s {planned=:.3f}s"
+    assert planned <= unplanned - 0.5 * latency_s, f"{unplanned=:.3f}s {planned=:.3f}s"
