@@ -281,9 +281,11 @@ def usage(value: object) -> Usage:
         return Usage(measured=False)
     fields = json_object(value, "usage")
     details = fields.get("output_tokens_details")
-    thinking = json_object(details, "output_tokens_details").get("thinking_tokens", 0)
     output = count(fields.get("output_tokens"), "usage.output_tokens")
-    reasoning = count(thinking if details is not None else 0, "usage.thinking_tokens")
+    reasoning = 0
+    if details is not None:
+        thinking = json_object(details, "output_tokens_details").get("thinking_tokens", 0)
+        reasoning = count(thinking, "usage.thinking_tokens")
     if reasoning > output:
         raise malformed("usage thinking_tokens exceed output_tokens")
     return Usage(
