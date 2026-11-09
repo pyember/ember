@@ -89,29 +89,27 @@ jobs:
       - run: uv pip list
       - run: uv run pytest -q
 
-  # TEMPORARY, removed before this branch merges: whether a process exits after
-  # a Hub read that stops early, with the locked versions.
+  # TEMPORARY, removed before this branch merges: how often a process fails to
+  # exit after a Hub read that stops early, with the locked versions.
   hub-probe:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
-          python-version: ${{ matrix.python }}
+          python-version: "3.13"
       - run: uv sync --locked --extra data
-      - name: The datasets library alone, read three rows and exit
+      - name: Six bounded attempts of each read
         shell: bash
-        timeout-minutes: 3
         run: |
-          set -euo pipefail
-          HF_HOME="$RUNNER_TEMP/hf-plain" uv run python - <<'PY'
+          set -uo pipefail
+          cat > "$RUNNER_TEMP/plain.py" <<'PY'
           import itertools
 
           import datasets
@@ -123,34 +121,39 @@ jobs:
               streaming=True,
               revision="c30699e8356da336a370243923dbaf21066bb9fe",
           )
-          print(len(list(itertools.islice(rows, 3))), "rows with datasets", datasets.__version__)
+          print(len(list(itertools.islice(rows, 3))))
           PY
-          echo "the process exited"
-      - name: An ember read, then five seconds of other work, then exit
-        if: ${{ !cancelled() }}
-        shell: bash
-        timeout-minutes: 3
-        run: |
-          set -euo pipefail
-          HF_HOME="$RUNNER_TEMP/hf-later" uv run python - <<'PY'
+          cat > "$RUNNER_TEMP/ember_now.py" <<'PY'
+          from ember import data
+
+          print(len(list(data.stream("mmlu", limit=3))))
+          PY
+          cat > "$RUNNER_TEMP/ember_later.py" <<'PY'
           import time
 
           from ember import data
 
-          print(len(list(data.stream("mmlu", limit=3))), "examples")
+          print(len(list(data.stream("mmlu", limit=3))))
           time.sleep(5)
           PY
-          echo "the process exited"
-      - name: An ember read of each dataset, then exit, three times
-        if: ${{ !cancelled() }}
-        shell: bash
-        timeout-minutes: 3
-        run: |
-          set -euo pipefail
-          for i in 1 2 3; do
-            HF_HOME="$RUNNER_TEMP/hf-$i" uv run python tests/live/hub.py
-            echo "read $i: the process exited"
-          done
+          attempts() {
+            local label="$1" exited=0 stuck=0 failed=0 status
+            for i in 1 2 3 4 5 6; do
+              # The alarm survives exec and ends a process that cannot exit (status 142).
+              HF_HOME="$RUNNER_TEMP/hf-$label-$i" perl -e 'alarm 60; exec @ARGV' \
+                .venv/bin/python "$RUNNER_TEMP/$label.py" > /dev/null 2> "$RUNNER_TEMP/err-$label-$i.txt"
+              status=$?
+              case "$status" in
+                0) exited=$((exited + 1)) ;;
+                142) stuck=$((stuck + 1)) ;;
+                *) failed=$((failed + 1)); tail -3 "$RUNNER_TEMP/err-$label-$i.txt" ;;
+              esac
+            done
+            echo "RESULT $label: $exited exited, $stuck did not exit, $failed failed for another reason"
+          }
+          attempts plain
+          attempts ember_now
+          attempts ember_later
 
   wheel:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
