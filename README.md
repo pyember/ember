@@ -100,8 +100,10 @@ executes your function.
 `xcs.map` runs a function over items concurrently and returns the results in order:
 
 ```python
-answers = xcs.map(lambda q: ember.models("gemini/gemini-3.1-pro-preview", q).text,
-                  ["Capital of Peru?", "Capital of Chile?", "Capital of Ghana?"])
+answers = xcs.map(
+    lambda q: ember.models("gemini/gemini-3.1-pro-preview", q).text,
+    ["Capital of Peru?", "Capital of Chile?", "Capital of Ghana?"],
+)
 print(answers)
 ```
 
@@ -124,8 +126,11 @@ shorten = ModelCall("anthropic/claude-sonnet-5-5", template="Make this shorter:\
 print((summarize >> shorten)("Ember composes model calls into larger systems.").text)
 
 panel = Ensemble(
-    (ModelCall("openai/gpt-5.5"), ModelCall("anthropic/claude-opus-5-5"),
-     ModelCall("gemini/gemini-3.1-pro-preview")),
+    (
+        ModelCall("openai/gpt-5.5"),
+        ModelCall("anthropic/claude-opus-5-5"),
+        ModelCall("gemini/gemini-3.1-pro-preview"),
+    ),
     quorum=2,
 )
 answers = tuple(o.value.text for o in panel("Is 1009 prime?") if isinstance(o, Succeeded))
@@ -185,8 +190,12 @@ def solve(example: Example) -> str:
     return ember.models("openai/gpt-5.5", prompt).text
 
 
-records = run(solve, items, scorer=NumericAnswer(after="Answer:"),
-              records=Path(tempfile.mkdtemp()) / "run.jsonl")
+records = run(
+    solve,
+    items,
+    scorer=NumericAnswer(after="Answer:"),
+    records=Path(tempfile.mkdtemp()) / "run.jsonl",
+)
 summary = records.summary
 print(summary.mean_score, summary.failed, summary.retries, summary.unpriced_calls)
 ```
