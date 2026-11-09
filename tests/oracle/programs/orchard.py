@@ -3,7 +3,7 @@
 The xcs oracle runs each program plainly and under `ember.xcs.jit` and
 requires the same result, the same model requests and the same side effects.
 Each program reproduces a shape that broke v0.1's trace-and-replay compiler;
-its docstring names the audit finding it covers. The module's name is
+where it is not obvious, its docstring says how. The module's name is
 deliberately unremarkable: nothing in ember may treat it specially.
 
 Every program takes the model as its first argument, so the oracle can run
@@ -37,7 +37,7 @@ def reset() -> None:
 
 
 def four_questions(model: Model, a: str, b: str, c: str, d: str) -> list[str]:
-    """Four independent calls written one after another (runtime #1)."""
+    """Four independent calls written one after another."""
     first = model(a)
     second = model(b)
     third = model(c)
@@ -57,12 +57,12 @@ def _middle(model: Model, x: str) -> str:
 
 
 def nested_helpers(model: Model, x: str) -> str:
-    """A three-deep helper chain (compiler #4: v0.1 re-ran each frame per depth)."""
+    """A three-deep helper chain (v0.1 re-ran each frame per depth)."""
     return _middle(model, x) + _middle(model, x + "'")
 
 
 def countdown(model: Model, n: int) -> list[str]:
-    """Recursion with a call pending across each recursive step (compiler #4)."""
+    """Recursion with a call pending across each recursive step."""
     note("countdown", n)
     if n == 0:
         return [model("liftoff").text]
@@ -75,12 +75,12 @@ PERSONA = {"name": "pirate"}
 
 
 def persona_reply(model: Model, question: str) -> str:
-    """Builds the prompt from a global (runtime #2, compiler #3: v0.1 froze it)."""
+    """Builds the prompt from a global (v0.1 froze it)."""
     return model(f"{PERSONA['name']}: {question}").text
 
 
 def converse(model: Model, question: str) -> str:
-    """Grows a list after sending it (runtime #2: v0.1 resent the grown list)."""
+    """Grows a list after sending it (v0.1 resent the grown list)."""
     messages = [question]
     reply = model(" / ".join(messages))
     messages.append(reply.text)
@@ -97,7 +97,7 @@ def _snapshot(items: list[str]) -> list[str]:
 
 
 def accumulate(model: Model, x: str) -> list[str]:
-    """A local list passed to helpers (compiler #3: v0.1 kept one list forever)."""
+    """A local list passed to helpers (v0.1 kept one list forever)."""
     items: list[str] = []
     _append_item(items, x)
     reply = model(f"sum {_snapshot(items)}")
@@ -114,7 +114,7 @@ def _read(store: dict[str, Completion], model: Model) -> str:
 
 
 def write_then_read(model: Model, x: str) -> str:
-    """A writer and a reader of one dict (compiler #1: v0.1 ran them concurrently)."""
+    """A writer and a reader of one dict (v0.1 ran them concurrently)."""
     store: dict[str, Completion] = {}
     _write(store, x, model)
     return _read(store, model)
@@ -126,7 +126,7 @@ def _bump(model: Model, n: int) -> Completion:
 
 
 def rebinding_callee(model: Model, x: int) -> str:
-    """A callee rebinds its parameter before calling (compiler #2)."""
+    """A callee rebinds its parameter before calling."""
     return _bump(model, x).text
 
 
@@ -135,7 +135,7 @@ def _push(target: list[str], value: str) -> None:
 
 
 def aliased_arguments(model: Model, dst: list[str], src: list[str]) -> list[int]:
-    """Writes through one of two parameters that may be the same list (compiler #3a)."""
+    """Writes through one of two parameters that may be the same list."""
     _push(dst, model("one").text)
     return [len(dst), len(src)]
 
@@ -145,7 +145,7 @@ def _risky(model: Model, x: str) -> str:
 
 
 def caught_failure(model: Model, x: str) -> str:
-    """A failure caught by the caller, then more calls (compiler #5, #18; runtime #5)."""
+    """A failure caught by the caller, then more calls."""
     try:
         return _risky(model, x)
     except ModelError as error:
@@ -168,7 +168,7 @@ class Agent:
 
 
 def method_shadows_function(model: Model, x: str) -> list[str]:
-    """Calls a method named like a module function (compiler #6)."""
+    """Calls a method named like a module function."""
     return Agent().run(model, x)
 
 
@@ -186,7 +186,7 @@ class Planner:
 
 
 def jitted_method(model: Model, goal: str) -> list[list[str]]:
-    """Calls one jitted method on two instances (compiler #6)."""
+    """Calls one jitted method on two instances."""
     return [Planner("a").plan(model, goal), Planner("b").plan(model, goal)]
 
 
@@ -203,7 +203,7 @@ def _pick(config: dict[str, int], other: Completion) -> dict[str, int]:
 
 
 def shared_config(model: Model, x: str) -> list[object]:
-    """Two helpers return the same object (compiler #7)."""
+    """Two helpers return the same object."""
     config = _get_config()
     other = model(f"other {x}")
     used = model(f"use {config['k']} {x}")
@@ -248,7 +248,7 @@ class LazyClient:
 
 
 def property_effects(model: Model, deposit: int) -> str:
-    """Property getters and setters with effects (compiler #8)."""
+    """Property getters and setters with effects."""
     account = Account()
     account.balance = account.balance + deposit
     lazy = LazyClient()
@@ -257,7 +257,7 @@ def property_effects(model: Model, deposit: int) -> str:
 
 
 def through_own_thread_pool(model: Model, x: str) -> list[str]:
-    """The program's own thread pool calls the model (compiler #9)."""
+    """The program's own thread pool calls the model."""
 
     def work(i: int) -> str:
         note(("worker", i), "start")
@@ -287,7 +287,7 @@ class Point:
 
 
 def dataclass_values(model: Model, n: int) -> list[Point]:
-    """Builds dataclasses from results (compiler #11)."""
+    """Builds dataclasses from results."""
     return [Point(i, len(model(f"p{i}").text)) for i in range(n)]
 
 
@@ -299,12 +299,12 @@ def inner_pair(model: Model, x: str) -> list[str]:
 
 
 def jit_calls_jit(model: Model, xs: list[str]) -> list[list[str]]:
-    """Calls a jitted function in a loop (runtime #4, compiler #8)."""
+    """Calls a jitted function in a loop."""
     return [inner_pair(model, x) for x in xs]
 
 
 def ask_with_temperature(model: Model, question: str, *, temperature: float = 0.7) -> str:
-    """A keyword-only parameter with a default (runtime #6)."""
+    """A keyword-only parameter with a default."""
     return model(f"{question} t={temperature}").text
 
 
@@ -317,7 +317,7 @@ def _options(**options: int) -> list[tuple[str, int]]:
 
 
 def variadic_calls(model: Model, x: int) -> list[str]:
-    """Builds prompts with *args and **kwargs helpers (compiler #10)."""
+    """Builds prompts with *args and **kwargs helpers."""
     first = model(f"total {_total(x, x, x)}")
     second = model(f"options {_options(a=x)}")
     return [first.text, second.text]
@@ -330,7 +330,7 @@ def helper(model: Model, x: str) -> str:
 
 
 def shadowed_helper(model: Model, x: str) -> str:
-    """A local function shadows a module function (runtime #3)."""
+    """A local function shadows a module function."""
 
     def inner(y: str) -> str:
         def helper(z: str) -> str:
@@ -363,7 +363,7 @@ def session_chat(model: Model, session: Session, question: str) -> str:
 
 
 def pair(model: Model, a: str, b: str) -> list[str]:
-    """Two independent calls; either may fail (runtime #5)."""
+    """Two independent calls; either may fail."""
     first = model(a)
     second = model(b)
     return [first.text, second.text]
@@ -379,7 +379,7 @@ def _per_question(model: Model, question: str) -> list[str]:
 
 
 def nested_fanout(model: Model, questions: list[str]) -> list[list[str]]:
-    """A map inside a map (runtime #7: v0.1 deadlocked on its shared pool)."""
+    """A map inside a map (v0.1 deadlocked on its shared pool)."""
     return xcs.map(lambda question: _per_question(model, question), questions)
 
 
@@ -388,24 +388,24 @@ def _named_model(model: Model, question: str) -> str:
 
 
 def scoped_context(model: Model, questions: list[str]) -> list[object]:
-    """A context override around a map (runtime #9: v0.1 workers lost it)."""
+    """A context override around a map (v0.1 workers lost it)."""
     with context.override(default_model="fake/scoped"):
         inside = xcs.map(lambda question: _named_model(model, question), questions)
     return [inside, _named_model(model, "after")]
 
 
 def ask_all(model: Model, prompts: list[str], system: str) -> list[str]:
-    """One string argument shared by every item (runtime #8: v0.1 split it)."""
+    """One string argument shared by every item (v0.1 split it)."""
     return xcs.map(lambda prompt: model(prompt, system=system).text, prompts)
 
 
 def send(model: Model, message: str, **options: object) -> str:
-    """Accepts keyword arguments named ``config`` (runtime #17)."""
+    """Accepts keyword arguments named ``config``."""
     return model(f"{message} options={sorted(options.items())}").text
 
 
 def build(model: Model, prompt: str, _config: object = None) -> str:
-    """Has a parameter named ``_config`` (runtime #17)."""
+    """Has a parameter named ``_config``."""
     return model(f"{prompt} config={_config}").text
 
 
@@ -438,7 +438,7 @@ def guarded(model: Model, xs: list[str]) -> list[str]:
 
 
 def strict_all(model: Model, xs: list[str]) -> list[str]:
-    """A failure escapes a map item (runtime #19)."""
+    """A failure escapes a map item."""
     return xcs.map(lambda x: model(x).text, xs)
 
 
@@ -482,7 +482,7 @@ def _counter() -> Callable[[], int]:
 
 
 def closure_state(model: Model, x: str) -> list[object]:
-    """A closure counter read at each call site (compiler #3)."""
+    """A closure counter read at each call site."""
     bump = _counter()
     first = model(f"{x} #{bump()}")
     second = model(f"{x} #{bump()}")

@@ -1,3 +1,5 @@
+import re
+import sys
 import threading
 from pathlib import Path
 
@@ -24,7 +26,7 @@ def test_missing_file_gives_builtin_providers() -> None:
 
 def test_invalid_file_raises_config_error_naming_the_path(isolated_config: Path) -> None:
     isolated_config.write_text("providers: [unclosed\n")
-    with pytest.raises(ConfigError, match=str(isolated_config)):
+    with pytest.raises(ConfigError, match=re.escape(str(isolated_config))):
         context.current()
 
 
@@ -92,6 +94,7 @@ def test_secrets_never_appear_in_reprs(isolated_config: Path) -> None:
 
 def test_save_provider_field_writes_atomically_with_private_mode(isolated_config: Path) -> None:
     config.save_provider_field("openai", "api_key", "sk-saved-00000000")
-    assert isolated_config.stat().st_mode & 0o777 == 0o600
+    if sys.platform != "win32":  # Windows has no mode bits.
+        assert isolated_config.stat().st_mode & 0o777 == 0o600
     context.reload()
     assert context.current().provider("openai").credential().reveal() == "sk-saved-00000000"

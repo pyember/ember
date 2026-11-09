@@ -87,11 +87,21 @@ class ConfigData:
 
 
 def config_path() -> Path:
-    """Returns the config file location: ``$EMBER_CONFIG`` or ``~/.ember/config.yaml``."""
+    """Returns the config file location: ``$EMBER_CONFIG`` or ``~/.ember/config.yaml``.
+
+    Raises:
+        ConfigError: The location is under the home directory and the system
+            does not say where that is.
+    """
     override = os.environ.get("EMBER_CONFIG")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / ".ember" / "config.yaml"
+    try:
+        if override:
+            return Path(override).expanduser()
+        return Path.home() / ".ember" / "config.yaml"
+    except RuntimeError:  # What pathlib raises when no home directory is known.
+        raise ConfigError(
+            "cannot find your home directory; set EMBER_CONFIG to the full path of the config file"
+        ) from None
 
 
 def load(path: Path | None = None) -> ConfigData:
@@ -113,6 +123,8 @@ def load(path: Path | None = None) -> ConfigData:
 
 def save_provider_field(provider: str, field: str, value: str, path: Path | None = None) -> None:
     """Sets one provider field in the config file, atomically, with mode 0600.
+
+    Windows has no mode bits: there the file takes the permissions of its folder.
 
     Args:
         provider: Provider name.
@@ -437,7 +449,7 @@ def _write_atomic(path: Path, text: str) -> None:
 def _sync_directory(directory: Path) -> None:
     """Makes the rename that replaced the file durable."""
     if sys.platform == "win32":
-        return  # Windows cannot open a directory to fsync it; its renames need no such step.
+        return  # Windows has no way to sync a directory.
     fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY)
     try:
         os.fsync(fd)

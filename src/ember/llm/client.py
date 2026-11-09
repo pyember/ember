@@ -29,6 +29,7 @@ import contextvars
 import dataclasses
 import os
 import random
+import sys
 import threading
 import time
 import uuid
@@ -601,4 +602,5 @@ def _after_fork_in_child() -> None:
 
 
 atexit.register(_close_default)
-os.register_at_fork(after_in_child=_after_fork_in_child)
+if sys.platform != "win32":
+    os.register_at_fork(after_in_child=_after_fork_in_child)

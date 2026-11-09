@@ -2,6 +2,11 @@
 
 The limiter is `ember.llm.limiter.Limiter`, which keeps its waiters in a
 `runtime.WaitQueue`; the calls take and release permits as the client does.
+
+A plan is what the previous run measured, and a loaded machine can stretch any
+measurement. So these tests read the order a plan implies from the recorded
+graph, and rely on one comparison only: a call that sleeps took longer than a
+call that does not.
 """
 
 import threading
@@ -52,8 +57,15 @@ def test_popping_an_empty_queue_raises() -> None:
         runtime.WaitQueue[str]().pop()
 
 
+def recorded_remaining_s(program: xcs.Jitted) -> tuple[float, ...]:
+    """Each call's remaining path in the program's last run, in dispatch order."""
+    graph = program.graph()
+    assert graph is not None
+    return graph.remaining_s()
+
+
 def recorded_durations(queue: "runtime.WaitQueue[int]", durations: list[float]) -> xcs.Jitted:
-    """A program whose items push to ``queue`` and then make one call of a known duration."""
+    """A program whose items push to ``queue`` and then make one call that sleeps its duration."""
 
     def item(i: int) -> None:
         queue.push(i)
@@ -69,11 +81,14 @@ def recorded_durations(queue: "runtime.WaitQueue[int]", durations: list[float]) 
 
 def test_within_a_jit_call_the_longest_predicted_path_goes_first() -> None:
     queue: runtime.WaitQueue[int] = runtime.WaitQueue()
-    program = recorded_durations(queue, [0.01, 0.08, 0.04])
+    program = recorded_durations(queue, [0.0, 0.08, 0.04])
     program("same")
     assert [queue.pop() for _ in range(3)] == [0, 1, 2]
+    _, *recorded = recorded_remaining_s(program)  # The labelled call, then the items.
+    assert recorded[1] > recorded[0], recorded
     program("same")
-    assert [queue.pop() for _ in range(3)] == [1, 2, 0]
+    longest_first = sorted(range(3), key=lambda i: -recorded[i])
+    assert [queue.pop() for _ in range(3)] == longest_first, recorded
 
 
 def test_a_run_that_departs_from_the_plan_drops_it() -> None:
@@ -87,7 +102,7 @@ def test_a_run_that_departs_from_the_plan_drops_it() -> None:
 
 def test_jit_calls_get_slots_in_arrival_order() -> None:
     queue: runtime.WaitQueue[str] = runtime.WaitQueue()
-    durations = {"short": 0.01, "long": 0.08}
+    durations = {"short": 0.0, "long": 0.08}
 
     def item(name: str) -> None:
         queue.push(name)
@@ -103,28 +118,35 @@ def test_jit_calls_get_slots_in_arrival_order() -> None:
 
     program()
     [queue.pop() for _ in range(3)]
+    short, long = recorded_remaining_s(program)
+    assert long > short, (short, long)
     program()
     assert [queue.pop() for _ in range(3)] == ["long", "outsider", "short"]
 
 
 def test_a_limiter_using_the_queue_grants_slots_by_predicted_remaining_path() -> None:
-    durations = {"first": 0.02, "short": 0.01, "long": 0.08, "middle": 0.04}
-    call = limited_call(1, durations.__getitem__)
+    # "first" takes the only slot on arrival and holds it while the others queue.
+    durations = {"first": 0.08, "short": 0.0, "long": 0.08, "middle": 0.04}
     granted: list[str] = []
 
-    def item(name: str) -> None:
-        call(name)
-        granted.append(name)
+    def latency_s(name: str) -> float:
+        granted.append(name)  # Called by the task, while it holds the slot.
+        return durations[name]
+
+    call = limited_call(1, latency_s)
 
     @xcs.jit
     def program() -> None:
-        xcs.map(item, list(durations))
+        xcs.map(call, list(durations))
 
     program()
     assert granted == ["first", "short", "long", "middle"]
+    recorded = dict(zip(granted, recorded_remaining_s(program), strict=True))
+    assert recorded["long"] > recorded["short"], recorded
     granted.clear()
     program()
-    assert granted == ["first", "long", "middle", "short"]
+    longest_first = sorted(["short", "long", "middle"], key=lambda name: -recorded[name])
+    assert granted == ["first", *longest_first], recorded
 
 
 @pytest.mark.slow

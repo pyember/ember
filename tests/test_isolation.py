@@ -8,7 +8,8 @@ from ember import config
 
 def test_tests_cannot_reach_the_real_home_or_config(real_home: Path) -> None:
     assert Path.home() != real_home
-    assert real_home not in config.config_path().parents
+    # Not `real_home` itself: on Windows the temporary directory is inside it.
+    assert real_home / ".ember" not in config.config_path().parents
 
 
 def test_tests_run_without_provider_keys() -> None:

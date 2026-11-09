@@ -26,6 +26,7 @@ import decimal
 import difflib
 import importlib.resources
 import os
+import sys
 import threading
 import tomllib
 from collections.abc import Iterator, Mapping
@@ -357,4 +358,5 @@ def _renew_lock_in_child() -> None:
     _lock = threading.Lock()
 
 
-os.register_at_fork(after_in_child=_renew_lock_in_child)
+if sys.platform != "win32":
+    os.register_at_fork(after_in_child=_renew_lock_in_child)

@@ -1,6 +1,7 @@
 """Config file errors name the file and line; removal can repair a misspelt key."""
 
 import os
+import re
 import stat
 import sys
 import traceback
@@ -55,15 +56,33 @@ def test_errors_name_the_file_and_line(
 
 def test_context_errors_from_the_file_name_the_file(config_file: Path) -> None:
     config_file.write_text("providers:\n  local:\n    base_url: http://h/v1\n")
-    with pytest.raises(ConfigError, match=f"^{config_file}: provider 'local' needs kind"):
+    with pytest.raises(
+        ConfigError, match=f"^{re.escape(str(config_file))}: provider 'local' needs kind"
+    ):
         context.current()
+
+
+@pytest.mark.parametrize("override", [None, "~/ember.yaml"])
+def test_an_unknown_home_directory_is_a_config_error(
+    monkeypatch: pytest.MonkeyPatch, override: str | None
+) -> None:
+    with monkeypatch.context() as patch:
+        if override is None:
+            patch.delenv("EMBER_CONFIG")
+        else:
+            patch.setenv("EMBER_CONFIG", override)
+        # With no home directory known, `os.path.expanduser` returns its argument unchanged.
+        patch.setattr(os.path, "expanduser", lambda path: path)
+        with pytest.raises(ConfigError, match="set EMBER_CONFIG to the full path"):
+            config.config_path()
 
 
 def test_remove_provider_field_removes_a_misspelt_key(config_file: Path) -> None:
     config_file.write_text("providers:\n  openai:\n    api_key: sk-kept-0000\n    api_kye: x\n")
     config.remove_provider_field("openai", "api_kye")
     assert config.load().providers["openai"] == {"api_key": "sk-kept-0000"}
-    assert config_file.stat().st_mode & 0o777 == 0o600
+    if sys.platform != "win32":  # Windows has no mode bits.
+        assert config_file.stat().st_mode & 0o777 == 0o600
 
 
 def test_removing_the_last_field_removes_the_provider_and_the_section(config_file: Path) -> None:
@@ -104,7 +123,9 @@ def test_a_yaml_error_does_not_chain_the_parser_error_that_quotes_the_line(
 def test_context_errors_name_the_file_wherever_the_data_is_checked(config_file: Path) -> None:
     config_file.write_text("providers:\n  local:\n    kind: bogus\n")
     data = config.load()
-    with pytest.raises(ConfigError, match=f"^{config_file}: provider 'local' has unknown kind"):
+    with pytest.raises(
+        ConfigError, match=f"^{re.escape(str(config_file))}: provider 'local' has unknown kind"
+    ):
         context.from_config(data)
 
 
@@ -143,7 +164,9 @@ def test_writes_keep_the_file_order(config_file: Path) -> None:
 )
 def test_writers_refuse_to_drop_comments(config_file: Path, text: str, line: int) -> None:
     config_file.write_text(text)
-    with pytest.raises(ConfigError, match=f"^{config_file} line {line}: .*comments"):
+    with pytest.raises(
+        ConfigError, match=f"^{re.escape(str(config_file))} line {line}: .*comments"
+    ):
         config.save_provider_field("openai", "api_key_env", "MY_KEY")
     with pytest.raises(ConfigError, match="comments"):
         config.remove_provider_field("openai", None)
@@ -166,7 +189,8 @@ def test_writes_are_synced_to_disk(config_file: Path, monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(os, "fsync", fsync)
     config.save_provider_field("openai", "api_key_env", "MY_KEY")
-    assert synced == ["file", "dir"]
+    # Windows has no way to sync a directory.
+    assert synced == (["file"] if sys.platform == "win32" else ["file", "dir"])
 
 
 def test_provider_fields_reads_a_file_that_load_rejects(config_file: Path) -> None:

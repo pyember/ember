@@ -1,9 +1,11 @@
 """`jit` and `map`.
 
-`jit` changes when model calls wait, never what a function computes. Inside a
-jitted function each model call is sent at its call site and returns a
-pending result; reading the result waits for that call only. The function runs
-once, in program order, on the caller's thread.
+`jit` changes when model calls wait. Inside a jitted function each model call
+is sent at its call site and returns a pending result; reading the result
+waits for that call only. The function runs once, in program order, on the
+caller's thread, so while its calls succeed it computes exactly what it
+computes without `jit`. A failed call's error is raised where its result is
+first read, not at the call.
 
 `map` runs a function on each item in its own greenlet, so the items' model
 calls overlap. Items interleave only where one of them waits for a result.

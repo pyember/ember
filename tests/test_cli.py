@@ -2,6 +2,7 @@
 
 import ast
 import getpass
+import os
 import re
 import subprocess
 import sys
@@ -114,7 +115,8 @@ def test_set_key_reads_the_key_at_a_hidden_prompt(
     assert main(["configure", "set-key", "openai"]) == 0
     assert prompts == ["API key for openai (input hidden): "]
     assert KEY not in capsys.readouterr().out
-    assert config_file.stat().st_mode & 0o777 == 0o600
+    if sys.platform != "win32":  # Windows has no mode bits.
+        assert config_file.stat().st_mode & 0o777 == 0o600
     context.reload()
     assert context.current().provider("openai").credential().reveal() == KEY
 
@@ -274,13 +276,30 @@ def test_unset_of_something_not_set_is_an_error(
     assert "FIELD is not set for openai; fields set there: base_url" in capsys.readouterr().err
 
 
+def test_an_unknown_home_directory_is_one_line_of_error(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    with monkeypatch.context() as patch:
+        patch.delenv("EMBER_CONFIG")
+        # With no home directory known, `os.path.expanduser` returns its argument unchanged.
+        patch.setattr(os.path, "expanduser", lambda path: path)
+        assert main(["configure", "show"]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "ember: error: cannot find your home directory; "
+        "set EMBER_CONFIG to the full path of the config file\n"
+    )
+
+
 def test_the_installed_command_survives_a_broken_home_config(tmp_path: Path) -> None:
     home = tmp_path / "home"
     (home / ".ember").mkdir(parents=True)
     (home / ".ember" / "config.yaml").write_text("default_model: [unclosed\n")
     result = subprocess.run(
         [sys.executable, "-m", "ember.cli", "configure", "show"],
-        env={"HOME": str(home), "PATH": "/usr/bin:/bin"},
+        # Windows reads the home directory from USERPROFILE.
+        env={"HOME": str(home), "USERPROFILE": str(home), "PATH": "/usr/bin:/bin"},
         capture_output=True,
         text=True,
         check=False,
@@ -288,9 +307,8 @@ def test_the_installed_command_survives_a_broken_home_config(tmp_path: Path) -> 
     assert result.returncode == 1
     assert result.stdout == ""
     assert len(result.stderr.splitlines()) == 1
-    assert result.stderr.startswith(
-        f"ember: error: {home}/.ember/config.yaml line 2: not valid YAML"
-    )
+    broken = home / ".ember" / "config.yaml"
+    assert result.stderr.startswith(f"ember: error: {broken} line 2: not valid YAML")
 
 
 def test_cli_data_and_eval_never_start_processes_or_prompt() -> None:
