@@ -207,7 +207,7 @@ benchmarks from the Hugging Face Hub at pinned revisions; install `ember-ai[data
 ## Configure
 
 `~/.ember/config.yaml`, or the file named by `EMBER_CONFIG`, holds providers and defaults. The CLI
-writes it with mode 0600 and never prints a key:
+writes it with mode 0600 (on Windows, with the permissions of its folder) and never prints a key:
 
 ```bash
 ember configure set-key openai                      # prompts for the key
