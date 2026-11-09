@@ -89,15 +89,15 @@ jobs:
       - run: uv pip list
       - run: uv run pytest -q
 
-  # TEMPORARY, removed before this branch merges: whether a real Hub read lets
-  # the process exit, with the locked versions, on each system.
+  # TEMPORARY, removed before this branch merges: whether a process exits after
+  # a Hub read that stops early, with the locked versions.
   hub-probe:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
         python: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -106,10 +106,45 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python }}
       - run: uv sync --locked --extra data
-      - run: uv pip list
-      - name: Three reads, each from an empty cache
+      - name: The datasets library alone, read three rows and exit
         shell: bash
-        timeout-minutes: 6
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          HF_HOME="$RUNNER_TEMP/hf-plain" uv run python - <<'PY'
+          import itertools
+
+          import datasets
+
+          rows = datasets.load_dataset(
+              "cais/mmlu",
+              "all",
+              split="test",
+              streaming=True,
+              revision="c30699e8356da336a370243923dbaf21066bb9fe",
+          )
+          print(len(list(itertools.islice(rows, 3))), "rows with datasets", datasets.__version__)
+          PY
+          echo "the process exited"
+      - name: An ember read, then five seconds of other work, then exit
+        if: ${{ !cancelled() }}
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          HF_HOME="$RUNNER_TEMP/hf-later" uv run python - <<'PY'
+          import time
+
+          from ember import data
+
+          print(len(list(data.stream("mmlu", limit=3))), "examples")
+          time.sleep(5)
+          PY
+          echo "the process exited"
+      - name: An ember read of each dataset, then exit, three times
+        if: ${{ !cancelled() }}
+        shell: bash
+        timeout-minutes: 3
         run: |
           set -euo pipefail
           for i in 1 2 3; do
