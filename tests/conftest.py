@@ -40,6 +40,7 @@ def isolated_config(
     """
     home = tmp_path_factory.mktemp("home")
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # What `Path.home()` reads on Windows.
     monkeypatch.setenv("EMBER_CONFIG", str(home / ".ember" / "config.yaml"))
     for name in _PROVIDER_KEY_VARIABLES:
         monkeypatch.delenv(name, raising=False)
