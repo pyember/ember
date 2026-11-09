@@ -12,7 +12,7 @@
 
 Ember composes model calls into larger systems: ensembles, judges, votes, verifiers and chains, as
 small typed objects or as one line of notation. Inside `@xcs.jit`, independent model calls run at
-the same time without any change to what your program computes. Every call reports what happened:
+the same time while your function still runs once, in order. Every call reports what happened:
 the text, tool calls, why generation stopped, tokens by kind, the exact cost when the price is
 known, and the provider's request id.
 
@@ -67,8 +67,11 @@ print(terse("Why is the sky blue?").text)
 Inside a function decorated with `@xcs.jit`, each model call is sent as soon as it is made and
 returns a pending `Completion`; reading it waits for that call only. Calls that do not read each
 other's results therefore overlap, and a call that reads an earlier result waits for exactly that
-result. The function still runs once, in program order, so it computes what it computes without
-`jit`.
+result. The function still runs once, in program order, so while its calls succeed it returns the
+same result, sends the same requests and has the same side effects as without `jit`. One thing
+differs: a failed call raises where its result is first read (or when the function returns, if it
+never is), not at the call, so code in between has already run and later calls have already been
+sent.
 
 ```python
 from ember import xcs
