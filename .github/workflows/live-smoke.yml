@@ -1,6 +1,7 @@
 name: live-smoke
 
-# Calls each provider's real API with the keys stored as repository secrets.
+# Calls each provider's real API with the keys stored as repository secrets, and
+# reads the pinned datasets from the Hugging Face Hub.
 # Started by hand only; it never runs on pushes, pull requests or forks.
 on:
   workflow_dispatch:
@@ -31,7 +32,7 @@ jobs:
         with:
           version: ${{ env.UV_VERSION }}
           python-version: "3.13"
-      - run: uv sync --locked
+      - run: uv sync --locked --extra data
       - name: Call each provider
         env:
           PROVIDERS: ${{ inputs.providers }}
@@ -39,3 +40,9 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: uv run python tests/live/smoke.py --providers "$PROVIDERS"
+      - name: Read the pinned datasets from the Hugging Face Hub
+        # Runs whatever the providers did. Bounded, because a read left
+        # unfinished at the limit has kept a process from exiting.
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        run: uv run python tests/live/hub.py
