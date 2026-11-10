@@ -76,4 +76,7 @@ follow_imports = "skip"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--import-mode=importlib --strict-markers"
+# A test that runs this long has hung: print every thread's stack so the log
+# shows where, instead of a job cancelled at its time limit.
+faulthandler_timeout = 120
 markers = ["slow: takes more than a second; still runs in CI"]
