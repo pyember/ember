@@ -94,7 +94,7 @@ jobs:
   # process, with the library versions that reproduced the exit hang.
   hub-count:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -104,7 +104,7 @@ jobs:
       - run: uv sync --locked --extra data
       - run: uv pip install datasets==3.6.0 pyarrow==20.0.0 huggingface-hub==0.35.3
       - run: uv pip list | grep -E "^(datasets|pyarrow|huggingface-hub|hf-xet) "
-      - name: Twenty rounds, one attempt of each read per round
+      - name: Forty rounds, one attempt of each read per round
         shell: bash
         run: |
           set +e -uo pipefail
@@ -128,7 +128,7 @@ jobs:
           # One line per attempt, counted at the end (macOS's bash 3.2 has no maps).
           results="$RUNNER_TEMP/results.txt"
           : > "$results"
-          for i in $(seq 1 20); do
+          for i in $(seq 1 40); do
             for label in stream file; do
               out="$RUNNER_TEMP/out-$label-$i.txt"
               # The alarm survives exec and ends a process that cannot exit (status 142).
