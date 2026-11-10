@@ -12,7 +12,6 @@ from ember.errors import ModelError
 from ember.xcs import runtime
 
 LATENCY_S = 0.2
-SLACK_S = 0.2
 
 ITEM_VALUE: contextvars.ContextVar[str] = contextvars.ContextVar("item_value", default="unset")
 
@@ -39,9 +38,8 @@ def test_items_can_come_from_any_iterable() -> None:
 
 def test_items_overlap_their_calls() -> None:
     model = fakemodel.FakeModel(LATENCY_S)
-    started = time.perf_counter()
     assert xcs.map(lambda x: model(x).text, ["a", "b", "c", "d"]) == ["<a>", "<b>", "<c>", "<d>"]
-    assert time.perf_counter() - started <= LATENCY_S + SLACK_S
+    assert model.peak_in_flight() == 4
 
 
 def test_items_interleave_only_where_one_reads_a_pending_result() -> None:
@@ -164,6 +162,5 @@ def test_a_map_inside_jit_can_return_pending_results() -> None:
         pending = xcs.map(model, ["a", "b", "c"])
         return [completion.text for completion in pending]
 
-    started = time.perf_counter()
     assert program() == ["<a>", "<b>", "<c>"]
-    assert time.perf_counter() - started <= LATENCY_S + SLACK_S
+    assert model.peak_in_flight() == 3

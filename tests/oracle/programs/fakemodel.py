@@ -51,6 +51,8 @@ class FakeModel:
         self._clock = 0
         self._reached = 0
         self._served: list[tuple[int, int, Request]] = []
+        self._in_flight = 0
+        self._peak_in_flight = 0
 
     def __call__(self, prompt: str, *, system: str | None = None) -> Completion:
         request = Request.from_prompt(prompt, system=system)
@@ -92,6 +94,11 @@ class FakeModel:
         with self._lock:
             return [request for reached, served, request in self._served if served < reached]
 
+    def peak_in_flight(self) -> int:
+        """The most requests this model was answering at the same moment."""
+        with self._lock:
+            return self._peak_in_flight
+
     def _tick(self) -> int:
         with self._lock:
             self._clock += 1
@@ -104,7 +111,13 @@ class FakeModel:
         served_at = self._tick()
         with self._lock:
             self._served.append((reached_at, served_at, request))
-        time.sleep(self.latency_s)
+            self._in_flight += 1
+            self._peak_in_flight = max(self._peak_in_flight, self._in_flight)
+        try:
+            time.sleep(self.latency_s)
+        finally:
+            with self._lock:
+                self._in_flight -= 1
         part = request.messages[-1].parts[0]
         assert isinstance(part, TextPart)
         if part.text.startswith(FAIL_PREFIX):
