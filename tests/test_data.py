@@ -237,6 +237,36 @@ def test_any_hub_dataset_with_a_parquet_file_is_read_from_it(files: FakeDownload
     assert files.calls == [downloaded("someone/arith", "main/train.parquet", "abc123")]
 
 
+def test_the_file_is_opened_by_path_and_decoded_on_the_calling_thread(
+    files: FakeDownloads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # What keeps a program that stops early from hanging at exit: no Python file
+    # object for Arrow to wrap, and no Arrow threads decoding rows.
+    opened: list[object] = []
+    reads: list[dict[str, object]] = []
+
+    class Spy(pyarrow.parquet.ParquetFile):
+        def __init__(self, source: object, *args: object, **kwargs: object) -> None:
+            opened.append(source)
+            super().__init__(source, *args, **kwargs)
+
+        def iter_batches(self, **options: object) -> Iterator[object]:
+            reads.append(options)
+            return super().iter_batches(**options)
+
+    monkeypatch.setattr(pyarrow.parquet, "ParquetFile", Spy)
+    list(data.stream("mmlu", limit=1))
+    assert opened == [str(files.directory / "download-1.parquet")]
+    assert [options["use_threads"] for options in reads] == [False]
+
+
+def test_named_datasets_do_not_need_the_datasets_library(
+    files: FakeDownloads, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    make_absent(monkeypatch, "datasets")
+    assert [example.answer for example in data.stream("mmlu")] == ["B", "D", "A"]
+
+
 def test_named_datasets_can_be_narrowed_with_replace(files: FakeDownloads) -> None:
     algebra = dataclasses.replace(DATASETS["mmlu"], config="abstract_algebra")
     list(data.stream(algebra, limit=1))
@@ -304,6 +334,9 @@ def test_an_empty_split_is_rejected() -> None:
         ({"parquet_file": "{name}/{split}.parquet"}, "may use only {config} and {split}"),
         ({"parquet_file": "{config}/{split}.parquet"}, "uses {config}, but config is None"),
         ({"parquet_file": "{split"}, "not a valid template"),
+        ({"parquet_file": "{split!r}.parquet"}, "may not convert or format"),
+        ({"parquet_file": "{split:>12}.parquet"}, "may not convert or format"),
+        ({"parquet_file": "{split:{config}}.parquet"}, "may not convert or format"),
     ],
 )
 def test_invalid_datasets_cannot_be_built(kwargs: dict[str, str], message: str) -> None:
@@ -312,17 +345,26 @@ def test_invalid_datasets_cannot_be_built(kwargs: dict[str, str], message: str) 
         Dataset(to_example=DATASETS["gsm8k"].to_example, **fields)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("first_line", "missing"),
+    [
+        ("import ember_test_missing_dependency", "ember_test_missing_dependency"),
+        # An installed package that lacks a name raises ImportError naming the
+        # package itself; that is a version clash, not a missing extra.
+        ("from huggingface_hub import ember_test_missing_name", "huggingface_hub"),
+    ],
+)
 def test_a_broken_install_is_not_reported_as_a_missing_extra(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, first_line: str, missing: str
 ) -> None:
     broken = tmp_path / "datasets"
     broken.mkdir()
-    (broken / "__init__.py").write_text("import ember_test_missing_dependency\n")
+    (broken / "__init__.py").write_text(first_line + "\n")
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.delitem(sys.modules, "datasets")
     with pytest.raises(ImportError) as raised:
         data.stream(STREAMED)
-    assert raised.value.name == "ember_test_missing_dependency"
+    assert raised.value.name == missing
     assert "ember-ai[data]" not in str(raised.value)
 
 

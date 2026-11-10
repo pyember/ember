@@ -5,8 +5,10 @@ extra, and no credentials. The test suite never imports this file, and its
 tests replace the Hub with a fake, so this is the one place a real read runs.
 
 The process must also end. Streaming these datasets and stopping at a limit
-once kept processes from exiting; they are now read from a downloaded file, and
-the workflow bounds this step so a return of that hang is reported.
+once kept processes from exiting on macOS; they are now read from a downloaded
+file, and the workflow bounds this step so that a process that does not exit
+fails it rather than holding the job. The workflow runs on Linux, so it would
+not see that macOS hang come back; tests/test_data.py pins how the file is read.
 
 Usage:
     uv run python tests/live/hub.py

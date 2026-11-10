@@ -48,7 +48,8 @@ def stream(dataset: str | Dataset, *, split: str | None = None, limit: int | Non
 
     A dataset with a ``parquet_file``, such as every named dataset, is read
     from that file: the first call downloads the whole split's file into the
-    Hugging Face cache, and later calls read it from there. Any other dataset
+    Hugging Face cache, and later calls at the same pinned commit read it
+    from there without the network. Any other dataset
     is streamed by the ``datasets`` library. On macOS with Python 3.13, a
     program that stops such a stream early (with ``limit``, say) and exits at
     once has been seen to hang at exit, held up by that library's reader.
@@ -67,10 +68,9 @@ def stream(dataset: str | Dataset, *, split: str | None = None, limit: int | Non
         ValueError: ``dataset`` is not a known name, ``split`` is empty, or
             ``limit`` is below 1.
         ImportError: The ``data`` extra is not installed.
-
-    The Hub's own errors pass through unchanged, among them the one for a
-    ``parquet_file`` that does not exist, which is how an unknown split of a
-    named dataset fails.
+        huggingface_hub errors: Raised unchanged, among them the Hub's error
+            for a ``parquet_file`` that does not exist, which is how an
+            unknown split of a named dataset fails.
     """
     spec = _resolve(dataset)
     if split is not None and (not isinstance(split, str) or not split):
@@ -113,6 +113,7 @@ def _open(spec: Dataset, split: str) -> Iterable[object]:
     )
     # Opened by path and decoded on this thread: an abandoned read then leaves no
     # Python object for Arrow's threads to release while the interpreter exits.
+    # tests/test_data.py pins both.
     batches = parquet.ParquetFile(local).iter_batches(batch_size=_BATCH_ROWS, use_threads=False)
     return itertools.chain.from_iterable(batch.to_pylist() for batch in batches)
 
@@ -121,7 +122,9 @@ def _extra(module: str) -> ModuleType:
     """Imports ``module`` from the data extra, naming the install command if it is missing."""
     try:
         return importlib.import_module(module)
-    except ImportError as exc:
+    except ModuleNotFoundError as exc:
+        # Only a package that is not there at all; any other ImportError, such
+        # as a name missing from an installed package, is a broken install.
         if exc.name not in _EXTRA_MODULES:
             raise
         raise ImportError(

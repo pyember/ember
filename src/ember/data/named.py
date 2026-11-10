@@ -59,9 +59,9 @@ def _gsm8k_example(row: Row) -> Example:
 # Each revision is the repository's commit as read from
 # https://huggingface.co/api/datasets/<id> ("sha") on 2026-11-07. Moving a pin
 # changes what a named dataset means, so it is a deliberate, reviewed change.
-# At those commits every split of every configuration is one file at this path,
-# as listed by https://huggingface.co/api/datasets/<id>/tree/<sha>/<config> on
-# 2026-11-09 (MMLU's "all" and "abstract_algebra", GSM8K's "main").
+# At those commits every split of every configuration (MMLU's 59, GSM8K's 2) is
+# one file at this path, as listed by
+# https://huggingface.co/api/datasets/<id>/tree/<sha>/<config> on 2026-11-09.
 _ONE_FILE_PER_SPLIT = "{config}/{split}-00000-of-00001.parquet"
 
 DATASETS: Mapping[str, Dataset] = MappingProxyType(

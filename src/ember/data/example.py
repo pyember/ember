@@ -92,8 +92,10 @@ class Dataset:
             Parquet file, with ``{split}`` and optionally ``{config}`` standing
             for their values, for example
             ``"{config}/{split}-00000-of-00001.parquet"``. When set,
-            `ember.data.stream` downloads that file once and reads it from
-            disk. When ``None``, it streams the split through the ``datasets``
+            `ember.data.stream` downloads that file and reads it from disk,
+            and ``to_example`` gets each row's values as stored in the file
+            (a column ``datasets`` would decode, such as an image, stays raw).
+            When ``None``, it streams the split through the ``datasets``
             library.
     """
 
@@ -122,11 +124,16 @@ class Dataset:
 
 def _check_parquet_file(template: str, config: str | None) -> None:
     try:
-        fields = {
-            field for _, field, _, _ in string.Formatter().parse(template) if field is not None
-        }
+        parts = [
+            (field, spec, conversion)
+            for _, field, spec, conversion in string.Formatter().parse(template)
+            if field is not None
+        ]
     except ValueError as exc:
         raise ValueError(f"parquet_file {template!r} is not a valid template: {exc}") from None
+    if any(spec or conversion for _, spec, conversion in parts):
+        raise ValueError(f"parquet_file {template!r} may not convert or format its values")
+    fields = {field for field, _, _ in parts}
     unknown = fields - _PARQUET_FIELDS
     if unknown:
         raise ValueError(
