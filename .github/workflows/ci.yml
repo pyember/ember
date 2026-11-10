@@ -89,6 +89,117 @@ jobs:
       - run: uv pip list
       - run: uv run pytest -q
 
+  # TEMPORARY, removed before this branch merges. Counts how often a process
+  # fails to exit after a short read: named datasets through the new file path,
+  # and the datasets library streaming as a baseline in the same job.
+  hub-count:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+      - run: uv sync --locked --extra data
+      - name: Bounded attempts, each a new process
+        shell: bash
+        run: |
+          set +e -uo pipefail
+          cat > "$RUNNER_TEMP/file.py" <<'PY'
+          from ember import data
+
+          for name in ("gsm8k", "mmlu"):
+              print(name, len(list(data.stream(name, limit=3))), flush=True)
+          print("script done", flush=True)
+          PY
+          cat > "$RUNNER_TEMP/stream.py" <<'PY'
+          import itertools
+
+          import datasets
+
+          rows = datasets.load_dataset(
+              "cais/mmlu",
+              "all",
+              split="test",
+              streaming=True,
+              revision="c30699e8356da336a370243923dbaf21066bb9fe",
+          )
+          print("mmlu", len(list(itertools.islice(rows, 3))), flush=True)
+          print("script done", flush=True)
+          PY
+          attempts() {
+            local label="$1" script="$2" count="$3" cache="$4"
+            local exited=0 stuck=0 failed=0 status out
+            for i in $(seq 1 "$count"); do
+              home="$RUNNER_TEMP/hf-$label-$i"
+              if [ "$cache" = warm ]; then home="$RUNNER_TEMP/hf-$label-warm"; fi
+              out="$RUNNER_TEMP/out-$label-$i.txt"
+              # The alarm survives exec and ends a process that cannot exit (status 142).
+              HF_HOME="$home" perl -e 'alarm 60; exec @ARGV' \
+                .venv/bin/python -u "$RUNNER_TEMP/$script" > "$out" 2>&1
+              status=$?
+              case "$status" in
+                0) exited=$((exited + 1)) ;;
+                142)
+                  stuck=$((stuck + 1))
+                  echo "$label attempt $i still running at 60 s; its output:"
+                  grep -v Warning "$out" | tail -4 ;;
+                *)
+                  failed=$((failed + 1))
+                  echo "$label attempt $i failed with status $status:"
+                  tail -6 "$out" ;;
+              esac
+            done
+            echo "RESULT $label: $exited exited, $stuck still running at 60 s, $failed failed otherwise"
+          }
+          attempts file-cold file.py 40 cold
+          attempts file-warm file.py 10 warm
+          attempts stream-cold stream.py 12 cold
+
+  # TEMPORARY, removed before this branch merges. Every example of these splits,
+  # read from the pinned file and streamed by the datasets library, must match.
+  hub-same-examples:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - run: uv sync --locked --extra data
+      - name: Compare the file read with the stream
+        shell: bash
+        run: |
+          set -euo pipefail
+          HF_HOME="$RUNNER_TEMP/hf" uv run python - <<'PY'
+          import dataclasses
+          import sys
+
+          from ember import data
+
+          splits = {"mmlu": ("test", "validation", "dev"), "gsm8k": ("test", "train")}
+          ok = True
+          for name, names in splits.items():
+              spec = data.DATASETS[name]
+              streamed_spec = dataclasses.replace(spec, parquet_file=None)
+              for split in names:
+                  from_file = list(data.stream(spec, split=split))
+                  streamed = list(data.stream(streamed_spec, split=split))
+                  same = from_file == streamed and [e.metadata for e in from_file] == [
+                      e.metadata for e in streamed
+                  ]
+                  ok = ok and same
+                  print(f"{name} {split}: {len(from_file)} from the file, "
+                        f"{len(streamed)} streamed, identical: {same}", flush=True)
+          sys.exit(0 if ok else 1)
+          PY
+
   wheel:
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
