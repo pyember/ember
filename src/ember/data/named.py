@@ -1,8 +1,9 @@
 """The datasets ember knows by name.
 
-Each entry pins the Hub repository, configuration and default split, and maps
-rows to examples with a function written for that dataset's schema. A row that
-does not match the schema raises instead of being skipped or guessed at.
+Each entry pins the Hub repository, configuration, default split and commit,
+names the Parquet file that holds each split, and maps rows to examples with a
+function written for that dataset's schema. A row that does not match the
+schema raises instead of being skipped or guessed at.
 """
 
 from collections.abc import Mapping
@@ -58,6 +59,11 @@ def _gsm8k_example(row: Row) -> Example:
 # Each revision is the repository's commit as read from
 # https://huggingface.co/api/datasets/<id> ("sha") on 2026-11-07. Moving a pin
 # changes what a named dataset means, so it is a deliberate, reviewed change.
+# At those commits every split of every configuration (MMLU's 59, GSM8K's 2) is
+# one file at this path, as listed by
+# https://huggingface.co/api/datasets/<id>/tree/<sha>/<config> on 2026-11-09.
+_ONE_FILE_PER_SPLIT = "{config}/{split}-00000-of-00001.parquet"
+
 DATASETS: Mapping[str, Dataset] = MappingProxyType(
     {
         "mmlu": Dataset(
@@ -66,6 +72,7 @@ DATASETS: Mapping[str, Dataset] = MappingProxyType(
             "test",
             _mmlu_example,
             revision="c30699e8356da336a370243923dbaf21066bb9fe",
+            parquet_file=_ONE_FILE_PER_SPLIT,
         ),
         "gsm8k": Dataset(
             "openai/gsm8k",
@@ -73,6 +80,7 @@ DATASETS: Mapping[str, Dataset] = MappingProxyType(
             "test",
             _gsm8k_example,
             revision="740312add88f781978c0658806c59bc2815b9866",
+            parquet_file=_ONE_FILE_PER_SPLIT,
         ),
     }
 )

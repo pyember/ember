@@ -7,6 +7,7 @@ field names.
 """
 
 import dataclasses
+import string
 from collections.abc import Callable, Mapping
 from types import MappingProxyType
 from typing import TypeAlias
@@ -17,7 +18,9 @@ LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 """Choice labels: the first choice is ``A``."""
 
 Row: TypeAlias = Mapping[str, object]
-"""One raw row, as the Hugging Face ``datasets`` library yields it."""
+"""One raw row of a dataset: each column's name and value."""
+
+_PARQUET_FIELDS = frozenset({"config", "split"})
 
 
 def _no_metadata() -> Mapping[str, str]:
@@ -85,6 +88,15 @@ class Dataset:
             the row does not have the fields and values it expects.
         revision: Hub revision (commit, tag or branch) to read; ``None`` reads
             the default branch, which can change.
+        parquet_file: Where in the repository each split is stored as one
+            Parquet file, with ``{split}`` and optionally ``{config}`` standing
+            for their values, for example
+            ``"{config}/{split}-00000-of-00001.parquet"``. When set,
+            `ember.data.stream` downloads that file and reads it from disk,
+            and ``to_example`` gets each row's values as stored in the file
+            (a column ``datasets`` would decode, such as an image, stays raw).
+            When ``None``, it streams the split through the ``datasets``
+            library.
     """
 
     path: str
@@ -92,14 +104,45 @@ class Dataset:
     split: str
     to_example: Callable[[Row], Example]
     revision: str | None = None
+    parquet_file: str | None = None
 
     def __post_init__(self) -> None:
         for name, value in (("path", self.path), ("split", self.split)):
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{name} must be a non-empty string, got {value!r}")
-        for name, optional in (("config", self.config), ("revision", self.revision)):
+        optionals = (
+            ("config", self.config),
+            ("revision", self.revision),
+            ("parquet_file", self.parquet_file),
+        )
+        for name, optional in optionals:
             if optional is not None and (not isinstance(optional, str) or not optional):
                 raise ValueError(f"{name} must be None or a non-empty string, got {optional!r}")
+        if self.parquet_file is not None:
+            _check_parquet_file(self.parquet_file, self.config)
+
+
+def _check_parquet_file(template: str, config: str | None) -> None:
+    try:
+        parts = [
+            (field, spec, conversion)
+            for _, field, spec, conversion in string.Formatter().parse(template)
+            if field is not None
+        ]
+    except ValueError as exc:
+        raise ValueError(f"parquet_file {template!r} is not a valid template: {exc}") from None
+    if any(spec or conversion for _, spec, conversion in parts):
+        raise ValueError(f"parquet_file {template!r} may not convert or format its values")
+    fields = {field for field, _, _ in parts}
+    unknown = fields - _PARQUET_FIELDS
+    if unknown:
+        raise ValueError(
+            f"parquet_file may use only {{config}} and {{split}}, not {sorted(unknown)}"
+        )
+    if "split" not in fields:
+        raise ValueError("parquet_file must contain {split}")
+    if "config" in fields and config is None:
+        raise ValueError("parquet_file uses {config}, but config is None")
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -201,8 +201,9 @@ print(summary.mean_score, summary.failed, summary.retries, summary.unpriced_call
 ```
 
 Failed items get no score rather than a zero, and the summary counts failures, retries and calls
-whose price is unknown. `ember.data.stream("gsm8k")` and `ember.data.stream("mmlu")` stream real
-benchmarks from the Hugging Face Hub at pinned revisions; install `ember-ai[data]` for them.
+whose price is unknown. `ember.data.stream("gsm8k")` and `ember.data.stream("mmlu")` read real
+benchmarks from the Hugging Face Hub at pinned revisions: the first call downloads the split's file,
+and later calls read it from the local cache. Install `ember-ai[data]` for them.
 
 ## Configure
 
