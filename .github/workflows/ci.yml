@@ -89,24 +89,22 @@ jobs:
       - run: uv pip list
       - run: uv run pytest -q
 
-  # TEMPORARY, removed before this branch merges. Counts how often a process
-  # fails to exit after a short read: named datasets through the new file path,
-  # and the datasets library streaming as a baseline in the same job.
+  # TEMPORARY, removed before this branch merges. Alternates a short read
+  # through the datasets stream and through the new file path, each a new
+  # process, with the library versions that reproduced the exit hang.
   hub-count:
     runs-on: macos-latest
-    timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        python: ["3.13", "3.14"]
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: ${{ env.UV_VERSION }}
-          python-version: ${{ matrix.python }}
+          python-version: "3.13"
       - run: uv sync --locked --extra data
-      - name: Bounded attempts, each a new process
+      - run: uv pip install datasets==3.6.0 pyarrow==20.0.0 huggingface-hub==0.35.3
+      - run: uv pip list | grep -E "^(datasets|pyarrow|huggingface-hub|hf-xet) "
+      - name: Twenty rounds, one attempt of each read per round
         shell: bash
         run: |
           set +e -uo pipefail
@@ -118,48 +116,38 @@ jobs:
           print("script done", flush=True)
           PY
           cat > "$RUNNER_TEMP/stream.py" <<'PY'
-          import itertools
+          import dataclasses
 
-          import datasets
+          from ember import data
 
-          rows = datasets.load_dataset(
-              "cais/mmlu",
-              "all",
-              split="test",
-              streaming=True,
-              revision="c30699e8356da336a370243923dbaf21066bb9fe",
-          )
-          print("mmlu", len(list(itertools.islice(rows, 3))), flush=True)
+          for name in ("gsm8k", "mmlu"):
+              spec = dataclasses.replace(data.DATASETS[name], parquet_file=None)
+              print(name, len(list(data.stream(spec, limit=3))), flush=True)
           print("script done", flush=True)
           PY
-          attempts() {
-            local label="$1" script="$2" count="$3" cache="$4"
-            local exited=0 stuck=0 failed=0 status out
-            for i in $(seq 1 "$count"); do
-              home="$RUNNER_TEMP/hf-$label-$i"
-              if [ "$cache" = warm ]; then home="$RUNNER_TEMP/hf-$label-warm"; fi
+          declare -A exited stuck failed
+          for label in stream file; do exited[$label]=0; stuck[$label]=0; failed[$label]=0; done
+          for i in $(seq 1 20); do
+            for label in stream file; do
               out="$RUNNER_TEMP/out-$label-$i.txt"
               # The alarm survives exec and ends a process that cannot exit (status 142).
-              HF_HOME="$home" perl -e 'alarm 60; exec @ARGV' \
-                .venv/bin/python -u "$RUNNER_TEMP/$script" > "$out" 2>&1
+              HF_HOME="$RUNNER_TEMP/hf-$label-$i" perl -e 'alarm 45; exec @ARGV' \
+                .venv/bin/python -u "$RUNNER_TEMP/$label.py" > "$out" 2>&1
               status=$?
-              case "$status" in
-                0) exited=$((exited + 1)) ;;
-                142)
-                  stuck=$((stuck + 1))
-                  echo "$label attempt $i still running at 60 s; its output:"
-                  grep -v Warning "$out" | tail -4 ;;
-                *)
-                  failed=$((failed + 1))
-                  echo "$label attempt $i failed with status $status:"
-                  tail -6 "$out" ;;
-              esac
+              if [ "$status" -eq 0 ]; then
+                exited[$label]=$((exited[$label] + 1))
+              elif [ "$status" -eq 142 ]; then
+                stuck[$label]=$((stuck[$label] + 1))
+                echo "round $i, $label: still running at 45 s; last output: $(grep -v Warning "$out" | tail -1)"
+              else
+                failed[$label]=$((failed[$label] + 1))
+                echo "round $i, $label: failed with status $status:"; tail -6 "$out"
+              fi
             done
-            echo "RESULT $label: $exited exited, $stuck still running at 60 s, $failed failed otherwise"
-          }
-          attempts file-cold file.py 40 cold
-          attempts file-warm file.py 10 warm
-          attempts stream-cold stream.py 12 cold
+          done
+          for label in stream file; do
+            echo "RESULT $label: ${exited[$label]} exited, ${stuck[$label]} still running at 45 s, ${failed[$label]} failed otherwise"
+          done
 
   # TEMPORARY, removed before this branch merges. Every example of these splits,
   # read from the pinned file and streamed by the datasets library, must match.
