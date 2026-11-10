@@ -1,7 +1,9 @@
-"""Streaming examples from the Hugging Face Hub."""
+"""Examples from the Hugging Face Hub, read from a downloaded file or streamed."""
 
+import importlib
 import itertools
 from collections.abc import Iterable, Iterator, Mapping
+from types import ModuleType
 
 from ember.data.example import Dataset, Example, Source
 from ember.data.named import DATASETS
@@ -10,7 +12,11 @@ __all__ = ["Stream", "stream"]
 
 # The modules whose absence means the data extra is not installed. Any other
 # ImportError raised while importing them is a broken install and propagates.
-_EXTRA_MODULES = frozenset({"datasets", "huggingface_hub"})
+_EXTRA_MODULES = frozenset({"datasets", "huggingface_hub", "pyarrow"})
+
+# Rows decoded from a Parquet file at a time, so a stream with a small limit
+# decodes little more than it yields.
+_BATCH_ROWS = 1024
 
 
 class Stream(Iterator[Example]):
@@ -40,6 +46,13 @@ def stream(dataset: str | Dataset, *, split: str | None = None, limit: int | Non
     unknown split fails here; rows are then read as the stream advances.
     Ember never runs code from the Hub (no ``trust_remote_code``).
 
+    A dataset with a ``parquet_file``, such as every named dataset, is read
+    from that file: the first call downloads the whole split's file into the
+    Hugging Face cache, and later calls read it from there. Any other dataset
+    is streamed by the ``datasets`` library. On macOS with Python 3.13, a
+    program that stops such a stream early (with ``limit``, say) and exits at
+    once has been seen to hang at exit, held up by that library's reader.
+
     Args:
         dataset: A name in `ember.data.DATASETS`, or a `Dataset` describing any
             Hub dataset and how its rows become examples.
@@ -54,6 +67,10 @@ def stream(dataset: str | Dataset, *, split: str | None = None, limit: int | Non
         ValueError: ``dataset`` is not a known name, ``split`` is empty, or
             ``limit`` is below 1.
         ImportError: The ``data`` extra is not installed.
+
+    The Hub's own errors pass through unchanged, among them the one for a
+    ``parquet_file`` that does not exist, which is how an unknown split of a
+    named dataset fails.
     """
     spec = _resolve(dataset)
     if split is not None and (not isinstance(split, str) or not split):
@@ -80,18 +97,36 @@ def _resolve(dataset: str | Dataset) -> Dataset:
 
 
 def _open(spec: Dataset, split: str) -> Iterable[object]:
+    if spec.parquet_file is None:
+        rows: Iterable[object] = _extra("datasets").load_dataset(
+            spec.path, spec.config, split=split, streaming=True, revision=spec.revision
+        )
+        return rows
+    # Both are imported before the download, so a missing extra never starts one.
+    hub = _extra("huggingface_hub")
+    parquet = _extra("pyarrow.parquet")
+    local = hub.hf_hub_download(
+        repo_id=spec.path,
+        filename=spec.parquet_file.format(config=spec.config, split=split),
+        repo_type="dataset",
+        revision=spec.revision,
+    )
+    # Opened by path and decoded on this thread: an abandoned read then leaves no
+    # Python object for Arrow's threads to release while the interpreter exits.
+    batches = parquet.ParquetFile(local).iter_batches(batch_size=_BATCH_ROWS, use_threads=False)
+    return itertools.chain.from_iterable(batch.to_pylist() for batch in batches)
+
+
+def _extra(module: str) -> ModuleType:
+    """Imports ``module`` from the data extra, naming the install command if it is missing."""
     try:
-        import datasets
+        return importlib.import_module(module)
     except ImportError as exc:
         if exc.name not in _EXTRA_MODULES:
             raise
         raise ImportError(
             "ember.data needs the data extra: pip install 'ember-ai[data]'", name=exc.name
         ) from exc
-    rows: Iterable[object] = datasets.load_dataset(
-        spec.path, spec.config, split=split, streaming=True, revision=spec.revision
-    )
-    return rows
 
 
 def _examples(spec: Dataset, split: str, rows: Iterable[object]) -> Iterator[Example]:

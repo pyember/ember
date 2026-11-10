@@ -177,6 +177,7 @@ dependencies = [
 data = [
     { name = "datasets" },
     { name = "huggingface-hub" },
+    { name = "pyarrow" },
 ]
 
 [package.dev-dependencies]
@@ -194,6 +195,7 @@ requires-dist = [
     { name = "greenlet", specifier = ">=3.0" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "huggingface-hub", marker = "extra == 'data'", specifier = ">=0.26" },
+    { name = "pyarrow", marker = "extra == 'data'", specifier = ">=16" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
