@@ -15,7 +15,6 @@ in about L under jit, and never slower than the plain run.
 
 import collections
 import dataclasses
-import time
 from collections.abc import Callable
 from typing import Literal
 
@@ -41,11 +40,9 @@ BACKENDS = [
 ]
 
 SEMANTIC_LATENCY_S = 0.005
+# Long enough that requests sent together are all still being answered when
+# the last of them arrives, on a slow runner too.
 OVERLAP_LATENCY_S = 0.25
-# Scheduling overhead plus the jitter of a shared CI runner.
-OVERHEAD_S = 0.25
-# Programs that use xcs.map overlap in the plain run too; allow timer noise.
-NOISE_S = 0.1
 
 
 def plain(program: Program) -> Program:
@@ -84,7 +81,7 @@ class Run:
     reached: int
     early: list[object]
     effects: object
-    wall_s: float
+    peak_in_flight: int
 
 
 def call(program: Program, *args: object, **kwargs: object) -> Drive:
@@ -231,21 +228,19 @@ def execute(
 ) -> Run:
     orchard.reset()
     model = backend(latency_s, case.answer, arrives_before_return=arrives_before_return)
-    started = time.perf_counter()
     try:
         outcome: object = case.drive(transform, model)
     except Exception as error:  # The outcome under test; compared below.
         outcome = error
     finally:
         model.close()
-    wall_s = time.perf_counter() - started
     return Run(
         outcome=outcome,
         requests=model.requests(),
         reached=model.reached(),
         early=list(model.early_requests()),
         effects=effects(orchard.LOG, case.order),
-        wall_s=wall_s,
+        peak_in_flight=model.peak_in_flight(),
     )
 
 
@@ -307,14 +302,10 @@ OVERLAP_CASES = [pytest.param(case, id=case.name) for case in CASES if case.inde
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("case", OVERLAP_CASES)
 def test_jit_overlaps_independent_calls(case: Case, backend: Backend) -> None:
-    plain_run = execute(case, plain, OVERLAP_LATENCY_S, backend=backend)
+    # Counted, not timed: under jit every independent request is being answered
+    # at once, however slow the machine.
     jit_run = execute(case, xcs.jit, OVERLAP_LATENCY_S, backend=backend)
-
-    assert jit_run.wall_s <= OVERLAP_LATENCY_S + OVERHEAD_S, (
-        f"{case.independent} independent calls of {OVERLAP_LATENCY_S}s took "
-        f"{jit_run.wall_s:.3f}s under jit"
-    )
-    assert jit_run.wall_s <= plain_run.wall_s + NOISE_S
+    assert jit_run.peak_in_flight == case.independent
 
 
 def test_programs_live_in_unremarkable_modules() -> None:

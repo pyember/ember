@@ -42,6 +42,8 @@ class ClientModel:
         self._reached = 0
         self._served = 0
         self._early: list[Request] = []
+        self._in_flight = 0
+        self._peak_in_flight = 0
         self._provider = FakeProvider(respond=self._respond)
         self._client = Client(provider_factory=self._provider.factory)
 
@@ -74,6 +76,11 @@ class ClientModel:
         with self._lock:
             return list(self._early)
 
+    def peak_in_flight(self) -> int:
+        """The most requests the provider was answering at the same moment."""
+        with self._lock:
+            return self._peak_in_flight
+
     def close(self) -> None:
         """Closes the client and its providers."""
         self._client.close()
@@ -88,8 +95,17 @@ class ClientModel:
             self._served += 1
             if self._served > self._reached:
                 self._early.append(request)
+            self._in_flight += 1
+            self._peak_in_flight = max(self._peak_in_flight, self._in_flight)
+        try:
+            # Slept here, on the serving thread, rather than by the provider, so
+            # that the requests answered at once can be counted.
+            time.sleep(self._latency_s)
+        finally:
+            with self._lock:
+                self._in_flight -= 1
         part = request.messages[-1].parts[0]
         assert isinstance(part, TextPart)
         if part.text.startswith(FAIL_PREFIX):
-            return Fail(ErrorKind.BAD_REQUEST, latency_s=self._latency_s)
-        return Reply(self._answer(part.text), latency_s=self._latency_s)
+            return Fail(ErrorKind.BAD_REQUEST)
+        return Reply(self._answer(part.text))

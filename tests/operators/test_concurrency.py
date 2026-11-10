@@ -1,8 +1,8 @@
 """Operators under the real scheduler: what overlaps and what waits.
 
-The primary measurement is how many requests the provider was answering at
-once, which does not depend on machine speed. Wall time is a second, loose
-check: every request takes `LATENCY_S`.
+Overlap is measured by how many requests the provider was answering at once,
+which does not depend on machine speed. Waiting is measured by wall time,
+only from below: every request takes `LATENCY_S`, and a sleep never ends early.
 """
 
 import time
@@ -31,9 +31,8 @@ def test_independent_model_calls_in_one_jit_call_overlap(fake_models: Callable[.
         second = translate(doc)
         return first.text + " " + second.text
 
-    elapsed = _timed(lambda: both("doc"))
+    both("doc")
     assert fake.peak_in_flight == 2
-    assert elapsed < 1.8 * LATENCY_S
 
 
 def test_a_model_call_on_another_calls_output_waits_for_it(
@@ -55,9 +54,8 @@ def test_a_model_call_on_another_calls_output_waits_for_it(
 def test_ensemble_members_overlap_outside_jit(fake_models: Callable[..., Any]) -> None:
     fake = fake_models(lambda model, prompt: model, latency_s=LATENCY_S)
     members = tuple(ModelCall(f"openai/m{index}") for index in range(4))
-    elapsed = _timed(lambda: Ensemble(members, quorum=4)("q"))
+    Ensemble(members, quorum=4)("q")
     assert fake.peak_in_flight == 4
-    assert elapsed < 1.8 * LATENCY_S
 
 
 def test_a_graphs_e_stages_all_overlap_and_the_judge_waits(
@@ -67,4 +65,5 @@ def test_a_graphs_e_stages_all_overlap_and_the_judge_waits(
     graph = build_graph("2E@openai/a, 3E@gemini/b, 1J@anthropic/j")
     elapsed = _timed(lambda: graph("q"))
     assert fake.peak_in_flight == 5
-    assert 2 * LATENCY_S <= elapsed < 2.8 * LATENCY_S
+    assert elapsed >= 2 * LATENCY_S
+    assert [call.model for call in fake.calls][-1] == "anthropic/j"
