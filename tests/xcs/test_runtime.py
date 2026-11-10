@@ -13,7 +13,6 @@ from ember.errors import ErrorKind, ModelError
 from ember.xcs import runtime
 
 LATENCY_S = 0.2
-SLACK_S = 0.2
 
 TAG: contextvars.ContextVar[str] = contextvars.ContextVar("tag", default="unset")
 
@@ -101,16 +100,37 @@ def test_inside_a_scope_tasks_run_on_named_worker_threads_in_the_dispatching_con
 
 
 def test_waiting_on_any_future_lets_other_greenlets_run() -> None:
-    permits = [Future[None]() for _ in range(3)]
-    threading.Timer(LATENCY_S, lambda: [permit.set_result(None) for permit in permits]).start()
+    # Items 0 and 1 wait for futures only item 2 completes, so item 2 can run
+    # only if their waits let it. A timer frees them after 5 s instead of
+    # letting a broken scheduler hang the test, and the log then says so.
+    permits = [Future[None]() for _ in range(2)]
+    log: list[str] = []
+    lock = threading.Lock()
+
+    def release(by: str) -> None:
+        with lock:
+            if not permits[0].done():
+                log.append(f"{by} completed the futures")
+                for permit in permits:
+                    permit.set_result(None)
+
+    timer = threading.Timer(5.0, release, args=("the timer",))
+    timer.start()
 
     def item(i: int) -> int:
-        runtime.wait(permits[i])
+        if i == 2:
+            release("item 2")
+        else:
+            runtime.wait(permits[i])
+            log.append(f"item {i} resumed")
         return i
 
-    started = time.perf_counter()
-    assert xcs.map(item, range(3)) == [0, 1, 2]
-    assert time.perf_counter() - started <= LATENCY_S + SLACK_S
+    try:
+        assert xcs.map(item, range(3)) == [0, 1, 2]
+    finally:
+        timer.cancel()
+    assert log[0] == "item 2 completed the futures"
+    assert sorted(log[1:]) == ["item 0 resumed", "item 1 resumed"]
 
 
 def test_a_stream_yields_its_items_in_order_then_its_error() -> None:
@@ -132,17 +152,27 @@ def test_a_stream_yields_its_items_in_order_then_its_error() -> None:
 
 
 def test_streams_read_in_different_items_overlap() -> None:
+    lock = threading.Lock()
+    open_streams = [0]
+    most_open = [0]
+
     def source(tag: str) -> Iterator[str]:
-        for i in range(2):
-            time.sleep(LATENCY_S / 2)
-            yield f"{tag}{i}"
+        with lock:
+            open_streams[0] += 1
+            most_open[0] = max(most_open[0], open_streams[0])
+        try:
+            for i in range(2):
+                time.sleep(LATENCY_S / 2)
+                yield f"{tag}{i}"
+        finally:
+            with lock:
+                open_streams[0] -= 1
 
     def item(tag: str) -> list[str]:
         return list(runtime.dispatch_stream(lambda: source(tag), label="s"))
 
-    started = time.perf_counter()
     assert xcs.map(item, ["a", "b", "c"]) == [["a0", "a1"], ["b0", "b1"], ["c0", "c1"]]
-    assert time.perf_counter() - started <= LATENCY_S + SLACK_S
+    assert most_open[0] == 3
 
 
 def test_closing_a_stream_early_stops_its_worker() -> None:
@@ -208,7 +238,8 @@ def test_an_unread_stream_failure_is_never_raised_however_the_reader_is_left(
 
     started = time.perf_counter()
     assert program() == "returned"
-    assert time.perf_counter() - started < 0.5
+    # The source ends at its failure, within 0.1 s, so a second is ample.
+    assert time.perf_counter() - started < 1.0
     assert len(pulled) <= 1
 
 
@@ -227,7 +258,8 @@ def test_closing_a_stream_before_reading_it_stops_its_worker() -> None:
 
     started = time.perf_counter()
     program()
-    assert time.perf_counter() - started < 0.6
+    # Draining all ten items takes 2 s; stopping at the next one, about 0.2 s.
+    assert time.perf_counter() - started < 1.0
     assert len(pulled) <= 2
 
 

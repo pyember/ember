@@ -23,8 +23,6 @@ from ember.llm import Completion, Request
 from ember.xcs import runtime
 
 LATENCY_S = 0.2
-# Scheduling overhead plus the jitter of a shared CI runner.
-SLACK_S = 0.2
 
 CALLER_VALUE: contextvars.ContextVar[str] = contextvars.ContextVar("caller_value", default="unset")
 
@@ -69,8 +67,9 @@ def test_independent_calls_overlap_and_a_dependent_call_waits_for_its_input() ->
 
     started = time.perf_counter()
     assert program() == "<<a><b>>"
-    elapsed = time.perf_counter() - started
-    assert 2 * LATENCY_S <= elapsed <= 2 * LATENCY_S + SLACK_S
+    # The first two were answered at once; the third, which reads them, after.
+    assert model.peak_in_flight() == 2
+    assert time.perf_counter() - started >= 2 * LATENCY_S
 
 
 def test_nothing_is_kept_between_calls() -> None:
@@ -345,27 +344,27 @@ def test_jit_binds_as_a_method() -> None:
 
 
 def test_jit_calls_from_many_threads_overlap_independently() -> None:
-    model = fakemodel.FakeModel(LATENCY_S)
+    # One model per thread, so each count is of one jit call's own requests.
+    models = [fakemodel.FakeModel(LATENCY_S) for _ in range(8)]
 
     @xcs.jit
-    def program(x: int) -> list[str]:
+    def program(model: fakemodel.FakeModel, x: int) -> list[str]:
         replies = [model(f"{x}.{i}") for i in range(3)]
         return [reply.text for reply in replies]
 
-    elapsed: list[float] = []
+    finished: list[int] = []
 
     def run(x: int) -> None:
-        started = time.perf_counter()
-        assert program(x) == [f"<{x}.{i}>" for i in range(3)]
-        elapsed.append(time.perf_counter() - started)
+        assert program(models[x], x) == [f"<{x}.{i}>" for i in range(3)]
+        finished.append(x)
 
     threads = [threading.Thread(target=run, args=(x,)) for x in range(8)]
     for thread in threads:
         thread.start()
     for thread in threads:
         thread.join()
-    assert len(elapsed) == 8
-    assert max(elapsed) <= LATENCY_S + SLACK_S
+    assert sorted(finished) == list(range(8))
+    assert [model.peak_in_flight() for model in models] == [3] * 8
 
 
 def test_jit_costs_little_when_the_body_makes_no_calls() -> None:

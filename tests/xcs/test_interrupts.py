@@ -115,18 +115,25 @@ def test_an_item_stopped_by_an_interrupt_still_has_its_requests_waited_for() -> 
 
 def test_other_items_stay_held_while_a_stopped_item_waits_in_its_finally() -> None:
     log: list[str] = []
+    cleaning_up = threading.Event()
+
+    def after_cleanup_starts() -> None:
+        cleaning_up.wait(5.0)
 
     def item(i: int) -> None:
         if i == 0:
             try:
-                call(0.5)
+                call(1.0)
             finally:
+                cleaning_up.set()
                 log.append(f"item 0 cleanup read {call(0.2)}")
         elif i == 1:
             call(0.05)
             raise KeyboardInterrupt
         else:
-            call(0.1)
+            # Its result arrives only once item 0 is cleaning up, so after the
+            # interrupt on every machine, however slowly the others' calls return.
+            runtime.wait(runtime.dispatch(after_cleanup_starts, label="m"))
             log.append("item 2 continued past its wait")
             runtime.dispatch(lambda: log.append("item 2 sent a request"), label="late")
             call(1.0)
@@ -145,15 +152,22 @@ def test_other_items_stay_held_while_a_stopped_item_waits_in_its_finally() -> No
 
 def test_what_a_held_item_started_stays_held_too() -> None:
     log: list[str] = []
+    cleaning_up = threading.Event()
+
+    def after_cleanup_starts() -> None:
+        cleaning_up.wait(5.0)
 
     def unwinding_leaf(_: int) -> None:
         try:
-            call(0.5)
+            call(1.0)
         finally:
+            cleaning_up.set()
             log.append(f"branch 0 leaf cleanup read {call(0.2)}")
 
     def running_leaf(_: int) -> None:
-        call(0.1)
+        # Its result arrives only once branch 0's leaf is cleaning up, so after
+        # the interrupt on every machine, however slowly the others' calls return.
+        runtime.wait(runtime.dispatch(after_cleanup_starts, label="m"))
         log.append("branch 2 leaf continued past its wait")
 
     def branch(i: int) -> None:
