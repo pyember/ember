@@ -4,8 +4,9 @@ Run only by the ``live-smoke`` workflow. It needs the network and the ``data``
 extra, and no credentials. The test suite never imports this file, and its
 tests replace the Hub with a fake, so this is the one place a real read runs.
 
-The process must also end: the workflow bounds this step, because a read left
-unfinished at the limit has kept a process from exiting.
+The process must also end. Streaming these datasets and stopping at a limit
+once kept processes from exiting; they are now read from a downloaded file, and
+the workflow bounds this step so a return of that hang is reported.
 
 Usage:
     uv run python tests/live/hub.py
