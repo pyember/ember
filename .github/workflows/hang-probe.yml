@@ -1,0 +1,67 @@
+name: hang-probe
+
+# Temporary, never merged: looks for the macOS suite hang seen once in run
+# 42731027991, and reads the pinned datasets on Windows.
+on: pull_request
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.13.7"
+
+jobs:
+  repeat:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [data-then-fork, xcs-tail]
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - run: uv sync --locked --group dev --all-extras
+      - name: Forty runs, each a new process, stacks dumped at 30 s, ended at 2 minutes
+        shell: bash
+        env:
+          ARM: ${{ matrix.arm }}
+        run: |
+          set +e -uo pipefail
+          if [ "$ARM" = data-then-fork ]; then
+            files="tests/test_data.py tests/xcs/test_workers.py"
+          else
+            files="tests/xcs/test_map.py tests/xcs/test_planning.py tests/xcs/test_runtime.py tests/xcs/test_workers.py"
+          fi
+          hung=0
+          for i in $(seq 1 40); do
+            out="$RUNNER_TEMP/run-$i.txt"
+            # shellcheck disable=SC2086
+            perl -e 'alarm 120; exec @ARGV' .venv/bin/python -m pytest -q -p no:cacheprovider \
+              -o faulthandler_timeout=30 $files > "$out" 2>&1
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              [ "$status" -eq 142 ] && hung=$((hung + 1))
+              echo "RUN $i: status $status (142 = still running at 2 minutes)"
+              grep -nE "Timeout|Thread 0x|Current thread|File \"|FAILED|ERROR|passed|failed" "$out" | head -80
+            fi
+          done
+          echo "RESULT $ARM: $hung of 40 runs still running at 2 minutes"
+
+  windows-hub:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - run: uv sync --locked --extra data
+      - name: Read the pinned datasets through the file path
+        timeout-minutes: 3
+        run: uv run python tests/live/hub.py
