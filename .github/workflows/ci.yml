@@ -125,8 +125,9 @@ jobs:
               print(name, len(list(data.stream(spec, limit=3))), flush=True)
           print("script done", flush=True)
           PY
-          declare -A exited stuck failed
-          for label in stream file; do exited[$label]=0; stuck[$label]=0; failed[$label]=0; done
+          # One line per attempt, counted at the end (macOS's bash 3.2 has no maps).
+          results="$RUNNER_TEMP/results.txt"
+          : > "$results"
           for i in $(seq 1 20); do
             for label in stream file; do
               out="$RUNNER_TEMP/out-$label-$i.txt"
@@ -135,18 +136,20 @@ jobs:
                 .venv/bin/python -u "$RUNNER_TEMP/$label.py" > "$out" 2>&1
               status=$?
               if [ "$status" -eq 0 ]; then
-                exited[$label]=$((exited[$label] + 1))
+                echo "$label exited" >> "$results"
               elif [ "$status" -eq 142 ]; then
-                stuck[$label]=$((stuck[$label] + 1))
+                echo "$label stuck" >> "$results"
                 echo "round $i, $label: still running at 45 s; last output: $(grep -v Warning "$out" | tail -1)"
               else
-                failed[$label]=$((failed[$label] + 1))
+                echo "$label failed" >> "$results"
                 echo "round $i, $label: failed with status $status:"; tail -6 "$out"
               fi
             done
           done
           for label in stream file; do
-            echo "RESULT $label: ${exited[$label]} exited, ${stuck[$label]} still running at 45 s, ${failed[$label]} failed otherwise"
+            echo "RESULT $label: $(grep -c "^$label exited" "$results") exited," \
+              "$(grep -c "^$label stuck" "$results") still running at 45 s," \
+              "$(grep -c "^$label failed" "$results") failed otherwise"
           done
 
   # TEMPORARY, removed before this branch merges. Every example of these splits,
