@@ -1,243 +1,149 @@
-"""Pytest configuration and fixtures."""
+"""Shared fixtures. No test reaches the network."""
 
-import json
-import sys
-import types
+import contextlib
+import dataclasses
+import threading
+import time
+from collections.abc import Callable, Iterator
 from pathlib import Path
-from unittest.mock import Mock
 
 import pytest
 
-try:
-    from .test_constants import Models, TestData
-    from .test_doubles import FakeContext, FakeModelRegistry
+from ember import context
+from ember.context import RetryPolicy
+from ember.errors import ErrorKind
+from ember.llm import Client, using
+from ember.llm.fake import Answer, Fail, FakeProvider, Reply
+from ember.llm.ref import ModelRef
+from ember.llm.request import Message, Request, TextPart
 
-    pytest_plugins = ("tests.fixtures",)
-except ImportError:
-    from test_constants import Models, TestData
-    from test_doubles import FakeContext, FakeModelRegistry
+ReplyFn = Callable[[str, "str | tuple[Message, ...]"], "str | Reply | ErrorKind"]
 
-    pytest_plugins = ("fixtures",)
-
-# Optional provider stubs to avoid heavy runtime dependencies during unit tests.
+_PROVIDER_KEY_VARIABLES = ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY")
+_REAL_HOME = Path.home()
 
 
 @pytest.fixture(scope="session")
-def anyio_backend():
-    """Force AnyIO-powered tests to run on asyncio backend only."""
-
-    return "asyncio"
-
-
-def _install_stub(fullname: str, attrs: dict | None = None) -> None:
-    parts = fullname.split(".")
-    module: types.ModuleType | None = None
-    qualname = ""
-    for part in parts:
-        qualname = f"{qualname}.{part}" if qualname else part
-        existing = sys.modules.get(qualname)
-        if existing is None:
-            new_module = types.ModuleType(qualname)
-            sys.modules[qualname] = new_module
-            if module is not None:
-                setattr(module, part, new_module)
-            module = new_module
-        else:
-            module = existing
-    if attrs and module is not None:
-        for key, value in attrs.items():
-            setattr(module, key, value)
+def real_home() -> Path:
+    """The home directory of whoever runs the suite; no test may read or write it."""
+    return _REAL_HOME
 
 
-if "anthropic" not in sys.modules:
+@pytest.fixture(autouse=True)
+def isolated_config(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Path]:
+    """Points every test at an empty home and config, with no provider keys.
 
-    class _AnthropicError(RuntimeError):
-        pass
-
-    class _Dummy:
-        pass
-
-    class _AnthropicClient:
-        def __init__(self, api_key: str | None = None):
-            self.api_key = api_key
-            self.messages = types.SimpleNamespace(create=self._create)
-
-        def _create(self, **kwargs):  # pragma: no cover
-            return types.SimpleNamespace(
-                content=[],
-                usage=types.SimpleNamespace(input_tokens=0, output_tokens=0),
-            )
-
-    _install_stub(
-        "anthropic",
-        attrs={
-            "Anthropic": _AnthropicClient,
-            "AuthenticationError": _AnthropicError,
-            "RateLimitError": _AnthropicError,
-            "APIError": _AnthropicError,
-        },
-    )
-    anthropic_module = sys.modules.get("anthropic")
-    if anthropic_module is not None:
-        anthropic_module.__path__ = ["."]
-
-    _install_stub(
-        "anthropic.types",
-        attrs={
-            "MessageParam": dict,
-            "Message": dict,
-            "ContentBlock": _Dummy,
-            "TextBlock": _Dummy,
-            "ThinkingBlock": _Dummy,
-            "RedactedThinkingBlock": _Dummy,
-            "ToolUseBlock": _Dummy,
-            "ServerToolUseBlock": _Dummy,
-            "WebSearchToolResultBlock": _Dummy,
-        },
-    )
-
-# Setup paths
-PROJECT_ROOT = Path(__file__).parent.parent.absolute()
-SRC_PATH = PROJECT_ROOT / "src"
-if str(SRC_PATH) not in sys.path:
-    sys.path.insert(0, str(SRC_PATH))
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
-
-# Configure pytest markers
-def pytest_configure(config):
-    """Register custom markers."""
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line("markers", "requires_gpu: marks tests that require GPU")
-    config.addinivalue_line("markers", "integration: marks tests as integration tests")
-
-
-# Core test fixtures
-@pytest.fixture
-def tmp_ctx(tmp_path, monkeypatch):
-    """Isolated EmberContext with temporary home directory.
-
-    Provides complete isolation from user's real ~/.ember directory.
-    All tests using this fixture are hermetic and parallelizable.
+    Applies to the whole suite so that no test can read the real
+    ``~/.ember/config.yaml`` or send a real key, whatever its file sets up.
     """
-    # Import only if we need the real context
-    try:
-        from ember._internal.context import EmberContext
-
-        # Create fake home
-        home = tmp_path / "home"
-        home.mkdir()
-        ember_dir = home / ".ember"
-        ember_dir.mkdir()
-
-        # Set environment to use temp directory
-        monkeypatch.setenv("HOME", str(home))
-        monkeypatch.setenv("EMBER_HOME", str(ember_dir))
-        monkeypatch.delenv("EMBER_CONFIG_PATH", raising=False)
-
-        # Try to use public API for context reset if available
-        if hasattr(EmberContext, "reset"):
-            EmberContext.reset()
-
-        # Create fresh context
-        ctx = EmberContext(isolated=True)
-        # Promote to current context so code paths using EmberContext.current()
-        # during the test see this isolated configuration.
-        EmberContext._thread_local.context = ctx
-        EmberContext._context_var.set(ctx)
-        yield ctx
-
-        # Cleanup via public API if available
-        if hasattr(EmberContext, "reset"):
-            EmberContext.reset()
-
-    except ImportError:
-        # If real context not available, use fake
-        ctx = FakeContext(isolated=True)
-        yield ctx
+    home = tmp_path_factory.mktemp("home")
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))  # What `Path.home()` reads on Windows.
+    monkeypatch.setenv("EMBER_CONFIG", str(home / ".ember" / "config.yaml"))
+    for name in _PROVIDER_KEY_VARIABLES:
+        monkeypatch.delenv(name, raising=False)
+    context.reload()
+    yield home
+    context.reload()
 
 
-@pytest.fixture
-def mock_cli_args(monkeypatch):
-    """Mock sys.argv for CLI testing without subprocess."""
+@dataclasses.dataclass(frozen=True)
+class SentCall:
+    """One request the fake received, with the fields operators set."""
 
-    def _mock_args(*args):
-        monkeypatch.setattr(sys, "argv", ["ember"] + list(args))
+    model: str
+    prompt: "str | tuple[Message, ...]"
+    system: str | None
+    temperature: float | None
+    max_output_tokens: int | None
+    seed: int | None
 
-    return _mock_args
+
+class FakeModels:
+    """A `FakeProvider` that answers with ``reply(model, prompt)``.
+
+    ``reply`` returns the answer text, a whole `Reply` (to set its finish
+    reason, for example), or an `ErrorKind` for the call to fail with. Each
+    answer takes ``latency_s``, slept here on the thread that runs the request
+    so that `peak_in_flight` counts requests answered at once.
+    """
+
+    def __init__(self, reply: ReplyFn, latency_s: float) -> None:
+        self._reply = reply
+        self._latency_s = latency_s
+        self._lock = threading.Lock()
+        self._in_flight = 0
+        self._peak_in_flight = 0
+        self.provider = FakeProvider(respond=self._respond)
+
+    @property
+    def calls(self) -> list[SentCall]:
+        """Requests received so far, in arrival order."""
+        return [_sent(seen.model, seen.request) for seen in self.provider.requests]
+
+    @property
+    def peak_in_flight(self) -> int:
+        """The most requests that were being answered at the same moment."""
+        with self._lock:
+            return self._peak_in_flight
+
+    def _respond(self, model: ModelRef, request: Request) -> Answer:
+        with self._lock:
+            self._in_flight += 1
+            self._peak_in_flight = max(self._peak_in_flight, self._in_flight)
+        try:
+            time.sleep(self._latency_s)
+            outcome = self._reply(str(model), _prompt_of(request))
+        finally:
+            with self._lock:
+                self._in_flight -= 1
+        if isinstance(outcome, ErrorKind):
+            return Fail(outcome)
+        return outcome if isinstance(outcome, Reply) else Reply(outcome)
 
 
-# Model API fixtures
-@pytest.fixture
-def mock_model_response():
-    """Standard mock response for model tests."""
-    from tests.fixtures import create_api_response
-
-    return create_api_response(
-        content="Test response", model=Models.GPT4, prompt_tokens=10, completion_tokens=20
+def _sent(model: ModelRef, request: Request) -> SentCall:
+    sampling = request.sampling
+    return SentCall(
+        str(model),
+        _prompt_of(request),
+        request.system,
+        sampling.temperature,
+        sampling.max_output_tokens,
+        sampling.seed,
     )
 
 
-@pytest.fixture
-def mock_registry():
-    """Mock model registry for testing."""
-    return FakeModelRegistry()
-
-
-# Data API fixtures
-@pytest.fixture
-def temp_data_file(tmp_path):
-    """Create temporary JSON data file."""
-    data = TestData.SAMPLE_JSON_DATA.copy()
-    file_path = tmp_path / "test_data.json"
-    file_path.write_text(json.dumps(data))
-    return file_path
+def _prompt_of(request: Request) -> "str | tuple[Message, ...]":
+    """A single-turn text request's prompt is its text; any other's, its messages."""
+    [*_, last] = request.messages
+    if len(request.messages) == 1 and len(last.parts) == 1 and isinstance(last.parts[0], TextPart):
+        return last.parts[0].text
+    return request.messages
 
 
 @pytest.fixture
-def temp_csv_file(tmp_path):
-    """Create temporary CSV data file."""
-    rows = ["text,label"]
-    for item in TestData.SAMPLE_JSON_DATA:
-        rows.append(f'{item["text"]},{item["label"]}')
-    csv_content = "\n".join(rows)
-    file_path = tmp_path / "test_data.csv"
-    file_path.write_text(csv_content)
-    return file_path
+def fake_models(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[Callable[..., FakeModels]]:
+    """Installs a client whose every provider answers with a reply function.
 
+    Config is isolated to a temporary directory, and the client makes one
+    attempt per call so that each test sees exactly the calls operators make.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("EMBER_CONFIG", str(tmp_path / "config.yaml"))
+    context.reload()
+    with contextlib.ExitStack() as stack:
 
-# Operator fixtures
-@pytest.fixture
-def simple_operator():
-    """Simple operator for testing."""
+        def install(reply: ReplyFn, latency_s: float = 0.0) -> FakeModels:
+            fake = FakeModels(reply, latency_s)
+            client = stack.enter_context(Client(provider_factory=fake.provider.factory))
+            stack.enter_context(using(client))
+            stack.enter_context(context.override(retry=RetryPolicy(max_attempts=1)))
+            return fake
 
-    def double(x):
-        return x * 2
-
-    return double
-
-
-@pytest.fixture
-def mock_model_operator():
-    """Mock model operator for testing."""
-
-    def model_op(text):
-        return Mock(text=f"Processed: {text}", usage={"tokens": 10})
-
-    return model_op
-
-
-# XCS fixtures
-@pytest.fixture
-def slow_function():
-    """Function that simulates slow operation."""
-    import time
-
-    def slow_op(x):
-        time.sleep(0.1)
-        return x
-
-    return slow_op
+        yield install
+    context.reload()

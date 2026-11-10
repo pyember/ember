@@ -1,0 +1,110 @@
+name: ci
+
+on:
+  push:
+    branches: [main, v0.2]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.13.7"
+
+jobs:
+  check:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    # Starting guesses; tighten once there are run durations to read.
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv lock --check
+      - run: uv sync --locked --group dev
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+
+  test:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every Python the package declares support for (requires-python).
+        python: ["3.11", "3.12", "3.13", "3.14", "3.15"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked --group dev --all-extras
+      - run: uv run pytest -q
+
+  # The suite on the other systems people install on. GitHub-hosted: the
+  # CI_RUNNER fleet is Linux only.
+  test-os:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+          enable-cache: true
+      - run: uv sync --locked --group dev --all-extras
+      - run: uv run pytest -q
+
+  # The suite against the oldest versions pyproject.toml says ember works with:
+  # direct dependencies at their minimum, everything else current, on the
+  # oldest supported Python. A failure means a declared minimum is wrong.
+  test-floors:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    env:
+      UV_RESOLUTION: lowest-direct
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.11"
+      # Not --locked: the committed lockfile holds current versions.
+      - run: uv sync --group dev --all-extras
+      - run: uv pip list
+      - run: uv run pytest -q
+
+  wheel:
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: "3.13"
+      - name: Build the wheel and import it in a clean environment
+        run: |
+          set -euo pipefail
+          uv build --wheel --out-dir dist
+          uv venv --python 3.13 /tmp/clean
+          uv pip install --python /tmp/clean/bin/python dist/*.whl
+          cd /tmp
+          HOME=/tmp/empty-home /tmp/clean/bin/python -c "import ember, sys; print(ember.__version__); sys.exit(0)"
+          # The model catalog is package data: fail if the wheel lacks it.
+          HOME=/tmp/empty-home /tmp/clean/bin/python -c "from ember.llm import catalog; spec = catalog.default().resolve('gpt-5.5'); assert spec.known and spec.rates is not None; print(spec.ref, spec.wire_id)"

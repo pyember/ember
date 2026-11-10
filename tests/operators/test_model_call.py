@@ -1,0 +1,145 @@
+"""ModelCall: one call per input, no default model, no repr-as-prompt."""
+
+import dataclasses
+from collections.abc import Callable
+from concurrent.futures import Future
+from typing import Any
+
+import pytest
+
+from ember.errors import ErrorKind, ModelError
+from ember.llm.completion import Completion
+from ember.llm.ref import ModelRef
+from ember.llm.request import Message, Sampling
+from ember.llm.result import Result
+from ember.operators import ModelCall
+
+
+def test_string_input_is_sent_as_is_with_settings(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: f"echo {prompt}")
+    call = ModelCall(
+        "openai/gpt-5",
+        system="be terse",
+        sampling=Sampling(temperature=0.2, max_output_tokens=64, seed=7),
+    )
+    result = call("hello")
+    assert result.text == "echo hello"
+    assert result.model == ModelRef("openai", "gpt-5")
+    [sent] = fake.calls
+    assert (sent.model, sent.prompt, sent.system) == ("openai/gpt-5", "hello", "be terse")
+    assert (sent.temperature, sent.max_output_tokens, sent.seed) == (0.2, 64, 7)
+
+
+def test_template_substitutes_the_input_without_interpreting_it(
+    fake_models: Callable[..., Any],
+) -> None:
+    fake = fake_models(lambda model, prompt: "ok")
+    ModelCall("openai/gpt-5", template="Q: {input}\nA:")("what is {x}?")
+    assert fake.calls[0].prompt == "Q: what is {x}?\nA:"
+
+
+def test_messages_are_sent_as_a_tuple(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: "ok")
+    history = [Message.user("hi"), Message.assistant("hello"), Message.user("bye")]
+    ModelCall("anthropic/claude-sonnet-4-5")(history)
+    assert fake.calls[0].prompt == tuple(history)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        {"question": "capital of France?", "context": "geo"},
+        None,
+        ["Paris", "Lyon"],
+        42,
+    ],
+)
+def test_anything_but_text_or_messages_raises_before_sending(
+    fake_models: Callable[..., Any], value: object
+) -> None:
+    fake = fake_models(lambda model, prompt: "should not be called")
+    with pytest.raises(TypeError, match="a string, a sequence of Message or a Completion"):
+        ModelCall("openai/gpt-5")(value)  # type: ignore[arg-type]
+    assert fake.calls == []
+
+
+def test_a_template_needs_text_input(fake_models: Callable[..., Any]) -> None:
+    fake_models(lambda model, prompt: "ok")
+    with pytest.raises(TypeError, match="with a template takes text"):
+        ModelCall("openai/gpt-5", template="{input}")([Message.user("hi")])
+
+
+def test_there_is_no_default_model() -> None:
+    with pytest.raises(TypeError):
+        ModelCall()  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="needs a model"):
+        ModelCall("  ")
+
+
+@pytest.mark.parametrize("model", [None, 123, b"openai/gpt-5.5"])
+def test_the_model_must_be_a_string_or_a_model_ref(model: object) -> None:
+    with pytest.raises(TypeError, match="str or ModelRef"):
+        ModelCall(model)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("template", "found"),
+    [
+        ("no field at all", "must contain {input}"),
+        ("{question}", "found {question}"),
+        ("{input!r}", "found {input!r}"),
+        ("{input:>10}", "found {input:>10}"),
+        ("{}", "found {}"),
+        ("{input} {", "Single '{'"),
+    ],
+)
+def test_templates_are_checked_at_construction(template: str, found: str) -> None:
+    with pytest.raises(ValueError, match=found.replace("{", r"\{").replace("}", r"\}")):
+        ModelCall("openai/gpt-5", template=template)
+
+
+def test_replace_changes_settings_and_revalidates() -> None:
+    call = ModelCall("openai/gpt-5")
+    hotter = dataclasses.replace(call, sampling=Sampling(temperature=1.0))
+    assert hotter.sampling.temperature == 1.0 and call.sampling.temperature is None
+    with pytest.raises(ValueError):
+        dataclasses.replace(call, template="{oops}")
+
+
+def _pending(outcome: "Result | ModelError") -> Completion:
+    """A Completion as a deferred call leaves it: its future already settled."""
+    future: Future[Result] = Future()
+    if isinstance(outcome, ModelError):
+        future.set_exception(outcome)
+    else:
+        future.set_result(outcome)
+    return Completion(future, ModelRef("fake", "earlier"))
+
+
+def test_a_completion_input_is_read_as_its_text(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: "ok")
+    earlier = ModelCall("openai/gpt-5")("draft")
+    ModelCall("openai/gpt-5", template="Improve: {input}")(earlier)
+    ModelCall("openai/gpt-5")(earlier)
+    assert [call.prompt for call in fake.calls] == ["draft", "Improve: ok", "ok"]
+
+
+def test_rshift_feeds_one_calls_text_to_the_next(fake_models: Callable[..., Any]) -> None:
+    fake = fake_models(lambda model, prompt: f"[{prompt}]")
+    pipeline = ModelCall("openai/first") >> ModelCall("anthropic/second", template="again {input}")
+    assert pipeline("x").text == "[again [x]]"
+    assert [(call.model, call.prompt) for call in fake.calls] == [
+        ("openai/first", "x"),
+        ("anthropic/second", "again [x]"),
+    ]
+
+
+def test_a_failed_input_completion_raises_its_error_before_sending(
+    fake_models: Callable[..., Any],
+) -> None:
+    fake = fake_models(lambda model, prompt: "should not be called")
+    error = ModelError(ErrorKind.SERVER, provider="fake", model="earlier", reason="injected")
+    with pytest.raises(ModelError) as raised:
+        ModelCall("openai/gpt-5")(_pending(error))
+    assert raised.value is error
+    assert fake.calls == []

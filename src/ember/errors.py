@@ -1,0 +1,192 @@
+"""Errors raised by ember.
+
+Ember raises a small, closed set of exceptions. A failed model call is always a
+`ModelError` whose `kind` says what went wrong; callers branch on `kind` and
+`retryable`, never on message text.
+"""
+
+import enum
+
+__all__ = [
+    "ConfigError",
+    "EmberError",
+    "ErrorKind",
+    "ModelError",
+    "NonSyntaxError",
+    "QuorumError",
+    "TieError",
+]
+
+
+class EmberError(Exception):
+    """Base class for every exception ember raises on purpose."""
+
+
+class ConfigError(EmberError):
+    """Configuration is unreadable or invalid, or a required credential is missing."""
+
+
+class ErrorKind(enum.Enum):
+    """Why a model call failed."""
+
+    AUTH = "auth"
+    PERMISSION = "permission"
+    QUOTA = "quota"
+    """The account's credit, spend limit or usage quota is exhausted."""
+    NOT_FOUND = "not_found"
+    BAD_REQUEST = "bad_request"
+    RATE_LIMITED = "rate_limited"
+    OVERLOADED = "overloaded"
+    SERVER = "server"
+    MALFORMED = "malformed"
+    """The provider answered, but ember could not decode the response."""
+    TRANSPORT = "transport"
+    UNPRICED = "unpriced"
+    CANCELLED = "cancelled"
+
+
+_RETRYABLE_KINDS = frozenset(
+    {ErrorKind.RATE_LIMITED, ErrorKind.OVERLOADED, ErrorKind.SERVER, ErrorKind.TRANSPORT}
+)
+
+
+class ModelError(EmberError):
+    """A model call failed.
+
+    The message is built only from the fields below and a short reason written
+    by ember. It never contains upstream response bodies, file paths, or
+    credentials.
+
+    Attributes:
+        kind: Why the call failed.
+        provider: Provider name, for example ``"openai"``; empty when the
+            caller named no provider, as with an unknown bare model name.
+        model: Model name as the caller wrote it.
+        reason: Short human-readable explanation written by ember.
+        status: HTTP status code, when the failure came from an HTTP response.
+        request_id: The provider's request id, when the provider sent one.
+        retry_after_s: Seconds the provider asked the caller to wait.
+        before_first_byte: Whether the caller had received nothing from this
+            attempt when it failed. False once a stream has yielded any event;
+            non-streaming calls always leave it True. Only such failures are
+            safe to retry, whatever their kind.
+    """
+
+    def __init__(
+        self,
+        kind: ErrorKind,
+        *,
+        provider: str,
+        model: str,
+        reason: str,
+        status: int | None = None,
+        request_id: str | None = None,
+        retry_after_s: float | None = None,
+        before_first_byte: bool = True,
+    ) -> None:
+        self.kind = kind
+        self.provider = provider
+        self.model = model
+        self.reason = reason
+        self.status = status
+        self.request_id = request_id
+        self.retry_after_s = retry_after_s
+        self.before_first_byte = before_first_byte
+        super().__init__(self._render())
+
+    @property
+    def retryable(self) -> bool:
+        """Whether sending the same request again can succeed and repeat nothing.
+
+        A failure after the caller received part of the output is never
+        retryable: a retry would deliver that part twice.
+        """
+        return self.before_first_byte and self.kind in _RETRYABLE_KINDS
+
+    def _render(self) -> str:
+        name = f"{self.provider}/{self.model}" if self.provider else self.model
+        parts = [f"{self.kind.value}: {self.reason}", f"model={name}"]
+        if self.status is not None:
+            parts.append(f"status={self.status}")
+        if self.request_id is not None:
+            parts.append(f"request_id={self.request_id}")
+        if self.retry_after_s is not None:
+            parts.append(f"retry_after_s={self.retry_after_s:g}")
+        return " ".join(parts)
+
+
+class NonSyntaxError(EmberError, ValueError):
+    """A NON graph specification is invalid.
+
+    Attributes:
+        spec: The specification that failed to parse.
+        column: Zero-based column where the error was detected.
+        reason: What is wrong at that column.
+    """
+
+    def __init__(self, spec: str, column: int, reason: str) -> None:
+        self.spec = spec
+        self.column = column
+        self.reason = reason
+        pointer = " " * column + "^"
+        super().__init__(f"{reason} at column {column}\n  {spec}\n  {pointer}")
+
+
+class QuorumError(EmberError):
+    """Fewer members of a composition counted than its quorum requires.
+
+    A member counts when it succeeded and, where the composition asks more of
+    an answer (a usable finish, a passing verdict), its answer qualified. The
+    message counts each outcome and names each failed member's error; it never
+    contains model output.
+
+    Attributes:
+        required: Members that must count.
+        succeeded: Members that counted.
+        counted_as: The word for counting in the message, such as
+            ``"succeeded"``, ``"usable"`` or ``"passed"``.
+        rejected: ``(member index, reason)`` for each member that answered but
+            did not count, such as ``"unusable (content_filter)"``.
+        failures: ``(member index, error)`` for each member whose call failed.
+    """
+
+    def __init__(
+        self,
+        *,
+        required: int,
+        succeeded: int,
+        failures: tuple[tuple[int, EmberError], ...],
+        rejected: tuple[tuple[int, str], ...] = (),
+        counted_as: str = "succeeded",
+    ) -> None:
+        self.required = required
+        self.succeeded = succeeded
+        self.counted_as = counted_as
+        self.rejected = rejected
+        self.failures = failures
+        counts = [f"{succeeded} {counted_as}"]
+        reasons = [reason for _, reason in rejected]
+        counts += [f"{reasons.count(reason)} {reason}" for reason in dict.fromkeys(reasons)]
+        if failures:
+            counts.append(f"{len(failures)} errored")
+        parts = [f"quorum not met: {', '.join(counts)}", f"{required} required"]
+        parts += [f"member {index}: {error}" for index, error in failures]
+        super().__init__("; ".join(parts))
+
+
+class TieError(EmberError):
+    """A majority vote tied and its tie policy is to raise.
+
+    The message never contains the answers, which are model output; read
+    `tied` for them.
+
+    Attributes:
+        tied: The tied answers after normalization, in the order first seen.
+        votes: Votes each tied answer received.
+    """
+
+    def __init__(self, tied: tuple[str, ...], votes: int) -> None:
+        self.tied = tied
+        self.votes = votes
+        noun = "vote" if votes == 1 else "votes"
+        super().__init__(f"majority vote tied: {len(tied)} answers have {votes} {noun} each")

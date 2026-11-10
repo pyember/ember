@@ -1,0 +1,7 @@
+{
+  "type": "error",
+  "code": "ERR_SOMETHING",
+  "message": "Something went wrong",
+  "param": null,
+  "sequence_number": 1
+}

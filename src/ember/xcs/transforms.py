@@ -1,0 +1,270 @@
+"""`jit` and `map`.
+
+`jit` changes when model calls wait. Inside a jitted function each model call
+is sent at its call site and returns a pending result; reading the result
+waits for that call only. The function runs once, in program order, on the
+caller's thread, so while its calls succeed it computes exactly what it
+computes without `jit`. A failed call's error is raised where its result is
+first read, not at the call.
+
+`map` runs a function on each item in its own greenlet, so the items' model
+calls overlap. Items interleave only where one of them waits for a result.
+
+Both end at a boundary: everything started inside has finished before they
+return, and a failure that nobody read is raised there.
+"""
+
+import functools
+import inspect
+import threading
+import types
+from collections.abc import Callable, Iterable
+from concurrent.futures import Future
+from typing import Generic, ParamSpec, TypeVar, overload
+
+import greenlet
+
+from ember.xcs import strands
+from ember.xcs.frames import Call, Frame, Plan
+from ember.xcs.graph import Graph
+
+__all__ = ["Jitted", "jit", "map"]
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T = TypeVar("T")
+
+_MAX_NOTED_FAILURES = 5
+
+
+class Jitted(Generic[P, R]):
+    """A function whose independent model calls overlap.
+
+    Calling it runs the function once. `graph` returns what the most recent
+    call executed. Nothing else carries over between calls: no result, no
+    argument and no object the function created is kept.
+
+    Raises:
+        TypeError: On construction, for async functions and generator
+            functions, whose bodies run after the call returns.
+    """
+
+    def __init__(self, fn: Callable[P, R]) -> None:
+        if inspect.iscoroutinefunction(fn) or inspect.isasyncgenfunction(fn):
+            raise TypeError(f"jit cannot run async function {fn.__qualname__}")
+        if inspect.isgeneratorfunction(fn):
+            raise TypeError(f"jit cannot run generator function {fn.__qualname__}")
+        functools.update_wrapper(self, fn, updated=())
+        self._fn = fn
+        self._lock = threading.Lock()
+        self._graph: Graph | None = None
+        self._plan: Plan | None = None
+
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> R:
+        with self._lock:
+            plan = self._plan
+        with strands.scope(plan) as strand:
+            frame = strand.frame
+            try:
+                result = _run_to_boundary(strand, functools.partial(self._fn, *args, **kwargs))
+            except Exception:
+                self._remember(frame)
+                raise
+            self._remember(frame)
+            return result
+
+    def graph(self) -> Graph | None:
+        """What the most recent call executed, or ``None`` before the first call."""
+        with self._lock:
+            return self._graph
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> "Jitted[P, R]": ...
+
+    @overload
+    def __get__(self, instance: object, owner: type) -> Callable[..., R]: ...
+
+    def __get__(self, instance: object | None, owner: type) -> "Jitted[P, R] | Callable[..., R]":
+        if instance is None:
+            return self
+        return types.MethodType(self, instance)
+
+    def _remember(self, frame: Frame) -> None:
+        if not frame.settled:
+            return  # Stopped before its calls finished: keep the previous graph.
+        graph = frame.graph()
+        plan = frame.next_plan(graph) if frame.parent is None else None
+        with self._lock:
+            self._graph = graph
+            if plan is not None:
+                self._plan = plan
+
+
+def jit(fn: Callable[P, R]) -> Jitted[P, R]:
+    """Makes ``fn``'s independent model calls overlap; see `Jitted`."""
+    return Jitted(fn)
+
+
+def map(fn: Callable[[T], R], items: Iterable[T]) -> list[R]:
+    """Runs ``fn`` on each item concurrently and returns the results in order.
+
+    Each item runs in its own greenlet on the caller's thread, with a copy of
+    the caller's context. Items start in order, each running until it first
+    waits before the next starts, so every item starts before any continues
+    past a wait. If one raises an exception, no further items start, the items
+    already started finish, and the error of the earliest failed item is
+    raised.
+
+    An interrupt (a `BaseException` that is not an `Exception`, such as
+    KeyboardInterrupt), raised in an item or arriving while the map waits,
+    stops the map at once: every started item that has not finished gets
+    `greenlet.GreenletExit` where it waits, and the interrupt is raised once
+    they have unwound. Requests they already sent still finish before the
+    enclosing jit call returns.
+    """
+    work = list(items)
+    if not work:
+        return []
+    strand = strands.current()
+    if strand is not None:
+        return _map_in(strand, fn, work)
+    with strands.scope(None) as strand:
+        return _run_to_boundary(strand, lambda: _map_in(strand, fn, work))
+
+
+def _run_to_boundary(strand: strands.Strand, body: Callable[[], R]) -> R:
+    """Runs ``body``, then waits for everything started in the strand's frame.
+
+    Raises the body's error if it raised; otherwise the first failure in the
+    frame that nobody read. Either way the other unread failures are attached
+    as notes.
+    """
+    frame = strand.frame
+    try:
+        result = body()
+    except Exception as error:
+        _note_unread(error, _settle(strand, frame))
+        raise
+    failures = _settle(strand, frame)
+    if failures:
+        first, *others = failures
+        _note_unread(first, others)
+        raise first
+    return result
+
+
+def _settle(strand: strands.Strand, frame: Frame) -> list[BaseException]:
+    position = 0
+    while position < len(frame.pending):
+        strand.wait(frame.pending[position])
+        position += 1
+    for drained in frame.streams:
+        strand.wait(drained)
+    frame.settled = True
+    return frame.take_unread_failures()
+
+
+def _note_unread(error: BaseException, others: list[BaseException]) -> None:
+    _note_others(
+        error,
+        others,
+        one="1 other result also failed and was never read",
+        many="{} other results also failed and were never read",
+    )
+
+
+def _note_others(error: BaseException, others: list[BaseException], *, one: str, many: str) -> None:
+    """Notes on ``error`` the distinct failures in ``others``, showing a few."""
+    distinct: list[BaseException] = []
+    for other in others:
+        if other is not error and not any(other is seen for seen in distinct):
+            distinct.append(other)
+    if not distinct:
+        return
+    shown = "; ".join(
+        f"{type(other).__name__}: {other}" for other in distinct[:_MAX_NOTED_FAILURES]
+    )
+    hidden = len(distinct) - _MAX_NOTED_FAILURES
+    more = f" and {hidden} more" if hidden > 0 else ""
+    lead = one if len(distinct) == 1 else many.format(len(distinct))
+    error.add_note(f"{lead}: {shown}{more}")
+
+
+class _MapRun:
+    """Shared state of one `map` call's items."""
+
+    def __init__(self) -> None:
+        self.failed = False
+        self.interrupt: BaseException | None = None
+        self.running = 0
+        self.all_started = False
+        self.settled: Future[None] = Future()
+        self.reads: set[Call] = set()
+        self.items: list[greenlet.greenlet] = []
+
+    def started_all(self) -> None:
+        self.all_started = True
+        self._settle_if_done()
+
+    def item_finished(self) -> None:
+        self.running -= 1
+        self._settle_if_done()
+
+    def _settle_if_done(self) -> None:
+        done = self.interrupt is not None or (self.all_started and self.running == 0)
+        if done and not self.settled.done():
+            self.settled.set_result(None)
+
+
+def _map_in(strand: strands.Strand, fn: Callable[[T], R], items: list[T]) -> list[R]:
+    run = _MapRun()
+    outcomes: list[Future[R]] = []
+    try:
+        for item in items:
+            if run.failed:
+                break
+            outcome: Future[R] = Future()
+            outcomes.append(outcome)
+            run.running += 1
+            run.items.append(strand.spawn(functools.partial(_run_item, run, fn, item, outcome)))
+        run.started_all()
+        strand.wait(run.settled)
+        if run.interrupt is not None:
+            raise run.interrupt
+    except BaseException:
+        strand.scheduler.hold(run.items)
+        for child in run.items:
+            strand.scheduler.stop(child)
+        raise
+    strand.absorb(frozenset(run.reads))
+    errors = [error for outcome in outcomes if (error := outcome.exception()) is not None]
+    if errors:
+        first, *others = errors
+        _note_others(
+            first, others, one="1 other item also raised", many="{} other items also raised"
+        )
+        raise first
+    return [outcome.result() for outcome in outcomes]
+
+
+def _run_item(
+    run: _MapRun, fn: Callable[[T], R], item: T, outcome: "Future[R]", child: strands.Strand
+) -> None:
+    try:
+        result = fn(item)
+    except Exception as error:  # Raised by `map` in item order.
+        run.failed = True
+        outcome.set_exception(error)
+    # An interrupt stops the whole map, which raises it; GreenletExit means the
+    # map is stopping this item because of one.
+    except BaseException as interrupt:
+        run.failed = True
+        if run.interrupt is None and not isinstance(interrupt, greenlet.GreenletExit):
+            run.interrupt = interrupt
+            child.scheduler.hold(run.items)
+        outcome.set_exception(interrupt)
+    else:
+        outcome.set_result(result)
+    finally:
+        run.reads |= child.reads
+        run.item_finished()

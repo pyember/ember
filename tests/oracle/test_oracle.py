@@ -1,0 +1,400 @@
+"""The xcs oracle: `jit` changes when model calls wait, never what a program computes.
+
+Every case runs a program from `orchard` plainly and under `xcs.jit`, each
+against a fresh `FakeModel`, and requires:
+
+- the same outcome: an equal value, or an error of the same type and message;
+- the same multiset of model requests, each served exactly once and never
+  before the program reached its call site;
+- the same side-effect log, in program order, or per item for programs whose
+  items run through `xcs.map`.
+
+Cases whose program makes N independent calls of latency L must also finish
+in about L under jit, and never slower than the plain run.
+"""
+
+import collections
+import dataclasses
+from collections.abc import Callable
+from typing import Literal
+
+import clientmodel
+import fakemodel
+import orchard
+import pytest
+
+from ember import context, xcs
+from ember.errors import ModelError
+
+Program = Callable[..., object]
+Transform = Callable[[Program], Program]
+Model = fakemodel.FakeModel | clientmodel.ClientModel
+Backend = Callable[..., Model]
+Drive = Callable[[Transform, Model], object]
+
+# Every case runs against the test fake, which dispatches through the runtime
+# directly, and against the real client through `ember.models`.
+BACKENDS = [
+    pytest.param(fakemodel.FakeModel, id="fake"),
+    pytest.param(clientmodel.ClientModel, id="client"),
+]
+
+SEMANTIC_LATENCY_S = 0.005
+# Long enough that requests sent together are all still being answered when
+# the last of them arrives, on a slow runner too.
+OVERLAP_LATENCY_S = 0.25
+
+
+def plain(program: Program) -> Program:
+    return program
+
+
+@dataclasses.dataclass(frozen=True)
+class Case:
+    """One oracle scenario.
+
+    Attributes:
+        name: Test id.
+        drive: Calls the transformed program, possibly several times.
+        independent: Independent calls the program makes, for the overlap check.
+        order: How side effects are compared.
+        answer: How the fake answers, on the thread that serves the request.
+        error: The error type both runs must raise, if any.
+        raises_late: A call fails outside `xcs.map`. The plain run raises at
+            the call site and the jit run at the first read, so the jit run
+            may also make the calls, and the side effects, in between.
+    """
+
+    name: str
+    drive: Drive
+    independent: int = 0
+    order: Literal["program", "per_item"] = "program"
+    answer: Callable[[str], str] = fakemodel.echo
+    error: type[Exception] | None = None
+    raises_late: bool = False
+
+
+@dataclasses.dataclass(frozen=True)
+class Run:
+    outcome: object
+    requests: collections.Counter[str]
+    reached: int
+    early: list[object]
+    effects: object
+    peak_in_flight: int
+
+
+def call(program: Program, *args: object, **kwargs: object) -> Drive:
+    """Drives one call of the transformed program."""
+    return lambda transform, model: transform(program)(model, *args, **kwargs)
+
+
+def repeat(program: Program, times: int, *args: object) -> Drive:
+    """Calls one transformed program several times; nothing may carry over."""
+
+    def drive(transform: Transform, model: Model) -> object:
+        transformed = transform(program)
+        return [transformed(model, *args) for _ in range(times)]
+
+    return drive
+
+
+def drive_persona(transform: Transform, model: Model) -> object:
+    reply = transform(orchard.persona_reply)
+    answers = []
+    for name in ("pirate", "lawyer", "lawyer"):
+        orchard.PERSONA["name"] = name
+        answers.append(reply(model, "hi"))
+    return answers
+
+
+def drive_aliasing(transform: Transform, model: Model) -> object:
+    aliased = transform(orchard.aliased_arguments)
+    same: list[str] = []
+    first = aliased(model, same, same)
+    dst: list[str] = []
+    src: list[str] = []
+    second = aliased(model, dst, src)
+    return [first, same, second, dst, src]
+
+
+def drive_fanout(transform: Transform, model: Model) -> object:
+    fanout = transform(orchard.fanout_from_global)
+    answers = []
+    for n in (1, 2, 2):
+        orchard.FANOUT["n"] = n
+        answers.append(fanout(model, "q"))
+    return answers
+
+
+def drive_session(transform: Transform, model: Model) -> object:
+    chat = transform(orchard.session_chat)
+    session = orchard.Session()
+    session.history.append("hello")
+    first = chat(model, session, "q")
+    session.history.append("more context")
+    return [first, chat(model, session, "q")]
+
+
+def drive_shared_config(transform: Transform, model: Model) -> object:
+    shared = transform(orchard.shared_config)
+    first = shared(model, "x")
+    orchard.CONFIG["k"] = 2
+    return [first, shared(model, "x")]
+
+
+def drive_config_keywords(transform: Transform, model: Model) -> object:
+    return [
+        transform(orchard.send)(model, "m", config="prod"),
+        transform(orchard.send)(model, "m", config={"parallel": False}),
+        transform(orchard.build)(model, "p", _config={"temperature": 0.2}),
+    ]
+
+
+def drive_temperature(transform: Transform, model: Model) -> object:
+    ask = transform(orchard.ask_with_temperature)
+    return [ask(model, "hi"), ask(model, "hi"), ask(model, "hi", temperature=0.1)]
+
+
+def drive_returned_stream(transform: Transform, model: Model) -> object:
+    stream = transform(orchard.returned_stream)(model, "a stream")
+    orchard.note("reading after return")
+    return "".join(stream)
+
+
+def answer_with_context(prompt: str) -> str:
+    return f"<{prompt} served under {context.current().default_model}>"
+
+
+CASES = [
+    Case("four_questions", call(orchard.four_questions, "a", "b", "c", "d"), independent=4),
+    Case("nested_helpers", repeat(orchard.nested_helpers, 2, "x")),
+    Case("countdown", call(orchard.countdown, 3), independent=4),
+    Case("persona_from_global", drive_persona),
+    Case("converse", repeat(orchard.converse, 3, "hi")),
+    Case("accumulate", repeat(orchard.accumulate, 4, "x")),
+    Case("write_then_read", repeat(orchard.write_then_read, 2, "x")),
+    Case("rebinding_callee", repeat(orchard.rebinding_callee, 2, 1)),
+    Case("aliased_arguments", drive_aliasing),
+    Case("caught_failure", repeat(orchard.caught_failure, 2, "x")),
+    Case("method_shadows_function", repeat(orchard.method_shadows_function, 2, "x")),
+    Case("jitted_method", repeat(orchard.jitted_method, 2, "ship")),
+    Case("shared_config", drive_shared_config),
+    Case("property_effects", repeat(orchard.property_effects, 2, 5)),
+    Case("own_thread_pool", call(orchard.through_own_thread_pool, "x"), order="per_item"),
+    Case("generator_calls", call(orchard.generator_calls, 3), independent=3),
+    Case("dataclass_values", repeat(orchard.dataclass_values, 2, 2)),
+    Case("jit_calls_jit", repeat(orchard.jit_calls_jit, 2, ["a", "b"])),
+    Case("keyword_only_default", drive_temperature),
+    Case("variadic_calls", call(orchard.variadic_calls, 2), independent=2),
+    Case("shadowed_helper", repeat(orchard.shadowed_helper, 2, "q")),
+    Case("fanout_from_global", drive_fanout),
+    Case("session_object", drive_session),
+    Case("pair", call(orchard.pair, "a", "b"), independent=2),
+    Case("pair_failure", call(orchard.pair, "fail:a", "b"), error=ModelError, raises_late=True),
+    Case(
+        "nested_fanout",
+        call(orchard.nested_fanout, ["q0", "q1"]),
+        independent=8,
+        order="per_item",
+    ),
+    Case(
+        "scoped_context",
+        call(orchard.scoped_context, ["a", "b"]),
+        order="per_item",
+        answer=answer_with_context,
+    ),
+    Case("string_argument", call(orchard.ask_all, ["q1", "q2", "q3"], "sys"), independent=3),
+    Case("config_keywords", drive_config_keywords),
+    Case("tally", call(orchard.tally, ["ab", "c", "def", "gh"]), independent=4, order="per_item"),
+    Case("guarded", call(orchard.guarded, ["a", "fail:b", "c"]), order="per_item"),
+    Case("strict_all", call(orchard.strict_all, ["a", "fail:b", "c"]), error=ModelError),
+    Case("closure_state", call(orchard.closure_state, "x"), independent=2),
+    Case("relay", repeat(orchard.relay, 2, "x")),
+    Case("unread_stream", call(orchard.unread_stream, "a stream")),
+    Case("unread_failing_stream", call(orchard.unread_stream, "fail:a stream")),
+    Case("stream_read_after_return", drive_returned_stream),
+    Case("streamed_answer", call(orchard.streamed_answer, "a stream")),
+]
+
+
+def execute(
+    case: Case,
+    transform: Transform,
+    latency_s: float,
+    *,
+    backend: Backend = fakemodel.FakeModel,
+    arrives_before_return: bool = False,
+) -> Run:
+    orchard.reset()
+    model = backend(latency_s, case.answer, arrives_before_return=arrives_before_return)
+    try:
+        outcome: object = case.drive(transform, model)
+    except Exception as error:  # The outcome under test; compared below.
+        outcome = error
+    finally:
+        model.close()
+    return Run(
+        outcome=outcome,
+        requests=model.requests(),
+        reached=model.reached(),
+        early=list(model.early_requests()),
+        effects=effects(orchard.LOG, case.order),
+        peak_in_flight=model.peak_in_flight(),
+    )
+
+
+def effects(log: list[tuple[object, ...]], order: Literal["program", "per_item"]) -> object:
+    if order == "program":
+        return list(log)
+    per_item: dict[str, list[tuple[object, ...]]] = collections.defaultdict(list)
+    for event in log:
+        per_item[repr(event[0])].append(event)
+    return dict(per_item)
+
+
+def divergences(case: Case, expected: Run, actual: Run) -> list[str]:
+    """Every way ``actual`` departs from the plain run ``expected``."""
+    found = []
+    if case.error is not None:
+        for run in (expected, actual):
+            if type(run.outcome) is not case.error:
+                found.append(f"expected {case.error.__name__}, got {run.outcome!r}")
+    if isinstance(expected.outcome, Exception) or isinstance(actual.outcome, Exception):
+        same_error = type(actual.outcome) is type(expected.outcome) and str(actual.outcome) == str(
+            expected.outcome
+        )
+        if not same_error:
+            found.append(f"outcome {actual.outcome!r} != {expected.outcome!r}")
+    elif actual.outcome != expected.outcome:
+        found.append(f"outcome {actual.outcome!r} != {expected.outcome!r}")
+    if case.raises_late:
+        if not expected.requests <= actual.requests:
+            found.append(f"requests {dict(actual.requests)} miss {dict(expected.requests)}")
+    elif actual.requests != expected.requests:
+        found.append(f"requests {dict(actual.requests)} != {dict(expected.requests)}")
+    for run in (expected, actual):
+        if sum(run.requests.values()) != run.reached:
+            found.append(f"{run.reached} call sites but {sum(run.requests.values())} requests")
+        if run.early:
+            found.append(f"sent before the program reached them: {run.early}")
+    if case.raises_late and isinstance(expected.effects, list):
+        assert isinstance(actual.effects, list)
+        if actual.effects[: len(expected.effects)] != expected.effects:
+            found.append(f"side effects {actual.effects!r} do not extend {expected.effects!r}")
+    elif actual.effects != expected.effects:
+        found.append(f"side effects {actual.effects!r} != {expected.effects!r}")
+    return found
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+@pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
+def test_jit_matches_plain(case: Case, backend: Backend) -> None:
+    plain_run = execute(case, plain, SEMANTIC_LATENCY_S, backend=backend)
+    jit_run = execute(case, xcs.jit, SEMANTIC_LATENCY_S, backend=backend)
+    assert divergences(case, plain_run, jit_run) == []
+
+
+OVERLAP_CASES = [pytest.param(case, id=case.name) for case in CASES if case.independent]
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("backend", BACKENDS)
+@pytest.mark.parametrize("case", OVERLAP_CASES)
+def test_jit_overlaps_independent_calls(case: Case, backend: Backend) -> None:
+    # Counted, not timed: under jit every independent request is being answered
+    # at once, however slow the machine.
+    jit_run = execute(case, xcs.jit, OVERLAP_LATENCY_S, backend=backend)
+    assert jit_run.peak_in_flight == case.independent
+
+
+def test_programs_live_in_unremarkable_modules() -> None:
+    for module in (orchard, fakemodel, clientmodel):
+        assert not module.__name__.startswith(("ember", "test", "__main__")), module.__name__
+
+
+def replaying(program: Program) -> Program:
+    """v0.1's cache hit: a later call with equal arguments reuses the first result."""
+    results: dict[str, object] = {}
+
+    def replay(model: fakemodel.FakeModel, *args: object, **kwargs: object) -> object:
+        key = repr((args, sorted(kwargs.items())))
+        if key not in results:
+            results[key] = program(model, *args, **kwargs)
+        return results[key]
+
+    return replay
+
+
+def running_twice(program: Program) -> Program:
+    """v0.1's cache hit in a user module: every recorded call ran twice."""
+
+    def twice(*args: object, **kwargs: object) -> object:
+        program(*args, **kwargs)
+        return program(*args, **kwargs)
+
+    return twice
+
+
+class ExecutionError(Exception):
+    """Stands in for v0.1's XCSExecutionError."""
+
+
+def wrapping_errors(program: Program) -> Program:
+    """v0.1 replay: a failure surfaced as a wrapper type."""
+
+    def wrapped(*args: object, **kwargs: object) -> object:
+        try:
+            return program(*args, **kwargs)
+        except Exception as error:
+            raise ExecutionError(str(error)) from error
+
+    return wrapped
+
+
+MUTANTS = [
+    (replaying, {"persona_from_global", "fanout_from_global", "session_object", "accumulate"}),
+    (running_twice, {"four_questions", "countdown", "nested_fanout", "tally"}),
+    (wrapping_errors, {"pair_failure", "strict_all"}),
+]
+
+
+@pytest.mark.parametrize(
+    ("mutant", "must_catch"), MUTANTS, ids=["replaying", "running_twice", "wrapping_errors"]
+)
+def test_oracle_rejects_v01_behaviours(mutant: Transform, must_catch: set[str]) -> None:
+    caught = set()
+    for case in CASES:
+        if case.name in must_catch:
+            plain_run = execute(case, plain, SEMANTIC_LATENCY_S)
+            mutant_run = execute(case, mutant, SEMANTIC_LATENCY_S)
+            if divergences(case, plain_run, mutant_run):
+                caught.add(case.name)
+    assert caught == must_catch
+
+
+FAIL_THEN_CONTINUE = Case(
+    "fail_then_continue", call(orchard.fail_then_continue, "x"), error=ModelError, raises_late=True
+)
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+@pytest.mark.parametrize("transform", [plain, xcs.jit], ids=["plain", "jit"])
+def test_failure_raises_at_the_same_place_however_fast_it_arrives(
+    transform: Transform, backend: Backend
+) -> None:
+    instant = execute(
+        FAIL_THEN_CONTINUE, transform, 0.0, backend=backend, arrives_before_return=True
+    )
+    delayed = execute(FAIL_THEN_CONTINUE, transform, 0.05, backend=backend)
+    same_place = dataclasses.replace(FAIL_THEN_CONTINUE, raises_late=False)
+    assert divergences(same_place, instant, delayed) == []
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_failure_raises_at_the_call_outside_jit_and_at_the_read_inside(backend: Backend) -> None:
+    plain_run = execute(FAIL_THEN_CONTINUE, plain, 0.0, backend=backend, arrives_before_return=True)
+    jit_run = execute(FAIL_THEN_CONTINUE, xcs.jit, 0.0, backend=backend, arrives_before_return=True)
+    assert plain_run.effects == [("before",)]
+    assert jit_run.effects == [("before",), ("after the failing call",), ("after the next call",)]
+    assert divergences(FAIL_THEN_CONTINUE, plain_run, jit_run) == []
