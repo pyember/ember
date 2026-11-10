@@ -115,18 +115,25 @@ def test_an_item_stopped_by_an_interrupt_still_has_its_requests_waited_for() -> 
 
 def test_other_items_stay_held_while_a_stopped_item_waits_in_its_finally() -> None:
     log: list[str] = []
+    cleaning_up = threading.Event()
+
+    def after_cleanup_starts() -> None:
+        cleaning_up.wait(5.0)
 
     def item(i: int) -> None:
         if i == 0:
             try:
-                call(0.5)
+                call(1.0)
             finally:
+                cleaning_up.set()
                 log.append(f"item 0 cleanup read {call(0.2)}")
         elif i == 1:
             call(0.05)
             raise KeyboardInterrupt
         else:
-            call(0.1)
+            # Its result arrives only once item 0 is cleaning up, so after the
+            # interrupt on every machine, however slowly the others' calls return.
+            runtime.wait(runtime.dispatch(after_cleanup_starts, label="m"))
             log.append("item 2 continued past its wait")
             runtime.dispatch(lambda: log.append("item 2 sent a request"), label="late")
             call(1.0)
