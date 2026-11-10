@@ -150,7 +150,13 @@ def test_a_limiter_using_the_queue_grants_slots_by_predicted_remaining_path() ->
 
 
 @pytest.mark.slow
-def test_planning_shortens_the_makespan_under_a_capacity_limit() -> None:
+def test_planning_starts_the_critical_path_first_under_a_capacity_limit() -> None:
+    # Eight single calls and one chain of four dependent calls share two slots.
+    # Without a plan the chain's first call waits behind every single; with the
+    # plan from the first run, it takes the first slot that frees. The order is
+    # the scheduler's decision, read from the recorded graph, so a slow machine
+    # cannot change it. The latency only has to keep one single shorter than the
+    # whole chain in the first run's measurements.
     latency_s = 0.15
     call = limited_call(2, lambda _: latency_s)
     singles, chain = 8, 4
@@ -167,16 +173,14 @@ def test_planning_shortens_the_makespan_under_a_capacity_limit() -> None:
     def program() -> list[str]:
         return xcs.map(item, range(singles + 1))
 
-    makespans = []
-    for _ in range(2):
-        started = time.perf_counter()
-        program()
-        makespans.append(time.perf_counter() - started)
-    unplanned, planned = makespans
-    # FIFO runs the four rounds of singles first and the chain after: 8 rounds.
-    # With the plan the chain starts in round 2. The lower bound is 6 rounds,
-    # but the client frees a permit inside the task, before the chain's next
-    # request can queue, so a slot freed by a link may go to a single first:
-    # the worst case is 7 rounds. Half a round of margin absorbs timer noise.
-    assert unplanned >= 8 * latency_s
-    assert planned <= unplanned - 0.5 * latency_s, f"{unplanned=:.3f}s {planned=:.3f}s"
+    def calls_before_the_chain() -> int:
+        graph = program.graph()
+        assert graph is not None
+        second_link = next(node for node in graph.nodes if node.deps)
+        [first_link] = second_link.deps
+        return first_link  # A node's id is its position in dispatch order.
+
+    program()
+    assert calls_before_the_chain() == singles
+    program()
+    assert calls_before_the_chain() == 2
